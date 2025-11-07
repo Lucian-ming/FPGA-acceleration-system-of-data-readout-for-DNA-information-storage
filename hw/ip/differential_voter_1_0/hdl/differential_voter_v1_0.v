@@ -1,0 +1,922 @@
+// ================================================================
+// File   : differential_voter_v1_0_fixed_final.v
+// Desc   : Voter(第二个IP核) -- BRAM推断 + DONE语义修正 + ARADDR时序稳固 + 末拍WSTRB硬件推导
+//
+// Key Fixes:
+//   1) BRAM: UG901 模板（读地址打一拍 + 同步读），(* ram_style="block" *)
+//   2) DONE: 进入 S_DONE 即置位；在 START / DONE_CLR 时清零
+//   3) AXI-Read: ARVALID 标准脉冲握手；ARADDR 用寄存器锁存
+//   4) WSTRB: 由 TOTAL_BITS 硬件推导末拍掩码，不依赖软件 out_beats
+//   5) RREADY: 在 S_READ_SETUP 与 S_READ_DATA 均为 1，避免 DDR 读超时
+//   6) 调试增强：采样并暴露 last_rresp 到 AXI-Lite 0x0E
+//
+// Date  : 2025-11-04
+// ================================================================
+
+`timescale 1 ns / 1 ps
+
+module differential_voter_v1_0 #
+(
+    parameter integer C_S00_AXI_DATA_WIDTH = 32,
+    parameter integer C_S00_AXI_ADDR_WIDTH = 7,
+    parameter integer C_M00_AXI_DATA_WIDTH = 64,
+    parameter integer C_M00_AXI_ADDR_WIDTH = 32,
+    parameter integer MAX_BURST_LEN        = 16,
+    parameter integer TOTAL_BITS           = 81000,
+    parameter integer CODEWORD_BITS        = 300,
+    parameter integer UPPER_LAYER_BITS     = 150,
+    parameter integer LAYER_SIZE           = 40500,
+    parameter integer FAST_INIT            = 0
+)
+(
+    // AXI-Lite
+    input  wire                               S00_AXI_ACLK,
+    input  wire                               S00_AXI_ARESETN,
+    input  wire [C_S00_AXI_ADDR_WIDTH-1:0]    S00_AXI_AWADDR,
+    input  wire                               S00_AXI_AWVALID,
+    output wire                               S00_AXI_AWREADY,
+    input  wire [C_S00_AXI_DATA_WIDTH-1:0]    S00_AXI_WDATA,
+    input  wire [C_S00_AXI_DATA_WIDTH/8-1:0]  S00_AXI_WSTRB,
+    input  wire                               S00_AXI_WVALID,
+    output wire                               S00_AXI_WREADY,
+    output wire [1:0]                         S00_AXI_BRESP,
+    output wire                               S00_AXI_BVALID,
+    input  wire                               S00_AXI_BREADY,
+    input  wire [C_S00_AXI_ADDR_WIDTH-1:0]    S00_AXI_ARADDR,
+    input  wire                               S00_AXI_ARVALID,
+    output wire                               S00_AXI_ARREADY,
+    output wire [C_S00_AXI_DATA_WIDTH-1:0]    S00_AXI_RDATA,
+    output wire [1:0]                         S00_AXI_RRESP,
+    output wire                               S00_AXI_RVALID,
+    input  wire                               S00_AXI_RREADY,
+
+    // AXI-Full master
+    input  wire                               M00_AXI_ACLK,
+    input  wire                               M00_AXI_ARESETN,
+
+    // Read address
+    output wire [C_M00_AXI_ADDR_WIDTH-1:0]    M00_AXI_ARADDR,
+    output wire [7:0]                         M00_AXI_ARLEN,
+    output wire [2:0]                         M00_AXI_ARSIZE,
+    output wire [1:0]                         M00_AXI_ARBURST,
+    output wire                               M00_AXI_ARLOCK,
+    output wire [3:0]                         M00_AXI_ARCACHE,
+    output wire [2:0]                         M00_AXI_ARPROT,
+    output wire [3:0]                         M00_AXI_ARQOS,
+    output reg                                M00_AXI_ARVALID,
+    input  wire                               M00_AXI_ARREADY,
+    input  wire [C_M00_AXI_DATA_WIDTH-1:0]    M00_AXI_RDATA,
+    input  wire [1:0]                         M00_AXI_RRESP,
+    input  wire                               M00_AXI_RLAST,
+    input  wire                               M00_AXI_RVALID,
+    output wire                               M00_AXI_RREADY,
+
+    // Write address/data
+    output reg  [C_M00_AXI_ADDR_WIDTH-1:0]    M00_AXI_AWADDR,
+    output reg  [7:0]                         M00_AXI_AWLEN,
+    output wire [2:0]                         M00_AXI_AWSIZE,
+    output wire [1:0]                         M00_AXI_AWBURST,
+    output wire                               M00_AXI_AWLOCK,
+    output wire [3:0]                         M00_AXI_AWCACHE,
+    output wire [2:0]                         M00_AXI_AWPROT,
+    output wire [3:0]                         M00_AXI_AWQOS,
+    output reg                                M00_AXI_AWVALID,
+    input  wire                               M00_AXI_AWREADY,
+    output wire [C_M00_AXI_DATA_WIDTH-1:0]    M00_AXI_WDATA,
+    output wire [C_M00_AXI_DATA_WIDTH/8-1:0]  M00_AXI_WSTRB,
+    output reg                                M00_AXI_WLAST,
+    output reg                                M00_AXI_WVALID,
+    input  wire                               M00_AXI_WREADY,
+    input  wire [1:0]                         M00_AXI_BRESP,
+    input  wire                               M00_AXI_BVALID,
+    output wire                               M00_AXI_BREADY
+);
+
+    // ----------------- 常量/辅助 -----------------
+    localparam integer WORDS_PER_READ   = 6; // 6 x 64b
+    localparam integer TOTAL_BEATS_HW   = (TOTAL_BITS + 63) / 64; // 硬件应写拍数
+    localparam        TIMEOUT_CYCLES    = 32'd100000000;
+
+    // ----------------- AXI-Lite 映射 -----------------
+    wire [31:0] in_addr_s, out_addr_s, in_beats_s, out_beats_s;
+    wire [31:0] total_reads_cfg_s;
+    wire        start_pulse_s, done_clr_s;
+    reg         done_s, idle_s, error_s;
+
+    // 调试寄存器
+    reg [31:0] debug_state_count;
+    reg [31:0] debug_pack_count;
+    reg [31:0] debug_setup_count;
+    reg [31:0] debug_write_count;
+    reg [31:0] debug_first_write_addr;
+
+    reg        axi_bresp_error;
+
+    // >>> 新增：读通道最后一次 RRESP 采样（[1:0]）
+    reg [1:0]  last_rresp;
+
+    axi_slave_voter u_axil (
+        .S_AXI_ACLK    (S00_AXI_ACLK),
+        .S_AXI_ARESETN (S00_AXI_ARESETN),
+        .S_AXI_AWADDR  (S00_AXI_AWADDR),
+        .S_AXI_AWVALID (S00_AXI_AWVALID),
+        .S_AXI_AWREADY (S00_AXI_AWREADY),
+        .S_AXI_WDATA   (S00_AXI_WDATA),
+        .S_AXI_WSTRB   (S00_AXI_WSTRB),
+        .S_AXI_WVALID  (S00_AXI_WVALID),
+        .S_AXI_WREADY  (S00_AXI_WREADY),
+        .S_AXI_BRESP   (S00_AXI_BRESP),
+        .S_AXI_BVALID  (S00_AXI_BVALID),
+        .S_AXI_BREADY  (S00_AXI_BREADY),
+        .S_AXI_ARADDR  (S00_AXI_ARADDR),
+        .S_AXI_ARVALID (S00_AXI_ARVALID),
+        .S_AXI_ARREADY (S00_AXI_ARREADY),
+        .S_AXI_RDATA   (S00_AXI_RDATA),
+        .S_AXI_RRESP   (S00_AXI_RRESP),
+        .S_AXI_RVALID  (S00_AXI_RVALID),
+        .S_AXI_RREADY  (S00_AXI_RREADY),
+
+        .in_addr       (in_addr_s),
+        .in_beats      (in_beats_s),
+        .out_addr      (out_addr_s),
+        .out_beats     (out_beats_s),
+        .total_reads_cfg(total_reads_cfg_s),
+        .start_pulse   (start_pulse_s),
+        .done_clr      (done_clr_s),
+
+        .done          (done_s),
+        .idle          (idle_s),
+        .error_flag    (error_s),
+        .bresp_err_flag(axi_bresp_error),
+
+        .debug_state_count     (debug_state_count),
+        .debug_pack_count      (debug_pack_count),
+        .debug_setup_count     (debug_setup_count),
+        .debug_write_count     (debug_write_count),
+        .debug_first_write_addr(debug_first_write_addr),
+
+        // >>> 新增映射：RRESP 只读视图
+        .last_rresp            (last_rresp)
+    );
+
+    // ----------------- 跨时钟域同步到 M00_AXI_ACLK -----------------
+    reg [31:0] in_addr, out_addr, in_beats, out_beats, total_reads_cfg;
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            in_addr         <= 32'd0;
+            out_addr        <= 32'd0;
+            in_beats        <= 32'd0;
+            out_beats       <= 32'd0;
+            total_reads_cfg <= 32'd0;
+        end else begin
+            in_addr         <= in_addr_s;
+            out_addr        <= out_addr_s;
+            in_beats        <= in_beats_s;
+            out_beats       <= out_beats_s;
+            total_reads_cfg <= total_reads_cfg_s;
+        end
+    end
+
+    // START 单脉冲 CDC
+    reg [2:0] start_sync_reg;
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN)
+            start_sync_reg <= 3'b000;
+        else
+            start_sync_reg <= {start_pulse_s, start_sync_reg[2:1]};
+    end
+    wire start_latched_pulse = start_sync_reg[1] & ~start_sync_reg[0];
+
+    // ----------------- 主状态机 -----------------
+    localparam [4:0]
+        S_IDLE            = 5'd0,
+        S_INIT_BRAM       = 5'd1,
+        S_READ_SETUP      = 5'd2,
+        S_READ_DATA       = 5'd3,
+        S_PARSE_READ      = 5'd4,
+        S_CALC_ADDR       = 5'd5,
+        S_VOTE_READ       = 5'd6,
+        S_VOTE_UPDATE     = 5'd7,
+        S_NEXT_READ       = 5'd8,
+        S_OUTPUT_PREFETCH = 5'd9,
+        S_OUTPUT_ADDR     = 5'd10,
+        S_OUTPUT_PACK     = 5'd11,
+        S_OUTPUT_SETUP    = 5'd12,
+        S_OUTPUT_WRITE    = 5'd13,
+        S_WAIT_BRESP      = 5'd14,
+        S_DONE            = 5'd15,
+        S_ERROR           = 5'd16;
+
+    reg [4:0] state, next_state;
+
+    // ----------------- 数据路径寄存器 -----------------
+    reg [63:0] read_words [0:5];
+    reg [2:0]  read_beat_count;
+
+    reg [299:0] current_codeword;
+    reg [9:0]   current_score;
+    reg [15:0]  current_position;
+
+    reg [8:0]   bit_in_codeword;
+
+    reg [16:0]  bram_addr;        // 读/写地址
+    reg  signed [9:0] bram_din;
+    reg               bram_we;
+
+    // BRAM 实体 + 同步读寄存器
+    (* ram_style = "block" *) reg [9:0] bram [0:TOTAL_BITS-1];
+    reg [16:0] bram_raddr_q;
+    reg [9:0]  bram_dout;
+    reg [9:0]  bram_dout_r;
+
+    reg  signed [9:0] accumulated_vote;
+
+    wire [9:0]  parse_score    = read_words[0][9:0];
+    wire [15:0] parse_position = read_words[0][25:10];
+
+    reg [16:0] pre_calc_addr;
+    reg        pre_calc_is_upper;
+    reg [8:0]  pre_calc_bit_idx;
+
+    reg [16:0] init_addr;          // 17位，足够覆盖 81000
+    reg [31:0] read_count;
+    reg [31:0] total_reads;
+
+    reg [31:0] read_addr;
+    reg [31:0] read_addr_reg;      // ARADDR 锁存
+
+    // 输出打包
+    reg [16:0] output_bit_count;
+    reg [63:0] output_word;
+    reg [5:0]  bit_in_output;
+
+    reg [31:0] write_addr;
+    reg [31:0] total_write_count;
+    reg [31:0] remaining_beats;    // 仅供调试，WSTRB 不再依赖此值
+
+    reg        pack_trigger;
+    reg        pack_pending;
+    reg        output_addr_wait;
+    reg        first_write_captured;
+
+    // ----------------- 位置/安全函数 -----------------
+    function [16:0] calc_layer_position;
+        input [8:0]  bit_idx;
+        input [15:0] position;
+        begin
+            if (bit_idx < UPPER_LAYER_BITS)
+                calc_layer_position = bit_idx + position;
+            else
+                calc_layer_position = (bit_idx - UPPER_LAYER_BITS) + position + LAYER_SIZE;
+        end
+    endfunction
+
+    function [16:0] safe_address;
+        input [16:0] addr;
+        begin
+            if (addr >= TOTAL_BITS) safe_address = TOTAL_BITS - 1;
+            else                    safe_address = addr;
+        end
+    endfunction
+
+    function signed [9:0] safe_vote_value;
+        input signed [9:0] vote;
+        begin
+            if (vote > 10'sd511)       safe_vote_value = 10'sd511;
+            else if (vote < -10'sd512) safe_vote_value = -10'sd512;
+            else                       safe_vote_value = vote;
+        end
+    endfunction
+
+    // ----------------- 条件/超时 -----------------
+    wire init_complete        = (FAST_INIT) ? (init_addr >= 17'd63) : (init_addr >= (TOTAL_BITS - 1));
+    wire read_setup_complete  = 1'b1;
+    wire read_data_complete   = (read_beat_count >= 3'd6) && M00_AXI_RVALID;
+    wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
+
+    reg [31:0] state_timeout_counter;
+
+    // ----------------- BRAM 同步读写（UG901 模板） -----------------
+    always @(posedge M00_AXI_ACLK) begin
+        if (bram_we)
+            bram[bram_addr] <= bram_din;     // 写
+        bram_raddr_q <= bram_addr;           // 读地址打一拍
+        bram_dout    <= bram[bram_raddr_q];  // 同步读
+    end
+
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) bram_dout_r <= 10'd0;
+        else                  bram_dout_r <= bram_dout;
+    end
+
+    // ----------------- 状态寄存 & 超时计数 -----------------
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) state <= S_IDLE;
+        else                  state <= next_state;
+    end
+
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) state_timeout_counter <= 32'd0;
+        else if (state == S_IDLE) state_timeout_counter <= 32'd0;
+        else if (state_timeout_counter < TIMEOUT_CYCLES) state_timeout_counter <= state_timeout_counter + 1;
+    end
+
+    // ----------------- 数据路径（时序） -----------------
+    reg bram_initialized;
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            bram_initialized    <= 1'b0;
+
+            init_addr           <= 17'd0;
+            read_count          <= 32'd0;
+            read_beat_count     <= 3'd0;
+            bit_in_codeword     <= 9'd0;
+
+            bram_addr           <= 17'd0;
+            bram_din            <= 10'sd0;
+            bram_we             <= 1'b0;
+            accumulated_vote    <= 10'sd0;
+
+            output_bit_count    <= 17'd0;
+            output_word         <= 64'd0;
+            bit_in_output       <= 6'd0;
+
+            write_addr          <= 32'd0;
+            total_write_count   <= 32'd0;
+            remaining_beats     <= 32'd0;
+
+            pack_trigger        <= 1'b0;
+            pack_pending        <= 1'b0;
+            output_addr_wait    <= 1'b0;
+            first_write_captured<= 1'b0;
+
+            current_codeword    <= 300'd0;
+            current_score       <= 10'd0;
+            current_position    <= 16'd0;
+
+            pre_calc_addr       <= 17'd0;
+            pre_calc_is_upper   <= 1'b0;
+            pre_calc_bit_idx    <= 9'd0;
+
+            debug_state_count   <= 32'd0;
+            debug_pack_count    <= 32'd0;
+            debug_setup_count   <= 32'd0;
+            debug_write_count   <= 32'd0;
+            debug_first_write_addr <= 32'd0;
+
+            read_addr_reg       <= 32'd0;
+            read_addr           <= 32'd0;
+            total_reads         <= 32'd0;
+
+            // >>> 新增复位
+            last_rresp          <= 2'b00;
+        end else begin
+            bram_we      <= 1'b0;
+            pack_trigger <= 1'b0;
+
+            if (state == S_OUTPUT_PACK)  debug_pack_count  <= debug_pack_count + 1;
+            if (state == S_OUTPUT_SETUP) debug_setup_count <= debug_setup_count + 1;
+            if (state == S_OUTPUT_WRITE && M00_AXI_WVALID && M00_AXI_WREADY) begin
+                debug_write_count <= debug_write_count + 1;
+                if (!first_write_captured) begin
+                    debug_first_write_addr <= write_addr;
+                    first_write_captured   <= 1'b1;
+                end
+            end
+
+            case (state)
+                S_IDLE: begin
+                    if (start_latched_pulse) begin
+                        read_count        <= 32'd0;
+                        total_reads       <= total_reads_cfg;
+                        read_addr         <= in_addr;
+
+                        output_bit_count  <= 17'd0;
+                        output_word       <= 64'd0;
+                        bit_in_output     <= 6'd0;
+                        write_addr        <= out_addr;
+                        remaining_beats   <= out_beats;
+                        total_write_count <= 32'd0;
+
+                        pack_pending      <= 1'b0;
+                        output_addr_wait  <= 1'b0;
+
+                        first_write_captured <= 1'b0;
+                        debug_state_count    <= state;
+                        debug_pack_count     <= 32'd0;
+                        debug_setup_count    <= 32'd0;
+                        debug_write_count    <= 32'd0;
+                    end
+                end
+
+                S_INIT_BRAM: begin
+                    if ((FAST_INIT && init_addr <= 17'd63) || (!FAST_INIT && init_addr <= (TOTAL_BITS - 1))) begin
+                        bram_addr <= init_addr;
+                        bram_din  <= 10'sd0;
+                        bram_we   <= 1'b1;
+                        init_addr <= init_addr + 1;
+                    end
+                    if (init_complete) bram_initialized <= 1'b1;
+                    debug_state_count <= state;
+                end
+
+                S_READ_SETUP: begin
+                    read_addr_reg   <= read_addr; // 锁存AR地址
+                    read_beat_count <= 3'd0;
+                    debug_state_count <= state;
+                end
+
+                S_READ_DATA: begin
+                    if (M00_AXI_RVALID && M00_AXI_RREADY) begin
+                        read_words[read_beat_count] <= M00_AXI_RDATA;
+                        read_beat_count <= read_beat_count + 1;
+                        // >>> 新增：采样 RRESP（只在握手成功时）
+                        last_rresp <= M00_AXI_RRESP;
+                    end
+                    debug_state_count <= state;
+                end
+
+                S_PARSE_READ: begin
+                    current_score               <= parse_score;
+                    current_position            <= parse_position;
+
+                    current_codeword[37:0]     <= read_words[0][63:26];
+                    current_codeword[101:38]   <= read_words[1][63:0];
+                    current_codeword[165:102]  <= read_words[2][63:0];
+                    current_codeword[229:166]  <= read_words[3][63:0];
+                    current_codeword[293:230]  <= read_words[4][63:0];
+                    current_codeword[299:294]  <= read_words[5][5:0];
+
+                    bit_in_codeword <= 9'd0;
+
+                    pre_calc_addr     <= safe_address(calc_layer_position(9'd0, parse_position));
+                    pre_calc_is_upper <= (9'd0 < UPPER_LAYER_BITS);
+                    pre_calc_bit_idx  <= 9'd0;
+                    debug_state_count <= state;
+                end
+
+                S_CALC_ADDR: begin
+                    bram_addr <= pre_calc_addr;
+                    if (bit_in_codeword < CODEWORD_BITS - 1) begin
+                        pre_calc_addr     <= safe_address(calc_layer_position(bit_in_codeword + 1, current_position));
+                        pre_calc_is_upper <= ((bit_in_codeword + 1) < UPPER_LAYER_BITS);
+                        pre_calc_bit_idx  <= bit_in_codeword + 1;
+                    end
+                    debug_state_count <= state;
+                end
+
+                S_VOTE_READ: begin
+                    // bram_dout_r 在上拍已对齐
+                    debug_state_count <= state;
+                end
+
+                S_VOTE_UPDATE: begin
+                    if (current_codeword[bit_in_codeword]) begin
+                        accumulated_vote <= bram_dout_r + 10'sd1;
+                        bram_din         <= safe_vote_value(bram_dout_r + 10'sd1);
+                    end else begin
+                        accumulated_vote <= bram_dout_r - 10'sd1;
+                        bram_din         <= safe_vote_value(bram_dout_r - 10'sd1);
+                    end
+                    bram_we <= 1'b1;
+
+                    if (bit_in_codeword < CODEWORD_BITS - 1)
+                        bit_in_codeword <= bit_in_codeword + 1;
+
+                    debug_state_count <= state;
+                end
+
+                S_NEXT_READ: begin
+                    if (read_count < total_reads - 1) begin
+                        read_count <= read_count + 1;
+                        read_addr  <= read_addr + (WORDS_PER_READ * 8);
+                    end
+                    debug_state_count <= state;
+                end
+
+                S_OUTPUT_PREFETCH: begin
+                    bram_addr <= 17'd0;
+                    debug_state_count <= state;
+                end
+
+                S_OUTPUT_ADDR: begin
+                    if (!output_addr_wait) begin
+                        if (output_bit_count < TOTAL_BITS)
+                            bram_addr <= output_bit_count;
+                        output_addr_wait <= 1'b1;   // 等一拍对齐 bram_dout_r
+                    end else begin
+                        output_addr_wait <= 1'b0;
+                    end
+                    debug_state_count <= state;
+                end
+
+                S_OUTPUT_PACK: begin
+                    debug_state_count <= state;
+                    if (output_bit_count < TOTAL_BITS) begin
+                        output_word[bit_in_output] <= (bram_dout_r > 10'sd0);
+
+                        if (bit_in_output == 6'd63) begin
+                            pack_trigger  <= 1'b1;   // 满 64b
+                            pack_pending  <= 1'b1;
+                            bit_in_output <= 6'd0;
+                        end else if (output_bit_count == TOTAL_BITS - 1) begin
+                            pack_trigger  <= 1'b1;   // 尾包 <64b
+                            pack_pending  <= 1'b1;
+                            bit_in_output <= 6'd0;
+                        end else begin
+                            bit_in_output <= bit_in_output + 6'd1;
+                        end
+
+                        output_bit_count <= output_bit_count + 17'd1;
+                    end
+                end
+
+                S_OUTPUT_SETUP: begin
+                    debug_state_count <= state;
+                end
+
+                S_OUTPUT_WRITE: begin
+                    debug_state_count <= state;
+                    if (M00_AXI_WVALID && M00_AXI_WREADY) begin
+                        total_write_count <= total_write_count + 1;
+                        write_addr        <= write_addr + 32'd8;
+                        if (remaining_beats != 0)
+                            remaining_beats <= remaining_beats - 32'd1;
+                    end
+                end
+
+                S_WAIT_BRESP: begin
+                    if (M00_AXI_BVALID && M00_AXI_BRESP == 2'b00) begin
+                        pack_pending  <= 1'b0;     // 本拍写清空待写
+                        output_word   <= 64'd0;
+                        bit_in_output <= 6'd0;
+                    end
+                    debug_state_count <= state;
+                end
+
+                S_DONE:  debug_state_count <= state;
+                S_ERROR: begin
+                    // 出错也清理待写，避免残留
+                    pack_pending  <= 1'b0;
+                    output_word   <= 64'd0;
+                    bit_in_output <= 6'd0;
+                    debug_state_count <= state;
+                end
+
+                default: ;
+            endcase
+        end
+    end
+
+    // ----------------- 状态转移 -----------------
+    always @(*) begin
+        next_state = state;
+
+        if (state_timeout_counter >= TIMEOUT_CYCLES) begin
+            next_state = S_ERROR;
+        end else begin
+            case (state)
+                S_IDLE:            next_state = start_latched_pulse ? (bram_initialized ? S_READ_SETUP : S_INIT_BRAM) : S_IDLE;
+                S_INIT_BRAM:       next_state = init_complete ? S_READ_SETUP : S_INIT_BRAM;
+                S_READ_SETUP:      next_state = read_setup_complete ? S_READ_DATA  : S_READ_SETUP;
+                S_READ_DATA:       next_state = read_data_complete  ? S_PARSE_READ : S_READ_DATA;
+                S_PARSE_READ:      next_state = S_CALC_ADDR;
+                S_CALC_ADDR:       next_state = S_VOTE_READ;
+                S_VOTE_READ:       next_state = S_VOTE_UPDATE;
+                S_VOTE_UPDATE:     next_state = vote_update_complete ? S_NEXT_READ : S_CALC_ADDR;
+                S_NEXT_READ:       next_state = (read_count >= total_reads - 1) ? S_OUTPUT_PREFETCH : S_READ_SETUP;
+                S_OUTPUT_PREFETCH: next_state = S_OUTPUT_ADDR;
+
+                S_OUTPUT_ADDR: begin
+                    next_state = output_addr_wait ? S_OUTPUT_PACK : S_OUTPUT_ADDR;
+                end
+
+                S_OUTPUT_PACK: begin
+                    if (pack_pending)                       next_state = S_OUTPUT_SETUP; // 有包就发
+                    else if (output_bit_count >= TOTAL_BITS) next_state = S_DONE;         // 全部位处理完且无待写
+                    else                                     next_state = S_OUTPUT_ADDR;
+                end
+
+                S_OUTPUT_SETUP: begin
+                    if (M00_AXI_AWVALID && M00_AXI_AWREADY) next_state = S_OUTPUT_WRITE;
+                    else                                     next_state = S_OUTPUT_SETUP;
+                end
+
+                S_OUTPUT_WRITE: begin
+                    if (M00_AXI_WVALID && M00_AXI_WREADY) next_state = S_WAIT_BRESP;
+                    else                                  next_state = S_OUTPUT_WRITE;
+                end
+
+                S_WAIT_BRESP: begin
+                    if (M00_AXI_BVALID) begin
+                        if (M00_AXI_BRESP != 2'b00)                      next_state = S_ERROR;
+                        else if (output_bit_count >= TOTAL_BITS && !pack_pending) next_state = S_DONE; // 写完最后一拍
+                        else                                              next_state = S_OUTPUT_ADDR;
+                    end else next_state = S_WAIT_BRESP;
+                end
+
+                // >>> 与修复方案一致：S_ERROR 必须退出
+                S_DONE:  next_state = S_IDLE;
+                S_ERROR: next_state = S_IDLE;
+                default: next_state = S_IDLE;
+            endcase
+        end
+    end
+
+    // ----------------- AXI Read Channel -----------------
+    // ARVALID：在 S_READ_SETUP 拉高一次，ARREADY 接受后拉低（不依赖 next_state）
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            M00_AXI_ARVALID <= 1'b0;
+        end else begin
+            if (state == S_READ_SETUP && !M00_AXI_ARVALID)
+                M00_AXI_ARVALID <= 1'b1;
+            else if (M00_AXI_ARREADY)
+                M00_AXI_ARVALID <= 1'b0;
+        end
+    end
+
+    assign M00_AXI_ARADDR  = read_addr_reg; // 地址已在 S_READ_SETUP 锁存
+    assign M00_AXI_ARLEN   = 8'd5;          // 6 个 64b 拍
+    assign M00_AXI_ARSIZE  = 3'b011;        // 8B
+    assign M00_AXI_ARBURST = 2'b01;         // INCR
+    assign M00_AXI_ARLOCK  = 1'b0;
+    assign M00_AXI_ARCACHE = 4'b0011;
+    assign M00_AXI_ARPROT  = 3'b000;
+    assign M00_AXI_ARQOS   = 4'b0000;
+
+    // >>> 关键修复：RREADY must be high during AR handshake to avoid DDR timeout
+    // 原：assign M00_AXI_RREADY = (state == S_READ_DATA);
+    // 现：
+    assign M00_AXI_RREADY  = (state == S_READ_DATA) || (state == S_READ_SETUP);
+
+    // ----------------- AXI Write Channel -----------------
+    assign M00_AXI_AWSIZE  = 3'b011;
+    assign M00_AXI_AWBURST = 2'b01;
+    assign M00_AXI_AWLOCK  = 1'b0;
+    assign M00_AXI_AWCACHE = 4'b0011;
+    assign M00_AXI_AWPROT  = 3'b000;
+    assign M00_AXI_AWQOS   = 4'b0000;
+
+    // AW
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            M00_AXI_AWVALID <= 1'b0;
+            M00_AXI_AWADDR  <= 32'd0;
+            M00_AXI_AWLEN   <= 8'd0; // 单拍
+        end else begin
+            if (state == S_OUTPUT_SETUP && pack_pending) begin
+                if (!M00_AXI_AWVALID) begin
+                    M00_AXI_AWADDR  <= write_addr;
+                    M00_AXI_AWLEN   <= 8'd0;
+                    M00_AXI_AWVALID <= 1'b1;
+                end else if (M00_AXI_AWREADY) begin
+                    M00_AXI_AWVALID <= 1'b0;
+                end
+            end else begin
+                M00_AXI_AWVALID <= 1'b0;
+            end
+        end
+    end
+
+    // 硬件推导末拍 WSTRB 掩码
+    wire [5:0] last_bits  = TOTAL_BITS[5:0];                                // TOTAL_BITS % 64
+    wire [3:0] last_bytes = (last_bits == 0) ? 4'd8 : ((last_bits + 6'd7) >> 3);
+    wire [7:0] last_mask  = (last_bytes == 8) ? 8'hFF : ((8'h01 << last_bytes) - 1);
+    wire       is_last_hw_beat_now = (state == S_OUTPUT_WRITE) && (total_write_count == (TOTAL_BEATS_HW - 1));
+
+    assign M00_AXI_WDATA = output_word;
+    assign M00_AXI_WSTRB = is_last_hw_beat_now ? last_mask : 8'hFF;
+
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            M00_AXI_WVALID <= 1'b0;
+            M00_AXI_WLAST  <= 1'b0;
+        end else begin
+            if (state == S_OUTPUT_WRITE && pack_pending) begin
+                if (!M00_AXI_WVALID) begin
+                    M00_AXI_WVALID <= 1'b1;
+                    M00_AXI_WLAST  <= 1'b1; // 单拍
+                end else if (M00_AXI_WREADY) begin
+                    M00_AXI_WVALID <= 1'b0;
+                    M00_AXI_WLAST  <= 1'b0;
+                end
+            end else begin
+                M00_AXI_WVALID <= 1'b0;
+                M00_AXI_WLAST  <= 1'b0;
+            end
+        end
+    end
+
+    // B 通道握手
+    assign M00_AXI_BREADY = 1'b1;
+
+    // BRESP 统计
+    reg [31:0] bresp_cnt_ok, bresp_cnt_err;
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            bresp_cnt_ok    <= 32'd0;
+            bresp_cnt_err   <= 32'd0;
+            axi_bresp_error <= 1'b0;
+        end else if (M00_AXI_BVALID && M00_AXI_BREADY) begin
+            if (M00_AXI_BRESP == 2'b00) bresp_cnt_ok  <= bresp_cnt_ok + 1;
+            else begin
+                bresp_cnt_err   <= bresp_cnt_err + 1;
+                axi_bresp_error <= 1'b1;
+            end
+        end
+    end
+
+    // ----------------- DONE / IDLE / ERROR（单点驱动） -----------------
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            done_s  <= 1'b0;
+            idle_s  <= 1'b1;
+            error_s <= 1'b0;
+        end else begin
+            idle_s <= (state == S_IDLE);
+
+            if (done_clr_s) begin
+                done_s  <= 1'b0;
+                error_s <= 1'b0;
+            end else begin
+                if (start_latched_pulse) begin
+                    // 启动同时清 DONE/ERROR，避免二次启动残留
+                    done_s  <= 1'b0;
+                    error_s <= 1'b0;
+                end
+
+                if (state == S_ERROR)
+                    error_s <= 1'b1;
+
+                // 进入 S_DONE 即置位 DONE（FSM 已确保全部写提交完成）
+                if (state == S_DONE)
+                    done_s <= 1'b1;
+            end
+        end
+    end
+
+endmodule
+
+
+// ================================================================
+// AXI-Lite Slave
+// Map (word-addressed):
+// 0x00: CTRL/STATUS  (W: bit0 START, bit1 DONE_CLR; R: bit0 IDLE, bit1 DONE)
+// 0x04: IN_ADDR
+// 0x08: IN_BEATS
+// 0x0C: OUT_ADDR
+// 0x10: OUT_BEATS
+// 0x14: TOTAL_READS
+// 0x18: DBG_STATE
+// 0x1C: DBG_PACK
+// 0x20: DBG_SETUP
+// 0x24: DBG_WRITE
+// 0x28: DBG_FIRST_AWADDR
+// 0x2C: ERR_FLAGS (R: bit0 ERROR_S, bit1 AXI_BRESP_ERROR)
+// 0x38: LAST_RRESP (R: bit[1:0] 最后一次读通道 RRESP)
+// ================================================================
+module axi_slave_voter #
+(
+    parameter C_S_AXI_DATA_WIDTH = 32,
+    parameter C_S_AXI_ADDR_WIDTH = 7
+)
+(
+    input  wire                             S_AXI_ACLK,
+    input  wire                             S_AXI_ARESETN,
+    input  wire [C_S_AXI_ADDR_WIDTH-1:0]    S_AXI_AWADDR,
+    input  wire                             S_AXI_AWVALID,
+    output reg                              S_AXI_AWREADY,
+    input  wire [C_S_AXI_DATA_WIDTH-1:0]    S_AXI_WDATA,
+    input  wire [C_S_AXI_DATA_WIDTH/8-1:0]  S_AXI_WSTRB,
+    input  wire                             S_AXI_WVALID,
+    output reg                              S_AXI_WREADY,
+    output reg  [1:0]                       S_AXI_BRESP,
+    output reg                              S_AXI_BVALID,
+    input  wire                             S_AXI_BREADY,
+    input  wire [C_S_AXI_ADDR_WIDTH-1:0]    S_AXI_ARADDR,
+    input  wire                             S_AXI_ARVALID,
+    output reg                              S_AXI_ARREADY,
+    output reg  [C_S_AXI_DATA_WIDTH-1:0]    S_AXI_RDATA,
+    output reg  [1:0]                       S_AXI_RRESP,
+    output reg                              S_AXI_RVALID,
+    input  wire                             S_AXI_RREADY,
+
+    output reg  [31:0] in_addr,
+    output reg  [31:0] in_beats,
+    output reg  [31:0] out_addr,
+    output reg  [31:0] out_beats,
+    output reg  [31:0] total_reads_cfg,
+    output reg         start_pulse,
+    output reg         done_clr,
+
+    input  wire        done,
+    input  wire        idle,
+    input  wire        error_flag,
+    input  wire        bresp_err_flag,
+
+    input  wire [31:0] debug_state_count,
+    input  wire [31:0] debug_pack_count,
+    input  wire [31:0] debug_setup_count,
+    input  wire [31:0] debug_write_count,
+    input  wire [31:0] debug_first_write_addr,
+
+    // >>> 新增：暴露 last_rresp
+    input  wire [1:0]  last_rresp
+);
+
+    wire [4:0] waddr = S_AXI_AWADDR[6:2];
+    wire [4:0] raddr = S_AXI_ARADDR[6:2];
+
+    // ----------------- 写通道 -----------------
+    reg aw_hs, w_hs;
+    always @(posedge S_AXI_ACLK) begin
+        if (!S_AXI_ARESETN) begin
+            S_AXI_AWREADY   <= 1'b0;
+            S_AXI_WREADY    <= 1'b0;
+            S_AXI_BVALID    <= 1'b0;
+            S_AXI_BRESP     <= 2'b00;
+
+            in_addr         <= 32'd0;
+            in_beats        <= 32'd0;
+            out_addr        <= 32'd0;
+            out_beats       <= 32'd0;
+            total_reads_cfg <= 32'd0;
+            start_pulse     <= 1'b0;
+            done_clr        <= 1'b0;
+
+            aw_hs <= 1'b0;
+            w_hs  <= 1'b0;
+        end else begin
+            S_AXI_AWREADY <= (S_AXI_AWVALID && !S_AXI_AWREADY);
+            S_AXI_WREADY  <= (S_AXI_WVALID  && !S_AXI_WREADY);
+
+            aw_hs <= S_AXI_AWVALID && S_AXI_AWREADY;
+            w_hs  <= S_AXI_WVALID  && S_AXI_WREADY;
+
+            if (aw_hs && w_hs) begin
+                case (waddr)
+                    5'h00: begin
+                        start_pulse <= S_AXI_WDATA[0];
+                        done_clr    <= S_AXI_WDATA[1];
+                    end
+                    5'h01: in_addr         <= S_AXI_WDATA;
+                    5'h02: in_beats        <= S_AXI_WDATA;
+                    5'h03: out_addr        <= S_AXI_WDATA;
+                    5'h04: out_beats       <= S_AXI_WDATA;
+                    5'h05: total_reads_cfg <= S_AXI_WDATA;
+                    default: ;
+                endcase
+                S_AXI_BVALID <= 1'b1;
+                S_AXI_BRESP  <= 2'b00;
+            end
+
+            if (S_AXI_BVALID && S_AXI_BREADY) begin
+                S_AXI_BVALID <= 1'b0;
+                start_pulse  <= 1'b0; // 脉冲自动清
+                done_clr     <= 1'b0;
+            end
+        end
+    end
+
+    // ----------------- 读通道 -----------------
+    reg ar_hs;
+    always @(posedge S_AXI_ACLK) begin
+        if (!S_AXI_ARESETN) begin
+            S_AXI_ARREADY <= 1'b0;
+            S_AXI_RVALID  <= 1'b0;
+            S_AXI_RRESP   <= 2'b00;
+            S_AXI_RDATA   <= {C_S_AXI_DATA_WIDTH{1'b0}};
+            ar_hs         <= 1'b0;
+        end else begin
+            S_AXI_ARREADY <= (S_AXI_ARVALID && !S_AXI_RVALID);
+            ar_hs         <= S_AXI_ARVALID && S_AXI_ARREADY;
+
+            if (ar_hs) begin
+                case (raddr)
+                    5'h00: S_AXI_RDATA <= {30'd0, done, idle};
+                    5'h01: S_AXI_RDATA <= in_addr;
+                    5'h02: S_AXI_RDATA <= in_beats;
+                    5'h03: S_AXI_RDATA <= out_addr;
+                    5'h04: S_AXI_RDATA <= out_beats;
+                    5'h05: S_AXI_RDATA <= total_reads_cfg;
+                    5'h06: S_AXI_RDATA <= debug_state_count;
+                    5'h07: S_AXI_RDATA <= debug_pack_count;
+                    5'h08: S_AXI_RDATA <= debug_setup_count;
+                    5'h09: S_AXI_RDATA <= debug_write_count;
+                    5'h0A: S_AXI_RDATA <= debug_first_write_addr;
+                    5'h0B: S_AXI_RDATA <= {30'd0, bresp_err_flag, error_flag};
+                    // >>> 新增：0x38
+                    5'h0E: S_AXI_RDATA <= {30'd0, last_rresp};
+                    default: S_AXI_RDATA <= 32'd0;
+                endcase
+                S_AXI_RRESP  <= 2'b00;
+                S_AXI_RVALID <= 1'b1;
+            end
+
+            if (S_AXI_RVALID && S_AXI_RREADY)
+                S_AXI_RVALID <= 1'b0;
+        end
+    end
+
+endmodule
