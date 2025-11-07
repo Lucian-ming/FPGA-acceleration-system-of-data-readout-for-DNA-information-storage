@@ -1,2 +1,62 @@
-# FPGA-acceleration-system-of-data-readout-for-DNA-information-storage
-基于 ZYNQ 芯片并行运算能力，完成面向 DNA数据存储快速读出的硬件加速实现架构。DNA数据存储是颠覆性数据存储技术，其读出借助高并行度的生化反应，产生大量测序数据，需匹配高并行度运算资源。基于“DNA光盘”创新模式，采用异构计算架构，包括计算机与ZYNQ板卡。计算机通过千兆接口将从DNA测序仪获取的读取序列传输至板卡。在 FPGA 上实现多路并行滑动相关，计算峰值定位读段位置；然后，逐比特多数投票获得共识序列，并传回计算机恢复原始数据。作品采用verilog实现，借助LLM实现代码优化。本作品面向DNA 存储快速读出瓶颈，结合FPGA 并行处理与设计灵活的优势，可实现DNA 数据存储快速读出，获得一到两个数量级的加速。
+ 🧬 Vitis DNA Accelerator — Zynq Pipeline Project
+
+## 📖 项目简介
+本项目基于 **Xilinx Zynq-7000 (XC7Z010)** 平台开发，实现了三阶段硬件加速流水线系统：
+1. **DNA Accelerator Core** — 数据预处理  
+2. **Differential Voter Core** — 加权投票计算  
+3. **Desparsification Decoder Core** — 稀疏解码重构  
+4. **AXI DMA** — PS 与 PL 间数据搬运  
+5. **lwIP Echo Server** — TCP 网络服务端
+
+---
+
+## 🧰 目录结构
+```
+vitis-dna-accelerator/
+├─ hw/                 # PL 工程
+│  ├─ ip/              # 三个 IP 核
+│  ├─ constr/          # 约束文件
+│  └─ scripts/         # 构建 Tcl 脚本
+├─ sw/                 # PS 软件
+│  ├─ app/             # lwIP 应用
+│  ├─ linker/          # 链接脚本
+│  └─ scripts/         # XSCT 脚本
+├─ clients/python/     # 上位机 TCP 客户端
+├─ docs/               # 技术说明
+├─ LICENSE
+├─ THIRD_PARTY_NOTICES.md
+└─ .gitignore
+```
+
+---
+
+## ⚙️ 环境要求
+- Vivado / Vitis 版本：2022.2
+- 硬件平台：Zynq-7000 (xc7z010clg400-1)
+- Python 依赖：`pip install -r clients/python/requirements.txt`
+
+---
+
+## 🧩 一键复现
+```bash
+vivado -mode batch -source hw/scripts/build.tcl
+xsct sw/scripts/create_vitis.tcl
+```
+
+生成：  
+- `hw/build/export/*.xsa`  
+- `sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf`
+
+---
+
+## 🚀 运行
+1. 烧录 `.bit` 与 `.elf`
+2. 设置 IP = 192.168.1.10
+3. 运行客户端：
+```bash
+cd clients/python
+python client.py --ip 192.168.1.10 --port 7
+```
+
+
+© 2025 Vitis DNA Accelerator Project
