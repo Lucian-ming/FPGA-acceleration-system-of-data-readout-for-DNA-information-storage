@@ -40,11 +40,9 @@ static unsigned char mac_ethernet_address[] = {0x00, 0x0a, 0x35, 0x00, 0x01, 0x0
 int force_decoder_to_idle(void) {
     xil_printf("\n\r[RESET] Forcing Decoder to IDLE state...\n\r");
 
-    // 方法1：清零配置并等待超时
-    xil_printf("[RESET] Method 1: Clear config and wait...\n\r");
+    // 方法1：清零START并等待
+    xil_printf("[RESET] Method 1: Clear START and wait...\n\r");
     write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
     usleep(100000);  // 100ms
 
     u32 status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
@@ -73,11 +71,11 @@ int force_decoder_to_idle(void) {
     Xil_DCacheFlushRange(dummy_in_addr, 128);
     Xil_DCacheFlushRange(dummy_out_addr, 128);
 
-    // 配置最小任务：8个输入beat，6个输出beat
-    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  dummy_in_addr);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR, dummy_out_addr);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 8);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 6);
+    // 配置最小任务（64位地址）
+    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_H,  (u32)(((u64)dummy_in_addr) >> 32));
+    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_L,  (u32)(dummy_in_addr & 0xFFFFFFFF));
+    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_H, (u32)(((u64)dummy_out_addr) >> 32));
+    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_L, (u32)(dummy_out_addr & 0xFFFFFFFF));
     usleep(1000);
 
     // 启动
@@ -90,12 +88,6 @@ int force_decoder_to_idle(void) {
     xil_printf("[RESET] After Method 2: STATUS=0x%02X (IDLE=%d, DONE=%d)\n\r",
                status, (status & 0x01) ? 1 : 0, (status & 0x02) ? 1 : 0);
 
-    // 清零配置
-    write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-    write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
-    usleep(50000);
-
-    status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
     if (status & 0x01) {
         xil_printf("[RESET] ✓ Method 2 succeeded\n\r");
         return 0;
@@ -106,17 +98,9 @@ int force_decoder_to_idle(void) {
     for (int attempt = 0; attempt < 5; attempt++) {
         xil_printf("[RESET] Attempt %d/5...\n\r", attempt + 1);
 
-        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 1);
-        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 1);
-        usleep(1000);
-
         write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x01);
         usleep(20000);
         write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-        usleep(20000);
-
-        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
         usleep(50000);
 
         status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);

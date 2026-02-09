@@ -1123,11 +1123,9 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        xil_printf("[STAGE3] Decoder Preparation\n\r");
 	        xil_printf("========================================\n\r");
 
-	        // ✅ 关键修复：在做任何操作前先强制清零START和beats
+	        // ✅ 关键修复：在做任何操作前先强制清零START
 	        xil_printf("[STAGE3] Step 0: Ensuring START is cleared...\n\r");
 	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
 	        usleep(10000);  // 等待10ms
 
 	        u32 status_before_config = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
@@ -1182,47 +1180,53 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	            out64[i] = DECODER_SENTINEL_U64;
 	        }
 	        Xil_DCacheFlushRange(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
+	        
+	        /* 内存屏障确保cache flush完成 */
+	        __asm__ volatile("dsb sy");
+	        __asm__ volatile("isb");
+	        
 	        xil_printf("[STAGE3] Output area filled with sentinel values\n\r");
 
 	        // ✅ 关键修复：写配置前再次确认START=0
-	        xil_printf("[STAGE3] Writing configuration (with safety checks)...\n\r");
+	        xil_printf("[STAGE3] Writing configuration...\n\r");
 	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);  // 再次确认
 	        usleep(1000);
 
-	        // 按安全顺序写入：先写地址，最后才写beats
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  DEC_IN_ADDR);
+	        // ✅ 修复: 写入64位地址 (分为低32位和高32位)
+	        // 按安全顺序写入：先写地址高位，再写地址低位
+	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_H,  (u32)(((u64)DEC_IN_ADDR) >> 32));
 	        usleep(100);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR, DEC_OUT_ADDR);
+	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_L,  (u32)(DEC_IN_ADDR & 0xFFFFFFFF));
 	        usleep(100);
-
-	        // ✅ 关键：最后才写beats，避免触发自动启动
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, DEC_OUT_BEATS);
+	        
+	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_H, (u32)(((u64)DEC_OUT_ADDR) >> 32));
 	        usleep(100);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, DEC_IN_BEATS);  // 最后写
+	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_L, (u32)(DEC_OUT_ADDR & 0xFFFFFFFF));
+	        usleep(100);
 
 	        /* 内存屏障 */
 	        __asm__ volatile("dsb sy");
 	        __asm__ volatile("isb");
 	        usleep(10);
 
-	        /* 回读验证 */
-	        u32 in_addr_rb  = read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR);
-	        u32 in_beats_rb = read_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS);
-	        u32 out_addr_rb = read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR);
-	        u32 out_beats_rb= read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS);
+	        /* 回读验证 (只验证地址寄存器，硬件自动计算beats) */
+	        u32 in_addr_l_rb  = read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_L);
+	        u32 in_addr_h_rb  = read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_H);
+	        u32 out_addr_l_rb = read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_L);
+	        u32 out_addr_h_rb = read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_H);
+
+	        u64 in_addr_rb  = ((u64)in_addr_h_rb << 32) | in_addr_l_rb;
+	        u64 out_addr_rb = ((u64)out_addr_h_rb << 32) | out_addr_l_rb;
 
 	        xil_printf("[STAGE3] Configuration verification:\n\r");
-	        xil_printf("  IN_ADDR:  0x%08X %s\n\r", in_addr_rb,
-	                   (in_addr_rb == DEC_IN_ADDR) ? "✓" : "❌");
-	        xil_printf("  IN_BEATS: %u %s\n\r", in_beats_rb,
-	                   (in_beats_rb == DEC_IN_BEATS) ? "✓" : "❌");
-	        xil_printf("  OUT_ADDR: 0x%08X %s\n\r", out_addr_rb,
-	                   (out_addr_rb == DEC_OUT_ADDR) ? "✓" : "❌");
-	        xil_printf("  OUT_BEATS:%u %s\n\r", out_beats_rb,
-	                   (out_beats_rb == DEC_OUT_BEATS) ? "✓" : "❌");
+	        xil_printf("  IN_ADDR:  0x%08X%08X %s\n\r", 
+	                   (u32)(in_addr_rb >> 32), (u32)(in_addr_rb & 0xFFFFFFFF),
+	                   (in_addr_rb == (u64)DEC_IN_ADDR) ? "✓" : "❌");
+	        xil_printf("  OUT_ADDR: 0x%08X%08X %s\n\r", 
+	                   (u32)(out_addr_rb >> 32), (u32)(out_addr_rb & 0xFFFFFFFF),
+	                   (out_addr_rb == (u64)DEC_OUT_ADDR) ? "✓" : "❌");
 
-	        if (in_addr_rb != DEC_IN_ADDR || in_beats_rb != DEC_IN_BEATS ||
-	            out_addr_rb != DEC_OUT_ADDR || out_beats_rb != DEC_OUT_BEATS) {
+	        if (in_addr_rb != (u64)DEC_IN_ADDR || out_addr_rb != (u64)DEC_OUT_ADDR) {
 	            xil_printf("\n\r[ERROR] Configuration verification failed!\n\r");
 	            pipeline_set_state(PIPE_FAIL);
 	            return PIPE_STEP_FAIL;
@@ -1242,8 +1246,6 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
 	            // 尝试紧急停止
 	            write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-	            write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-	            write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
 	            usleep(50000);
 
 	            u32 recovery_status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
@@ -1363,8 +1365,6 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        }
 	        xil_printf("[CLEANUP] Resetting Decoder for next run...\n\r");
 	           write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-	           write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-	           write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
 	           usleep(50000);  // 等待50ms让状态机稳定
 
 	           u32 cleanup_status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
@@ -1373,11 +1373,11 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
 	           if (!(cleanup_status & 0x01)) {
 	               xil_printf("[CLEANUP] ⚠️ Not IDLE, forcing dummy run...\n\r");
-	               // 执行虚拟运行
-	               write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  DDR_VOTER_OUT_BASE);
-	               write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 1);
-	               write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR, DDR_DECODER_OUT_BASE);
-	               write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 1);
+	               // 执行虚拟运行 (使用64位地址写入)
+	               write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_H,  (u32)(((u64)DDR_VOTER_OUT_BASE) >> 32));
+	               write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_L,  (u32)(DDR_VOTER_OUT_BASE & 0xFFFFFFFF));
+	               write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_H, (u32)(((u64)DDR_DECODER_OUT_BASE) >> 32));
+	               write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR_L, (u32)(DDR_DECODER_OUT_BASE & 0xFFFFFFFF));
 	               usleep(1000);
 	               write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x01);
 	               usleep(5000);

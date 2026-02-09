@@ -158,21 +158,29 @@
 
 /* ========= 第三个IP核: Decoder (反稀疏化解码) =========
  *
- * 寄存器映射:
- *   0x00: IN_ADDR     - 输入DDR地址
- *   0x04: IN_BEATS    - 输入数据拍数 (1266)
- *   0x08: OUT_ADDR    - 输出DDR地址
- *   0x0C: OUT_BEATS   - 输出数据拍数 (1013)
- *   0x10: START       - 启动控制 (写1启动)
- *   0x18: STATUS      - 状态寄存器 (bit[0]=idle, bit[1]=done)
+ * 硬件寄存器映射 (基于desparsification_decoder_v1_0_S00_AXI.v):
+ *   0x00: CTRL        - 启动控制 (写1启动, bit[0]=start)
+ *   0x04: STATUS      - 状态寄存器 (bit[0]=idle, bit[1]=done)
+ *   0x10: IN_ADDR_L   - 输入DDR地址 (低32位)
+ *   0x14: IN_ADDR_H   - 输入DDR地址 (高32位)
+ *   0x18: OUT_ADDR_L  - 输出DDR地址 (低32位)
+ *   0x1C: OUT_ADDR_H  - 输出DDR地址 (高32位)
+ *
+ * 注意: 硬件使用64位地址，分为HIGH/LOW两个32位寄存器
+ *       IN_BEATS/OUT_BEATS通过AXI Master接口自动计算，不需要软件配置
  *============================================================================*/
 #define DECODER_BASEADDR            XPAR_DESPARSIFICATION_DEC_0_S00_AXI_BASEADDR
-#define DECODER_REG_IN_ADDR         0x00U
-#define DECODER_REG_IN_BEATS        0x04U
-#define DECODER_REG_OUT_ADDR        0x08U
-#define DECODER_REG_OUT_BEATS       0x0CU
-#define DECODER_REG_START           0x10U
-#define DECODER_REG_STATUS          0x18U   /* ⚠️ 注意: 状态寄存器在0x18 */
+#define DECODER_REG_CTRL            0x00U  /* 启动控制寄存器 */
+#define DECODER_REG_STATUS          0x04U  /* 状态寄存器 (FIXED: was 0x18) */
+#define DECODER_REG_IN_ADDR_L       0x10U  /* 输入地址低32位 */
+#define DECODER_REG_IN_ADDR_H       0x14U  /* 输入地址高32位 */
+#define DECODER_REG_OUT_ADDR_L      0x18U  /* 输出地址低32位 */
+#define DECODER_REG_OUT_ADDR_H      0x1CU  /* 输出地址高32位 */
+
+/* 为兼容性保留的旧名称 (映射到低32位寄存器) */
+#define DECODER_REG_START           DECODER_REG_CTRL
+#define DECODER_REG_IN_ADDR         DECODER_REG_IN_ADDR_L
+#define DECODER_REG_OUT_ADDR        DECODER_REG_OUT_ADDR_L
 
 #define DECODER_STATUS_IDLE         (1U << 0)
 #define DECODER_STATUS_DONE         (1U << 1)
