@@ -167,7 +167,10 @@
  *   0x1C: OUT_ADDR_H  - 输出DDR地址 (高32位)
  *
  * 注意: 硬件使用64位地址，分为HIGH/LOW两个32位寄存器
- *       IN_BEATS/OUT_BEATS通过AXI Master接口自动计算，不需要软件配置
+ *       传输长度由硬件的AXI Master接口根据数据格式自动计算：
+ *       - 输入: 81000位 = 1266个64位字 = 1266拍
+ *       - 输出: 64800位 = 1013个64位字 = 1013拍
+ *       - 硬件通过five_to_four解码算法确定何时停止传输
  *============================================================================*/
 #define DECODER_BASEADDR            XPAR_DESPARSIFICATION_DEC_0_S00_AXI_BASEADDR
 #define DECODER_REG_CTRL            0x00U  /* 启动控制寄存器 */

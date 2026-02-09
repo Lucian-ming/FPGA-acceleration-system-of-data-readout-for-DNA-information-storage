@@ -1181,9 +1181,8 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        }
 	        Xil_DCacheFlushRange(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
 	        
-	        /* 内存屏障确保cache flush完成 */
-	        __asm__ volatile("dsb sy");
-	        __asm__ volatile("isb");
+	        /* Memory barrier to ensure cache flush completes before register writes */
+	        __asm__ volatile("dsb sy");  // Data Synchronization Barrier
 	        
 	        xil_printf("[STAGE3] Output area filled with sentinel values\n\r");
 
@@ -1193,7 +1192,7 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        usleep(1000);
 
 	        // ✅ 修复: 写入64位地址 (分为低32位和高32位)
-	        // 按安全顺序写入：先写地址高位，再写地址低位
+	        // 注意：硬件在两个32位寄存器都写入后才更新完整的64位地址
 	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_H,  (u32)(((u64)DEC_IN_ADDR) >> 32));
 	        usleep(100);
 	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR_L,  (u32)(DEC_IN_ADDR & 0xFFFFFFFF));
