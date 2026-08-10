@@ -38,12 +38,16 @@ PKT_BATCH_OK = 0x12
 PKT_ERROR = 0xEE
 
 READ_SIZE_BYTES = 40
-DEFAULT_TOTAL_READS = 64_800
+READ_BASES = 150            # 当前比特流只支持 150 bp；换档位需重新综合
+DEFAULT_TOTAL_READS = 2_048  # 实测约 1,080 条即可完整还原，2,048 留足余量
 MAX_TOTAL_READS = 108_000
 DEFAULT_BATCH_SIZE = 1_000
 RESULT_BYTES = 8 * 1024
 MAX_WATERMARK = 10_128
 WM_ALIGN = 8
+
+# srpe_batch 固定每批 64 条，发送总量必须是它的整数倍，否则尾批会饿死（C2）
+FRAME_READS = 64
 
 BASE2BITS = {
     "A": "00",
@@ -57,6 +61,19 @@ BASE2BITS = {
     "c": "11",
     "n": "00",
 }
+
+# 反向互补：A<->T, G<->C。测序数据里约一半读段是反向的（docs/03-status.md D1），
+# 不处理的话即使用满全部读段也无法译码。
+#
+# 注意 N 映射到 T 而不是 N：整条流水线只认 2-bit 符号，而 BASE2BITS["N"] == "00"，
+# 即 N 在编码阶段就已经被当成 A；既然如此，反向互补也必须按 A 处理（A→T）。
+# 这样与黄金模型的「符号值异或 1 后整体反序」完全等价——否则含 N 的读段
+# 会在两侧算出不同的编码（实测 64 条里差 1 条）。
+REVCOMP = str.maketrans("ACGTNacgtn", "TGCATtgcat")
+
+
+def reverse_complement(seq: str) -> str:
+    return seq.translate(REVCOMP)[::-1]
 
 
 class OperationCancelled(RuntimeError):
@@ -85,7 +102,7 @@ class NetStats:
         return (bytes_ * 8) / seconds / 1e6
 
 
-@dataclass(slots=True)
+@dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
 class ReadFileInfo:
     """Metadata extracted from a reads file."""
 
@@ -94,7 +111,7 @@ class ReadFileInfo:
     total_reads: int
 
 
-@dataclass(slots=True)
+@dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
 class ClientConfig:
     """High-level configuration for a client session."""
 
@@ -107,6 +124,7 @@ class ClientConfig:
     total: Optional[int] = None
     send_limit: Optional[int] = None
     skip_wm: bool = False
+    orient: str = "both"        # both = 每条读段发正向+反向互补（必需，见 D1）
     post: bool = True
     format: str = DEFAULT_FORMAT
 
@@ -123,7 +141,7 @@ class ClientConfig:
         return resolved
 
 
-@dataclass(slots=True)
+@dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
 class ProgressCallbacks:
     """Optional GUI hooks for status and progress updates."""
 
@@ -200,103 +218,123 @@ def analyze_reads_file(path: Path, format_hint: str = "auto") -> ReadFileInfo:
 
 
 def seq_to_40B(seq: str) -> bytes:
-    """Encode a 150bp sequence into 40 bytes (packed 2-bit bases)."""
-    s = seq.strip().upper()
-    if len(s) < 150:
-        s += "N" * (150 - len(s))
-    elif len(s) > 150:
-        s = s[:150]
+    """把一条 150 bp 序列编码成 40 字节。
 
-    out_bits = ["0"] * (150 * 2)
+    格式见 docs/02-data-contract.md：
+      * 位平面布局：码流前 150 位是每个碱基的高位，后 150 位是低位；
+      * 字节内 **LSB-first** 打包：码流第 k 位 → 第 k/8 个字节的第 k%8 位。
+
+    LSB-first 是刻意选的：这样 AXIS 上组装出来的 `in_buf[k]` 正好等于码流第 k 位，
+    RTL 端不需要任何位反转。原实现用的是 MSB-first，与 RTL 对不上（缺陷 B4）。
+    """
+    s = seq.strip().upper()
+    if len(s) < READ_BASES:
+        s += "N" * (READ_BASES - len(s))
+    elif len(s) > READ_BASES:
+        s = s[:READ_BASES]
+
+    data = bytearray(READ_SIZE_BYTES)
     for idx, base in enumerate(s):
         pair = BASE2BITS.get(base, "00")
-        out_bits[idx] = pair[0]
-        out_bits[150 + idx] = pair[1]
-
-    bit_string = "".join(out_bits)
-    data = bytes(int(bit_string[i : i + 8].ljust(8, "0"), 2) for i in range(0, len(bit_string), 8))
-
-    if len(data) < READ_SIZE_BYTES:
-        data += b"\x00" * (READ_SIZE_BYTES - len(data))
-    elif len(data) > READ_SIZE_BYTES:
-        data = data[:READ_SIZE_BYTES]
-    return data
+        if pair[0] == "1":                       # 高位平面
+            data[idx >> 3] |= 1 << (idx & 7)
+        if pair[1] == "1":                       # 低位平面
+            k = READ_BASES + idx
+            data[k >> 3] |= 1 << (k & 7)
+    return bytes(data)
 
 
-def iter_reads_fastq(path: Path, limit: int) -> Iterable[bytes]:
-    """Yield encoded reads from a FASTQ file."""
-    produced = 0
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
-        while produced < limit:
-            header = handle.readline()
-            if not header:
-                break
-            seq = handle.readline()
-            plus = handle.readline()
-            qual = handle.readline()
-            if not seq or not qual:
-                break
-            yield seq_to_40B(seq)
-            produced += 1
-
-    while produced < limit:
-        yield b"\x00" * READ_SIZE_BYTES
-        produced += 1
-
-
-def iter_reads_plain(path: Path, limit: int) -> Iterable[bytes]:
-    """Yield encoded reads when each line contains one sequence."""
-    produced = 0
-    with path.open("r", encoding="utf-8", errors="ignore") as handle:
-        for line in handle:
-            if produced >= limit:
-                break
-            seq = line.strip()
-            if not seq:
-                continue
-            yield seq_to_40B(seq)
-            produced += 1
-
-    while produced < limit:
-        yield b"\x00" * READ_SIZE_BYTES
-        produced += 1
-
-
-def iter_reads(path: Path, limit: int, format_type: str = "auto") -> Iterable[bytes]:
-    """Dispatch to the appropriate reader iterator."""
+def iter_source_seqs(path: Path, limit: int, format_type: str = "auto") -> Iterable[str]:
+    """按源文件顺序产出序列字符串，最多 limit 条。"""
     fmt = format_type
     if fmt == "auto":
         fmt = detect_file_format(path)
-    if fmt == "fastq":
-        return iter_reads_fastq(path, limit)
-    return iter_reads_plain(path, limit)
+    produced = 0
+    with path.open("r", encoding="utf-8", errors="ignore") as handle:
+        if fmt == "fastq":
+            while produced < limit:
+                header = handle.readline()
+                if not header:
+                    break
+                seq = handle.readline()
+                handle.readline()
+                qual = handle.readline()
+                if not seq or not qual:
+                    break
+                yield seq.strip()
+                produced += 1
+        else:
+            for line in handle:
+                if produced >= limit:
+                    break
+                seq = line.strip()
+                if seq:
+                    yield seq
+                    produced += 1
+
+
+def iter_reads(
+    path: Path,
+    limit: int,
+    format_type: str = "auto",
+    orient: str = "both",
+) -> Iterable[bytes]:
+    """产出编码后的读段字节。
+
+    `orient="both"` 时每条源读段发两份：正向 + 反向互补。
+    板端 Stage1 会分别给两份打分，Voter 按分数丢掉方向错的那份
+    （docs/06-implementation-plan.md P1）。这是必需的：测序数据里约一半读段
+    是反向互补的，不发的话即使用满全部读段也无法译码。
+    """
+    for seq in iter_source_seqs(path, limit, format_type):
+        yield seq_to_40B(seq)
+        if orient == "both":
+            yield seq_to_40B(reverse_complement(seq))
+
+
+def round_up_frames(n: int) -> int:
+    """向上取整到 FRAME_READS 的整数倍（srpe_batch 每批固定 64 条）。"""
+    return ((n + FRAME_READS - 1) // FRAME_READS) * FRAME_READS
 
 
 def iter_read_batches(
     reads_file: Path,
-    total_reads: int,
+    source_reads: int,
+    send_total: int,
     batch_size: int = DEFAULT_BATCH_SIZE,
     format_type: str = "auto",
+    orient: str = "both",
 ) -> Iterable[bytes]:
-    """Generate payload blocks for sending read batches."""
-    batch: list[bytes] = []
+    """产出 PKT_BATCH 的负载块；不足 send_total 的部分补零读段。"""
+    batch: list = []
     count = 0
 
-    for read in iter_reads(reads_file, total_reads, format_type):
+    def flush():
+        header = struct.pack(">I", len(batch))
+        return header + b"".join(batch)
+
+    for read in iter_reads(reads_file, source_reads, format_type, orient):
+        if count >= send_total:
+            break
         batch.append(read)
         count += 1
         if len(batch) >= batch_size:
-            header = struct.pack(">I", len(batch))
-            yield header + b"".join(batch)
+            yield flush()
+            batch.clear()
+
+    # 补零到 64 的整数倍（这些补零读段的比对分接近 0，会被板端阈值丢掉）
+    while count < send_total:
+        batch.append(b"\x00" * READ_SIZE_BYTES)
+        count += 1
+        if len(batch) >= batch_size:
+            yield flush()
             batch.clear()
 
     if batch:
-        header = struct.pack(">I", len(batch))
-        yield header + b"".join(batch)
+        yield flush()
 
-    if count != total_reads:
-        # 调试信息: 实际发送数量与预期不一致
-        print(f"[WARN] 预期 {total_reads} 条读段, 实际生成 {count} 条")
+    if count != send_total:
+        print(f"[WARN] 预期发送 {send_total} 条读段, 实际生成 {count} 条")
 
 
 # ============================================================================
@@ -353,10 +391,12 @@ def send_watermark(sock: socket.socket, wm_file: Path, stats: NetStats) -> int:
     if len(filtered) > 81_000:
         filtered = filtered[:81_000]
 
-    payload = bytearray()
-    for idx in range(0, len(filtered), 8):
-        byte_str = filtered[idx : idx + 8].ljust(8, "0")
-        payload.append(int(byte_str, 2))
+    # 与读段一致：码流顺序 + 字节内 LSB-first（docs/02-data-contract.md）。
+    # 原实现是 MSB-first，与 RTL / PS 的取位方式对不上。
+    payload = bytearray((len(filtered) + 7) // 8)
+    for idx, ch in enumerate(filtered):
+        if ch == "1":
+            payload[idx >> 3] |= 1 << (idx & 7)
 
     padding = (WM_ALIGN - (len(payload) % WM_ALIGN)) % WM_ALIGN
     if padding:
@@ -374,11 +414,13 @@ def send_watermark(sock: socket.socket, wm_file: Path, stats: NetStats) -> int:
 def send_batches(
     sock: socket.socket,
     reads_file: Path,
-    total_reads: int,
+    source_reads: int,
+    send_total: int,
     stats: NetStats,
     *,
     batch_size: int = DEFAULT_BATCH_SIZE,
     format_type: str = "auto",
+    orient: str = "both",
     stop_check: Optional[Callable[[], bool]] = None,
     progress: Optional[ProgressCallbacks] = None,
 ) -> int:
@@ -386,7 +428,8 @@ def send_batches(
     total_sent = 0
     batch_index = 0
 
-    for payload in iter_read_batches(reads_file, total_reads, batch_size, format_type):
+    for payload in iter_read_batches(reads_file, source_reads, send_total,
+                                     batch_size, format_type, orient):
         if stop_check and stop_check():
             raise OperationCancelled("Operation cancelled")
 
@@ -401,10 +444,10 @@ def send_batches(
         batch_index += 1
 
         if progress:
-            progress.update_upload_progress(total_sent, total_reads)
+            progress.update_upload_progress(total_sent, send_total)
 
     if progress:
-        progress.update_upload_progress(total_reads, total_reads)
+        progress.update_upload_progress(send_total, send_total)
     return batch_index
 
 
@@ -453,9 +496,13 @@ def run_client(
         raise FileNotFoundError(f"Watermark file does not exist: {watermark_path}")
 
     info = analyze_reads_file(reads_path, config.format)
-    total_reads = config.resolve_total(info.total_reads if info.total_reads else DEFAULT_TOTAL_READS)
-    if total_reads > MAX_TOTAL_READS:
-        raise ValueError(f"Read count {total_reads} exceeds hardware limit {MAX_TOTAL_READS}")
+    source_reads = config.resolve_total(info.total_reads if info.total_reads else DEFAULT_TOTAL_READS)
+    per_read = 2 if config.orient == "both" else 1
+    send_total = round_up_frames(source_reads * per_read)
+    if send_total > MAX_TOTAL_READS:
+        raise ValueError(
+            f"发送量 {send_total} 条超过板端上限 {MAX_TOTAL_READS}"
+            f"（源读段 {source_reads} 条 × {per_read} 个方向，向上取整到 {FRAME_READS} 的倍数）")
 
     progress = progress or ProgressCallbacks()
 
@@ -464,10 +511,10 @@ def run_client(
         log,
         f"[INFO] Reads file: {reads_path} ({info.total_reads} reads detected, format {info.format.upper()})",
     )
-    if config.send_limit and config.send_limit < info.total_reads:
-        log_info(log, f"[INFO] Will only send first {total_reads} reads (user limited)")
-    else:
-        log_info(log, f"[INFO] Sending {total_reads} reads")
+    log_info(log, f"[INFO] 取用源读段 {source_reads} 条，方向 {config.orient}（每条 {per_read} 份）")
+    padding = send_total - source_reads * per_read
+    log_info(log, f"[INFO] 实际发送 {send_total} 条（{FRAME_READS} 的整数倍"
+                  + (f"，其中补零 {padding} 条" if padding else "") + "）")
     log_info(log, f"[INFO] Output file: {output_path}")
 
     with socket.create_connection((config.ip, config.port)) as sock:
@@ -496,15 +543,17 @@ def run_client(
         batch_count = send_batches(
             sock,
             reads_path,
-            total_reads,
+            source_reads,
+            send_total,
             stats,
             batch_size=config.batch,
             format_type=info.format,
+            orient=config.orient,
             stop_check=stop_requested,
             progress=progress,
         )
         stats.t_batches = perf_counter() - t0
-        reads_bytes = total_reads * READ_SIZE_BYTES
+        reads_bytes = send_total * READ_SIZE_BYTES
         log_info(
             log,
             (
@@ -585,6 +634,8 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=None, help="最多发送多少条读段(默认全部)")
     parser.add_argument("--batch", type=int, default=DEFAULT_BATCH_SIZE, help="每批包含的读段数")
     parser.add_argument("--format", choices=["auto", "fastq", "plain"], default=DEFAULT_FORMAT)
+    parser.add_argument("--orient", choices=["both", "forward"], default="both",
+                        help="both=每条读段发正向+反向互补（默认，必需）；forward=只发正向（仅作对照实验）")
     parser.add_argument("--skip-watermark", action="store_true", help="跳过水印发送")
     parser.add_argument("--no-post", action="store_true", help="不发送POST触发命令")
     return parser.parse_args(argv)
@@ -603,6 +654,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         total=args.total_reads,
         send_limit=args.limit,
         skip_wm=args.skip_watermark,
+        orient=args.orient,
         post=not args.no_post,
         format=args.format,
     )

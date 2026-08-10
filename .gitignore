@@ -1,0 +1,29 @@
+# 本机 Git 元数据（因受限工作区使用 .git 文件指向此目录）
+.git-data/
+
+# Vivado / Vitis 生成目录与临时文件
+.Xil/
+hw/build/synth_*/
+sw/workspace/
+*.jou
+*.log
+*.str
+*.pb
+*.wdb
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 本地导入的只读数据与历史归档。
+# 校验和、来源和使用约束记录在 docs/reference/；如需远端保存大文件，请另行使用 Git LFS 或制品库。
+data/
+archive/
+
+# 编辑器与操作系统本地文件
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

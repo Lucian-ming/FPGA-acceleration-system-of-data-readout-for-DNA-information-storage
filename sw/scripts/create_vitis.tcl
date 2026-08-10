@@ -10,17 +10,18 @@
 set plat "dna_platform"
 set dom  "standalone_domain"
 set app  "dna_lwip_app"
-set ws   "[file normalize ../../sw/workspace]"
+set _here [file normalize [file dirname [info script]]]
+set _root [file normalize "$_here/../.."]
+set ws   "$_root/sw/workspace"
 
 # 自动搜 XSA（优先使用 -tclargs 指定）
 proc _find_xsa {} {
   set cand {}
-  foreach p {
-    ../../hw/build/export/*.xsa
-    ../hw/build/export/*.xsa
-    ./hw/build/export/*.xsa
-    ../../hw/**/*.xsa
-  } {
+  foreach p [list \
+    "$::_root/hw/build/export/*.xsa" \
+    "$::_root/*.xsa" \
+    "$::_root/hw/**/*.xsa" \
+  ] {
     set g [glob -nocomplain -types f $p]
     set cand [concat $cand $g]
   }
@@ -68,11 +69,12 @@ puts "     DOM : $dom"
 puts "     APP : $app"
 
 # ---------- 路径（相对仓库根） ----------
-set app_src   [file normalize ../../sw/app]
-set linker_ld [file normalize ../../sw/linker/lscript.ld]
+set app_src   "$_root/sw/app"
+set linker_ld "$_root/sw/linker/lscript.ld"
 
 # ---------- Workspace / Platform ----------
-platform reset
+# 注意：`platform reset` 在 Vitis 2022.2 的 XSCT 里不是合法子命令，会直接报错退出。
+catch { platform reset }
 file mkdir $ws
 setws $ws
 
@@ -84,17 +86,19 @@ if {[catch {platform create -name $plat -hw $xsa -out $ws} err]} {
   puts "===> Platform created: $plat"
 }
 
-# 创建 standalone 域（C 或 C++ 均可，这里用 C）
+# 创建 standalone 域
+# 注意：Vitis 2022.2 的 `-runtime` 只接受 cpp / ocl，写 c 会直接报错退出。
+#       cpp 运行时同样可以编译纯 C 源码。
 # 处理不同版本 CPU 名称（Zynq PS7）
+# 【修复】原来这里是一行括号不配对的 Tcl（`[lindex [array names [dict create] 0]`），
+# 直接导致整个脚本解析失败、根本跑不到构建那一步。它本身也是个 no-op，删掉即可。
 set proc_name "ps7_cortexa9_0"
-catch { set proc_name [lindex [array names [dict create] 0]  } _ ;# no-op
-# 如果平台中处理器命名不同，可在此修改 proc_name
 
 # 如果 domain 已存在则跳过创建
 set need_dom 1
 if {![catch {domain active $dom} _]} { set need_dom 0 }
 if {$need_dom} {
-  domain create -name $dom -os standalone -proc $proc_name -runtime c
+  domain create -name $dom -os standalone -proc $proc_name -runtime cpp
 }
 
 # ---------- BSP 配置：启用 lwIP 并设置网络参数 ----------
@@ -123,7 +127,9 @@ platform generate
 
 # ---------- 应用 ----------
 # 若存在则复用，否则创建
-set apps [app list]
+# 注意：workspace 里一个应用都没有时，`app list` 会**抛错**而不是返回空列表。
+set apps {}
+catch { set apps [app list] }
 set exists 0
 foreach a $apps { if {[string equal $a $app]} { set exists 1 } }
 if {!$exists} {

@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include "echo.h"
+#include "wm_expand.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
@@ -377,13 +378,14 @@ static int tx_expected    = 0;
 static int tx_done        = 0;
 static int rx_done        = 0;
 
+static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
 static u32 tx_frames_total = 0;
 static u32 tx_frames_sent  = 0;
 static u32 tx_frames_done  = 0;
 
 static inline void pipeline_reset_counters(void){
     wm_tx_expected=0; rx_expected=0; tx_expected=0; tx_done=0; rx_done=0;
-    tx_frames_total=0; tx_frames_sent=0; tx_frames_done=0;
+    tx_frames_total=0; tx_frames_sent=0; tx_frames_done=0; wm_region=0;
 }
 
 static inline void pipeline_set_state(pipe_state_e st){ pipe_state = st; }
@@ -437,18 +439,41 @@ static int submit_reads_chunk(void)
 static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 {
     switch (pipe_state) {
+    /* 【修订 B1】水印预载重做
+     *
+     * 原实现：置 preload → 一次 DMA 整个打包水印 → 清 preload。
+     * 三处致命问题：
+     *   1) DNA 核预载时每个 32-bit 拍只取 TDATA[1:0]，即 1 拍 1 个符号，
+     *      而打包水印一拍带 16 个符号 —— 只有 1/16 的数据被写进去；
+     *   2) wm_waddr 到 956 就归零，写入永远落在 bram_sel 选中的**单个**区域；
+     *   3) bram_sel 来自 reg1，而这里从头到尾只写过 reg0 —— 区域 1..49 恒为全 0。
+     *
+     * 现在改为：先把水印展开成 50 个区域（每符号一个 32-bit 字），
+     * 然后逐区域「写 reg1=区域号 → 置 preload → DMA 957 拍 → 等完成」。
+     */
     case PIPE_WM_PREP: {
-        xil_printf("\n\r[STAGE1] WM_PREP\n\r");
-        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x02);
-        usleep(100);
-        Xil_DCacheFlushRange(DDR_WATERMARK_BASE, conn->watermark_size);
+        xil_printf("\n\r[STAGE1] WM_PREP: expanding watermark into %u regions\n\r",
+                   (u32)WM_NUM_LC);
+        if (expand_watermark_regions(conn) != 0) {
+            pipeline_set_state(PIPE_FAIL);
+            return PIPE_STEP_FAIL;
+        }
+        wm_region = 0;
         pipeline_set_state(PIPE_WM_TX);
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_WM_TX: {
-        wm_tx_expected = submit_bd_transfer(TxRingPtr, DDR_WATERMARK_BASE,
-                                            conn->watermark_size, TxMaxTransferLen,
-                                            "TX-WM", XFER_TX_WM);
+        /* 先选区域，再进预载模式；顺序不能反 */
+        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG1_WMSEL, wm_region);
+        usleep(10);
+        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL,
+                    DNA_ACC_CTRL_BIT_PRELOAD);
+        usleep(10);
+
+        wm_tx_expected = submit_bd_transfer(TxRingPtr,
+                                            DDR_WM_REGIONS_BASE + wm_region * WM_REGION_BYTES,
+                                            WM_REGION_BYTES, TxMaxTransferLen,
+                                            "TX-WM-REGION", XFER_TX_WM);
         if (wm_tx_expected < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
         pipeline_set_state(PIPE_WM_WAIT);
         return PIPE_STEP_PROGRESS;
@@ -457,10 +482,17 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         int got = reclaim_some_bd(TxRingPtr, wm_tx_expected);
         if (got < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
         if (got == wm_tx_expected) {
+            /* 每个区域传完都退出预载模式，确保 wm_waddr 与区域边界对齐 */
             write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x00);
-            usleep(100);
-            xil_printf("[STAGE1] WM preload done\n\r");
-            pipeline_set_state(PIPE_RX_PREP);
+            usleep(10);
+            wm_region++;
+            if (wm_region < WM_NUM_LC) {
+                pipeline_set_state(PIPE_WM_TX);
+            } else {
+                xil_printf("[STAGE1] WM preload done: %u regions x %u symbols\n\r",
+                           (u32)WM_NUM_LC, (u32)WM_REF_LEN);
+                pipeline_set_state(PIPE_RX_PREP);
+            }
         }
         return PIPE_STEP_PROGRESS;
     }
@@ -1078,6 +1110,13 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
     	    usleep(2000);
     	    xil_printf("[STAGE2] ✓ Flush complete\n\r");
 
+    	    /* 【修订 B3】Stage2 输出的是共识 DNA 序列，必须先与水印做差分
+    	       才是 Stage3 期望的稀疏流。原来整条链路缺了这一级。 */
+    	    if (apply_watermark_differential() != 0) {
+    	        pipeline_set_state(PIPE_FAIL);
+    	        return PIPE_STEP_FAIL;
+    	    }
+
     	    xil_printf("\n\r[PIPELINE] Proceeding to Stage3 (Decoder)...\n\r");
     	    pipeline_set_state(PIPE_DECODER_PREP);
     	    return PIPE_STEP_PROGRESS;
@@ -1567,11 +1606,103 @@ int start_application(void)
  *============================================================================*/
 void process_watermark(dna_connection_t *conn, u8 *data, u32 len)
 {
-    if (len > MAX_WATERMARK_SIZE) len = MAX_WATERMARK_SIZE;
+    /* 【修订 B1】原实现是 `if (len > MAX) len = MAX;` —— 静默截断。
+       MAX 当时还是 10120，比 81,000 bit 所需的 10,125 B 还小，
+       尾部 40 bit 直接被丢掉，而上位机完全无从得知。 */
+    if (len > MAX_WATERMARK_SIZE) {
+        xil_printf("[WM] ERROR: %u bytes exceeds MAX_WATERMARK_SIZE %u\n\r",
+                   len, (u32)MAX_WATERMARK_SIZE);
+        conn->watermark_size = 0;
+        return;                      /* 上层据此回 PKT_ERROR */
+    }
+    if (len < WM_PACKED_BYTES) {
+        xil_printf("[WM] ERROR: %u bytes < required %u (%u bits)\n\r",
+                   len, (u32)WM_PACKED_BYTES, (u32)WM_TOTAL_BITS);
+        conn->watermark_size = 0;
+        return;
+    }
     memcpy((void *)DDR_WATERMARK_BASE, data, len);
     Xil_DCacheFlushRange(DDR_WATERMARK_BASE, len);
     conn->watermark_size = len;
-    xil_printf("[WM] Stored %u bytes\n\r", len);
+    xil_printf("[WM] Stored %u bytes (%u bits, %u symbols)\n\r",
+               len, (u32)WM_TOTAL_BITS, (u32)WM_SYMBOLS);
+}
+
+/*============================================================================
+ * 【修订 B1】把打包水印展开成 NUM_LC 个重叠区域
+ *
+ * 上位机送来的是「码流顺序 + 字节内 LSB-first」的 81,000 bit：
+ *     bit[k]        = (buf[k>>3] >> (k&7)) & 1
+ *     symbol[i]     = (bit[i] << 1) | bit[WM_SYMBOLS + i]        位平面布局
+ * DNA 核的水印 BRAM 需要 NUM_LC × REF_LEN 个符号（区域之间重叠 READ_BPS），
+ * 且预载时每个 32-bit AXIS 拍只取 TDATA[1:0]，所以必须一符号一拍地送。
+ *
+ * 区域 lc 覆盖符号 [lc*STRIDE, lc*STRIDE + REF_LEN)。
+ *==========================================================================*/
+int expand_watermark_regions(dna_connection_t *conn)
+{
+    const volatile u8 *wm = (const volatile u8 *)DDR_WATERMARK_BASE;
+    volatile u32 *dst = (volatile u32 *)DDR_WM_REGIONS_BASE;
+    u32 lc, row, idx, sym;
+
+    if (conn->watermark_size < WM_PACKED_BYTES) {
+        xil_printf("[WM] ERROR: watermark not loaded (%u bytes)\n\r",
+                   conn->watermark_size);
+        return -1;
+    }
+
+    Xil_DCacheInvalidateRange(DDR_WATERMARK_BASE, conn->watermark_size);
+
+    /* 位序与几何由 wm_expand.h 统一定义，并在主机上用黄金向量单元测试
+       （tools/test_wm_expand.c，见 tools/run_sim.sh） */
+    for (lc = 0; lc < WM_NUM_LC; lc++) {
+        for (row = 0; row < WM_REF_LEN; row++) {
+            sym = wm_region_symbol((const unsigned char *)wm, lc, row,
+                                   WM_STRIDE, WM_SYMBOLS);
+            *dst++ = sym;
+        }
+    }
+    (void)idx;
+
+    Xil_DCacheFlushRange(DDR_WM_REGIONS_BASE, WM_REGIONS_TOTAL_BYTES);
+    __asm__ volatile("dsb sy");
+    xil_printf("[WM] Expanded to %u regions x %u symbols (%u bytes) @ 0x%08X\n\r",
+               (u32)WM_NUM_LC, (u32)WM_REF_LEN,
+               (u32)WM_REGIONS_TOTAL_BYTES, (u32)DDR_WM_REGIONS_BASE);
+    return 0;
+}
+
+/*============================================================================
+ * 【修订 B3】共识序列 ⊕ 水印 = 稀疏流
+ *
+ * 整条流水线原本缺了这一整级：Stage2 输出的是共识 DNA 序列，
+ * Stage3 却直接把它当稀疏流去做 5b→4b 反稀疏化。
+ *
+ * 两侧都是「码流顺序 + 字节内 LSB-first」打包，因此逐字节异或即可。
+ * 这里先用 PS 软件实现（10,125 B，一次几十微秒），把端到端链路打通；
+ * 是否下沉到 Voter 里做，等链路验证通过后再决定。
+ *==========================================================================*/
+int apply_watermark_differential(void)
+{
+    volatile u8 *cons = (volatile u8 *)DDR_VOTER_OUT_BASE;
+    const volatile u8 *wm = (const volatile u8 *)DDR_WATERMARK_BASE;
+    u32 i;
+
+    Xil_DCacheInvalidateRange(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
+    Xil_DCacheInvalidateRange(DDR_WATERMARK_BASE, WM_PACKED_BYTES);
+    __asm__ volatile("dsb sy");
+
+    for (i = 0; i < WM_PACKED_BYTES; i++) {
+        cons[i] = (u8)(cons[i] ^ wm[i]);
+    }
+    /* 81,000 bit 不是 8 的整数倍余数为 0（10,125*8 = 81,000），无需处理尾部 */
+
+    Xil_DCacheFlushRange(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
+    __asm__ volatile("dsb sy");
+    __asm__ volatile("isb");
+    xil_printf("[DIFF] Consensus XOR watermark done (%u bytes)\n\r",
+               (u32)WM_PACKED_BYTES);
+    return 0;
 }
 
 void process_batch(dna_connection_t *conn, u8 *data, u32 len)

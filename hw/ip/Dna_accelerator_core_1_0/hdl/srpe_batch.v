@@ -1,11 +1,11 @@
 // =============================================================
 // File: srpe_batch.v
 // Desc : 64-read batch engine using bit-plane BRAM
-//        - ROM/Î»Æ½Ãæ¾ùÍÆ¶ÏÎª BRAM£¨Í¬²½¶Á£©
-//        - ¼ÆËã½×¶ÎÓÃ pos_base ¹Ì»¯µ±Ç° pos£¬½µµÍ¸ßÉÈ³ö
-//        - ´ò·ÖÂ·¾¶ 8¡Á8 ·Ö×é£¨¾Ö²¿Ê¹ÄÜ+Æ¥ÅäÎ»¼Ä´æ£©½µµÍ¾»ÑÓ³Ù
-//        - ¡ï ÐÞ¸´£ºË®Ó¡ ROM µØÖ·¸ÄÎªÏßÐÔµØÖ· lc*REF_LEN + row
-//        - ¡ï ×îÖÕÐÞ¸´£ºregion_mul_stride ±ÜÃâÖÐ¼ä¼Ó·¨Òç³ö
+//        - ROM/Î»Æ½ï¿½ï¿½ï¿½ï¿½Æ¶ï¿½Îª BRAMï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+//        - ï¿½ï¿½ï¿½ï¿½×¶ï¿½ï¿½ï¿½ pos_base ï¿½Ì»ï¿½ï¿½ï¿½Ç° posï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ï¿½È³ï¿½
+//        - ï¿½ï¿½ï¿½Â·ï¿½ï¿½ 8ï¿½ï¿½8 ï¿½ï¿½ï¿½é£¨ï¿½Ö²ï¿½Ê¹ï¿½ï¿½+Æ¥ï¿½ï¿½Î»ï¿½Ä´æ£©ï¿½ï¿½ï¿½Í¾ï¿½ï¿½Ó³ï¿½
+//        - ï¿½ï¿½ ï¿½Þ¸ï¿½ï¿½ï¿½Ë®Ó¡ ROM ï¿½ï¿½Ö·ï¿½ï¿½Îªï¿½ï¿½ï¿½Ôµï¿½Ö· lc*REF_LEN + row
+//        - ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½ï¿½ï¿½region_mul_stride ï¿½ï¿½ï¿½ï¿½ï¿½Ð¼ï¿½Ó·ï¿½ï¿½ï¿½ï¿½
 // Synth: Verilog-2001
 // =============================================================
 `timescale 1 ns / 1 ps
@@ -13,9 +13,9 @@
 (* keep_hierarchy = "yes" *)
 module srpe_batch #(
     parameter integer BATCH     = 64,
-    parameter integer NUM_LC    = 50,      // ²Î¿¼Æ¬¶ÎÊý£º50
-    parameter integer STRIDE    = 807,     // Ã¿¶Î»¬¶¯²½³¤£º807
-    parameter integer REF_LEN   = 957,     // Ã¿¶Î²Î¿¼³¤¶È£º957
+    parameter integer NUM_LC    = 50,      // ï¿½Î¿ï¿½Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½50
+    parameter integer STRIDE    = 807,     // Ã¿ï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½807
+    parameter integer REF_LEN   = 957,     // Ã¿ï¿½Î²Î¿ï¿½ï¿½ï¿½ï¿½È£ï¿½957
     parameter integer READ_BPS  = 150,
     parameter integer SCORE_W   = 10,
     parameter integer POS_W     = 16
@@ -24,18 +24,18 @@ module srpe_batch #(
     input  wire                   rst_n,
     input  wire                   start_batch,
 
-    // ´ÓÉÏ²ã°´Ðè»ñÈ¡ BATCH Ìõ codeword£¨Ã¿Ìõ 2*READ_BPS bit£©
-    output reg                    cw_req,     // ÒýÇæÐèÒªÒ»Ìõ read
-    input  wire                   cw_valid,   // ¶¥²ãÔÚÏÂÒ»ÅÄÌá¹© cw_data
+    // ï¿½ï¿½ï¿½Ï²ã°´ï¿½ï¿½ï¿½È¡ BATCH ï¿½ï¿½ codewordï¿½ï¿½Ã¿ï¿½ï¿½ 2*READ_BPS bitï¿½ï¿½
+    output reg                    cw_req,     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÒ»ï¿½ï¿½ read
+    input  wire                   cw_valid,   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½á¹© cw_data
     input  wire [READ_BPS*2-1:0]  cw_data,    // 300b when READ_BPS=150
 
-    // Ô¤¼ÓÔØË®Ó¡£¨Ð´ ROM£©
+    // Ô¤ï¿½ï¿½ï¿½ï¿½Ë®Ó¡ï¿½ï¿½Ð´ ROMï¿½ï¿½
     input  wire                   bram_write_en,
     input  wire [5:0]             bram_sel,
     input  wire [9:0]             bram_write_addr,  // 0..REF_LEN-1 (957-1=956)
     input  wire [1:0]             bram_write_data,
 
-    // ½á¹ûÊä³öµ½½á¹û FIFO
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ FIFO
     output reg                    res_wr,
     output reg  [READ_BPS*2+POS_W+SCORE_W-1:0] res_din,
     input  wire                   res_full,
@@ -47,19 +47,19 @@ module srpe_batch #(
     localparam integer CODEBITS = READ_BPS*2;
     localparam integer RESULT_W = CODEBITS + POS_W + SCORE_W;
 
-    // ¡¾ÐÞ¸Ä3-1¡¿ÐÂÔö²ÎÊý
+    // ï¿½ï¿½ï¿½Þ¸ï¿½3-1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     localparam integer REGION_W = 6;                     // 0~49
     localparam integer WM_DEPTH = NUM_LC * REF_LEN;      // 50*957
     localparam integer WM_AW = CLOG2(WM_DEPTH);
 
     // ----------------------------------------------------------
-    // ÊµÓÃº¯Êý
+    // Êµï¿½Ãºï¿½ï¿½ï¿½
     // ----------------------------------------------------------
     function integer CLOG2; input integer v; integer t,i; begin
         t=v-1; i=0; while(t>0) begin t=t>>1; i=i+1; end CLOG2=i;
     end endfunction
 
-    // ¡¾ÐÞ¸´1¡¿MUL957 ÕýÈ·ÊµÏÖ + ×¢ÊÍÐÞÕý
+    // ï¿½ï¿½ï¿½Þ¸ï¿½1ï¿½ï¿½MUL957 ï¿½ï¿½È·Êµï¿½ï¿½ + ×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     // 957 = 512 + 256 + 128 + 32 + 16 + 8 + 4 + 1
     //     = 2^9 + 2^8 + 2^7 + 2^5 + 2^4 + 2^3 + 2^2 + 2^0
     function [15:0] MUL957; 
@@ -70,30 +70,30 @@ module srpe_batch #(
     endfunction
 
     // ----------------------------------------------------------
-    // Ë®Ó¡ ROM£ºNUM_LC * REF_LEN * 2-bit
+    // Ë®Ó¡ ROMï¿½ï¿½NUM_LC * REF_LEN * 2-bit
     // ----------------------------------------------------------
     (* ram_style="block", rom_style="block" *)
     reg [1:0] wm_bram [0:WM_DEPTH-1];
 
-    // Ð´µØÖ·: wm_wr_addr = MUL957(region) + row 
+    // Ð´ï¿½ï¿½Ö·: wm_wr_addr = MUL957(region) + row 
     wire [15:0] wm_wr_addr_lin = MUL957({10'd0, bram_sel}) + {6'd0, bram_write_addr};
     wire [WM_AW-1:0] wm_wr_addr = wm_wr_addr_lin[WM_AW-1:0];
 
-    // ¶ÁµØÖ·: wm_rd_addr = MUL957(lc_idx) + ((pos_base + i_idx) % REF_LEN) 
+    // ï¿½ï¿½ï¿½ï¿½Ö·: wm_rd_addr = MUL957(lc_idx) + ((pos_base + i_idx) % REF_LEN) 
     reg  [WM_AW-1:0] wm_rd_addr_q;
     wire [WM_AW-1:0] wm_rd_addr_d;
 
-    // Í¬²½¶ÁÊä³ö
+    // Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     reg [1:0] wm_sym_q;
 
     // ----------------------------------------------------------
-    // ¶Á¶ÎÎ»Æ½Ãæ BRAM£ºÃ¿ÐÐ 64bit ¡Á READ_BPS ÐÐ£¨·Ö±ð´æ LSB/MSB£©
-    // Port A£ºcompute£¨Í¬²½¶Á£©£»Port B£ºbuild/emit£¨RMW£©
+    // ï¿½ï¿½ï¿½ï¿½Î»Æ½ï¿½ï¿½ BRAMï¿½ï¿½Ã¿ï¿½ï¿½ 64bit ï¿½ï¿½ READ_BPS ï¿½Ð£ï¿½ï¿½Ö±ï¿½ï¿½ LSB/MSBï¿½ï¿½
+    // Port Aï¿½ï¿½computeï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Port Bï¿½ï¿½build/emitï¿½ï¿½RMWï¿½ï¿½
     // ----------------------------------------------------------
     (* ram_style = "block" *) reg [63:0] plane_lo [0:READ_BPS-1];
     (* ram_style = "block" *) reg [63:0] plane_hi [0:READ_BPS-1];
 
-    // A ¿Ú£¨compute£¬Í¬²½¶Á£©
+    // A ï¿½Ú£ï¿½computeï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     reg [7:0]  a_addr;
     reg [63:0] a_lo_q, a_hi_q;
     always @(posedge clk) begin
@@ -101,7 +101,7 @@ module srpe_batch #(
         a_hi_q <= plane_hi[a_addr];
     end
 
-    // B ¿Ú£¨build/emit£¬RMW£©
+    // B ï¿½Ú£ï¿½build/emitï¿½ï¿½RMWï¿½ï¿½
     reg [7:0]  b_addr;
     reg [63:0] b_lo_q, b_hi_q;
     reg        b_we_lo, b_we_hi;
@@ -114,7 +114,7 @@ module srpe_batch #(
     end
 
     // ----------------------------------------------------------
-    // ×´Ì¬»úÓëË÷Òý
+    // ×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     // ----------------------------------------------------------
     localparam [3:0] S_IDLE   = 4'd0,
                      S_CLR    = 4'd1,
@@ -126,34 +126,35 @@ module srpe_batch #(
                      S_UPD    = 4'd8,
                      S_NEXT   = 4'd9,
                      S_EMIT   = 4'd10,
+                     S_EMIT_W = 4'd14,
                      S_EMIT2  = 4'd11,
                      S_EMIT_FINAL = 4'd12,
                      S_DONE   = 4'd13;
 
     reg [3:0]  st;
 
-    // ÊäÈë½×¶Î
+    // ï¿½ï¿½ï¿½ï¿½×¶ï¿½
     reg [6:0]  cw_idx;
     reg [8:0]  row_i;
-    reg        phase;
+    reg [1:0]  phase;      // 0=ç»™åœ°å€ 1=ç­‰BRAMè¯»å‡º 2=è¯»æ”¹å†™ï¼ˆä¿®è®¢ B11ï¼‰
     reg [5:0]  bit_sel;
 
-    // ¼ÆËã½×¶Î
+    // ï¿½ï¿½ï¿½ï¿½×¶ï¿½
     reg [5:0]   lc_idx;
     reg [15:0]  pos_cnt;
     reg [15:0]  pos_base;
     reg [8:0]   i_idx;
 
-    // 64 Ìõ¶Á¶ÎµÄÀÛ¼ÆÓë×îÓÅ
+    // 64 ï¿½ï¿½ï¿½ï¿½ï¿½Îµï¿½ï¿½Û¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     reg [SCORE_W-1:0] score   [0:BATCH-1];
     reg [SCORE_W-1:0] best_sc [0:BATCH-1];
     reg [POS_W-1:0]   best_pos[0:BATCH-1];
-    // ¡¾ÐÞ¸Ä3-2¡¿ÐÂÔö£º¼ÇÂ¼×î¼Ñ region
+    // ï¿½ï¿½ï¿½Þ¸ï¿½3-2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ region
     reg [REGION_W-1:0] best_region [0:BATCH-1];
 
     integer t, g;
 
-    // ÏòÁ¿Æ¥Åä
+    // ï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½
     reg [63:0] match_mask;
     always @(*) begin
         case (wm_sym_q)
@@ -164,13 +165,28 @@ module srpe_batch #(
         endcase
     end
 
-    // === 8¡Á8 ·Ö×é ===
-    wire run_en = (st == S_RUN);
+    // === ç´¯åŠ ä½¿èƒ½ï¼šå¿…é¡»ä¸Žæ•°æ®ä¸¥æ ¼å¯¹é½ï¼ˆä¿®è®¢ B12ï¼‰===
+    //
+    // æ¯”å¯¹æµæ°´çº¿çš„å»¶è¿Ÿï¼šç»™å‡º i_idx çš„é‚£ä¸€æ‹è®°ä¸º Cï¼Œ
+    //   C+1  a_addr / wm_rd_addr_q ç”Ÿæ•ˆ
+    //   C+2  a_lo_q / a_hi_q / wm_sym_q å‡ºæ•° â†’ match_mask ç»„åˆæœ‰æ•ˆ
+    //   C+3  mm_q å¯„å­˜å¥½ï¼Œæ­¤æ—¶æ‰è¯¥ç´¯åŠ 
+    // åŽŸå®žçŽ°ç›´æŽ¥æŠŠ (st==S_RUN) å»¶è¿Ÿ 1 æ‹å½“ä½¿èƒ½ï¼Œå¯¼è‡´æ¯ä¸ªä½ç½®çš„å‰ 2 ä¸ªç¢±åŸº
+    // ç”¨çš„æ˜¯ä¸Šä¸€ä¸ªä½ç½®çš„æ®‹ç•™ã€è‡ªå·±æœ€åŽ 2 ä¸ªç¢±åŸºåˆæ²¡è¢«è®¡å…¥ï¼Œåˆ†æ•°ç³»ç»Ÿæ€§åå·®ã€‚
+    // è¿™é‡Œæ”¹æˆæœ‰æ•ˆæ€§ç§»ä½é“¾ï¼Œå¹¶è®© S_RUN å¤šè·‘ 3 æ‹æŠŠæµæ°´çº¿æŽ’ç©ºã€‚
+    reg [8:0] run_cnt;
+    wire idx_valid = (st == S_RUN) && (run_cnt < READ_BPS);
+    reg  v0, v1;
+    always @(posedge clk) begin
+        v0 <= idx_valid;
+        v1 <= v0;
+    end
+
     (* max_fanout = 8, keep = "true", dont_touch = "true" *)
     reg run_en_q0, run_en_q1, run_en_q2, run_en_q3, run_en_q4, run_en_q5, run_en_q6, run_en_q7;
     always @(posedge clk) begin
-        run_en_q0 <= run_en; run_en_q1 <= run_en; run_en_q2 <= run_en; run_en_q3 <= run_en;
-        run_en_q4 <= run_en; run_en_q5 <= run_en; run_en_q6 <= run_en; run_en_q7 <= run_en;
+        run_en_q0 <= v1; run_en_q1 <= v1; run_en_q2 <= v1; run_en_q3 <= v1;
+        run_en_q4 <= v1; run_en_q5 <= v1; run_en_q6 <= v1; run_en_q7 <= v1;
     end
     (* max_fanout = 8, keep = "true", dont_touch = "true" *)
     reg [7:0] mm_q0, mm_q1, mm_q2, mm_q3, mm_q4, mm_q5, mm_q6, mm_q7;
@@ -185,55 +201,55 @@ module srpe_batch #(
     wire [16:0] add_tmp  = pos_base + i_idx;
     wire [9:0]  addr_mod = (add_tmp >= REF_LEN) ? (add_tmp - REF_LEN) : add_tmp[9:0];
 
-    // ÏßÐÔ¶ÁµØÖ·£ºlc_idx*REF_LEN + addr_mod
+    // ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½Ö·ï¿½ï¿½lc_idx*REF_LEN + addr_mod
     wire [15:0] wm_rd_addr_lin = MUL957({10'd0, lc_idx}) + {6'd0, addr_mod};
     assign wm_rd_addr_d = wm_rd_addr_lin[WM_AW-1:0];
 
-    // Êä³ö³ÉÖ¡
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ö¡
     reg [CODEBITS-1:0] cw_acc;
     reg [8:0]          emit_i;
     reg [6:0]          emit_idx;
 
-    // ¡¾×îÖÕÐÞ¸´¡¿±ÜÃâÖÐ¼ä¼Ó·¨Òç³ö£ºÏÈÀ©Õ¹ best_region µ½ POS_W Î»¿í
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¼ï¿½Ó·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹ best_region ï¿½ï¿½ POS_W Î»ï¿½ï¿½
     wire [POS_W-1:0] region_ext = 
         {{(POS_W - REGION_W){1'b0}}, best_region[emit_idx]};
 
-    // ÕýÈ·¼ÆËã£ºregion * 807£¨ÎÞ½Ø¶Ï£©
+    // ï¿½ï¿½È·ï¿½ï¿½ï¿½ã£ºregion * 807ï¿½ï¿½ï¿½Þ½Ø¶Ï£ï¿½
     wire [POS_W-1:0] region_mul_stride = 
          (region_ext << 9) + (region_ext << 8) +
          (region_ext << 5) + (region_ext << 2) +
          (region_ext << 1) +  region_ext;  // 512+256+32+4+2+1 = 807
 
-    // È«¾Ö¾ø¶ÔÎ»ÖÃ
+    // È«ï¿½Ö¾ï¿½ï¿½ï¿½Î»ï¿½ï¿½
     wire [POS_W-1:0] global_pos = region_mul_stride + best_pos[emit_idx];
 
     // ----------------------------------------------------------
-    // Ö÷Ê±Ðò
+    // ï¿½ï¿½Ê±ï¿½ï¿½
     // ----------------------------------------------------------
     always @(posedge clk) begin
         if (!rst_n) begin
             st   <= S_IDLE; busy <= 1'b0; done <= 1'b0;
             cw_req <= 1'b0; res_wr <= 1'b0;
-            cw_idx <= 0; row_i <= 0; phase <= 1'b0; bit_sel <= 0;
-            lc_idx<= 0; pos_cnt <= 0; pos_base <= 0; i_idx <= 0;
+            cw_idx <= 0; row_i <= 0; phase <= 2'd0; bit_sel <= 0;
+            lc_idx<= 0; pos_cnt <= 0; pos_base <= 0; i_idx <= 0; run_cnt <= 0;
             a_addr<= 0; b_addr <= 0; b_we_lo <= 1'b0; b_we_hi <= 1'b0;
             wm_sym_q <= 2'b00; wm_rd_addr_q <= {WM_AW{1'b0}};
             for (t=0; t<BATCH; t=t+1) begin
                 best_sc[t]     <= {SCORE_W{1'b0}};
                 best_pos[t]    <= {POS_W{1'b0}};
-                best_region[t] <= {REGION_W{1'b0}};  // ³õÊ¼»¯ region
+                best_region[t] <= {REGION_W{1'b0}};  // ï¿½ï¿½Ê¼ï¿½ï¿½ region
                 score[t]       <= {SCORE_W{1'b0}};
             end
             emit_i <= 0; emit_idx <= 0; cw_acc <= {CODEBITS{1'b0}};
         end else begin
-            // ---- È«¾ÖÄ¬ÈÏ ----
+            // ---- È«ï¿½ï¿½Ä¬ï¿½ï¿½ ----
             done   <= 1'b0;
             res_wr <= 1'b0;
             b_we_lo<= 1'b0;
             b_we_hi<= 1'b0;
             cw_req <= 1'b0;
 
-            // ---- ROM Í¬²½¶Á ----
+            // ---- ROM Í¬ï¿½ï¿½ï¿½ï¿½ ----
             wm_rd_addr_q <= wm_rd_addr_d;
             wm_sym_q     <= wm_bram[wm_rd_addr_q];
             if (bram_write_en) wm_bram[wm_wr_addr] <= bram_write_data;
@@ -252,7 +268,7 @@ module srpe_batch #(
                     b_lo_d <= 64'd0; b_hi_d <= 64'd0;
                     b_we_lo<= 1'b1;  b_we_hi<= 1'b1;
                     if (row_i == READ_BPS-1) begin
-                        cw_idx  <= 0; row_i <= 0; phase <= 1'b0; bit_sel <= 0;
+                        cw_idx  <= 0; row_i <= 0; phase <= 2'd0; bit_sel <= 0;
                         st      <= S_LOAD;
                     end else begin
                         row_i <= row_i + 1'b1;
@@ -263,25 +279,38 @@ module srpe_batch #(
                     cw_req <= 1'b1;
                     if (cw_valid) begin
                         row_i <= 0;
-                        phase <= 1'b0;
+                        phase <= 2'd0;
                         st    <= S_LOAD_R;
                     end
                 end
 
                 S_LOAD_R: begin
-                    if (!phase) begin
+                    // ã€ä¿®è®¢ B11ã€‘plane BRAM æ˜¯åŒæ­¥è¯»ï¼šç»™å‡ºåœ°å€çš„ä¸‹ä¸€æ‹æ•°æ®æ‰æœ‰æ•ˆã€‚
+                    // åŽŸå®žçŽ°åªæœ‰ä¸¤ç›¸ï¼ˆç»™åœ°å€â†’ç«‹åˆ»è¯»æ”¹å†™ï¼‰ï¼Œè¯»åˆ°çš„å…¶å®žæ˜¯**ä¸Šä¸€è¡Œ**çš„å†…å®¹ï¼Œ
+                    // å†å†™å›žæœ¬è¡Œï¼Œç­‰äºŽæŠŠåˆ«çš„è¯»æ®µçš„ä½è¦†ç›–æŽ‰ï¼Œè£…è½½å‡ºæ¥çš„ä½å¹³é¢å…¨æ˜¯é”™çš„ã€‚
+                    // è¿™é‡Œæ’å…¥ä¸€æ‹ç­‰å¾…ç›¸ã€‚
+                    if (phase == 2'd0) begin
                         b_addr <= row_i[7:0];
-                        phase  <= 1'b1;
+                        phase  <= 2'd1;
+                    end else if (phase == 2'd1) begin
+                        phase  <= 2'd2;          // ç­‰ b_lo_q/b_hi_q å‡ºæ•°
                     end else begin
-                        b_lo_d <= (cw_data[(row_i<<1)+0]) ?
-                                  (b_lo_q | (64'h1 << bit_sel)) :
-                                  (b_lo_q & ~(64'h1 << bit_sel));
-                        b_hi_d <= (cw_data[(row_i<<1)+1]) ?
+                        // ã€ä¿®è®¢ B2ã€‘ç å­—æ˜¯ã€Œä½å¹³é¢ã€å¸ƒå±€ï¼Œä¸æ˜¯äº¤ç»‡ï¼š
+                        //   cw_data[0 .. READ_BPS-1]        = æ¯ä¸ªç¢±åŸºçš„é«˜ä½
+                        //   cw_data[READ_BPS .. 2*READ_BPS-1] = æ¯ä¸ªç¢±åŸºçš„ä½Žä½
+                        // è€Œ match_mask é‡Œçš„ç¬¦å·çº¦å®šæ˜¯ {a_hi, a_lo}ï¼Œ
+                        // å› æ­¤ç¬¬ä¸€ä½å¹³é¢è¿› hiã€ç¬¬äºŒä½å¹³é¢è¿› loã€‚
+                        // åŽŸå®žçŽ°æŒ‰ cw_data[2i]/cw_data[2i+1] å–ï¼ˆäº¤ç»‡å¸ƒå±€ï¼‰ï¼Œ
+                        // ä¸Ž Voter çš„ calc_layer_position() å’Œä¸Šä½æœºéƒ½å¯¹ä¸ä¸Šã€‚
+                        b_hi_d <= (cw_data[row_i]) ?
                                   (b_hi_q | (64'h1 << bit_sel)) :
                                   (b_hi_q & ~(64'h1 << bit_sel));
+                        b_lo_d <= (cw_data[READ_BPS + row_i]) ?
+                                  (b_lo_q | (64'h1 << bit_sel)) :
+                                  (b_lo_q & ~(64'h1 << bit_sel));
                         b_we_lo<= 1'b1; b_we_hi<= 1'b1;
 
-                        phase  <= 1'b0;
+                        phase  <= 2'd0;
                         if (row_i == READ_BPS-1) begin
                             if (cw_idx == BATCH-1) begin
                                 st <= S_INITC;
@@ -300,10 +329,11 @@ module srpe_batch #(
                     lc_idx  <= 0;
                     pos_cnt <= 0;
                     i_idx   <= 0;
+                    run_cnt <= 0;
                     for (t=0; t<BATCH; t=t+1) begin
                         best_sc[t]     <= {SCORE_W{1'b0}};
                         best_pos[t]    <= {POS_W{1'b0}};
-                        best_region[t] <= {REGION_W{1'b0}};  // ÇåÁã region
+                        best_region[t] <= {REGION_W{1'b0}};  // ï¿½ï¿½ï¿½ï¿½ region
                         score[t]       <= {SCORE_W{1'b0}};
                     end
                     a_addr   <= 0;
@@ -313,6 +343,7 @@ module srpe_batch #(
 
                 S_LAUNCH: begin
                     i_idx    <= 0;
+                    run_cnt  <= 0;
                     pos_base <= pos_cnt;
                     for (t=0; t<BATCH; t=t+1) score[t] <= {SCORE_W{1'b0}};
                     a_addr   <= 0;
@@ -332,11 +363,10 @@ module srpe_batch #(
                         if (run_en_q7 && mm_q7[g]) score[g+56]   <= score[g+56]   + 1'b1;
                     end
 
-                    if (i_idx == READ_BPS-1) begin
-                        st <= S_UPD;
-                    end else begin
-                        i_idx <= i_idx + 1'b1;
-                    end
+                    // å¤šè·‘ 3 æ‹æŠŠæµæ°´çº¿æŽ’ç©ºï¼›i_idx åˆ°é¡¶åŽä¿æŒï¼Œé  idx_valid å±è”½ç´¯åŠ 
+                    run_cnt <= run_cnt + 1'b1;
+                    if (i_idx < READ_BPS-1) i_idx <= i_idx + 1'b1;
+                    if (run_cnt == READ_BPS + 2) st <= S_UPD;
                 end    
 
                 S_UPD: begin
@@ -344,7 +374,7 @@ module srpe_batch #(
                         if (score[t] > best_sc[t]) begin
                             best_sc[t]     <= score[t];
                             best_pos[t]    <= pos_base[POS_W-1:0];
-                            best_region[t] <= lc_idx;          // ¼ÇÂ¼µ±Ç° lc_idx
+                            best_region[t] <= lc_idx;          // ï¿½ï¿½Â¼ï¿½ï¿½Ç° lc_idx
                         end
                     end
                     st <= S_NEXT;
@@ -369,13 +399,17 @@ module srpe_batch #(
                 S_EMIT: begin
                     if (!res_full) begin
                         b_addr <= emit_i[7:0];
-                        st     <= S_EMIT2;
+                        st     <= S_EMIT_W;     // ã€ä¿®è®¢ B10ã€‘åŒæ ·è¦ç­‰ä¸€æ‹åŒæ­¥è¯»
                     end
                 end
 
+                S_EMIT_W: st <= S_EMIT2;
+
                 S_EMIT2: begin
-                    cw_acc[(emit_i<<1)+0] <= b_lo_q[emit_idx];
-                    cw_acc[(emit_i<<1)+1] <= b_hi_q[emit_idx];
+                    // ã€ä¿®è®¢ B2ã€‘è¾“å‡ºåŒæ ·æŒ‰ä½å¹³é¢å¸ƒå±€ï¼Œä¸Ž Voter çš„
+                    // calc_layer_position()ï¼ˆå‰ READ_BPS ä½å±žä¸Šå±‚ï¼‰ä¿æŒä¸€è‡´ã€‚
+                    cw_acc[emit_i]            <= b_hi_q[emit_idx];
+                    cw_acc[READ_BPS + emit_i] <= b_lo_q[emit_idx];
 
                     if (emit_i == READ_BPS-1) begin
                         emit_i  <= 0;

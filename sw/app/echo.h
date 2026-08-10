@@ -39,7 +39,30 @@
 #define FRAME_READS             64U
 #define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 2560B */
 #define TOTAL_READS             108000U
-#define MAX_WATERMARK_SIZE      10120U
+
+/*=============================================================================
+ * 水印几何（必须与 srpe_batch 的 parameter 一致）
+ *
+ *   REF_LEN = STRIDE + READ_BPS
+ *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*807 + 150 = 40,500
+ *   水印比特数 = 2 * L = 81,000
+ *
+ * 【修订 B1】MAX_WATERMARK_SIZE 原为 10120，小于 81,000 bit 所需的 10,125 B，
+ * 而且 process_watermark() 还会静默截断，尾部 40 bit 直接丢掉。
+ *============================================================================*/
+#define WM_NUM_LC               50U
+#define WM_STRIDE               807U
+#define WM_REF_LEN              957U
+#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 150U)   /* 40,500 */
+#define WM_TOTAL_BITS           (WM_SYMBOLS * 2U)                /* 81,000 */
+#define WM_PACKED_BYTES         ((WM_TOTAL_BITS + 7U) / 8U)      /* 10,125 */
+#define MAX_WATERMARK_SIZE      10240U                           /* 上位机按 8 对齐发 10,128 */
+
+/* 展开后的区域缓冲：每个符号占一个 32-bit 字（低 2 位有效），
+ * DNA 核预载时每拍只取 TDATA[1:0]，故必须一符号一拍地送。 */
+#define WM_REGION_SYMBOLS       WM_REF_LEN
+#define WM_REGION_BYTES         (WM_REGION_SYMBOLS * 4U)         /* 3,828 B */
+#define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 191,400 B */
 
 /*=============================================================================
  * DDR 地址映射 (优化后，去除重打包)
@@ -56,7 +79,8 @@
  *============================================================================*/
 
 /* 输入数据区 */
-#define DDR_WATERMARK_BASE      0x10000000U    /* 标准水印数据 */
+#define DDR_WATERMARK_BASE      0x10000000U    /* 上位机送来的打包水印（LSB-first） */
+#define DDR_WM_REGIONS_BASE     0x10040000U    /* 展开后的 50 个区域，共 191,400 B（修订 B1） */
 #define DDR_READS_BASE          0x10100000U    /* 原始读段数据 */
 
 /* Stage1: DNA Accelerator */
@@ -128,6 +152,10 @@
 #define DNA_ACC_REG0_CTRL           0x00U
 #define DNA_ACC_CTRL_BIT_START      (1U << 0)
 #define DNA_ACC_CTRL_BIT_PRELOAD    (1U << 1)
+#define DNA_ACC_CTRL_BIT_SOFTRST    (1U << 2)
+/* 【修订 B1】预载的区域号寄存器。原实现从未写过它，
+ * 结果 50 个区域里只有第 0 个被写入，其余 49 个恒为全 0。 */
+#define DNA_ACC_REG1_WMSEL          0x04U
 
 /* ========= 第二个IP核: Voter (差分投票) =========
  *
@@ -223,6 +251,10 @@ int  dna_accelerator_init(void);
 
 /* 数据处理函数 */
 void process_watermark(dna_connection_t *conn, u8 *data, u32 len);
+/* 把打包水印展开成 NUM_LC 个区域写进 DDR（修订 B1） */
+int  expand_watermark_regions(dna_connection_t *conn);
+/* Stage2 共识 ⊕ 水印 → 稀疏流，供 Stage3 使用（修订 B3） */
+int  apply_watermark_differential(void);
 void process_batch(dna_connection_t *conn, u8 *data, u32 len);
 void process_post(dna_connection_t *conn);
 void send_result(dna_connection_t *conn);

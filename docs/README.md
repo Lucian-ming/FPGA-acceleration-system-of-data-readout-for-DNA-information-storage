@@ -1,141 +1,41 @@
-# 📘 Vitis DNA Accelerator — 技术文档
+# 文档索引
 
-## 一、系统概览
+按「先看什么」的顺序排列。
 
-```
-PS (lwIP) ⇄ DMA ⇄ DNA Accelerator ⇄ Differential Voter ⇄ Desparsification Decoder ⇄ DMA ⇄ PS
-```
+| 文档 | 回答什么问题 | 什么时候看 |
+| --- | --- | --- |
+| [01-architecture.md](01-architecture.md) | 系统应该是什么样、每一级在算什么 | 第一次接手项目 |
+| [02-data-contract.md](02-data-contract.md) | 编码、位序、码表的**唯一权威规范** | 改任何数据格式之前 |
+| [03-status.md](03-status.md) | 现在哪里是坏的、证据在哪一行 | 决定动手改什么之前 |
+| [04-roadmap.md](04-roadmap.md) | 接下来按什么顺序做、每步的验收判据 | 排期与分工 |
+| [06-implementation-plan.md](06-implementation-plan.md) | **详细实施计划**：阶段、任务、判据、工作量、风险 | 开工前 / 每周对表 |
+| [05-interfaces.md](05-interfaces.md) | TCP 协议、寄存器、DDR 地址 | 写 PS 固件或上位机 |
+| [07-performance.md](07-performance.md) | CPU/FPGA 性能实测与加速价值分析 | 讨论选型、立项、答辩 |
+| [08-handoff-2026-08-10.md](08-handoff-2026-08-10.md) | 当前可交接基线、复跑结果与下一阻塞项 | 接续 Claude 的工作前 |
 
-三阶段硬件流水线实现高速 DNA 数据解码处理。
+## 参考资料（历史审计结果，只读）
 
----
+| 文档 | 内容 |
+| --- | --- |
+| [reference/dataset.md](reference/dataset.md) | R0.83 数据集的来源、SHA-256、格式与使用限制 |
+| [reference/repo-structure.md](reference/repo-structure.md) | 逐文件的职责索引 |
+| [reference/gap-audit.md](reference/gap-audit.md) | 复现缺口与风险清单（2026-08-05 审计） |
+| [reference/submission-archive.md](reference/submission-archive.md) | 2025-11-07 提交资产的校验和与黄金参考关系 |
+| [reference/legacy-tech-note.md](reference/legacy-tech-note.md) | 旧技术说明。⚠️ 其寄存器表是「示例模板」，与实现不符，已被 05 取代 |
 
-## 二、硬件结构
+## 工具
 
-| 模块                     | 接口                                          | 功能           |
-| ------------------------ | --------------------------------------------- | -------------- |
-| DNA Accelerator          | S_AXI_LITE_CTRL / S_AXIS_DATA / M_AXIS_RESULT | 数据预处理     |
-| Differential Voter       | S00_AXI / M00_AXI                             | 加权表决       |
-| Desparsification Decoder | S00_AXI / M00_AXI                             | 稀疏数据解码   |
-| AXI DMA                  | MM2S / S2MM / SG                              | 高速传输       |
-| PS7                      | GP0 / HP0                                     | 控制与内存接口 |
+| 工具 | 用途 |
+| --- | --- |
+| `tools/golden_model.py` | 黄金参考模型：验证算法契约、生成各级期望输出、软件复现整条流水线 |
+| `tools/extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC EXE 缺失的 3 个 MinGW 运行时 DLL |
+| `tools/make_golden.py` | 生成各级黄金向量到 `tests/golden/`（RTL Testbench 与端到端回归的判据） |
+| `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL |
+| `tools/readout.py` | **干净的纯软件读出实现**：只吃 FASTQ + 水印，产出 dec_input.txt，可 `--prove-inputs` 自证不碰参考答案 |
+| `tools/bench_align.py` + `tools/align.c` | Stage1 比对的 CPU 性能基准，以及「种子法为何失效」的实证 |
 
----
+## 文档维护约定
 
-## 三、软件结构
-
--   `main.c`：初始化 lwIP、DMA 与调度逻辑
--   `echo.c / echo.h`：TCP Echo 服务
--   `xparameters.h`：寄存器映射定义
--   `lscript.ld`：链接脚本
--   `create_vitis.tcl`：一键构建脚本
-
----
-
-## 四、通信协议
-
-| 字段   | 字节 | 描述            |
-| ------ | ---- | --------------- |
-| Header | 2    | 固定标识 0xBEEF |
-| Type   | 1    | 包类型          |
-| Length | 4    | 数据长度        |
-| CRC32  | 4    | 校验            |
-
----
-
-## 五、生成与调试
-
-```bash
-vivado -mode batch -source hw/scripts/build.tcl
-xsct sw/scripts/create_vitis.tcl
-```
-
----
-
-## 六、接口时序与寄存器（三个 IP 核）
-
-### 6.1 DNA Accelerator Core（AXIS + AXI‑Lite）
-
-**AXIS 输入（S_AXIS_DATA）**
-| 信号 | 方向 | 说明 |
-|------|------|------|
-| `S_AXIS_DATA_TDATA[31:0]` | I | 输入数据 |
-| `S_AXIS_DATA_TVALID` | I | 数据有效 |
-| `S_AXIS_DATA_TREADY` | O | 接收就绪 |
-| `S_AXIS_DATA_TLAST` | I | 帧结束 |
-
-**AXIS 输出（M_AXIS_RESULT）**
-| 信号 | 方向 | 说明 |
-|------|------|------|
-| `M_AXIS_RESULT_TDATA[31:0]` | O | 输出数据 |
-| `M_AXIS_RESULT_TVALID` | O | 数据有效 |
-| `M_AXIS_RESULT_TREADY` | I | 下游就绪 |
-| `M_AXIS_RESULT_TLAST` | O | 帧结束 |
-
-**AXI‑Lite 控制（S_AXI_LITE_CTRL，示例寄存器）**
-| 偏移 | 名称 | 位段 | 说明 |
-|------|------|------|------|
-| 0x00 | CTRL | [0]=START | 上升沿启动一次处理 |
-| 0x04 | STATUS| [0]=IDLE, [1]=DONE, [2]=ERR | 状态位 |
-| 0x08 | CFG_IN_ADDR_LO | 31:0 | 输入物理地址低 32 位 |
-| 0x0C | CFG_IN_ADDR_HI | 31:0 | 输入物理地址高 32 位（如需） |
-| 0x10 | CFG_OUT_ADDR_LO | 31:0 | 输出地址低 32 位 |
-| 0x14 | CFG_OUT_ADDR_HI | 31:0 | 输出地址高 32 位 |
-| 0x18 | CFG_LEN | 31:0 | 处理字节数 |
-
-> 具体寄存器以实际 RTL 为准，上表为常见布局建议。
-
----
-
-### 6.2 Differential Voter Core（AXI‑Lite + AXI Master）
-
-**AXI‑Lite 控制（S00_AXI，示例寄存器）**
-| 偏移 | 名称 | 位段 | 说明 |
-|------|------|------|------|
-| 0x00 | CTRL | [0]=START | 触发一次表决计算 |
-| 0x04 | STATUS | [0]=IDLE, [1]=DONE, [2]=ERR | 运行状态 |
-| 0x08 | IN_BASE_LO | 31:0 | 输入缓冲区基地址（低） |
-| 0x0C | IN_BASE_HI | 31:0 | 输入缓冲区基地址（高） |
-| 0x10 | OUT_BASE_LO | 31:0 | 输出缓冲区基地址（低） |
-| 0x14 | OUT_BASE_HI | 31:0 | 输出缓冲区基地址（高） |
-| 0x18 | LEN | 31:0 | 数据长度（字节/拍） |
-| 0x1C | THRESH | 15:0 | 表决阈值/参数 |
-
-**AXI Master（M00_AXI）**
-
--   通过 M_AXI 从 DDR 读取输入、写回输出（突发长度由内部或寄存器控制）。
--   时钟/复位：`M00_AXI_ACLK` / `M00_AXI_ARESETN`。
-
----
-
-### 6.3 Desparsification Decoder Core（AXI‑Lite + AXI Master）
-
-**AXI‑Lite 控制（S00_AXI，示例寄存器）**
-| 偏移 | 名称 | 位段 | 说明 |
-|------|------|------|------|
-| 0x00 | CTRL | [0]=START | 触发一次解码 |
-| 0x04 | STATUS | [0]=IDLE, [1]=DONE, [2]=ERR | 运行状态 |
-| 0x08 | IN_BASE_LO | 31:0 | 输入稀疏数据地址（低） |
-| 0x0C | IN_BASE_HI | 31:0 | 输入稀疏数据地址（高） |
-| 0x10 | OUT_BASE_LO | 31:0 | 输出密集数据地址（低） |
-| 0x14 | OUT_BASE_HI | 31:0 | 输出密集数据地址（高） |
-| 0x18 | N_IN | 31:0 | 输入元素数 |
-| 0x1C | N_OUT | 31:0 | 输出元素数/最大容量 |
-
-**AXI Master（M00_AXI）**
-
--   负责从 DDR 读取稀疏输入、写回解码结果。
--   时钟/复位：`M00_AXI_ACLK` / `M00_AXI_ARESETN`。
-
-> Voter/Decoder 的具体寄存器布局以你的 RTL/封装为准；上表提供规范化模板，便于文档化与上位机对接。
-
----
-
-## 七、网络配置
-
-默认静态 IP：  
-IP = 192.168.1.10  
-MASK = 255.255.255.0  
-GW = 192.168.1.1
-
-可在 `sw/app/app_net_config.h` 修改。
+- 改协议 / 寄存器 / 数据格式：先改 `02-data-contract.md` 或 `05-interfaces.md`，再改代码。
+- 修好一个缺陷：在 `03-status.md` 里划掉它并记录判据结果，不要静默删除。
+- 新增数据集版本：在 `reference/dataset.md` 追加一节，保留 SHA-256，不覆盖旧记录。

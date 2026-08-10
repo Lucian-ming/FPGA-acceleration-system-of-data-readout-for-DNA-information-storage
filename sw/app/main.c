@@ -16,16 +16,18 @@
 #include "lwip/tcp.h"
 #include "lwip/dhcp.h"
 #include "lwip/timeouts.h"
+/* tcp_fasttmr()/tcp_slowtmr() 在 lwIP 2.x 里声明在私有头里；
+   不包含它会变成隐式声明（-Werror 下直接失败，且返回类型按 int 猜测）。 */
+#include "lwip/priv/tcp_priv.h"
 
 /* 应用层 */
 #include "echo.h"
 #include "sleep.h"
 
-/* 若 BSP 未提供 sleep(),提供一个基于 usleep 的弱符号 */
-void sleep(unsigned int seconds) __attribute__((weak));
-void sleep(unsigned int seconds) {
-    usleep(seconds * 1000000U);
-}
+/* 注意：standalone BSP 的 sleep.h 已经声明并实现了 `void sleep(u32)`。
+   这里原本还定义了一个 `void sleep(unsigned int)` 的弱符号兜底，
+   与 BSP 原型冲突（u32 是 unsigned long），编译直接报
+   "conflicting types for 'sleep'"。既然 BSP 一定提供，直接去掉。 */
 
 /* 这两个 Flag 通常由 BSP 的定时器 ISR 置位 */
 extern volatile int TcpFastTmrFlag;

@@ -15,12 +15,15 @@ from typing import Callable, Optional
 DECODER_EXE = "R5_6_LDPC_hard_decoder.exe"
 DECODER_PCHK = "dvb_s2_r5_6.pchk"
 DECODER_PERM = "permutation64800"
+# 解码器是 MinGW 构建，运行时依赖这三个 DLL。缺失时它不报错、不输出、退出码仍为 0，
+# 极易被误判成输入数据有问题。来源见 tools/extract_ldpc_dlls.py。
+DECODER_DLLS = ("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")
 DEC_INPUT_NAME = "dec_input.txt"
 DECODER_OUTPUT_BITS = "TestBitStream.txt"
 DECODER_OUTPUT_IMAGE = "image.jpg"
 
 
-@dataclass(slots=True)
+@dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
 class LDPCResult:
     """Summary of decoder outputs."""
 
@@ -85,23 +88,29 @@ def run_ldpc_decoder(
     decoder_exe = _copy_resource(workspace, DECODER_EXE)
     _copy_resource(workspace, DECODER_PCHK)
     _copy_resource(workspace, DECODER_PERM)
+    for dll in DECODER_DLLS:
+        try:
+            _copy_resource(workspace, dll)
+        except FileNotFoundError:
+            log_info(f"[LDPC] 警告: 缺少运行时 {dll}，解码器可能静默失败；"
+                     f"可用 tools/extract_ldpc_dlls.py 从历史 gui_app.exe 提取")
 
-    # 1. ??????????????????
+    # 1. 把板端回传的比特流写入解码器工作目录
     result_bits = result_bits_path.read_text(encoding="utf-8")
-    log_info(f"[LDPC] ????????????: {result_bits_path} ({len(result_bits)} ??)")
+    log_info(f"[LDPC] 读取板端结果: {result_bits_path} ({len(result_bits)} 字符)")
 
     dec_input_workspace = workspace / DEC_INPUT_NAME
     dec_input_workspace.write_text(result_bits, encoding="utf-8")
-    log_info(f"[LDPC] ??????? {dec_input_workspace.name} ({len(result_bits)} ??)")
+    log_info(f"[LDPC] 已写入 {dec_input_workspace.name} ({len(result_bits)} 字符)")
 
     if result_bits_path.name == DEC_INPUT_NAME:
         dec_input_output = result_bits_path
     else:
         dec_input_output = output_dir / DEC_INPUT_NAME
         dec_input_output.write_text(result_bits, encoding="utf-8")
-        log_info(f"[LDPC] ??????? {dec_input_output.name}")
+        log_info(f"[LDPC] 已另存 {dec_input_output.name}")
 
-    # 2. ?????
+    # 2. 调用外部 LDPC 解码器
     cmd = [
         str(decoder_exe),
         DEC_INPUT_NAME,
@@ -124,7 +133,11 @@ def run_ldpc_decoder(
     image_src = workspace / DECODER_OUTPUT_IMAGE
 
     if not decoded_bits_src.exists() or not image_src.exists():
-        raise FileNotFoundError("解码输出缺失，可能是外部解码器失败")
+        raise FileNotFoundError(
+            "解码输出缺失。解码器已退出但没有产出文件——最常见的原因是缺少 MinGW 运行时 "
+            f"({', '.join(DECODER_DLLS)})，此时它不报错、退出码仍为 0。"
+            "请确认 clients/python/resources/ 下这三个 DLL 存在。"
+        )
 
     decoded_bits_dst = output_dir / "decoded_bits.txt"
     image_dst = output_dir / "decoded_image.jpg"
