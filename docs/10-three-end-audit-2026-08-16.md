@@ -23,6 +23,7 @@
 | R2 | 上位机 | 已完成：提取 TaskSpec/协议模块；严格水印/读段/结果校验；LDPC 默认原生 | 12 项单测；全量 9/9；dry-run/auto LDPC 通过 | `44f00eb` / `git revert 44f00eb` |
 | R3 | PL | 已完成：修复 DNA 入口丢数、三核 AXI-Lite 独立握手、尾批超时位宽；清理死寄存器/乱码注释并标记遗留 RTL | RTL 全量回归 + 三个顶层 Vivado 综合/时序 | `6c8bdcd` / `git revert 6c8bdcd` |
 | R4 | 文档与收尾 | 已同步 03/05/06/09/README；全量回归、ELF、三顶层综合复跑 | 全绿 | `92bf2c2` / `git revert 92bf2c2` |
+| R5 | 可上板构建链 | 已完成：修复 IP 打包文件集、固化 PS7 板级配置与地址图、完整生成 bitstream/XSA/匹配 ELF | Vivado/Vitis 2022.2；全量回归 11/11 | `2f6be1f`、`8cae574` |
 
 ## R1 审查发现（已提交 `80f53b9`）
 
@@ -136,3 +137,38 @@
 - 功能提交：`6c8bdcd fix(pl): 修复数据入口与AXI-Lite握手缺陷`
 - 单独回退：`git revert 6c8bdcd`
 - 本节文档回填提交：`8fbd108`（回退：`git revert 8fbd108`；不会触及 RTL）。
+
+## R5 比特流、XSA 与匹配 ELF 重建（当前工作树）
+
+### 构建缺陷与修复
+
+1. 三个自研 IP 的 `component.xml` 引用了不存在的软件驱动文件，Stage3 又漏列
+   `desparsify_datapath.v`，导致 BD IP 综合无法稳定复现；已清理无效 driver view/fileSet，
+   并把 Stage3 数据通路加入 synthesis/simulation fileSet。
+2. `bd.tcl` 原来只用默认 PS7 自动化，GEM0/UART1 未启用且 DDR 型号错误，新 XSA 因而
+   无法生成 lwIP BSP。现从只读历史 XSA 的 HWH 固化 DDR、GEM0/MDIO、UART1、Bank1 1.8V、
+   FCLK0 100 MHz、GP0/HP0；四个 AXI-Lite 地址固定匹配 PS 常量。
+3. 补接 PS GP0/HP0 ACLK；修正 Clock Wizard 的真实参数名；`build.tcl` 增加 run 失败检查，
+   `collect_info.tcl` 不再把 Vivado `-tclargs` 当报告目录；删除 XDC 不支持的 `if` 命令。
+
+### 构建产物与判据
+
+| 产物 | 大小 | SHA-256 |
+| --- | ---: | --- |
+| `hw/build/dna_accel.runs/impl_1/top_bd_wrapper.bit` | 2,083,850 B | `c3a365a02b76daff29e52acd694c2457f25cd3a44f553f169baf45f9a3f7d25f` |
+| `hw/build/export/dna_accel.xsa` | 680,134 B | `aed6f74ab5f2ef5fcd5998ddd575834e9dd68d8d4f3fbdb76065da0f87df92cf` |
+| `sw/workspace/dna_lwip_app_board_20260816/Debug/dna_lwip_app_board_20260816.elf` | 943,824 B | `fd88dce5909f522a7255ca6ae1fe114539dcefa0a2e5bef0b6ca94a00a4cfef4` |
+| `hw/build/export/BOOT.bin` | 2,319,112 B | `5b7f9840cff67fc36a1c5cdcefb56a8c7581956460c4d97cab724dff8d92b711` |
+
+- Vivado：bitgen 0 error；0 routing error；WNS +0.145 ns、WHS +0.018 ns；FCLK0/PL 100 MHz。
+- Vitis：新 XSA 成功生成 `lwip211` BSP；ELF text/data/bss = 144,519/3,148/3,266,624。
+- 同源性：XSA 内嵌 bitstream 与独立 `.bit` 哈希相同；平台内 XSA 与导出 XSA 哈希相同；
+  BSP 与应用的 DMA、三核、GEM0、UART1 地址一致。
+- 回归：`bash tools/run_sim.sh` 通过 11 项、失败 0 项。
+- 启动镜像：`sw/boot/dna_board_20260816.bif` 按 FSBL → bitstream → 应用 ELF 组装；
+  FSBL SHA-256 `6575e43f...8cb78cb0`。Bootgen `-read` 确认 3 个 image/partition header，
+  应用 load/exec 均为 `0x00100000`；二次生成与交付 `BOOT.bin` 逐字节相同。
+- Bootgen 会对 Zynq `.bit` 分区（其 header load address 显示为 0）报告与 ELF 地址区间
+  重叠的 warning；读回 partition attributes 为 bitstream 类型且生成成功，不是 DDR 装载冲突。
+- 事实边界：本节只证明产物可复现且软硬件平台匹配，不证明 G3；仍需烧板、真实回传、
+  LDPC 后图片 SHA-256 等于 `fcd0cf90...b6b1f2c3`。

@@ -1,21 +1,20 @@
 # 03 · 现状与缺陷清单
 
 初始审计：2026-08-06；代码与回归复核：2026-08-10；Stage2 黄金 Testbench：2026-08-16；
-离线任务全量完成（D1/D2、C1~C4、A2/A8/A9、P5）：2026-08-16 下午。证据全部标注了 `文件:行号`，可直接跳转复核。
+离线任务全量完成（D1/D2、C1~C4、A2/A3/A8/A9、P5）：2026-08-16。证据全部标注了 `文件:行号`，可直接跳转复核。
 
 ---
 
 ## 一句话现状
 
-**除「上开发板」本身以外的一切都已做完并有自动化判据；现在离正确结果只差一次上板。**
+**当前 RTL 的 bitstream/XSA 与相匹配 ELF 已重建；剩余主路径是上板端到端验收。**
 硬件侧：Stage1/2/3 三级 RTL 全部有黄金向量逐位背书（含 D1 方案B 的 SCORE_MIN 阈值过滤），
-修改后的 Voter 已重新综合并在 100 MHz 收敛（WNS +2.48 ns）；
-PS 侧：按实际条数运行（C1~C3）、SCORE_MIN=67 已写入并回读校验，ELF 已用 xsct 重建；
+完整 `top_bd_wrapper` 已生成 bitstream，在 100 MHz 收敛（WNS +0.145 ns、WHS +0.018 ns）；
+PS 侧：按实际条数运行（C1~C3）、SCORE_MIN=67 已写入并回读校验，ELF 已基于同一份新 XSA 用 xsct 重建；
 主机侧：纯 Python LDPC 译码器（P5）在 Linux 上完成黄金数据全链自检（重建 JPEG 与原图逐字节相同）。
 
-**唯一剩余主路径：用修复后的 RTL 重新生成比特流 → 烧板 → 真实回传 → LDPC → 图片哈希 = `fcd0cf90...b6b1f2c3`（G3）。**
-次要遗留：A3（bd.tcl 未固化 PS7 板级配置——需要板卡的具体 DDR/MIO 参数或从历史 XSA 反推）、
-A7（LICENSE 需要用户选择许可证类型与权属确认）、P7 Stage1 架构改造。
+**唯一剩余主路径：烧录新 bitstream/ELF → 真实回传 → LDPC → 图片哈希 = `fcd0cf90...b6b1f2c3`（G3）。**
+次要遗留：A7（LICENSE 需要用户选择许可证类型与权属确认）、P7 Stage1 架构改造。
 P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线部分，见 changelog。
 
 **已完成（时间线）**：
@@ -37,6 +36,9 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
   `sw/app/task_config.h` 解析/校验/CRC 主机单测全过（黄金 CRC 与 zlib 交叉验证）；
   `first.py` 自动推导几何并下发（`--dry-run` 可预览，顺带修正 `resolve_total` 把
   `--limit` 当抬底的既有 bug）；ELF 重建（943,120 B）。板端握手联调待上板。
+- 2026-08-16 晚 · **A3 与可上板构建链关闭**：从只读历史 XSA 的 `design_1.hwh`
+  固化 DDR、GEM0/MDIO、UART1、FCLK0 和 MIO Bank 电压；完整 Vivado/Vitis 2022.2
+  重建 bitstream、XSA、lwIP BSP 与匹配 ELF。全量回归 11/11；产物和哈希见下文。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到
@@ -552,6 +554,26 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 text 140,603 / data 3,116 / bss 3,266,624。
 2026-08-16 傍晚（P3 后）：`dna_lwip_app.elf` 943,120 B。
 
+2026-08-16 晚（A3 后，当前可上板构建对）：
+
+```
+bitstream: hw/build/dna_accel.runs/impl_1/top_bd_wrapper.bit
+           2,083,850 B  SHA-256 c3a365a02b76daff29e52acd694c2457f25cd3a44f553f169baf45f9a3f7d25f
+XSA      : hw/build/export/dna_accel.xsa
+           680,134 B    SHA-256 aed6f74ab5f2ef5fcd5998ddd575834e9dd68d8d4f3fbdb76065da0f87df92cf
+ELF      : sw/workspace/dna_lwip_app_board_20260816/Debug/dna_lwip_app_board_20260816.elf
+           943,824 B    SHA-256 fd88dce5909f522a7255ca6ae1fe114539dcefa0a2e5bef0b6ca94a00a4cfef4
+段大小  : text 144,519 / data 3,148 / bss 3,266,624
+BOOT.bin : hw/build/export/BOOT.bin
+           2,319,112 B  SHA-256 5b7f9840cff67fc36a1c5cdcefb56a8c7581956460c4d97cab724dff8d92b711
+```
+
+XSA 内嵌 `dna_accel.bit` 与独立 bitstream SHA-256 相同；Vitis 平台目录内两份
+`dna_accel.xsa` 与导出 XSA 也逐字节相同。完整实现 0 路由错误，WNS +0.145 ns、
+WHS +0.018 ns；`clk_fpga_0` 与 `clk_wiz_0/clk_out1` 均为 100 MHz。`BOOT.bin` 由
+同源 FSBL（SHA-256 `6575e43f...8cb78cb0`）、上述 bitstream、上述 ELF 依次组装；
+Bootgen 读回确认 3 个 image/partition header，独立重生成逐字节相同。
+
 ---
 
 ## A 类 · 工程可复现性（不影响算法，但影响能否交付）
@@ -559,8 +581,8 @@ text 140,603 / data 3,116 / bss 3,266,624。
 | 编号 | 问题 | 证据 |
 | --- | --- | --- |
 | A1 | 旧 README 的一键命令、`requirements.txt`、`client.py`、`LICENSE` 全都不存在 | 已在本次整理中重写 |
-| ~~A2~~ ✅ | ~~build.tcl 路径/IP 仓库/XDC 三缺失~~（2026-08-16 修复）：路径改由脚本自身位置推导；注册 `hw/ip` 为 IP 仓库并 `update_ip_catalog`；`hw/constr/top.xdc` 加入 constrs_1；综合后自动 source `collect_info.tcl` 收报告。⚠️ 未跑过完整 BD 构建（bd.tcl 的 A3 问题仍在） | `hw/scripts/build.tcl` |
-| A3 | `bd.tcl` 只调 `apply_bd_automation`，PS7 的 DDR 型号/MIO/PHY 全没保存；生成的是 `top_bd`，而 XSA 内是 `design_1`，两者不同源 | `hw/scripts/bd.tcl`，XSA 内 `design_1.hwh` |
+| ~~A2~~ ✅ | ~~build.tcl 路径/IP 仓库/XDC 三缺失~~（2026-08-16 修复并完整复跑）：路径按脚本位置推导；注册 `hw/ip`；XDC 进入构建；综合/实现失败立即终止；实现后正确打开 run 并输出报告到 `hw/build/reports/`。 | `hw/scripts/build.tcl`、`hw/build/reports/summary.log` |
+| ~~A3~~ ✅ | ~~`bd.tcl` 未保存 PS7 DDR/MIO/PHY 配置~~（2026-08-16 修复）：从只读历史 XSA 的 `design_1.hwh` 固化 MT41J128M16、GEM0 MIO16..27、MDIO MIO52..53、UART1 MIO48..49、Bank1 1.8V、FCLK0 100 MHz、GP0/HP0；四个 AXI-Lite 地址与历史 XSA/PS 常量固定一致。新 XSA 已成功生成 lwIP BSP 和 ELF。 | `hw/scripts/bd.tcl`、`hw/build/.../top_bd.hwh`、当前构建哈希 |
 | ~~A4~~ ✅ | `clients/python/requirements.txt` 已补 `numpy` / `Pillow`；`first.py` 已移除 `dataclass(slots=True)`，当前最低 Python 为 3.8。 | `clients/python/requirements.txt`、`clients/python/first.py:114` |
 | ~~A5~~ ✅ | 已删除（2026-08-07） | 原：`gui_app.spec` 仍把 `dec_input.txt` 打进 EXE |
 | ~~A11~~ ✅ | **`sw/scripts/create_vitis.tcl` 有 4 处错误，脚本从未跑通过**（2026-08-08 全部修复）：① 第 90 行 Tcl 括号不配对，整个脚本解析即失败；② `platform reset` 在 Vitis 2022.2 里不是合法子命令；③ `domain create -runtime c` 非法（只接受 cpp/ocl）；④ workspace 为空时 `app list` 抛错而非返回空。另把相对路径改成按脚本自身位置推导。 | 实测 xsct 输出 |
@@ -568,7 +590,7 @@ text 140,603 / data 3,116 / bss 3,266,624。
 | A5-orig | `gui_app.spec` 仍把 `dec_input.txt` 打进 EXE —— 这正是历史「用正确结果直接出图」的残留通道，必须删除 | `clients/python/gui_app.spec:10` |
 | ~~A6~~ ✅ | ~~LDPC 只有 Windows EXE~~（2026-08-16，P5）：新增 `tools/ldpc_decode.py` 纯 Python min-sum 硬判决译码器（逆向了 pchk 二进制格式与 permutation 方向），黄金自检通过：88 bit 错误 5 轮收敛、info 0 错误、重建 JPEG 与 `Milk coronet.jpg` 逐字节相同。Windows EXE 仍保留给 GUI 用 | `tools/ldpc_decode.py`、`clients/python/resources/` |
 | A7 | 缺 LICENSE、第三方声明（Xilinx/lwIP）、`.gitignore` | 仓库根 |
-| ~~A8~~ ✅ | ~~top.xdc 与 collect_info.tcl 均为 0 字节~~（2026-08-16 补齐）：top.xdc 含 PS7 FCLK 100 MHz 兜底约束（自动约束缺失时才创建，get_pins -quiet 静默跳过）；collect_info.tcl 产出 util/timing/summary 一页摘要 | `hw/constr/top.xdc`、`hw/scripts/collect_info.tcl` |
+| ~~A8~~ ✅ | ~~top.xdc 与 collect_info.tcl 均为 0 字节~~（2026-08-16 补齐并实跑）：PS7 生成的 IP XDC 是 FCLK 唯一时钟源，`top.xdc` 记录无 PL 外部引脚的约束边界（删除 XDC 不支持的 `if`）；collect_info 产出 util/timing/summary。实现报告确认两个相关时钟均为 100 MHz。 | `hw/constr/top.xdc`、`hw/scripts/collect_info.tcl`、`hw/build/reports/` |
 | ~~A9~~ ✅ | ~~tb_dna_quick 把 AWVALID/WVALID 固定为 0；quick_sim part 写错~~（2026-08-16 修复）：TB 改为标准 axil_write 任务真正写入 preload/start；fork/join_none（SystemVerilog）重构为独立 initial+使能标志；quick_sim part 改为 xc7z010clg400-1。Icarus -g2005 语法通过（该 TB 仍是冒烟级，非黄金判据） | `hw/ip/Dna_accelerator_core_1_0/hdl/tb_dna_quick.v`、`vivado_quick_sim.tcl` |
 | ~~A10~~ ✅ | **LDPC EXE 缺 3 个 MinGW 运行时 DLL，在干净机器上会静默失败**（2026-08-13 已修复并验证）。缺 `libstdc++-6.dll`/`libgcc_s_seh-1.dll`/`libwinpthread-1.dll` 时 EXE 无输出、无报错、退出码 0。DLL 已提取进 `clients/python/resources/`，且 `run_ldpc_decoder()` 会把它们与 EXE/`.pchk`/`permutation64800` 一起拷进临时工作目录，缺失时打警告并提示 `tools/extract_ldpc_dlls.py`，运行后还有输出缺失检查兜底报错（不再静默）。**判据**：① 拷贝逻辑单元验证（2026-08-13 实测通过，可复跑）——3 个 DLL 经 `resource_path`/`_copy_resource` 拷入临时工作目录后 SHA-256 与源一致：
 ```bash
@@ -586,7 +608,7 @@ python3 -c "import sys,tempfile,hashlib,pathlib,shutil;sys.path.insert(0,'client
 - Stage2 的投票机制（±1 饱和累加、`vote>0` 判决）与位平面地址计算逻辑正确，
   且已用黄金向量逐位证明（2026-08-16）。
 - Stage3 的 `conv40_32` **函数形式**正确（标志位取反 + 4 bit 数据），只是标志位取在了组的另一端。
-- 两份 XSA 字节相同（SHA-256 `79c64736...`），内含可用的 bitstream 与 `ps7_init.tcl`，
-  可作为「历史硬件快照」用于板级回归，但不是当前 Tcl 的可复现产物。
-  ⚠️ 该 bitstream 里的 Voter 是 B13~B16 修复**之前**的版本，上板必须用重新综合的比特流。
+- 两份历史 XSA 字节相同（SHA-256 `79c64736...`），只作为板级配置反推来源；当前 Tcl
+  已可复现生成新 XSA（SHA-256 `aed6f74a...92cf`）及匹配 ELF，但最终正确性仍须 G3 上板验收。
+  历史 XSA 内的旧 bitstream 仍是 B13~B16 修复前版本，禁止与当前构建对混用。
 - 三个当前综合顶层通过 Icarus Verilog 语法检查（非功能验证）。
