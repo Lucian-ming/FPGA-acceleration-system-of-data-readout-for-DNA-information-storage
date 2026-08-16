@@ -10,7 +10,21 @@
 //   5) RREADY: 在 S_READ_SETUP 与 S_READ_DATA 均为 1，避免 DDR 读超时
 //   6) 调试增强：采样并暴露 last_rresp 到 AXI-Lite 0x0E
 //
-// Date  : 2025-11-04
+// 2026-08-16 黄金 Testbench 修复（判据见 docs/03-status.md B13~B15/C4）：
+//   B13) 投票读流水线错位：bram_addr→bram_dout_r 共 3 拍，而每位投票循环
+//        只有 3 拍，S_VOTE_UPDATE 读到的是【上一位】的累加器。修复：循环
+//        改为 4 拍（插入 S_VOTE_WAIT），判决改用 2 拍对齐的 bram_dout。
+//   B14) 输出判决 (bram_dout > 0) 是无符号比较，负票（如 -1=10'h3FF）
+//        被判成 1。修复：按符号位 + 非零判断。
+//   B15) 每 64-bit 字丢 1 bit：字装满后 FSM 先绕回 S_OUTPUT_ADDR/PACK 多
+//        打包一拍，随后 S_WAIT_BRESP 清 output_word 把它抹掉（81000/65≈1247，
+//        与实测少写 19 拍吻合）。修复：装满当拍直接转 S_OUTPUT_SETUP。
+//   C4)  第二次 START 不再复用旧累加器：每次 START 都走 S_INIT_BRAM 清零。
+//   B16) S_READ_DATA 完成条件 (beat_count>=6 && RVALID) 依赖最后一个 beat
+//        握手后 RVALID 仍保持——合规从机会在 RLAST 握手后撤下 RVALID，
+//        真实互连上 DUT 将死锁。修复：只看握手计数。
+//
+// Date  : 2025-11-04 初版 / 2026-08-16 黄金向量对齐修复
 // ================================================================
 
 `timescale 1 ns / 1 ps
@@ -196,6 +210,7 @@ module differential_voter_v1_0 #
         S_PARSE_READ      = 5'd4,
         S_CALC_ADDR       = 5'd5,
         S_VOTE_READ       = 5'd6,
+        S_VOTE_WAIT       = 5'd17,  // 【修订 B13】等 bram_dout 对齐（2 拍读延迟）
         S_VOTE_UPDATE     = 5'd7,
         S_NEXT_READ       = 5'd8,
         S_OUTPUT_PREFETCH = 5'd9,
@@ -224,10 +239,12 @@ module differential_voter_v1_0 #
     reg               bram_we;
 
     // BRAM 实体 + 同步读寄存器
+    // 【修订 B13】读通路只有两级：bram_addr →（打一拍）bram_raddr_q →
+    // （同步读出）bram_dout。原先还有一级 bram_dout_r，使数据晚 3 拍才到，
+    // 与 3 拍的投票循环错开一位——已被删除，改由 FSM 插入 S_VOTE_WAIT 对齐。
     (* ram_style = "block" *) reg [9:0] bram [0:TOTAL_BITS-1];
     reg [16:0] bram_raddr_q;
     reg [9:0]  bram_dout;
-    reg [9:0]  bram_dout_r;
 
     reg  signed [9:0] accumulated_vote;
 
@@ -256,7 +273,7 @@ module differential_voter_v1_0 #
 
     reg        pack_trigger;
     reg        pack_pending;
-    reg        output_addr_wait;
+    reg  [1:0] output_addr_wait;   // 【修订 B13】输出读对齐要等 2 拍（bram_dout 两级）
     reg        first_write_captured;
 
     // ----------------- 位置/安全函数 -----------------
@@ -291,7 +308,10 @@ module differential_voter_v1_0 #
     // ----------------- 条件/超时 -----------------
     wire init_complete        = (FAST_INIT) ? (init_addr >= 17'd63) : (init_addr >= (TOTAL_BITS - 1));
     wire read_setup_complete  = 1'b1;
-    wire read_data_complete   = (read_beat_count >= 3'd6) && M00_AXI_RVALID;
+    // 【修订 B16】完成条件只看握手计数：第 6 次握手发生在 RLAST 那拍，
+    // beat_count 要到下一拍才等于 6；而合规从机在 RLIST 握手后即撤下 RVALID。
+    // 原条件 (beat_count>=6 && RVALID) 依赖残留的 RVALID 电平，真实互连上会死锁。
+    wire read_data_complete   = (read_beat_count >= 3'd6);
     wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
 
     reg [31:0] state_timeout_counter;
@@ -302,11 +322,6 @@ module differential_voter_v1_0 #
             bram[bram_addr] <= bram_din;     // 写
         bram_raddr_q <= bram_addr;           // 读地址打一拍
         bram_dout    <= bram[bram_raddr_q];  // 同步读
-    end
-
-    always @(posedge M00_AXI_ACLK) begin
-        if (!M00_AXI_ARESETN) bram_dout_r <= 10'd0;
-        else                  bram_dout_r <= bram_dout;
     end
 
     // ----------------- 状态寄存 & 超时计数 -----------------
@@ -322,10 +337,8 @@ module differential_voter_v1_0 #
     end
 
     // ----------------- 数据路径（时序） -----------------
-    reg bram_initialized;
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
-            bram_initialized    <= 1'b0;
 
             init_addr           <= 17'd0;
             read_count          <= 32'd0;
@@ -347,7 +360,7 @@ module differential_voter_v1_0 #
 
             pack_trigger        <= 1'b0;
             pack_pending        <= 1'b0;
-            output_addr_wait    <= 1'b0;
+            output_addr_wait    <= 2'd0;
             first_write_captured<= 1'b0;
 
             current_codeword    <= 300'd0;
@@ -399,13 +412,17 @@ module differential_voter_v1_0 #
                         total_write_count <= 32'd0;
 
                         pack_pending      <= 1'b0;
-                        output_addr_wait  <= 1'b0;
+                        output_addr_wait  <= 2'd0;
 
                         first_write_captured <= 1'b0;
                         debug_state_count    <= state;
                         debug_pack_count     <= 32'd0;
                         debug_setup_count    <= 32'd0;
                         debug_write_count    <= 32'd0;
+
+                        // 【修订 C4】每次任务都从零累加：原实现靠 bram_initialized
+                        // 只在首次 START 清零，第二次任务会在上一轮的旧票上叠加。
+                        init_addr          <= 17'd0;
                     end
                 end
 
@@ -416,7 +433,6 @@ module differential_voter_v1_0 #
                         bram_we   <= 1'b1;
                         init_addr <= init_addr + 1;
                     end
-                    if (init_complete) bram_initialized <= 1'b1;
                     debug_state_count <= state;
                 end
 
@@ -466,17 +482,24 @@ module differential_voter_v1_0 #
                 end
 
                 S_VOTE_READ: begin
-                    // bram_dout_r 在上拍已对齐
+                    // 【修订 B13】bram_addr 在上一拍（S_CALC_ADDR 末沿）才更新，
+                    // 两级读管线要再等一拍数据才对齐到 S_VOTE_UPDATE。
+                    debug_state_count <= state;
+                end
+
+                S_VOTE_WAIT: begin
                     debug_state_count <= state;
                 end
 
                 S_VOTE_UPDATE: begin
+                    // 【修订 B13】改用 bram_dout（两级：bram_addr→bram_raddr_q→bram_dout），
+                    // 本拍恰好对齐本位的累加器；原先的 bram_dout_r 晚一拍，读到上一位。
                     if (current_codeword[bit_in_codeword]) begin
-                        accumulated_vote <= bram_dout_r + 10'sd1;
-                        bram_din         <= safe_vote_value(bram_dout_r + 10'sd1);
+                        accumulated_vote <= bram_dout + 10'sd1;
+                        bram_din         <= safe_vote_value(bram_dout + 10'sd1);
                     end else begin
-                        accumulated_vote <= bram_dout_r - 10'sd1;
-                        bram_din         <= safe_vote_value(bram_dout_r - 10'sd1);
+                        accumulated_vote <= bram_dout - 10'sd1;
+                        bram_din         <= safe_vote_value(bram_dout - 10'sd1);
                     end
                     bram_we <= 1'b1;
 
@@ -500,12 +523,16 @@ module differential_voter_v1_0 #
                 end
 
                 S_OUTPUT_ADDR: begin
-                    if (!output_addr_wait) begin
+                    // 【修订 B13】bram_dout 两级读管线：给地址后要等 2 拍数据才到，
+                    // 因此 ADDR 共 3 拍（给地址 + 等 2 拍），PACK 拍正好取到本位。
+                    if (output_addr_wait == 2'd0) begin
                         if (output_bit_count < TOTAL_BITS)
                             bram_addr <= output_bit_count;
-                        output_addr_wait <= 1'b1;   // 等一拍对齐 bram_dout_r
+                        output_addr_wait <= 2'd1;
+                    end else if (output_addr_wait != 2'd2) begin
+                        output_addr_wait <= output_addr_wait + 2'd1;
                     end else begin
-                        output_addr_wait <= 1'b0;
+                        output_addr_wait <= 2'd0;
                     end
                     debug_state_count <= state;
                 end
@@ -513,7 +540,9 @@ module differential_voter_v1_0 #
                 S_OUTPUT_PACK: begin
                     debug_state_count <= state;
                     if (output_bit_count < TOTAL_BITS) begin
-                        output_word[bit_in_output] <= (bram_dout_r > 10'sd0);
+                        // 【修订 B14】bram_dout 是无符号的：负票（如 -1=10'h3FF）
+                        // 直接 >0 比较会误判成 1。按补码语义：非负且非零才是 1。
+                        output_word[bit_in_output] <= ~bram_dout[9] && (bram_dout != 10'd0);
 
                         if (bit_in_output == 6'd63) begin
                             pack_trigger  <= 1'b1;   // 满 64b
@@ -569,6 +598,9 @@ module differential_voter_v1_0 #
     end
 
     // ----------------- 状态转移 -----------------
+    // 【修订 B15】本拍是否装满一个字（含尾包）：装满当拍直接转 S_OUTPUT_SETUP。
+    wire word_done = (bit_in_output == 6'd63) || (output_bit_count == TOTAL_BITS - 1);
+
     always @(*) begin
         next_state = state;
 
@@ -576,24 +608,29 @@ module differential_voter_v1_0 #
             next_state = S_ERROR;
         end else begin
             case (state)
-                S_IDLE:            next_state = start_latched_pulse ? (bram_initialized ? S_READ_SETUP : S_INIT_BRAM) : S_IDLE;
+                // 【修订 C4】每次 START 都走清零路径（81,000 拍 ≈ 0.81 ms @100 MHz）
+                S_IDLE:            next_state = start_latched_pulse ? S_INIT_BRAM : S_IDLE;
                 S_INIT_BRAM:       next_state = init_complete ? S_READ_SETUP : S_INIT_BRAM;
                 S_READ_SETUP:      next_state = read_setup_complete ? S_READ_DATA  : S_READ_SETUP;
                 S_READ_DATA:       next_state = read_data_complete  ? S_PARSE_READ : S_READ_DATA;
                 S_PARSE_READ:      next_state = S_CALC_ADDR;
                 S_CALC_ADDR:       next_state = S_VOTE_READ;
-                S_VOTE_READ:       next_state = S_VOTE_UPDATE;
+                S_VOTE_READ:       next_state = S_VOTE_WAIT;   // 【修订 B13】
+                S_VOTE_WAIT:       next_state = S_VOTE_UPDATE;
                 S_VOTE_UPDATE:     next_state = vote_update_complete ? S_NEXT_READ : S_CALC_ADDR;
                 S_NEXT_READ:       next_state = (read_count >= total_reads - 1) ? S_OUTPUT_PREFETCH : S_READ_SETUP;
                 S_OUTPUT_PREFETCH: next_state = S_OUTPUT_ADDR;
 
                 S_OUTPUT_ADDR: begin
-                    next_state = output_addr_wait ? S_OUTPUT_PACK : S_OUTPUT_ADDR;
+                    next_state = (output_addr_wait == 2'd2) ? S_OUTPUT_PACK : S_OUTPUT_ADDR;
                 end
 
                 S_OUTPUT_PACK: begin
-                    if (pack_pending)                       next_state = S_OUTPUT_SETUP; // 有包就发
-                    else if (output_bit_count >= TOTAL_BITS) next_state = S_DONE;         // 全部位处理完且无待写
+                    // 【修订 B15】装满当拍直接去发写请求。原实现先绕回 ADDR/PACK
+                    // 多打包一拍，而 S_WAIT_BRESP 会清 output_word，那一 bit 被
+                    // 静默丢弃（每 64 bit 丢 1 bit，实测只写出 1,247/1,266 拍）。
+                    if (word_done)                        next_state = S_OUTPUT_SETUP;
+                    else if (output_bit_count >= TOTAL_BITS) next_state = S_DONE;
                     else                                     next_state = S_OUTPUT_ADDR;
                 end
 

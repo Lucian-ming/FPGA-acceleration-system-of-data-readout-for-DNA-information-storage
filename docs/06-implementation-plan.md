@@ -20,13 +20,16 @@
 - 算法链路已在软件上端到端验证：SE150 原始读段 → LDPC → 还原出的 JPEG 与原图
   SHA-256 完全一致（`docs/03-status.md` D1）。
 - 数据契约已固化并可自动验证（`docs/02-data-contract.md` + `tools/golden_model.py`）。
-- 缺陷已定位到行号：算法缺口 D1/D2，实现缺陷 B1~B6，配置问题 C1~C3，工程问题 A1~A10；
-- B1（PS 水印区域展开）、B2/B4（位序/位平面）、B3（PS XOR）、B5--B9（Stage3）和
-  B10--B12（Stage1 同步读流水线）已落地；`tools/run_sim.sh` 已覆盖 Stage1、Stage3 与水印展开；
-- `sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf` 已于 2026-08-08 用 Vitis 2022.2 构建。
+- 缺陷已定位到行号：算法缺口 D1/D2，实现缺陷 B1~B6 与 B10~B16，配置问题 C1~C4，工程问题 A1~A10；
+- B1（PS 水印区域展开）、B2/B4（位序/位平面）、B3（PS XOR）、B5--B9（Stage3）、
+  B10--B12（Stage1 同步读流水线）和B13--B16/C4（Stage2 投票核，2026-08-16）已落地；
+  `tools/run_sim.sh` 已覆盖 Stage1、Stage2、Stage3 与水印展开；
+- `sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf` 已于 2026-08-08 用 Vitis 2022.2 构建
+  （注意：该 ELF 早于 B13--B16 修复，但其 PS 侧代码不涉及本次 RTL 改动，仍可作基线）。
 
-尚未完成：Stage2 没有黄金 RTL Testbench；D1 的板端择优/加权、实际读段数/尾批、动态任务配置、
-板级重建与“真实板端回传 → LDPC → 图片哈希”验收均未开始或未闭环。
+尚未完成：D1 的板端择优/加权、实际读段数/尾批（C1~C3）、动态任务配置、
+板级重建（**上板必须用修复后的 RTL 重新综合**）与“真实板端回传 → LDPC → 图片哈希”
+验收均未开始或未闭环。
 
 关键量化结论，后面所有排期都建立在它之上：
 
@@ -67,8 +70,10 @@
 
 没有回归就没有进度可言。这一阶段不改任何算法，只把「怎么判断对错」固定下来。
 
-**进度**：黄金向量、`tools/run_sim.sh`、Stage1/Stage3 文件型 Testbench 与水印展开主机单测已具备；
-尚缺 Stage2 Voter 的黄金 Testbench，故 P0 不能视为完全完成。
+**进度**：黄金向量、`tools/run_sim.sh`、Stage1/Stage2/Stage3 文件型 Testbench 与水印展开
+主机单测已具备（Stage2 的 `tb_differential_voter.v` 于 2026-08-16 建成，两轮 4,096 条记录
+逐位通过，顺带修复 Voter 的 B13~B16/C4 五个缺陷）；
+`tools/regression.py` 尚未单独建（`run_sim.sh` 已承担该职责）。
 
 ### 任务
 
@@ -76,7 +81,7 @@
 | --- | --- | --- |
 | 0.1 | 生成并归档黄金向量集（见下表），记录 SHA-256 | 新建 `tests/golden/` |
 | 0.2 | 写回归脚本 `tools/regression.py`，逐级比对并输出 PASS/FAIL 摘要 | 新建 |
-| 0.3 | `ldpc_pipeline.py` 补拷 3 个 MinGW DLL（否则干净机器必失败，A10） | `clients/python/ldpc_pipeline.py:85` |
+| ~~0.3~~ ✅ | `ldpc_pipeline.py` 补拷 3 个 MinGW DLL（否则干净机器必失败，A10）——2026-08-13 已落地并验证（同源性 + 拷贝逻辑） | `clients/python/ldpc_pipeline.py:20,88-96` |
 | 0.4 | 删除 `gui_app.spec` 里的 `('dec_input.txt', '.')`（G3 的旁路残留） | `clients/python/gui_app.spec:10` |
 | 0.5 | 补 `clients/python/requirements.txt`（numpy、Pillow），注明 Python ≥ 3.8 | 新建 |
 | 0.6 | 把 `five_to_four_decoder.v` 按契约改对或标注废弃（B5 的死代码部分） | `hw/ip/desparsification_decoder_1_0/hdl/` |

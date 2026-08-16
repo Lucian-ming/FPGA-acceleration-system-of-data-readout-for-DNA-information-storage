@@ -1,6 +1,6 @@
 # 03 · 现状与缺陷清单
 
-初始审计：2026-08-06；代码与回归复核：2026-08-10。证据全部标注了 `文件:行号`，可直接跳转复核。
+初始审计：2026-08-06；代码与回归复核：2026-08-10；Stage2 黄金 Testbench：2026-08-16。证据全部标注了 `文件:行号`，可直接跳转复核。
 
 ---
 
@@ -10,8 +10,7 @@
 
 - **D1 反向互补的板端取舍未完成**：上位机已能发送两个方向，但 Stage1/Voter 尚未按 `score`
   配对择优或加权，不能把“双份发送”等同于正确处理；
-- **Stage2 Voter 尚未有黄金 RTL Testbench**，其 PS 配置仍固定使用 `TOTAL_READS=108000`；
-- **C1～C3、A 类工程问题**仍在，尤其是读段数、尾批、DDR 布局和可复现构建；
+- **C1～C3、A 类工程问题**仍在，尤其是读段条数、尾批、DDR 布局和可复现构建；
 - 所有 RTL/PS 回归均为离线仿真或构建，尚无“真实 FPGA 回传 → LDPC → 图片哈希”的验收。
 
 **已完成**：
@@ -22,10 +21,15 @@
   编码逐字节与黄金模型相同。
 - 2026-08-10 · 复跑：黄金模型、Stage1、Stage3（数据通路与 AXI）、PS 水印展开主机单测
   和综合顶层语法检查全部通过，详见 `docs/08-handoff-2026-08-10.md`。
+- 2026-08-13 · A10：`ldpc_pipeline.py` 已把 3 个 MinGW DLL 与 EXE 一起拷进临时工作目录，
+  同源性与拷贝逻辑均已验证，判据见下方 A10 行。
+- 2026-08-16 · **Stage2：黄金 RTL Testbench 建成并接入回归**（`tb_differential_voter.v`），
+  首跑即暴露 5 个先前未知的缺陷 B13/B14/B15/B16/C4，全部修复后
+  **4,096 条记录（正反两方向）投票 → 81,000 bit 共识与黄金向量逐位相同，连跑两轮一致**。
 
-**Stage1 与 Stage3 的核心运算已经用黄金 RTL 仿真证明；B1 已用主机单测证明 PS 展开几何。**
-**B3 已接入 PS 状态机，但其输入仍依赖未经验证的 Stage2。**
-剩余：D1 板端取舍、D2、C1～C3、A 类，以及 Stage2/整链/上板验证。
+**Stage1、Stage2、Stage3 的核心运算均已用黄金 RTL 仿真证明；B1 已用主机单测证明 PS 展开几何。**
+**B3 已接入 PS 状态机，其输入（Stage2 输出）现在有了黄金向量背书，但 PS 侧整链仍未上板验证。**
+剩余：D1 板端取舍、D2、C1～C3、A 类，以及整链/上板验证。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到
@@ -79,8 +83,10 @@
 
 ### D2 比对分被算出来却从未使用
 
-`srpe_batch` 输出 `score`，Voter 在 `differential_voter_v1_0.v:440` 把它存进
-`current_score`，然后**再也没有用过**。所有读段（包括比对失败的）等权投票。
+`srpe_batch` 输出 `score`，Voter 在 `differential_voter_v1_0.v:456` 把它存进
+`current_score`，然后**再也没有用过**。所有读段（包括比对失败的）等权投票
+——2026-08-16 的 Stage2 黄金判据正是在「不过滤分数」的板端现行语义下建立的
+（`stage2_rtl_expect.hex`）；实现 SCORE_MIN 后同一 TB 换用 `stage2_expect.hex` 验证。
 注意：实测简单阈值过滤会因丢失覆盖而更差（阈值 75 时误码率反升到 3.3%），
 应当用加权投票而不是直接砍掉。
 
@@ -218,6 +224,46 @@ Stage3 启动之前，对 DDR 上的 10,125 B 做逐字节 `共识 ⊕ 水印`�
 
 「回传码字 64/64 全不符」是最有价值的线索：它与比对算法无关，直接指向装载/输出通路。
 
+### ~~B13 / B14 / B15 / B16 Voter 的四个数据通路/协议缺陷~~ ✅ 黄金 Testbench 新发现并已修复（2026-08-16）
+
+写 Stage2 的 Testbench（`hw/ip/differential_voter_1_0/hdl/tb_differential_voter.v`）时暴露，
+全部**先于本次改动就存在**——此前 Voter 从未被任何黄金向量验证过，这些缺陷说明
+「界面跑通」与「运算正确」完全无关。
+
+| 编号 | 问题 | 修法 |
+| --- | --- | --- |
+| **B13** | 投票读流水线错位：`bram_addr → bram_raddr_q → bram_dout → bram_dout_r` 共 3 拍，而每位投票循环只有 3 拍（CALC/READ/UPDATE），`S_VOTE_UPDATE` 读到的是**上一位**的累加器，还把 ±1 写进当前位地址——整个投票被系统性摧毁。输出级同样错位（ADDR 只等 1 拍） | 删除多余的 `bram_dout_r` 一级；投票循环改 4 拍（插入 `S_VOTE_WAIT`）；输出级 ADDR 改 3 拍（`output_addr_wait` 扩为 2 位计数器），统一改用 2 拍对齐的 `bram_dout` |
+| **B14** | 输出判决 `(bram_dout > 10'sd0)` 是**无符号**比较，负票（如 −1 = `10'h3FF`）被判成 1 | 改为按补码语义：`~bram_dout[9] && (bram_dout != 10'd0)` |
+| **B15** | 每 64 bit 字丢 1 bit：字装满后 FSM 先绕回 ADDR/PACK 多打包一拍，`S_WAIT_BRESP` 清 `output_word` 时把它静默抹掉（81000/65 ≈ 1247，与实测只写出 1,247/1,266 拍吻合） | 新增组合 `word_done`，装满当拍直接转 `S_OUTPUT_SETUP` |
+| **B16** | `S_READ_DATA` 完成条件 `(beat_count>=6 && RVALID)` 依赖第 6 拍握手后 RVALID 仍保持——合规从机在 RLAST 握手后即撤下 RVALID，**真实互连上会死锁**（原 TB 从机残留 RVALID 电平才让它勉强走完，代价是污染下一条记录的字序列） | 完成条件只看握手计数 `beat_count >= 6` |
+
+**症状对照**（同一个 TB，同样 4,096 条记录）：
+
+| 版本 | 输出拍数 | 逐位比对 |
+| --- | ---: | --- |
+| 修复前 | 1,247/1,266 | 全部 1,266 拍不符（满屏 `ffff`/全零两种模式） |
+| 修 B13~B16 后 | 1,266/1,266 | **0 拍不符，81,000 bit 逐位相同** |
+
+**判据结果**（`bash tools/run_sim.sh stage2`，约 1,100 万周期）：
+
+```
+[TB] 第 1 轮：1,266 拍 / 81,000 bit 与黄金向量逐位相同
+[TB] 第 2 轮：1,266 拍 / 81,000 bit 与黄金向量逐位相同
+[TB] ✓ PASS  两轮结果均与黄金向量逐位相同（累加器确已清零）
+```
+
+判据要点：
+- 激励 `tests/golden/stage2_in.hex` = 2,048 读段 ×（正向 + 反向互补）共 4,096 条
+  Stage1 格式记录（与 `first.py orient="both"` 的板端数据流一致）；
+- 期望 `tests/golden/stage2_rtl_expect.hex` = **板端现行语义**（D2 未修，分数不过滤，
+  全部记录投票）的共识码流——将来实现 SCORE_MIN 后改用已有的
+  `stage2_expect.hex`（阈值过滤版）即可直接复用同一 TB；
+- 附带判据：每次读突发恰 6 拍（ARLEN=5）、每笔写单拍（WLAST=1）、
+  末拍 WSTRB=0x1F、DBG_WRITE=1266、首写地址=OUT_ADDR、ERR_FLAGS=0；
+- **连跑两轮**：第二轮验证每次 START 都重新清零累加器（C4）；
+- 调试手段：`vvp ... +dump_bram` 转储 81,000 个累加器，
+  配 `tools/debug_vote_diff.py` 与 Python 重算票值逐位置 diff。
+
 ### ~~B5 反稀疏化的取反标志取错了位置~~ ✅ 已修复并仿真验证（2026-08-07）
 
 **修复**：`conv40_32()` 改为 `r[k] = grp[4:1] ^ {4{grp[0]}}`，取反标志改用组内**第一个** bit。
@@ -345,6 +391,15 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 实际条数变化时，各缓冲区上界、cache flush/invalidate 范围都要跟着算，
 目前是硬编码常量。
 
+### ~~C4 Voter 第二次任务复用旧累加器~~ ✅ 已修复（2026-08-16，Stage2 黄金 Testbench 发现）
+
+原实现靠 `bram_initialized` 只在**首次** START 后清零 81,000 个累加器；
+板卡不断电、第二条 TCP 任务到来时，投票会在上一轮的旧票上叠加，结果必然错误。
+ Voter 也没有软复位寄存器，PS 无法单独清零。
+**修复**：每次 START 都走 `S_INIT_BRAM`（81,000 拍 ≈ 0.81 ms @100 MHz，相对
+约 50 ms 的任务时长可忽略），START 时同步复位 `init_addr`。
+**判据**：`tb_differential_voter.v` 连跑两轮，输出逐位相同（见 B13~B16 判据）。
+
 ---
 
 ## 已验证的构建结果（2026-08-08，Vivado/Vitis 2022.2，WSL `/tools/Xilinx`）
@@ -390,7 +445,11 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 | A7 | 缺 LICENSE、第三方声明（Xilinx/lwIP）、`.gitignore` | 仓库根 |
 | A8 | `hw/constr/top.xdc` 与 `hw/scripts/collect_info.tcl` 均为 0 字节 | — |
 | A9 | `tb_dna_quick.v` 把 AXI-Lite `AWVALID`/`WVALID` 固定为 0，控制寄存器从未真正写入；`vivado_quick_sim.tcl` 的 part 写成 `xc7z020clg484-1`（实际是 `xc7z010clg400-1`） | `hw/ip/Dna_accelerator_core_1_0/hdl/` |
-| A10 | **LDPC EXE 缺 3 个 MinGW 运行时 DLL，在干净机器上会静默失败**（无输出、无报错、退出码 0，极易被误判成数据问题）。缺的是 `libstdc++-6.dll`、`libgcc_s_seh-1.dll`、`libwinpthread-1.dll`；它们只存在于历史 `gui_app.exe` 内部。已用 `tools/extract_ldpc_dlls.py` 提取并补进 `clients/python/resources/`；**`ldpc_pipeline.py` 还需要把它们一起拷进临时工作目录**（目前只拷 3 个数据文件）。 | `clients/python/ldpc_pipeline.py:85-87` |
+| ~~A10~~ ✅ | **LDPC EXE 缺 3 个 MinGW 运行时 DLL，在干净机器上会静默失败**（2026-08-13 已修复并验证）。缺 `libstdc++-6.dll`/`libgcc_s_seh-1.dll`/`libwinpthread-1.dll` 时 EXE 无输出、无报错、退出码 0。DLL 已提取进 `clients/python/resources/`，且 `run_ldpc_decoder()` 会把它们与 EXE/`.pchk`/`permutation64800` 一起拷进临时工作目录，缺失时打警告并提示 `tools/extract_ldpc_dlls.py`，运行后还有输出缺失检查兜底报错（不再静默）。**判据**：① 拷贝逻辑单元验证（2026-08-13 实测通过，可复跑）——3 个 DLL 经 `resource_path`/`_copy_resource` 拷入临时工作目录后 SHA-256 与源一致：
+```bash
+python3 -c "import sys,tempfile,hashlib,pathlib,shutil;sys.path.insert(0,'clients/python');import ldpc_pipeline as lp;t=pathlib.Path(tempfile.mkdtemp(dir='.'));ok=all(hashlib.sha256(lp._copy_resource(t,d).read_bytes()).digest()==hashlib.sha256(lp.resource_path(d).read_bytes()).digest() for d in lp.DECODER_DLLS);shutil.rmtree(t,ignore_errors=True);sys.exit(0 if ok else 1)"
+```
+② 同源性：`tools/extract_ldpc_dlls.py` 从历史 `gui_app.exe` 重新提取的 3 个 DLL 与仓库内逐字节相同（SHA-256 一致）；③ 端到端真跑 EXE 需 Windows 可见可写路径（本环境 `/mnt/c` 只读），留待 Windows/可写 WSL 环境执行。 | `clients/python/ldpc_pipeline.py:20,88-96,135-140` |
 
 ---
 
@@ -399,8 +458,10 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 - 算法链路（`docs/02-data-contract.md`）已被黄金数据逐位证明。
 - Stage1 的滑窗几何 `NUM_LC=50, STRIDE=807, REF_LEN=957` 与 40,500 nt / 150 bp 完全自洽，
   覆盖 0..40,350 全部合法起点，设计意图正确。
-- Stage2 的投票机制（±1 饱和累加、`vote>0` 判决）与位平面地址计算逻辑正确。
+- Stage2 的投票机制（±1 饱和累加、`vote>0` 判决）与位平面地址计算逻辑正确，
+  且已用黄金向量逐位证明（2026-08-16）。
 - Stage3 的 `conv40_32` **函数形式**正确（标志位取反 + 4 bit 数据），只是标志位取在了组的另一端。
 - 两份 XSA 字节相同（SHA-256 `79c64736...`），内含可用的 bitstream 与 `ps7_init.tcl`，
   可作为「历史硬件快照」用于板级回归，但不是当前 Tcl 的可复现产物。
+  ⚠️ 该 bitstream 里的 Voter 是 B13~B16 修复**之前**的版本，上板必须用重新综合的比特流。
 - 三个当前综合顶层通过 Icarus Verilog 语法检查（非功能验证）。

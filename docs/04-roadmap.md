@@ -12,7 +12,8 @@
 `verify-code` 证明了算法链路成立，`simulate` 能从 FASTQ 直接产出各级的期望输出。
 
 截至 2026-08-10，Stage1 与 Stage3 已有黄金 RTL 回归，PS 水印区域展开已有主机单测；
-Stage2 没有黄金 RTL Testbench，且没有板上端到端结果。以下路线图中的已完成部分保留，
+2026-08-16 起 Stage2 也有黄金 RTL Testbench（4,096 条记录两轮逐位通过，顺带修复
+B13~B16/C4 五个先前未知的缺陷），但仍没有板上端到端结果。以下路线图中的已完成部分保留，
 但不把“代码已写”误记为“整链已验收”。
 
 **强烈建议不要一上来就改 RTL。** 推荐的替换顺序是「软件全链 → 逐级换成硬件」，
@@ -25,6 +26,7 @@ Stage2 没有黄金 RTL Testbench，且没有板上端到端结果。以下路�
 | 任务 | 判据 |
 | --- | --- |
 | 用 `golden_model.py simulate` 产出 R0.83 SE150 的全套黄金向量：Stage1 每条 (pos,score)、Stage2 的 81,000 bit、Stage3 的 64,800 bit | 四个文件落盘并记录 SHA-256 |
+| ~~为 Voter 建文件型黄金 Testbench~~ ✅ 2026-08-16 完成：`tb_differential_voter.v` 接入 `run_sim.sh stage2`，并新产出 `stage2_in.hex` / `stage2_rtl_expect.hex`（板端语义：正反双向、不过滤分数） | 两轮 4,096 条记录投票 81,000 bit 逐位相同；ARLEN/WLAST/WSTRB/调试寄存器全查 |
 | 删除 `gui_app.spec` 里的 `('dec_input.txt', '.')` | EXE 内不再携带任何正确答案 |
 | 补 `clients/python/requirements.txt`（`numpy`、`Pillow`），并注明需要 Python ≥ 3.8 | 干净环境 `pip install -r` 后能跑 |
 | 把 `five_to_four_decoder.v` 标注为废弃或直接按契约改对 | 不再有与契约矛盾的死代码 |
@@ -184,8 +186,9 @@ R5_6_LDPC_hard_decoder.exe dec_input.txt TestBitStream.txt image.jpg H
 非常容易被误判成「输入数据不对」。这三个 DLL 只藏在历史 `gui_app.exe` 里，
 已用 `tools/extract_ldpc_dlls.py` 提取到 `clients/python/resources/`。
 
-⚠️ `ldpc_pipeline.py` 目前只把 EXE + `.pchk` + `permutation64800` 拷进临时目录，
-**没有拷这三个 DLL**，所以在没装 MinGW 的机器上它一定会失败——这是 P0 要补的一行改动。
+✅ 已修复（2026-08-13）：`ldpc_pipeline.py` 会把 EXE + `.pchk` + `permutation64800`
+和三个 DLL 一起拷进临时目录（缺失时警告并提示提取工具；运行后还有输出缺失检查兜底），
+判据见 `docs/03-status.md` A10。
 
 WSL 下可直接调用 Windows EXE（binfmt 互操作），但工作目录必须放在
 `/mnt/c/...` 等 Windows 可见路径上；放在 `\\wsl$` UNC 路径下会以错误码 53 失败。

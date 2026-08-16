@@ -21,9 +21,10 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   因而这不是已验证的板端 D1 修复。软件模型正确处理方向后，码字误码率可从 2.33%
   降到 0.014%，约 1,080 条读段即可还原。
 - ✅ 已完成并有离线判据：PS 水印区域展开（B1 主机单测）、读段位序/位平面（B2/B4）、
-  Stage1 三处同步读流水线修复（B10/B11/B12）、Stage3 数据通路与 AXI 控制层（B5--B9）。
-  PS 端水印 XOR（B3）已在 `PIPE_DONE_STAGE2` 实际调用；它仍等待真实 Stage2 输出验证。
-- ❌ Stage2 Voter 没有黄金 RTL Testbench，且仍用固定 `TOTAL_READS=108000` 配置；
+  Stage1 三处同步读流水线修复（B10/B11/B12）、Stage3 数据通路与 AXI 控制层（B5--B9）、
+  **Stage2 投票核（B13--B16/C4，2026-08-16 黄金 Testbench 逐位通过）**。
+  PS 端水印 XOR（B3）已在 `PIPE_DONE_STAGE2` 实际调用；其输入（Stage2 输出）已有黄金向量背书。
+- ⚠️ Stage2 的 PS 配置仍用固定 `TOTAL_READS=108000`（C1~C3）；
   尾批、运行时任务配置、板级构建复现和板上端到端验证都未完成。
 - ❌ 一键复现脚本、板级配置、LDPC 源码均不完整。
 
@@ -103,6 +104,9 @@ xsct sw/scripts/create_vitis.tcl
 
 详细实施计划见 [`docs/06-implementation-plan.md`](docs/06-implementation-plan.md)，
 方向性说明见 [`docs/04-roadmap.md`](docs/04-roadmap.md)。一句话版本：
-**下一步先补 Stage2 的黄金 Testbench，并让其按实际读段数运行；随后完成反向互补的板端取舍，
-再做真实 FPGA 回传到 LDPC 的端到端验收，最后进行任务配置化。**
+**Stage2 的黄金 Testbench 已于 2026-08-16 完成（五缺陷修复、逐位通过）；
+下一步让 Voter 按实际读段数运行（C1~C3），完成反向互补的板端取舍（D1/D2，
+`stage2_expect.hex` 阈值版判据已就绪），再做真实 FPGA 回传到 LDPC 的端到端验收，
+最后进行任务配置化。** 上板前必须用修复后的 RTL 重新综合比特流
+（历史 XSA 里的 Voter 是 B13~B16 修复之前的版本）。
 调试期只需要传 2,048 条读段（80 KB），不必传全部 51,781 条。

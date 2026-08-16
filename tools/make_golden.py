@@ -12,7 +12,9 @@
     watermark_sym.hex    40,500 个 2-bit 水印符号，每行一个
     wm_regions.hex       NUM_LC × REF_LEN 个符号，按区域展开，Stage1 预载用
     stage1_expect.txt    每条读段的 dir/pos/score
-    stage2_expect.hex    Stage2 应输出的 81,000 bit 共识码流（64 bit/行）
+    stage2_expect.hex    Stage2 应输出的 81,000 bit 共识码流（64 bit/行，含分数过滤，D1 修后用）
+    stage2_in.hex        Voter Testbench 激励：2n 条 Stage1 输出记录 × 6 个 64-bit 字
+    stage2_rtl_expect.hex Voter 板端语义期望：全部记录投票（无分数过滤）的 81,000 bit
     sparse_expect.hex    共识 ⊕ 水印后的稀疏流（= Stage3 输入），64 bit/行
     stage3_expect.hex    Stage3 应输出的 64,800 bit 码字，64 bit/行
     dec_input.txt        交给 LDPC 的 0/1 文本
@@ -147,6 +149,34 @@ def main(argv=None):
     consensus = (votes > 0).astype(np.uint8)
     write_hex(out / "stage2_expect.hex", pack_lsb_first(consensus), 16)
     print(f"  stage2_expect.hex    {2*L} bit，{used}/{n} 条参与投票")
+
+    # ---- Stage2 RTL 语义向量（Voter Testbench 判据）----
+    # 板端现行语义：上位机把每条读段「正向 + 反向互补」各发一份（first.py
+    # orient="both"，交替顺序），Stage1 只做正向比对，Voter 的比对分目前
+    # 不参与过滤（D2 未修）。因此 Voter 的输入是 2n 条记录、全部参与投票。
+    # 记录格式 = Stage1 输出 48 B：bit[9:0]=score, bit[25:10]=pos,
+    # bit[325:26]=codeword（位平面布局），LSB-first 装进 6 个 64-bit 字。
+    rtl_records = []
+    votes_rtl = np.zeros(2 * L, dtype=np.int64)
+    for i, (pf, sf, pr, srr) in enumerate(both):
+        for d, p, s, a in ((0, pf, sf, R[i]), (1, pr, srr, (R[i] ^ 1)[::-1])):
+            planes = np.concatenate([(a >> 1) & 1, a & 1])
+            v = int(s) | (int(p) << 10)
+            for k in np.nonzero(planes)[0]:
+                v |= 1 << (26 + int(k))
+            for j in range(6):
+                rtl_records.append((v >> (64 * j)) & 0xFFFF_FFFF_FFFF_FFFF)
+            idx = np.arange(p, p + rb)
+            np.add.at(votes_rtl, idx, ((a >> 1) & 1).astype(np.int64) * 2 - 1)
+            np.add.at(votes_rtl, idx + L, (a & 1).astype(np.int64) * 2 - 1)
+    # 与 RTL safe_vote_value 一致：每次 ±1 后钳位到 [-512, 511]。
+    # 本数据量（约 15 票/位）远达不到钳位，这里只保证语义等价。
+    votes_rtl = np.clip(votes_rtl, -512, 511)
+    write_hex(out / "stage2_in.hex", rtl_records, 16)
+    write_hex(out / "stage2_rtl_expect.hex",
+              pack_lsb_first((votes_rtl > 0).astype(np.uint8)), 16)
+    print(f"  stage2_in.hex        {2*n} 条记录 × 6 字（板端语义，不过滤分数）")
+    print(f"  stage2_rtl_expect.hex {2*L} bit，全部记录参与投票")
 
     # ---- 差分 + Stage3 ----
     sparse = consensus ^ wm_bits

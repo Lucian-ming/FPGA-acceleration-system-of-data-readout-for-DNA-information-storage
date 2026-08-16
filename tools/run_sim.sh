@@ -55,6 +55,13 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1" ]; then
     run_case srpe_batch "$A1/srpe_batch.v" "$A1/tb_srpe_batch.v"
 fi
 
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage2" ]; then
+    # Stage2 投票核：4,096 条 Stage1 输出记录（正反两方向，与上位机一致）
+    # → 81,000 bit 共识。连跑两轮，第二轮验证累加器重新清零。
+    V=hw/ip/differential_voter_1_0/hdl
+    run_case differential_voter "$V/differential_voter_v1_0.v" "$V/tb_differential_voter.v"
+fi
+
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
     # PS 侧水印展开的主机单元测试（与固件共用 sw/app/wm_expand.h）
     printf '\n=== wm_expand（PS 侧水印展开，主机单元测试）===\n'
