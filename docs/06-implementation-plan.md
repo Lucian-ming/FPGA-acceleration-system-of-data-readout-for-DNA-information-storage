@@ -15,7 +15,7 @@
 
 ## 0. 现在站在哪里
 
-截至 2026-08-10 已完成：
+截至 2026-08-16 已完成：
 
 - 算法链路已在软件上端到端验证：SE150 原始读段 → LDPC → 还原出的 JPEG 与原图
   SHA-256 完全一致（`docs/03-status.md` D1）。
@@ -34,6 +34,11 @@ P5（LDPC 软件参考实现）已完成：`tools/ldpc_decode.py` 黄金自检�
 P3（任务配置化）离线部分已于 2026-08-16 傍晚完成：PKT_CONFIG/PKT_CAPS 协议 +
 `task_config.h` 主机单测 + `first.py` 下发与 `--dry-run` + ELF 重建；
 板端握手联调随上板进行。PL 几何参数寄存器化（P3 的 G1 深水区）与 P7 绑定，未动。
+
+R3（2026-08-16）已完成 PL 低风险收口：DNA 输入 FIFO 满背压与计数一致性、三个生产
+AXI-Lite 从机的 AW/W 独立握手、DNA 尾批超时计数器位宽；对应黄金 TB 已接入
+`tools/run_sim.sh`。同时清理 Voter 只写不读寄存器、标记未进入 component.xml 的遗留 RTL，
+并统一 `srpe_batch.v` 注释编码。R3 提交为 `6c8bdcd`，文档回填为 `8fbd108`。
 
 关键量化结论，后面所有排期都建立在它之上：
 

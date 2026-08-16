@@ -13,6 +13,7 @@
 | [07-performance.md](07-performance.md) | CPU/FPGA 性能实测与加速价值分析 | 讨论选型、立项、答辩 |
 | [08-handoff-2026-08-10.md](08-handoff-2026-08-10.md) | 历史快照：Stage1/Stage3 修复与复核 | 追溯 2026-08-06~10 的工作 |
 | [09-handoff-2026-08-16.md](09-handoff-2026-08-16.md) | **当前可交接基线**：Stage2 黄金 TB + 同日完成的 D1/C1~C4/P5 全部离线任务 | 接续开发前 |
+| [10-three-end-audit-2026-08-16.md](10-three-end-audit-2026-08-16.md) | 三端审查、R1/R2/R3 提交与回退记录 | 追踪本轮修复与验证 |
 
 ## 参考资料（历史审计结果，只读）
 
@@ -31,7 +32,7 @@
 | `tools/golden_model.py` | 黄金参考模型：验证算法契约、生成各级期望输出、软件复现整条流水线 |
 | `tools/extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC EXE 缺失的 3 个 MinGW 运行时 DLL |
 | `tools/make_golden.py` | 生成各级黄金向量到 `tests/golden/`（RTL Testbench 与端到端回归的判据） |
-| `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL（stage1/stage2/stage3/host/syntax） |
+| `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL（含 DNA ingress/AXI-Lite、stage1/2/3/host/syntax） |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
 | `tools/test_ddr_layout.c` | C2/C3 的主机单元测试：按实际条数校验 DDR 区间（与固件共用 `sw/app/ddr_layout.h`） |

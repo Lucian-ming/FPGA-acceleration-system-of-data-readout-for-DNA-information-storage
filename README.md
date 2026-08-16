@@ -10,7 +10,7 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 
 ---
 
-## ⚠️ 项目状态（截至 2026-08-10）
+## ⚠️ 项目状态（截至 2026-08-16）
 
 **流程能跑通，结果还不正确。** 请在动手前先读 [`docs/03-status.md`](docs/03-status.md)。
 
@@ -28,6 +28,10 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   ELF 已用 xsct 重建。
 - ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
   推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
+- ✅ R3 PL 收口：DNA FIFO 满背压、DNA/Voter/Desparsifier AXI-Lite AW/W 独立握手、
+  尾批超时位宽；全量 `bash tools/run_sim.sh` 11 项通过，DNA/Voter/Desparsifier
+  三个顶层 100 MHz 综合通过（DNA WNS `+0.543 ns`、Voter WNS `+2.480 ns`，
+  Desparsifier 0 errors / 0 critical warnings）。
 - ⚠️ 板级构建一键复现（A3）和板上端到端验证未完成（P3 的板端握手联调也待上板）。
 - ✅ LDPC 有纯 Python 参考实现（`tools/ldpc_decode.py`，Linux 可跑）：黄金自检
   88 bit 错误 5 轮收敛、重建 JPEG 与原图逐字节相同（Windows EXE 保留给 GUI）。
@@ -97,6 +101,8 @@ xsct sw/scripts/create_vitis.tcl
 
 `design_2_wrapper.xsa`（与 `hw/build/export/hardware.xsa` 字节相同）是**历史硬件快照**，
 含可用的 bitstream，但尚未被证明能由当前 Tcl 重新生成。
+R3 后 XSCT 已在无效 DISPLAY 的环境下通过自动 Xvfb 重建，ELF 为 941,888 B
+（text 144,519 / data 3,148 / bss 3,266,624）。
 
 ## 🔧 环境
 

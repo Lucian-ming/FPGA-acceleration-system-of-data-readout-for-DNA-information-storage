@@ -1,6 +1,6 @@
 # 05 · 接口规范（协议 / 寄存器 / 地址）
 
-本文按**截至 2026-08-10 的实现现状**记录，来源是 `sw/app/echo.h`、`sw/app/echo.c`、`clients/python/first.py`
+本文按**截至 2026-08-16 的实现现状**记录，来源是 `sw/app/echo.h`、`sw/app/echo.c`、`clients/python/first.py`
 和三个 IP 的 RTL。历史文档 `docs/reference/legacy-tech-note.md` 里的寄存器表是「示例模板」，
 与实现不符，不要参考。
 
@@ -105,6 +105,15 @@ PC: ◄───────────────── 板: PKT_RESULT + 8,1
 板端也不会隐式启动流水线，客户端仍须发送显式 `PKT_POST`。
 包头声明的 `payload_len` 若超过接收缓冲可容纳的 `99,992` 字节，或接收缓存溢出，板端先回
 `PKT_ERROR` 再清理回调并关闭连接，以便下一次连接恢复。
+
+AXI-Lite 控制口遵循 AW/W 独立握手：DNA、Voter、Desparsifier 三个生产从机分别缓存地址
+与数据通道，二者均完成后才提交一次寄存器写并返回 B 响应；上层不能假定 AWVALID/WVALID
+必须同周期。DNA 正常读段入口的 `S_AXIS_DATA_TREADY` 仅在输入 FIFO 非满时有效，预载水印
+模式例外地直接接收，不经过读段 FIFO。
+
+当前 BD 将 DNA、Voter、Desparsifier 的 AXI-Lite、AXI 主口和 DMA 时钟统一接到
+`clk_wiz_0/clk_out1`。这些接口在本版隐含同一时钟域；若后续拆分时钟，必须先设计 CDC
+并新增跨域 Testbench，不能只改端口名。
 
 ## 3. IP 寄存器
 
