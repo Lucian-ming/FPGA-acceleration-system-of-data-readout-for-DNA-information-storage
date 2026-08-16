@@ -212,16 +212,31 @@ module tb_desparsifier;
     // AXI-Lite 写任务（真正驱动 AWVALID / WVALID）
     // =========================================================
     task axil_write(input [5:0] addr, input [31:0] data);
+        integer wait_cycles;
         begin
-            @(posedge clk);
-            s_awaddr <= addr; s_awvalid <= 1'b1;
-            s_wdata  <= data; s_wstrb <= 4'hF; s_wvalid <= 1'b1; s_bready <= 1'b1;
-            wait (s_awready && s_wready);
-            @(posedge clk);
-            s_awvalid <= 1'b0; s_wvalid <= 1'b0;
-            wait (s_bvalid);
-            @(posedge clk);
-            s_bready <= 1'b0;
+            @(negedge clk);
+            s_awaddr = addr; s_awvalid = 1'b1; s_bready = 1'b1;
+            wait_cycles = 0;
+            while (!s_awready && wait_cycles < 20) begin
+                @(negedge clk); wait_cycles = wait_cycles + 1;
+            end
+            if (!s_awready) $fatal(1, "AXI-Lite AW 握手超时");
+            @(posedge clk); @(negedge clk); s_awvalid = 1'b0;
+
+            s_wdata = data; s_wstrb = 4'hF; s_wvalid = 1'b1;
+            wait_cycles = 0;
+            while (!s_wready && wait_cycles < 20) begin
+                @(negedge clk); wait_cycles = wait_cycles + 1;
+            end
+            if (!s_wready) $fatal(1, "AXI-Lite W 握手超时");
+            @(posedge clk); @(negedge clk); s_wvalid = 1'b0;
+
+            wait_cycles = 0;
+            while (!s_bvalid && wait_cycles < 20) begin
+                @(negedge clk); wait_cycles = wait_cycles + 1;
+            end
+            if (!s_bvalid) $fatal(1, "AXI-Lite B 响应超时");
+            @(posedge clk); @(negedge clk); s_bready = 1'b0;
         end
     endtask
 

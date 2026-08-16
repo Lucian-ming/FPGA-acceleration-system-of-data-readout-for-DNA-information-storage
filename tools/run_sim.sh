@@ -5,7 +5,7 @@
 #   bash tools/run_sim.sh datapath     # 只跑某一项
 #
 # 依赖 Icarus Verilog（iverilog / vvp）。黄金向量由 tools/make_golden.py 生成。
-set -u
+set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 BUILD=$(mktemp -d)
@@ -17,12 +17,17 @@ A1=hw/ip/Dna_accelerator_core_1_0/hdl
 
 run_case() {
     local name="$1"; shift
+    local log="$BUILD/$name.log"
+    local status
     printf '\n=== %s ===\n' "$name"
     if ! iverilog -g2005 -o "$BUILD/$name" "$@" 2>&1; then
         echo "  ✗ 编译失败"
         FAIL=$((FAIL+1)); return
     fi
-    if timeout 600 vvp "$BUILD/$name" 2>&1 | sed 's/^/  /'; then
+    timeout 600 vvp "$BUILD/$name" >"$log" 2>&1
+    status=$?
+    sed 's/^/  /' "$log"
+    if [ "$status" -eq 0 ] && ! rg -q 'FATAL:' "$log" && rg -q 'PASS' "$log"; then
         PASS=$((PASS+1))
     else
         FAIL=$((FAIL+1))
@@ -53,6 +58,21 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1" ]; then
     # Stage1 比对引擎：一批 64 条读段，pos/score 与黄金模型比对
     # （约 620 万周期，Icarus 上 1~3 分钟）
     run_case srpe_batch "$A1/srpe_batch.v" "$A1/tb_srpe_batch.v"
+fi
+
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "ingress" ]; then
+    # DNA 顶层 AXIS 入口：10 拍组装 + FIFO 满背压，防止 DMA 数据静默丢失。
+    run_case dna_ingress \
+        "$A1/Dna_accelerator_core_v1_0.v" \
+        "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
+        "$A1/srpe_batch.v" "$A1/tb_dna_ingress.v"
+fi
+
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "dna_axil" ]; then
+    # DNA AXI-Lite 控制口：AW/W 独立握手与字节写使能。
+    run_case dna_axil "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+                      "$A1/tb_dna_axil.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage2" ]; then

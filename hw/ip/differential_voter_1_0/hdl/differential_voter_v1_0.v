@@ -238,7 +238,6 @@ module differential_voter_v1_0 #
     reg [2:0]  read_beat_count;
 
     reg [299:0] current_codeword;
-    reg [9:0]   current_score;
     reg [15:0]  current_position;
 
     reg [8:0]   bit_in_codeword;
@@ -255,14 +254,11 @@ module differential_voter_v1_0 #
     reg [16:0] bram_raddr_q;
     reg [9:0]  bram_dout;
 
-    reg  signed [9:0] accumulated_vote;
 
     wire [9:0]  parse_score    = read_words[0][9:0];
     wire [15:0] parse_position = read_words[0][25:10];
 
     reg [16:0] pre_calc_addr;
-    reg        pre_calc_is_upper;
-    reg [8:0]  pre_calc_bit_idx;
 
     reg [16:0] init_addr;          // 17位，足够覆盖 81000
     reg [31:0] read_count;
@@ -360,7 +356,6 @@ module differential_voter_v1_0 #
             bram_addr           <= 17'd0;
             bram_din            <= 10'sd0;
             bram_we             <= 1'b0;
-            accumulated_vote    <= 10'sd0;
 
             output_bit_count    <= 17'd0;
             output_word         <= 64'd0;
@@ -376,12 +371,9 @@ module differential_voter_v1_0 #
             first_write_captured<= 1'b0;
 
             current_codeword    <= 300'd0;
-            current_score       <= 10'd0;
             current_position    <= 16'd0;
 
             pre_calc_addr       <= 17'd0;
-            pre_calc_is_upper   <= 1'b0;
-            pre_calc_bit_idx    <= 9'd0;
 
             debug_state_count   <= 32'd0;
             debug_pack_count    <= 32'd0;
@@ -465,7 +457,6 @@ module differential_voter_v1_0 #
                 end
 
                 S_PARSE_READ: begin
-                    current_score               <= parse_score;
                     current_position            <= parse_position;
 
                     current_codeword[37:0]     <= read_words[0][63:26];
@@ -478,8 +469,6 @@ module differential_voter_v1_0 #
                     bit_in_codeword <= 9'd0;
 
                     pre_calc_addr     <= safe_address(calc_layer_position(9'd0, parse_position));
-                    pre_calc_is_upper <= (9'd0 < UPPER_LAYER_BITS);
-                    pre_calc_bit_idx  <= 9'd0;
                     debug_state_count <= state;
                 end
 
@@ -487,8 +476,6 @@ module differential_voter_v1_0 #
                     bram_addr <= pre_calc_addr;
                     if (bit_in_codeword < CODEWORD_BITS - 1) begin
                         pre_calc_addr     <= safe_address(calc_layer_position(bit_in_codeword + 1, current_position));
-                        pre_calc_is_upper <= ((bit_in_codeword + 1) < UPPER_LAYER_BITS);
-                        pre_calc_bit_idx  <= bit_in_codeword + 1;
                     end
                     debug_state_count <= state;
                 end
@@ -507,10 +494,8 @@ module differential_voter_v1_0 #
                     // 【修订 B13】改用 bram_dout（两级：bram_addr→bram_raddr_q→bram_dout），
                     // 本拍恰好对齐本位的累加器；原先的 bram_dout_r 晚一拍，读到上一位。
                     if (current_codeword[bit_in_codeword]) begin
-                        accumulated_vote <= bram_dout + 10'sd1;
                         bram_din         <= safe_vote_value(bram_dout + 10'sd1);
                     end else begin
-                        accumulated_vote <= bram_dout - 10'sd1;
                         bram_din         <= safe_vote_value(bram_dout - 10'sd1);
                     end
                     bram_we <= 1'b1;
@@ -839,11 +824,11 @@ module axi_slave_voter #
     input  wire                             S_AXI_ARESETN,
     input  wire [C_S_AXI_ADDR_WIDTH-1:0]    S_AXI_AWADDR,
     input  wire                             S_AXI_AWVALID,
-    output reg                              S_AXI_AWREADY,
+    output wire                             S_AXI_AWREADY,
     input  wire [C_S_AXI_DATA_WIDTH-1:0]    S_AXI_WDATA,
     input  wire [C_S_AXI_DATA_WIDTH/8-1:0]  S_AXI_WSTRB,
     input  wire                             S_AXI_WVALID,
-    output reg                              S_AXI_WREADY,
+    output wire                             S_AXI_WREADY,
     output reg  [1:0]                       S_AXI_BRESP,
     output reg                              S_AXI_BVALID,
     input  wire                             S_AXI_BREADY,
@@ -879,17 +864,29 @@ module axi_slave_voter #
     input  wire [1:0]  last_rresp
 );
 
-    wire [4:0] waddr = S_AXI_AWADDR[6:2];
+    reg [C_S_AXI_ADDR_WIDTH-1:0] awaddr_q;
+    reg [C_S_AXI_DATA_WIDTH-1:0] wdata_q;
+    reg aw_pending, w_pending;
+    wire aw_accept = S_AXI_AWVALID && S_AXI_AWREADY;
+    wire w_accept = S_AXI_WVALID && S_AXI_WREADY;
+    wire write_commit = (aw_pending || aw_accept) &&
+                        (w_pending || w_accept) && ~S_AXI_BVALID;
+    wire [C_S_AXI_ADDR_WIDTH-1:0] write_addr = aw_pending ? awaddr_q : S_AXI_AWADDR;
+    wire [C_S_AXI_DATA_WIDTH-1:0] write_data = w_pending ? wdata_q : S_AXI_WDATA;
+    wire [4:0] waddr = write_addr[6:2];
     wire [4:0] raddr = S_AXI_ARADDR[6:2];
+    assign S_AXI_AWREADY = ~aw_pending & ~S_AXI_BVALID;
+    assign S_AXI_WREADY = ~w_pending & ~S_AXI_BVALID;
 
     // ----------------- 写通道 -----------------
-    reg aw_hs, w_hs;
     always @(posedge S_AXI_ACLK) begin
         if (!S_AXI_ARESETN) begin
-            S_AXI_AWREADY   <= 1'b0;
-            S_AXI_WREADY    <= 1'b0;
             S_AXI_BVALID    <= 1'b0;
             S_AXI_BRESP     <= 2'b00;
+            awaddr_q        <= {C_S_AXI_ADDR_WIDTH{1'b0}};
+            wdata_q         <= {C_S_AXI_DATA_WIDTH{1'b0}};
+            aw_pending      <= 1'b0;
+            w_pending       <= 1'b0;
 
             in_addr         <= 32'd0;
             in_beats        <= 32'd0;
@@ -900,27 +897,30 @@ module axi_slave_voter #
             start_pulse     <= 1'b0;
             done_clr        <= 1'b0;
 
-            aw_hs <= 1'b0;
-            w_hs  <= 1'b0;
         end else begin
-            S_AXI_AWREADY <= (S_AXI_AWVALID && !S_AXI_AWREADY);
-            S_AXI_WREADY  <= (S_AXI_WVALID  && !S_AXI_WREADY);
+            if (aw_accept) begin
+                awaddr_q <= S_AXI_AWADDR;
+                aw_pending <= 1'b1;
+            end
+            if (w_accept) begin
+                wdata_q <= S_AXI_WDATA;
+                w_pending <= 1'b1;
+            end
 
-            aw_hs <= S_AXI_AWVALID && S_AXI_AWREADY;
-            w_hs  <= S_AXI_WVALID  && S_AXI_WREADY;
-
-            if (aw_hs && w_hs) begin
+            if (write_commit) begin
+                aw_pending <= 1'b0;
+                w_pending <= 1'b0;
                 case (waddr)
                     5'h00: begin
-                        start_pulse <= S_AXI_WDATA[0];
-                        done_clr    <= S_AXI_WDATA[1];
+                        start_pulse <= write_data[0];
+                        done_clr    <= write_data[1];
                     end
-                    5'h01: in_addr         <= S_AXI_WDATA;
-                    5'h02: in_beats        <= S_AXI_WDATA;
-                    5'h03: out_addr        <= S_AXI_WDATA;
-                    5'h04: out_beats       <= S_AXI_WDATA;
-                    5'h05: total_reads_cfg <= S_AXI_WDATA;
-                    5'h0C: score_min_cfg   <= S_AXI_WDATA;   // 0x30【D1/D2】
+                    5'h01: in_addr         <= write_data;
+                    5'h02: in_beats        <= write_data;
+                    5'h03: out_addr        <= write_data;
+                    5'h04: out_beats       <= write_data;
+                    5'h05: total_reads_cfg <= write_data;
+                    5'h0C: score_min_cfg   <= write_data;   // 0x30【D1/D2】
                     default: ;
                 endcase
                 S_AXI_BVALID <= 1'b1;

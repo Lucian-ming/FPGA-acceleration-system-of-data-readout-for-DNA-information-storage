@@ -1,11 +1,11 @@
 // =============================================================
 // File: srpe_batch.v
 // Desc : 64-read batch engine using bit-plane BRAM
-//        - ROM/λƽ����ƶ�Ϊ BRAM��ͬ������
-//        - ����׶��� pos_base �̻���ǰ pos�����͸��ȳ�
-//        - ���·�� 8��8 ���飨�ֲ�ʹ��+ƥ��λ�Ĵ棩���;��ӳ�
-//        - �� �޸���ˮӡ ROM ��ַ��Ϊ���Ե�ַ lc*REF_LEN + row
-//        - �� �����޸���region_mul_stride �����м�ӷ����
+//        - 水印与位平面存储均推导为 BRAM，采用同步读
+//        - 比对阶段由 pos_base 固化当前位置，避免流水线位置漂移
+//        - 数据通路按 8x8 分组，降低扇出和组合路径压力
+//        - 水印 BRAM 使用线性地址 lc*REF_LEN + row
+//        - region_mul_stride 保留完整中间位宽
 // Synth: Verilog-2001
 // =============================================================
 `timescale 1 ns / 1 ps
@@ -13,9 +13,9 @@
 (* keep_hierarchy = "yes" *)
 module srpe_batch #(
     parameter integer BATCH     = 64,
-    parameter integer NUM_LC    = 50,      // �ο�Ƭ������50
-    parameter integer STRIDE    = 807,     // ÿ�λ���������807
-    parameter integer REF_LEN   = 957,     // ÿ�βο����ȣ�957
+    parameter integer NUM_LC    = 50,      // 参考区域数量
+    parameter integer STRIDE    = 807,     // 每区域可滑动位置数
+    parameter integer REF_LEN   = 957,     // 每段参考长度
     parameter integer READ_BPS  = 150,
     parameter integer SCORE_W   = 10,
     parameter integer POS_W     = 16
@@ -24,18 +24,18 @@ module srpe_batch #(
     input  wire                   rst_n,
     input  wire                   start_batch,
 
-    // ���ϲ㰴���ȡ BATCH �� codeword��ÿ�� 2*READ_BPS bit��
-    output reg                    cw_req,     // ������Ҫһ�� read
-    input  wire                   cw_valid,   // ��������һ���ṩ cw_data
+    // 从上层依次读取 BATCH 条码字，每条宽 2*READ_BPS bit。
+    output reg                    cw_req,     // 请求一条读段
+    input  wire                   cw_valid,   // 本周期 cw_data 有效
     input  wire [READ_BPS*2-1:0]  cw_data,    // 300b when READ_BPS=150
 
-    // Ԥ����ˮӡ��д ROM��
+    // 预载水印写入口
     input  wire                   bram_write_en,
     input  wire [5:0]             bram_sel,
     input  wire [9:0]             bram_write_addr,  // 0..REF_LEN-1 (957-1=956)
     input  wire [1:0]             bram_write_data,
 
-    // ����������� FIFO
+    // 结果输出到上层 FIFO
     output reg                    res_wr,
     output reg  [READ_BPS*2+POS_W+SCORE_W-1:0] res_din,
     input  wire                   res_full,
@@ -47,19 +47,19 @@ module srpe_batch #(
     localparam integer CODEBITS = READ_BPS*2;
     localparam integer RESULT_W = CODEBITS + POS_W + SCORE_W;
 
-    // ���޸�3-1����������
+    // 区域索引与水印存储几何
     localparam integer REGION_W = 6;                     // 0~49
     localparam integer WM_DEPTH = NUM_LC * REF_LEN;      // 50*957
     localparam integer WM_AW = CLOG2(WM_DEPTH);
 
     // ----------------------------------------------------------
-    // ʵ�ú���
+    // 辅助函数
     // ----------------------------------------------------------
     function integer CLOG2; input integer v; integer t,i; begin
         t=v-1; i=0; while(t>0) begin t=t>>1; i=i+1; end CLOG2=i;
     end endfunction
 
-    // ���޸�1��MUL957 ��ȷʵ�� + ע������
+    // 常量乘法 MUL957
     // 957 = 512 + 256 + 128 + 32 + 16 + 8 + 4 + 1
     //     = 2^9 + 2^8 + 2^7 + 2^5 + 2^4 + 2^3 + 2^2 + 2^0
     function [15:0] MUL957; 
@@ -70,30 +70,30 @@ module srpe_batch #(
     endfunction
 
     // ----------------------------------------------------------
-    // ˮӡ ROM��NUM_LC * REF_LEN * 2-bit
+    // 水印 BRAM：NUM_LC * REF_LEN 个 2-bit 符号
     // ----------------------------------------------------------
     (* ram_style="block", rom_style="block" *)
     reg [1:0] wm_bram [0:WM_DEPTH-1];
 
-    // д��ַ: wm_wr_addr = MUL957(region) + row 
+    // 写地址：wm_wr_addr = MUL957(region) + row
     wire [15:0] wm_wr_addr_lin = MUL957({10'd0, bram_sel}) + {6'd0, bram_write_addr};
     wire [WM_AW-1:0] wm_wr_addr = wm_wr_addr_lin[WM_AW-1:0];
 
-    // ����ַ: wm_rd_addr = MUL957(lc_idx) + ((pos_base + i_idx) % REF_LEN) 
+    // 读地址：wm_rd_addr = MUL957(lc_idx) + ((pos_base + i_idx) % REF_LEN)
     reg  [WM_AW-1:0] wm_rd_addr_q;
     wire [WM_AW-1:0] wm_rd_addr_d;
 
-    // ͬ�������
+    // 同步读数据
     reg [1:0] wm_sym_q;
 
     // ----------------------------------------------------------
-    // ����λƽ�� BRAM��ÿ�� 64bit �� READ_BPS �У��ֱ�� LSB/MSB��
-    // Port A��compute��ͬ��������Port B��build/emit��RMW��
+    // 读段位平面 BRAM：READ_BPS 行，每行并行保存 64 条读段。
+    // Port A 用于比对同步读，Port B 用于装载/输出的读改写。
     // ----------------------------------------------------------
     (* ram_style = "block" *) reg [63:0] plane_lo [0:READ_BPS-1];
     (* ram_style = "block" *) reg [63:0] plane_hi [0:READ_BPS-1];
 
-    // A �ڣ�compute��ͬ������
+    // Port A：比对阶段同步读
     reg [7:0]  a_addr;
     reg [63:0] a_lo_q, a_hi_q;
     always @(posedge clk) begin
@@ -101,7 +101,7 @@ module srpe_batch #(
         a_hi_q <= plane_hi[a_addr];
     end
 
-    // B �ڣ�build/emit��RMW��
+    // Port B：装载/输出阶段读改写
     reg [7:0]  b_addr;
     reg [63:0] b_lo_q, b_hi_q;
     reg        b_we_lo, b_we_hi;
@@ -114,7 +114,7 @@ module srpe_batch #(
     end
 
     // ----------------------------------------------------------
-    // ״̬��������
+    // 状态机编码
     // ----------------------------------------------------------
     localparam [3:0] S_IDLE   = 4'd0,
                      S_CLR    = 4'd1,
@@ -133,28 +133,28 @@ module srpe_batch #(
 
     reg [3:0]  st;
 
-    // ����׶�
+    // 读段装载阶段
     reg [6:0]  cw_idx;
     reg [8:0]  row_i;
     reg [1:0]  phase;      // 0=给地址 1=等BRAM读出 2=读改写（修订 B11）
     reg [5:0]  bit_sel;
 
-    // ����׶�
+    // 位置比对阶段
     reg [5:0]   lc_idx;
     reg [15:0]  pos_cnt;
     reg [15:0]  pos_base;
     reg [8:0]   i_idx;
 
-    // 64 �����ε��ۼ�������
+    // 64 条读段并行的分数与最优位置
     reg [SCORE_W-1:0] score   [0:BATCH-1];
     reg [SCORE_W-1:0] best_sc [0:BATCH-1];
     reg [POS_W-1:0]   best_pos[0:BATCH-1];
-    // ���޸�3-2����������¼��� region
+    // 记录每条读段的最优区域
     reg [REGION_W-1:0] best_region [0:BATCH-1];
 
     integer t, g;
 
-    // ����ƥ��
+    // 64 路符号匹配
     reg [63:0] match_mask;
     always @(*) begin
         case (wm_sym_q)
@@ -201,30 +201,30 @@ module srpe_batch #(
     wire [16:0] add_tmp  = pos_base + i_idx;
     wire [9:0]  addr_mod = (add_tmp >= REF_LEN) ? (add_tmp - REF_LEN) : add_tmp[9:0];
 
-    // ���Զ���ַ��lc_idx*REF_LEN + addr_mod
+    // 水印线性读地址：lc_idx*REF_LEN + addr_mod
     wire [15:0] wm_rd_addr_lin = MUL957({10'd0, lc_idx}) + {6'd0, addr_mod};
     assign wm_rd_addr_d = wm_rd_addr_lin[WM_AW-1:0];
 
-    // �����֡
+    // 结果输出组装
     reg [CODEBITS-1:0] cw_acc;
     reg [8:0]          emit_i;
     reg [6:0]          emit_idx;
 
-    // �������޸��������м�ӷ����������չ best_region �� POS_W λ��
+    // 先扩展区域索引，保证后续移位加法不截断。
     wire [POS_W-1:0] region_ext = 
         {{(POS_W - REGION_W){1'b0}}, best_region[emit_idx]};
 
-    // ��ȷ���㣺region * 807���޽ضϣ�
+    // 计算 region * 807，完整保留 POS_W 位。
     wire [POS_W-1:0] region_mul_stride = 
          (region_ext << 9) + (region_ext << 8) +
          (region_ext << 5) + (region_ext << 2) +
          (region_ext << 1) +  region_ext;  // 512+256+32+4+2+1 = 807
 
-    // ȫ�־���λ��
+    // 全局最优位置
     wire [POS_W-1:0] global_pos = region_mul_stride + best_pos[emit_idx];
 
     // ----------------------------------------------------------
-    // ��ʱ��
+    // 主时序逻辑
     // ----------------------------------------------------------
     always @(posedge clk) begin
         if (!rst_n) begin
@@ -237,19 +237,19 @@ module srpe_batch #(
             for (t=0; t<BATCH; t=t+1) begin
                 best_sc[t]     <= {SCORE_W{1'b0}};
                 best_pos[t]    <= {POS_W{1'b0}};
-                best_region[t] <= {REGION_W{1'b0}};  // ��ʼ�� region
+                best_region[t] <= {REGION_W{1'b0}};  // 初始化区域
                 score[t]       <= {SCORE_W{1'b0}};
             end
             emit_i <= 0; emit_idx <= 0; cw_acc <= {CODEBITS{1'b0}};
         end else begin
-            // ---- ȫ��Ĭ�� ----
+            // ---- 全局默认值 ----
             done   <= 1'b0;
             res_wr <= 1'b0;
             b_we_lo<= 1'b0;
             b_we_hi<= 1'b0;
             cw_req <= 1'b0;
 
-            // ---- ROM ͬ���� ----
+            // ---- 水印 BRAM 同步读写 ----
             wm_rd_addr_q <= wm_rd_addr_d;
             wm_sym_q     <= wm_bram[wm_rd_addr_q];
             if (bram_write_en) wm_bram[wm_wr_addr] <= bram_write_data;
@@ -333,7 +333,7 @@ module srpe_batch #(
                     for (t=0; t<BATCH; t=t+1) begin
                         best_sc[t]     <= {SCORE_W{1'b0}};
                         best_pos[t]    <= {POS_W{1'b0}};
-                        best_region[t] <= {REGION_W{1'b0}};  // ���� region
+                        best_region[t] <= {REGION_W{1'b0}};  // 初始化区域
                         score[t]       <= {SCORE_W{1'b0}};
                     end
                     a_addr   <= 0;
@@ -374,7 +374,7 @@ module srpe_batch #(
                         if (score[t] > best_sc[t]) begin
                             best_sc[t]     <= score[t];
                             best_pos[t]    <= pos_base[POS_W-1:0];
-                            best_region[t] <= lc_idx;          // ��¼��ǰ lc_idx
+                            best_region[t] <= lc_idx;          // 记录当前区域
                         end
                     end
                     st <= S_NEXT;

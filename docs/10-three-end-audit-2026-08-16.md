@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- |
 | R1 | PS 协议与 Voter 控制 | 已完成：修复失败 ACK、分帧原子发送、超大 payload 恢复；合并 Voter 配置；清理死函数 | `run_sim.sh` 8/8；xsct ELF 941,888 B | `80f53b9` / `git revert 80f53b9` |
 | R2 | 上位机 | 已完成：提取 TaskSpec/协议模块；严格水印/读段/结果校验；LDPC 默认原生 | 12 项单测；全量 9/9；dry-run/auto LDPC 通过 | `44f00eb` / `git revert 44f00eb` |
-| R3 | PL | 审查三个 IP；删除不影响接口的死寄存器；标记遗留死 RTL；统一乱码注释；必要 bug 用黄金 TB 钉死 | RTL 全量回归 + Voter 综合 | 待提交 |
+| R3 | PL | 已完成：修复 DNA 入口丢数、三核 AXI-Lite 独立握手、尾批超时位宽；清理死寄存器/乱码注释并标记遗留 RTL | RTL 全量回归 + Voter 综合 | 待提交（功能已验证，提交号待回填） |
 | R4 | 文档与收尾 | 同步 03/05/06/09/README；全量回归、ELF、综合复跑 | 全绿 | 待提交 |
 
 ## R1 审查发现（已提交 `80f53b9`）
@@ -93,6 +93,38 @@
 - 当前系统未安装 `tkinter`，GUI 窗口未做运行时启动；`gui_app.py` 已通过 `py_compile`，
   其调用的 `run_client()` / `run_ldpc_decoder(auto)` 已由上述单元与集成判据覆盖。
 
-## R3
+## R3 PL 审查、流控与控制口修复
 
-待 R2 提交后继续补充。
+### 已确认真 bug
+
+1. **PL-1：DNA FIFO 满时继续向 DMA 宣告 READY，静默丢读段。**
+   `eng_busy=1` 时原逻辑无条件 `TREADY=1`，而 1,024 深度 FIFO 在满时忽略写入，
+   `in_count` 仍继续增长。`tb_dna_ingress.v` 修复前复现为 11,000 拍全部被接受；
+   现改为正常读段仅在 `~in_full` 时握手，并按真实 FIFO 写入更新计数。
+2. **PL-2：DNA/Voter/Decoder 的生产 AXI-Lite 从机不支持 AW/W 独立握手。**
+   新增 DNA 专项 TB，并把 Stage2/Stage3 BFM 改为先 AW 后 W；修复前均在首笔配置事务
+   无 B 响应。三个从机现各保存一个地址/数据槽，凑齐后提交一次写入。
+3. **PL-3：DNA partial-batch 超时永远不可达。**
+   16 bit `idle_counter` 无法达到 100,000；扩为 17 bit，并由 ingress TB 钉死阈值。
+
+### 低风险清理
+
+- 删除 Voter 中只写不读的 `accumulated_vote`、`current_score`、
+  `pre_calc_is_upper`、`pre_calc_bit_idx`；核心地址与投票流水线未改。
+- `srpe_batch.v` 的不可逆乱码注释重写为 UTF-8 中文，RTL 逻辑不变。
+- 由三个 `component.xml` 文件集确认并标记为 `DEPRECATED`：`srpe.v`、
+  `differential_voter_v1_0_M00_AXI.v`、`differential_voter_v1_0_S00_AXI.v`、
+  `five_to_four_decoder.v`。历史文件保留，不接回生产路径。
+- `bd.tcl` 把 DNA 三个时钟端口以及 Voter/Decoder 的 S00/M00 时钟全部连接到
+  `clk_wiz_0/clk_out1`；当前构建不存在跨时钟数据通路。顶层接口仍隐含同钟约束，
+  不在本批贸然引入 CDC 重构。
+- `tools/run_sim.sh` 现在同时检查进程退出码、`FATAL:` 与显式 `PASS`；修复了
+  Icarus 在 Verilog-2005 模式下 `$fatal(1)` 仍返回 0 导致的假绿摘要。
+
+### R3 验证
+
+- `bash tools/run_sim.sh ingress`：读段组装、1,024 深度背压、计数一致、100,000 超时阈值通过。
+- `bash tools/run_sim.sh dna_axil`：AW→W、W→AW、`WSTRB` 通过。
+- `bash tools/run_sim.sh axi`：1,013 拍 / 64,800 bit 与 Stage3 黄金向量逐位相同。
+- `bash tools/run_sim.sh stage2`：阈值 67 两轮 + 阈值 0 一轮，均为 1,266 拍 / 81,000 bit 逐位相同。
+- 全量回归、Voter 综合/时序与功能提交号在 R3 收尾后回填。

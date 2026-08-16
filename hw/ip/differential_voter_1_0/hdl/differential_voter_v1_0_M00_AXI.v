@@ -905,3 +905,5 @@
 	// User logic ends
 
 	endmodule
+// DEPRECATED：未进入 component.xml 文件集，也未被生产顶层实例化。
+// 生产 AXI 主控实现在 differential_voter_v1_0.v 内，本文件仅保留作历史参考。

@@ -160,7 +160,7 @@ module Dna_accelerator_core_v1_0 #(
         if (!aresetn || soft_reset_s) begin
             in_count <= 12'd0;
         end else begin
-            case ({in_wr, (in_rd && ~in_empty)})
+            case ({(in_wr && ~in_full), (in_rd && ~in_empty)})
                 2'b10: in_count <= in_count + 1'b1;
                 2'b01: in_count <= in_count - 1'b1;
                 default: in_count <= in_count;
@@ -168,14 +168,9 @@ module Dna_accelerator_core_v1_0 #(
         end
     end
 
-    // ========================================================================
-    // *** FIX 1: TREADY logic to prevent DMA deadlock ***
-    // - During preload: always accept
-    // - When engine busy: keep accepting (engine is consuming data continuously)
-    // - When engine idle: accept only if count < 1000 (leave margin before full at 1024)
-    // ========================================================================
-    assign S_AXIS_DATA_TREADY = preload_mode_s ? 1'b1 : 
-                                (eng_busy ? 1'b1 : (in_count < 12'd1000));
+    // 预载不经过输入 FIFO；正常读段只有在 FIFO 可接纳时才握手。
+    // 一条读段完成后 in_wr 延迟一拍，因此 FIFO 满时必须直接阻止下一拍进入。
+    assign S_AXIS_DATA_TREADY = preload_mode_s ? 1'b1 : ~in_full;
 
     // Assemble read data
     always @* begin
@@ -287,7 +282,7 @@ module Dna_accelerator_core_v1_0 #(
     // =================================================
     reg  start_rise_latched;
     reg  arm_start;
-    reg  [15:0] idle_counter;  // Track engine idle time with data in FIFO
+    reg  [16:0] idle_counter;  // Track engine idle time with data in FIFO
 
     // Latch the start signal - don't clear it when engine is busy
     always @(posedge aclk or negedge aresetn) begin
@@ -300,10 +295,10 @@ module Dna_accelerator_core_v1_0 #(
     // Track how long engine has been idle with data in FIFO
     always @(posedge aclk or negedge aresetn) begin
         if (!aresetn || soft_reset_s)
-            idle_counter <= 16'd0;
+            idle_counter <= 17'd0;
         else if (eng_busy)
-            idle_counter <= 16'd0;  // Reset when engine is working
-        else if (~eng_busy && (in_count > 0) && (idle_counter < 16'hFFFF))
+            idle_counter <= 17'd0;  // Reset when engine is working
+        else if (~eng_busy && (in_count > 0) && (idle_counter < 17'h1FFFF))
             idle_counter <= idle_counter + 1'b1;  // Increment when idle with data
     end
 
@@ -315,7 +310,7 @@ module Dna_accelerator_core_v1_0 #(
     assign trigger_full_batch = (in_count >= BATCH);
     assign trigger_timeout = (in_count > 0) && 
                                    (in_count < BATCH) && 
-                                   (idle_counter >= 20'd100000);
+                                   (idle_counter >= 17'd100000);
     assign can_trigger = trigger_full_batch | trigger_timeout;                              
     always @(posedge aclk or negedge aresetn) begin
         if (!aresetn || soft_reset_s) begin

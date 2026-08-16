@@ -385,11 +385,11 @@ module axi_slave_decoder #
     input  wire                             S_AXI_ARESETN,
     input  wire [C_S_AXI_ADDR_WIDTH-1:0]    S_AXI_AWADDR,
     input  wire                             S_AXI_AWVALID,
-    output reg                              S_AXI_AWREADY,
+    output wire                             S_AXI_AWREADY,
     input  wire [C_S_AXI_DATA_WIDTH-1:0]    S_AXI_WDATA,
     input  wire [C_S_AXI_DATA_WIDTH/8-1:0]  S_AXI_WSTRB,
     input  wire                             S_AXI_WVALID,
-    output reg                              S_AXI_WREADY,
+    output wire                             S_AXI_WREADY,
     output reg  [1:0]                       S_AXI_BRESP,
     output reg                              S_AXI_BVALID,
     input  wire                             S_AXI_BREADY,
@@ -410,34 +410,52 @@ module axi_slave_decoder #
     input  wire                               done,
     input  wire                               idle
 );
-    wire [3:0] waddr = S_AXI_AWADDR[5:2];
+    reg [C_S_AXI_ADDR_WIDTH-1:0] awaddr_q;
+    reg [C_S_AXI_DATA_WIDTH-1:0] wdata_q;
+    reg aw_pending, w_pending;
+    wire aw_accept = S_AXI_AWVALID && S_AXI_AWREADY;
+    wire w_accept = S_AXI_WVALID && S_AXI_WREADY;
+    wire write_commit = (aw_pending || aw_accept) &&
+                        (w_pending || w_accept) && ~S_AXI_BVALID;
+    wire [C_S_AXI_ADDR_WIDTH-1:0] write_addr = aw_pending ? awaddr_q : S_AXI_AWADDR;
+    wire [C_S_AXI_DATA_WIDTH-1:0] write_data = w_pending ? wdata_q : S_AXI_WDATA;
+    wire [3:0] waddr = write_addr[5:2];
     wire [3:0] raddr = S_AXI_ARADDR[5:2];
+    assign S_AXI_AWREADY = ~aw_pending & ~S_AXI_BVALID;
+    assign S_AXI_WREADY = ~w_pending & ~S_AXI_BVALID;
 
     // ???����?��?"
     always @(posedge S_AXI_ACLK) begin
         if (!S_AXI_ARESETN) begin
-            S_AXI_AWREADY <= 1'b0;
-            S_AXI_WREADY  <= 1'b0;
             S_AXI_BVALID  <= 1'b0;
             S_AXI_BRESP   <= 2'b00;
+            awaddr_q <= {C_S_AXI_ADDR_WIDTH{1'b0}};
+            wdata_q <= {C_S_AXI_DATA_WIDTH{1'b0}};
+            aw_pending <= 1'b0;
+            w_pending <= 1'b0;
             in_addr <= 32'd0; in_beats <= 32'd0; out_addr <= 32'd0; out_beats <= 32'd0;
             start_pulse <= 1'b0; done_clr <= 1'b0;
         end else begin
             start_pulse <= 1'b0;
             done_clr    <= 1'b0;
 
-            if (~S_AXI_AWREADY && S_AXI_AWVALID) S_AXI_AWREADY <= 1'b1;
-            else                                 S_AXI_AWREADY <= 1'b0;
+            if (aw_accept) begin
+                awaddr_q <= S_AXI_AWADDR;
+                aw_pending <= 1'b1;
+            end
+            if (w_accept) begin
+                wdata_q <= S_AXI_WDATA;
+                w_pending <= 1'b1;
+            end
 
-            if (~S_AXI_WREADY && S_AXI_WVALID)   S_AXI_WREADY  <= 1'b1;
-            else                                 S_AXI_WREADY  <= 1'b0;
-
-            if ((~S_AXI_BVALID) && S_AXI_AWREADY && S_AXI_AWVALID && S_AXI_WREADY && S_AXI_WVALID) begin
+            if (write_commit) begin
+                aw_pending <= 1'b0;
+                w_pending <= 1'b0;
                 case (waddr)
-                    4'd0: in_addr   <= S_AXI_WDATA;
-                    4'd1: in_beats  <= S_AXI_WDATA;
-                    4'd2: out_addr  <= S_AXI_WDATA;
-                    4'd3: out_beats <= S_AXI_WDATA;
+                    4'd0: in_addr   <= write_data;
+                    4'd1: in_beats  <= write_data;
+                    4'd2: out_addr  <= write_data;
+                    4'd3: out_beats <= write_data;
                     4'd4: start_pulse <= 1'b1;
                     default: ;
                 endcase

@@ -1,3 +1,5 @@
+// DEPRECATED：未进入 component.xml 文件集，也未被生产顶层实例化。
+// 生产 Stage1 实现为 srpe_batch.v；本文件仅保留作历史参考，禁止接回数据通路。
 // Filename: srpe.v
 // FINAL FIX: Changed wire declarations to reg for variables assigned within procedural blocks.
 // UPDATED: SCORE_WIDTH increased to 10 to match combined-plane scoring.
@@ -240,4 +242,3 @@ assign global_peak_pos = global_peak_pos_reg;
 assign global_peak_codeword = global_peak_codeword_reg;
 
 endmodule
-

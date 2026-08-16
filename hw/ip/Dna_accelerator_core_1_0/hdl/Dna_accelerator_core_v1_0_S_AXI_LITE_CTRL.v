@@ -30,14 +30,17 @@ module Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL #(
     input  wire                           S_AXI_RREADY
 );
     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_awaddr;
-    reg axi_awready, axi_wready, axi_bvalid;
+    reg axi_bvalid;
     reg [1:0] axi_bresp;
     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_araddr;
     reg axi_arready, axi_rvalid;
     reg [1:0] axi_rresp;
     reg [C_S_AXI_DATA_WIDTH-1:0] axi_rdata;
-    assign S_AXI_AWREADY = axi_awready;
-    assign S_AXI_WREADY  = axi_wready;
+    reg aw_pending, w_pending;
+    reg [C_S_AXI_DATA_WIDTH-1:0] axi_wdata;
+    reg [(C_S_AXI_DATA_WIDTH/8)-1:0] axi_wstrb;
+    assign S_AXI_AWREADY = ~aw_pending & ~axi_bvalid;
+    assign S_AXI_WREADY  = ~w_pending & ~axi_bvalid;
     assign S_AXI_BRESP   = axi_bresp;
     assign S_AXI_BVALID  = axi_bvalid;
     assign S_AXI_ARREADY = axi_arready;
@@ -46,51 +49,54 @@ module Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL #(
     assign S_AXI_RDATA   = axi_rdata;
 
     reg [C_S_AXI_DATA_WIDTH-1:0] slv_reg0, slv_reg1, slv_reg2, slv_reg3;
-    reg aw_en;
-    always @(posedge S_AXI_ACLK) begin
-        if (!S_AXI_ARESETN) begin axi_awready <= 1'b0; aw_en <= 1'b1; end
-        else begin
-            if (~axi_awready && S_AXI_AWVALID && S_AXI_WVALID && aw_en) begin
-                axi_awready <= 1'b1; aw_en <= 1'b0;
-            end else if (S_AXI_BREADY && axi_bvalid) begin
-                aw_en <= 1'b1; axi_awready <= 1'b0;
-            end else begin
-                axi_awready <= 1'b0;
-            end
-        end
-    end
-    always @(posedge S_AXI_ACLK) begin
-        if (!S_AXI_ARESETN) axi_awaddr <= {C_S_AXI_ADDR_WIDTH{1'b0}};
-        else if (~axi_awready && S_AXI_AWVALID && S_AXI_WVALID && aw_en) axi_awaddr <= S_AXI_AWADDR;
-    end
-    always @(posedge S_AXI_ACLK) begin
-        if (!S_AXI_ARESETN) axi_wready <= 1'b0;
-        else if (~axi_wready && S_AXI_WVALID && S_AXI_AWVALID && aw_en) axi_wready <= 1'b1;
-        else axi_wready <= 1'b0;
-    end
-
-    wire slv_reg_wren = axi_wready && S_AXI_WVALID && axi_awready && S_AXI_AWVALID;
+    wire aw_accept = S_AXI_AWVALID && S_AXI_AWREADY;
+    wire w_accept  = S_AXI_WVALID && S_AXI_WREADY;
+    wire slv_reg_wren = (aw_pending || aw_accept) &&
+                        (w_pending || w_accept) && ~axi_bvalid;
+    wire [C_S_AXI_ADDR_WIDTH-1:0] write_addr = aw_pending ? axi_awaddr : S_AXI_AWADDR;
+    wire [C_S_AXI_DATA_WIDTH-1:0] write_data = w_pending ? axi_wdata : S_AXI_WDATA;
+    wire [(C_S_AXI_DATA_WIDTH/8)-1:0] write_strb = w_pending ? axi_wstrb : S_AXI_WSTRB;
     integer i;
     localparam integer ADDR_LSB = (C_S_AXI_DATA_WIDTH/32) + 1;
     localparam integer OPT_MEM_ADDR_BITS = 1;
     always @(posedge S_AXI_ACLK) begin
-        if (!S_AXI_ARESETN) begin slv_reg0<=0; slv_reg1<=0; slv_reg2<=0; slv_reg3<=0; end
-        else if (slv_reg_wren) begin
-            case (axi_awaddr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB])
-                2'h0: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (S_AXI_WSTRB[i]) slv_reg0[(i*8)+:8] <= S_AXI_WDATA[(i*8)+:8];
-                2'h1: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (S_AXI_WSTRB[i]) slv_reg1[(i*8)+:8] <= S_AXI_WDATA[(i*8)+:8];
-                2'h2: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (S_AXI_WSTRB[i]) slv_reg2[(i*8)+:8] <= S_AXI_WDATA[(i*8)+:8];
-                2'h3: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (S_AXI_WSTRB[i]) slv_reg3[(i*8)+:8] <= S_AXI_WDATA[(i*8)+:8];
-                default: ;
-            endcase
-        end
-    end
-    always @(posedge S_AXI_ACLK) begin
-        if (!S_AXI_ARESETN) begin axi_bvalid <= 1'b0; axi_bresp <= 2'b0; end
-        else if (axi_awready && S_AXI_AWVALID && ~axi_bvalid && axi_wready && S_AXI_WVALID) begin
-            axi_bvalid <= 1'b1; axi_bresp <= 2'b00;
-        end else if (S_AXI_BREADY && axi_bvalid) begin
+        if (!S_AXI_ARESETN) begin
+            axi_awaddr <= {C_S_AXI_ADDR_WIDTH{1'b0}};
+            axi_wdata <= {C_S_AXI_DATA_WIDTH{1'b0}};
+            axi_wstrb <= {(C_S_AXI_DATA_WIDTH/8){1'b0}};
+            aw_pending <= 1'b0;
+            w_pending <= 1'b0;
             axi_bvalid <= 1'b0;
+            axi_bresp <= 2'b00;
+            slv_reg0 <= 0;
+            slv_reg1 <= 0;
+            slv_reg2 <= 0;
+            slv_reg3 <= 0;
+        end else begin
+            if (axi_bvalid && S_AXI_BREADY)
+                axi_bvalid <= 1'b0;
+            if (aw_accept) begin
+                axi_awaddr <= S_AXI_AWADDR;
+                aw_pending <= 1'b1;
+            end
+            if (w_accept) begin
+                axi_wdata <= S_AXI_WDATA;
+                axi_wstrb <= S_AXI_WSTRB;
+                w_pending <= 1'b1;
+            end
+            if (slv_reg_wren) begin
+                aw_pending <= 1'b0;
+                w_pending <= 1'b0;
+                axi_bvalid <= 1'b1;
+                axi_bresp <= 2'b00;
+                case (write_addr[ADDR_LSB+OPT_MEM_ADDR_BITS:ADDR_LSB])
+                    2'h0: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (write_strb[i]) slv_reg0[(i*8)+:8] <= write_data[(i*8)+:8];
+                    2'h1: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (write_strb[i]) slv_reg1[(i*8)+:8] <= write_data[(i*8)+:8];
+                    2'h2: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (write_strb[i]) slv_reg2[(i*8)+:8] <= write_data[(i*8)+:8];
+                    2'h3: for (i=0;i<(C_S_AXI_DATA_WIDTH/8);i=i+1) if (write_strb[i]) slv_reg3[(i*8)+:8] <= write_data[(i*8)+:8];
+                    default: ;
+                endcase
+            end
         end
     end
     always @(posedge S_AXI_ACLK) begin

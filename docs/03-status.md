@@ -275,6 +275,34 @@ Stage3 启动之前，对 DDR 上的 10,125 B 做逐字节 `共识 ⊕ 水印`�
 - 调试手段：`vvp ... +dump_bram` 转储 81,000 个累加器，
   配 `tools/debug_vote_diff.py` 与 Python 重算票值逐位置 diff。
 
+### ~~B17 DNA 输入 FIFO 满时仍接收数据~~ ✅ 已修复并仿真验证（2026-08-16，R3）
+
+**原问题**：`Dna_accelerator_core_v1_0.v` 在 `eng_busy=1` 时无条件令
+`S_AXIS_DATA_TREADY=1`。输入 FIFO 深度只有 1,024，满后 `fifo_sync_sdpram_b64.v`
+会静默忽略写入，但顶层 `in_count` 仍增加；DMA 认为数据已握手，实际读段已经丢失。
+
+**修复**：预载模式仍直接接收；正常读段的 `TREADY` 改为 `~in_full`，`in_count`
+只按 `in_wr && ~in_full` 的真实 FIFO 写入计数。新增 `tb_dna_ingress.v`：先验证
+10×32 bit 组装成 300 bit，再模拟引擎长时间 busy 连续提供 1,100 条读段。
+修复前 11,000 拍全部被接受且无背压；修复后 FIFO 与镜像计数都稳定在 1,024，测试通过。
+
+### ~~B18 三个生产 IP 的 AXI-Lite 写通道要求 AW/W 同周期~~ ✅ 已修复（2026-08-16，R3）
+
+**原问题**：DNA、Voter、Desparsifier 的生产 AXI-Lite 从机都隐含要求地址通道 AW
+与数据通道 W 同周期有效；合法的“先 AW 后 W”事务无法产生 B 响应。Voter/Decoder 目录中
+同名 `_S00_AXI.v` 是未进入 `component.xml` 的死文件，不能修它们代替生产顶层。
+
+**修复**：三个生产从机各自缓存一个 AW 和一个 W，独立握手，凑齐后仅提交一次写入并
+返回一次 B 响应。新增 `tb_dna_axil.v` 覆盖 AW→W、W→AW 与 `WSTRB`；Stage2/Stage3
+既有 BFM 改为先 AW 后 W。修复前两级都在首笔事务报“B 响应超时”，修复后
+Stage2 三轮 81,000 bit 与 Stage3 64,800 bit 黄金向量仍逐位相同。
+
+### ~~B19 DNA 尾批超时阈值超出计数器位宽~~ ✅ 已修复（2026-08-16，R3）
+
+`idle_counter` 原为 16 bit，却比较 `100000`，因此 partial-batch 超时永远不可达。
+当前 CONFIG 强制读段数为 64 的倍数，生产协议不依赖该分支，但 RTL 行为与注释不符。
+计数器扩为 17 bit，饱和值和比较常量同步修正；`tb_dna_ingress.v` 直接钉死阈值可表示且可触发。
+
 ### ~~B5 反稀疏化的取反标志取错了位置~~ ✅ 已修复并仿真验证（2026-08-07）
 
 **修复**：`conv40_32()` 改为 `r[k] = grp[4:1] ^ {4{grp[0]}}`，取反标志改用组内**第一个** bit。
