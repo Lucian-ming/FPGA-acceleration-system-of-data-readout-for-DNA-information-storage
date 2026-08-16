@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- |
 | R1 | PS 协议与 Voter 控制 | 已完成：修复失败 ACK、分帧原子发送、超大 payload 恢复；合并 Voter 配置；清理死函数 | `run_sim.sh` 8/8；xsct ELF 941,888 B | `80f53b9` / `git revert 80f53b9` |
 | R2 | 上位机 | 已完成：提取 TaskSpec/协议模块；严格水印/读段/结果校验；LDPC 默认原生 | 12 项单测；全量 9/9；dry-run/auto LDPC 通过 | `44f00eb` / `git revert 44f00eb` |
-| R3 | PL | 已完成：修复 DNA 入口丢数、三核 AXI-Lite 独立握手、尾批超时位宽；清理死寄存器/乱码注释并标记遗留 RTL | RTL 全量回归 + Voter 综合 | 待提交（功能已验证，提交号待回填） |
+| R3 | PL | 已完成：修复 DNA 入口丢数、三核 AXI-Lite 独立握手、尾批超时位宽；清理死寄存器/乱码注释并标记遗留 RTL | RTL 全量回归 + 三个顶层 Vivado 综合/时序 | `6c8bdcd` / `git revert 6c8bdcd` |
 | R4 | 文档与收尾 | 同步 03/05/06/09/README；全量回归、ELF、综合复跑 | 全绿 | 待提交 |
 
 ## R1 审查发现（已提交 `80f53b9`）
@@ -127,4 +127,12 @@
 - `bash tools/run_sim.sh dna_axil`：AW→W、W→AW、`WSTRB` 通过。
 - `bash tools/run_sim.sh axi`：1,013 拍 / 64,800 bit 与 Stage3 黄金向量逐位相同。
 - `bash tools/run_sim.sh stage2`：阈值 67 两轮 + 阈值 0 一轮，均为 1,266 拍 / 81,000 bit 逐位相同。
-- 全量回归、Voter 综合/时序与功能提交号在 R3 收尾后回填。
+- `bash tools/run_sim.sh`：11 项通过、0 项失败（Stage1/2/3、DNA 两项 TB、主机五项、语法检查）。
+- Vivado 2022.2 `synth_check.tcl`：DNA 顶层 WNS `+0.543 ns`、Voter `+2.480 ns`、
+  Desparsifier 综合均为 0 errors / 0 critical warnings，100 MHz 时序收敛。
+
+### R3 提交与回退
+
+- 功能提交：`6c8bdcd fix(pl): 修复数据入口与AXI-Lite握手缺陷`
+- 单独回退：`git revert 6c8bdcd`
+- 本节文档回填提交：待提交（回退该文档提交不会触及 RTL）。
