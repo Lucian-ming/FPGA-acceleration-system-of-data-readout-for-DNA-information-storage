@@ -13,8 +13,16 @@
 
 set outdir "hw/build/reports"
 set dname  "current"
-if {[llength $argv] >= 1} { set outdir [lindex $argv 0] }
-if {[llength $argv] >= 2} { set dname  [lindex $argv 1] }
+if {[info exists ::collect_info_outdir]} {
+    set outdir $::collect_info_outdir
+} elseif {[llength $argv] >= 1 && ![string match "*=*" [lindex $argv 0]]} {
+    set outdir [lindex $argv 0]
+}
+if {[info exists ::collect_info_design]} {
+    set dname $::collect_info_design
+} elseif {[llength $argv] >= 2 && ![string match "*=*" [lindex $argv 1]]} {
+    set dname [lindex $argv 1]
+}
 file mkdir $outdir
 
 puts "===> collect_info: design=$dname outdir=$outdir"

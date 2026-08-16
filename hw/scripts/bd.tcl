@@ -1,5 +1,5 @@
 # =========================================
-# bd.tcl 
+# bd.tcl
 # 设备: xc7z010clg400-1
 # IP:
 #   - xilinx.com:user:Dna_accelerator_core:1.0
@@ -26,19 +26,63 @@ create_bd_design "top_bd"
 # PS7
 set ps_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7 ps_0]
 apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config { make_external "FIXED_IO, DDR" } [get_bd_cells ps_0]
+
+# 板级参数来自只读历史硬件快照 design_2_wrapper.xsa（SHA-256 79c64736...e6eb33）
+# 的 design_1.hwh。历史 XSA 未声明 BOARD，不能套用其他开发板 preset。
 set_property -dict [list \
   CONFIG.PCW_USE_M_AXI_GP0 {1} \
   CONFIG.PCW_USE_S_AXI_HP0 {1} \
   CONFIG.PCW_EN_CLK0_PORT {1} \
+  CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100} \
+  CONFIG.PCW_PRESET_BANK1_VOLTAGE {LVCMOS 1.8V} \
+  CONFIG.PCW_ENET0_PERIPHERAL_ENABLE {1} \
+  CONFIG.PCW_ENET0_ENET0_IO {MIO 16 .. 27} \
+  CONFIG.PCW_ENET0_GRP_MDIO_ENABLE {1} \
+  CONFIG.PCW_ENET0_GRP_MDIO_IO {MIO 52 .. 53} \
+  CONFIG.PCW_ENET0_PERIPHERAL_FREQMHZ {1000 Mbps} \
+  CONFIG.PCW_UART1_PERIPHERAL_ENABLE {1} \
+  CONFIG.PCW_UART1_UART1_IO {MIO 48 .. 49} \
+  CONFIG.PCW_UART1_BAUD_RATE {115200} \
+  CONFIG.PCW_UART_PERIPHERAL_FREQMHZ {100} \
+  CONFIG.PCW_UIPARAM_DDR_ENABLE {1} \
+  CONFIG.PCW_UIPARAM_DDR_MEMORY_TYPE {DDR 3} \
+  CONFIG.PCW_UIPARAM_DDR_BUS_WIDTH {32 Bit} \
+  CONFIG.PCW_UIPARAM_DDR_PARTNO {MT41J128M16 HA-125} \
+  CONFIG.PCW_UIPARAM_DDR_DRAM_WIDTH {16 Bits} \
+  CONFIG.PCW_UIPARAM_DDR_DEVICE_CAPACITY {2048 MBits} \
+  CONFIG.PCW_UIPARAM_DDR_SPEED_BIN {DDR3_1066F} \
+  CONFIG.PCW_UIPARAM_DDR_FREQ_MHZ {533.333333} \
+  CONFIG.PCW_UIPARAM_DDR_CL {7} \
+  CONFIG.PCW_UIPARAM_DDR_CWL {6} \
+  CONFIG.PCW_UIPARAM_DDR_T_RCD {7} \
+  CONFIG.PCW_UIPARAM_DDR_T_RP {7} \
+  CONFIG.PCW_UIPARAM_DDR_T_RC {48.75} \
+  CONFIG.PCW_UIPARAM_DDR_T_RAS_MIN {35.0} \
+  CONFIG.PCW_UIPARAM_DDR_T_FAW {40.0} \
+  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY0 {0.25} \
+  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY1 {0.25} \
+  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY2 {0.25} \
+  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY3 {0.25} \
+  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_0 {0.0} \
+  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_1 {0.0} \
+  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_2 {0.0} \
+  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_3 {0.0} \
+  CONFIG.PCW_UIPARAM_DDR_TRAIN_WRITE_LEVEL {1} \
+  CONFIG.PCW_UIPARAM_DDR_TRAIN_READ_GATE {1} \
+  CONFIG.PCW_UIPARAM_DDR_TRAIN_DATA_EYE {1} \
 ] [get_bd_cells ps_0]
 
 # 时钟/复位
 set clk_wiz_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz clk_wiz_0]
-set_property -dict [list CONFIG.PRIM_SOURCE {No_buffer} CONFIG.NUM_OUT_CLK {1} CONFIG.CLK_OUT1_REQUESTED_OUT_FREQ $clk_mhz] $clk_wiz_0
+set_property -dict [list CONFIG.PRIM_SOURCE {No_buffer} CONFIG.CLKOUT1_REQUESTED_OUT_FREQ $clk_mhz] $clk_wiz_0
 set rst_ps   [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset rst_ps]
 connect_bd_net [get_bd_pins ps_0/FCLK_CLK0]     [get_bd_pins clk_wiz_0/clk_in1]
 connect_bd_net [get_bd_pins ps_0/FCLK_RESET0_N] [get_bd_pins rst_ps/ext_reset_in]
 connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins rst_ps/slowest_sync_clk]
+# PS AXI 主/从端口也必须接入同一时钟，否则 validate_bd_design 会拒绝
+# M_AXI_GP0 和 S_AXI_HP0 的接口连接。
+connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ps_0/M_AXI_GP0_ACLK]
+connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ps_0/S_AXI_HP0_ACLK]
 
 # AXI-Lite 互联 (GP0 -> 多从)
 set ic_lite [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect ic_lite]
@@ -127,14 +171,18 @@ connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S]     [get_bd_intf_pi
 # DNA 输出 -> S2MM
 connect_bd_intf_net [get_bd_intf_pins Dna_accelerator_core_0/M_AXIS_RESULT] [get_bd_intf_pins axi_dma_0/S_AXIS_S2MM]
 
-# ===== 地址分配（可固定，也可用自动）=====
+# ===== 地址分配 =====
 assign_bd_address
-# 若需固定，解开如下并按需修改（与常见默认一致）：
-# set_property offset 0x40400000 [get_bd_addr_segs axi_dma_0/S_AXI_LITE/Reg]
-# set_property offset 0x43C00000 [get_bd_addr_segs Dna_accelerator_core_0/S_AXI_LITE_CTRL/Reg]
-# set_property offset 0x43C10000 [get_bd_addr_segs differential_voter_0/S00_AXI/Reg]
-# set_property offset 0x43C20000 [get_bd_addr_segs desparsification_dec_0/S00_AXI/Reg]
-# assign_bd_address
+# 与历史 XSA 及 sw/app/xparameters.h 固定一致，禁止依赖自动分配顺序。
+set ps_data [get_bd_addr_spaces ps_0/Data]
+assign_bd_address -offset 0x40400000 -range 0x00010000 -target_address_space $ps_data \
+  [get_bd_addr_segs axi_dma_0/S_AXI_LITE/Reg] -force
+assign_bd_address -offset 0x43C00000 -range 0x00010000 -target_address_space $ps_data \
+  [get_bd_addr_segs Dna_accelerator_core_0/S_AXI_LITE_CTRL/S_AXI_LITE_CTRL_reg] -force
+assign_bd_address -offset 0x43C10000 -range 0x00010000 -target_address_space $ps_data \
+  [get_bd_addr_segs desparsification_dec_0/S00_AXI/S00_AXI_reg] -force
+assign_bd_address -offset 0x43C20000 -range 0x00010000 -target_address_space $ps_data \
+  [get_bd_addr_segs differential_voter_0/S00_AXI/S00_AXI_reg] -force
 
 # 校验/保存
 validate_bd_design

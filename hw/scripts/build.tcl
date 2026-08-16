@@ -34,6 +34,16 @@ puts "===> Vivado [version -short]"
 puts "===> proj=$proj_name part=$part_name clk=${clk_mhz}MHz"
 puts "===> root=$repo_root"
 
+proc require_run_success {run_name} {
+  set run [get_runs $run_name]
+  set status [get_property STATUS $run]
+  set progress [get_property PROGRESS $run]
+  if {$progress ne "100%" || ![string match "*Complete*" $status]} {
+    puts "FATAL: run $run_name failed: status='$status', progress='$progress'"
+    exit 1
+  }
+}
+
 # 工程
 file mkdir $proj_wk
 create_project $proj_name $proj_wk -force
@@ -68,12 +78,19 @@ if {[file exists $xdc_file]} {
 # 综合/实现/bit
 launch_runs synth_1 -jobs 8
 wait_on_runs synth_1
+require_run_success synth_1
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_runs impl_1
+require_run_success impl_1
 
 # 收集报告（可选，失败不阻断）
 if {[file exists [file join $repo_root hw scripts collect_info.tcl]]} {
+  open_run impl_1
+  set ::collect_info_outdir [file join $proj_wk reports]
+  set ::collect_info_design $proj_name
   catch {source [file join $repo_root hw scripts collect_info.tcl]}
+  unset ::collect_info_outdir
+  unset ::collect_info_design
 }
 
 # 导出 XSA（含bit）
