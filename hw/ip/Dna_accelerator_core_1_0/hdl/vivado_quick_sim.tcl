@@ -10,7 +10,7 @@ puts "========================================"
 
 # Project settings
 set project_name "dna_sim"
-set part_name "xc7z020clg484-1"
+set part_name "xc7z010clg400-1"  ;# 修订 A9：实际器件是 xc7z010
 set sim_time "100us"
 
 # Create project directory

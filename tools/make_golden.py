@@ -12,7 +12,7 @@
     watermark_sym.hex    40,500 个 2-bit 水印符号，每行一个
     wm_regions.hex       NUM_LC × REF_LEN 个符号，按区域展开，Stage1 预载用
     stage1_expect.txt    每条读段的 dir/pos/score
-    stage2_expect.hex    Stage2 应输出的 81,000 bit 共识码流（64 bit/行，含分数过滤，D1 修后用）
+    stage2_expect.hex    Stage2 应输出的 81,000 bit 共识（64 bit/行，方案B：逐记录过阈值）
     stage2_in.hex        Voter Testbench 激励：2n 条 Stage1 输出记录 × 6 个 64-bit 字
     stage2_rtl_expect.hex Voter 板端语义期望：全部记录投票（无分数过滤）的 81,000 bit
     sparse_expect.hex    共识 ⊕ 水印后的稀疏流（= Stage3 输入），64 bit/行
@@ -135,20 +135,25 @@ def main(argv=None):
     (out / "reads_cw.hex").write_text("\n".join(cw_lines) + "\n", encoding="utf-8")
     print(f"  reads_cw.hex         {n} 行 × {2*rb} bit")
 
-    # ---- Stage2：投票 ----
+    # ---- Stage2：投票（方案 B，与板端 RTL 的 SCORE_MIN 语义一致）----
+    # 板端（D1 方案 B）：上位机把每条读段正向、反向互补各发一份，Voter 对
+    # 每条记录【独立】按分数过滤（score >= thr 才投票）。与
+    # `golden_model.py simulate --rc` 的「每对择优一条」语义仅在双方向都
+    # 过阈的读段上不同（本数据集 2,048 条中有 10 条）；两种语义的码字误码
+    # 相当（88 与 86 / 64,800），都远低于 LDPC 硬判决可解边界。
     votes = np.zeros(2 * L, dtype=np.int32)
     used = 0
-    for i, (d, p, s) in enumerate(res):
-        if s < thr:
-            continue
-        a = R[i] if d == 0 else (R[i] ^ 1)[::-1]
-        used += 1
-        idx = np.arange(p, p + rb)
-        np.add.at(votes, idx, ((a >> 1) & 1).astype(np.int32) * 2 - 1)
-        np.add.at(votes, idx + L, (a & 1).astype(np.int32) * 2 - 1)
+    for i, (pf, sf, pr, sr_) in enumerate(both):
+        for p, s, a in ((pf, sf, R[i]), (pr, sr_, (R[i] ^ 1)[::-1])):
+            if s < thr:
+                continue
+            used += 1
+            idx = np.arange(p, p + rb)
+            np.add.at(votes, idx, ((a >> 1) & 1).astype(np.int32) * 2 - 1)
+            np.add.at(votes, idx + L, (a & 1).astype(np.int32) * 2 - 1)
     consensus = (votes > 0).astype(np.uint8)
     write_hex(out / "stage2_expect.hex", pack_lsb_first(consensus), 16)
-    print(f"  stage2_expect.hex    {2*L} bit，{used}/{n} 条参与投票")
+    print(f"  stage2_expect.hex    {2*L} bit（方案B：逐记录过阈值），{used}/{2*n} 条记录参与投票")
 
     # ---- Stage2 RTL 语义向量（Voter Testbench 判据）----
     # 板端现行语义：上位机把每条读段「正向 + 反向互补」各发一份（first.py

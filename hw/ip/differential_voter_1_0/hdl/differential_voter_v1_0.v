@@ -23,6 +23,10 @@
 //   B16) S_READ_DATA 完成条件 (beat_count>=6 && RVALID) 依赖最后一个 beat
 //        握手后 RVALID 仍保持——合规从机会在 RLAST 握手后撤下 RVALID，
 //        真实互连上 DUT 将死锁。修复：只看握手计数。
+//   D1/D2) 新增 AXI-Lite 0x30 SCORE_MIN：score < SCORE_MIN 的记录在
+//        S_PARSE_READ 直接跳过、不投票（反向互补方案 B 的板端取舍；
+//        上位机正反双向发送，错误方向/补零记录分数低于阈值被丢弃）。
+//        复位默认 0 = 不过滤，与旧行为兼容。
 //
 // Date  : 2025-11-04 初版 / 2026-08-16 黄金向量对齐修复
 // ================================================================
@@ -114,6 +118,7 @@ module differential_voter_v1_0 #
     // ----------------- AXI-Lite 映射 -----------------
     wire [31:0] in_addr_s, out_addr_s, in_beats_s, out_beats_s;
     wire [31:0] total_reads_cfg_s;
+    wire [31:0] score_min_cfg_s;   // 【D1/D2】分数阈值（0x30），0 = 不过滤
     wire        start_pulse_s, done_clr_s;
     reg         done_s, idle_s, error_s;
 
@@ -155,6 +160,7 @@ module differential_voter_v1_0 #
         .out_addr      (out_addr_s),
         .out_beats     (out_beats_s),
         .total_reads_cfg(total_reads_cfg_s),
+        .score_min_cfg (score_min_cfg_s),
         .start_pulse   (start_pulse_s),
         .done_clr      (done_clr_s),
 
@@ -175,6 +181,7 @@ module differential_voter_v1_0 #
 
     // ----------------- 跨时钟域同步到 M00_AXI_ACLK -----------------
     reg [31:0] in_addr, out_addr, in_beats, out_beats, total_reads_cfg;
+    reg [31:0] score_min_cfg;
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
             in_addr         <= 32'd0;
@@ -182,12 +189,14 @@ module differential_voter_v1_0 #
             in_beats        <= 32'd0;
             out_beats       <= 32'd0;
             total_reads_cfg <= 32'd0;
+            score_min_cfg   <= 32'd0;   // 复位默认不过滤（向后兼容）
         end else begin
             in_addr         <= in_addr_s;
             out_addr        <= out_addr_s;
             in_beats        <= in_beats_s;
             out_beats       <= out_beats_s;
             total_reads_cfg <= total_reads_cfg_s;
+            score_min_cfg   <= score_min_cfg_s;
         end
     end
 
@@ -309,9 +318,12 @@ module differential_voter_v1_0 #
     wire init_complete        = (FAST_INIT) ? (init_addr >= 17'd63) : (init_addr >= (TOTAL_BITS - 1));
     wire read_setup_complete  = 1'b1;
     // 【修订 B16】完成条件只看握手计数：第 6 次握手发生在 RLAST 那拍，
-    // beat_count 要到下一拍才等于 6；而合规从机在 RLIST 握手后即撤下 RVALID。
+    // beat_count 要到下一拍才等于 6；而合规从机在 RLAST 握手后即撤下 RVALID。
     // 原条件 (beat_count>=6 && RVALID) 依赖残留的 RVALID 电平，真实互连上会死锁。
     wire read_data_complete   = (read_beat_count >= 3'd6);
+    // 【D1/D2】比对分低于阈值的记录不参与投票（含上位机补零的尾批记录）。
+    // parse_score 在 S_PARSE_READ 拍从 read_words[0] 组合读出，天然有效。
+    wire score_below_min      = ({22'd0, parse_score} < score_min_cfg);
     wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
 
     reg [31:0] state_timeout_counter;
@@ -613,7 +625,8 @@ module differential_voter_v1_0 #
                 S_INIT_BRAM:       next_state = init_complete ? S_READ_SETUP : S_INIT_BRAM;
                 S_READ_SETUP:      next_state = read_setup_complete ? S_READ_DATA  : S_READ_SETUP;
                 S_READ_DATA:       next_state = read_data_complete  ? S_PARSE_READ : S_READ_DATA;
-                S_PARSE_READ:      next_state = S_CALC_ADDR;
+                // 【D1/D2】低分记录直接跳到下一条，不进入投票循环
+                S_PARSE_READ:      next_state = score_below_min ? S_NEXT_READ : S_CALC_ADDR;
                 S_CALC_ADDR:       next_state = S_VOTE_READ;
                 S_VOTE_READ:       next_state = S_VOTE_WAIT;   // 【修订 B13】
                 S_VOTE_WAIT:       next_state = S_VOTE_UPDATE;
@@ -811,6 +824,9 @@ endmodule
 // 0x24: DBG_WRITE
 // 0x28: DBG_FIRST_AWADDR
 // 0x2C: ERR_FLAGS (R: bit0 ERROR_S, bit1 AXI_BRESP_ERROR)
+// 0x30: SCORE_MIN  【D1/D2】比对分阈值；score < SCORE_MIN 的记录不投票。
+//       复位默认 0（不过滤）。注：06-implementation-plan 原写 0x18，
+//       但 0x18 已被 DBG_STATE 占用，实际落在 0x30。
 // 0x38: LAST_RRESP (R: bit[1:0] 最后一次读通道 RRESP)
 // ================================================================
 module axi_slave_voter #
@@ -844,6 +860,7 @@ module axi_slave_voter #
     output reg  [31:0] out_addr,
     output reg  [31:0] out_beats,
     output reg  [31:0] total_reads_cfg,
+    output reg  [31:0] score_min_cfg,
     output reg         start_pulse,
     output reg         done_clr,
 
@@ -879,6 +896,7 @@ module axi_slave_voter #
             out_addr        <= 32'd0;
             out_beats       <= 32'd0;
             total_reads_cfg <= 32'd0;
+            score_min_cfg   <= 32'd0;
             start_pulse     <= 1'b0;
             done_clr        <= 1'b0;
 
@@ -902,6 +920,7 @@ module axi_slave_voter #
                     5'h03: out_addr        <= S_AXI_WDATA;
                     5'h04: out_beats       <= S_AXI_WDATA;
                     5'h05: total_reads_cfg <= S_AXI_WDATA;
+                    5'h0C: score_min_cfg   <= S_AXI_WDATA;   // 0x30【D1/D2】
                     default: ;
                 endcase
                 S_AXI_BVALID <= 1'b1;
@@ -943,6 +962,7 @@ module axi_slave_voter #
                     5'h09: S_AXI_RDATA <= debug_write_count;
                     5'h0A: S_AXI_RDATA <= debug_first_write_addr;
                     5'h0B: S_AXI_RDATA <= {30'd0, bresp_err_flag, error_flag};
+                    5'h0C: S_AXI_RDATA <= score_min_cfg;
                     // >>> 新增：0x38
                     5'h0E: S_AXI_RDATA <= {30'd0, last_rresp};
                     default: S_AXI_RDATA <= 32'd0;

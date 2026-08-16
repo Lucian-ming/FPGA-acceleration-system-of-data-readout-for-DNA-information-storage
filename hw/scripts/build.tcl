@@ -1,7 +1,13 @@
 # =========================================
-# build.tcl#   vivado -mode batch -source hw/scripts/build.tcl
+# build.tcl
+#   vivado -mode batch -source hw/scripts/build.tcl
 # 可选参数：
 #   -tclargs proj_name=dna_accel part=xc7z010clg400-1 clk_mhz=100
+#
+# 2026-08-16 修复 A2：
+#   - 仓库根路径改由「脚本自身位置」推导，不再依赖启动时的 pwd；
+#   - 注册 hw/ip 为 IP 仓库并 update_ip_catalog（否则找不到三个自研 IP）；
+#   - 把 hw/constr/top.xdc 加入 constrs_1（此前 XDC 完全不进构建流）。
 # =========================================
 
 # 默认
@@ -15,11 +21,14 @@ _arg proj_name $proj_name
 _arg part_name $part_name
 _arg clk_mhz   $clk_mhz
 
-# 路径
-set repo_root  [file normalize [file join [pwd] ../..]]
+# 路径：按脚本自身位置推导（可在任意目录启动）
+set _here     [file normalize [file dirname [info script]]]
+set repo_root [file normalize "$_here/../.."]
 set proj_wk    [file join $repo_root hw/build]
 set bd_script  [file join $repo_root hw/scripts/bd.tcl]
+set xdc_file   [file join $repo_root hw/constr/top.xdc]
 set xsa_out    [file join $proj_wk export ${proj_name}.xsa]
+set ip_repo    [file join $repo_root hw/ip]
 
 puts "===> Vivado [version -short]"
 puts "===> proj=$proj_name part=$part_name clk=${clk_mhz}MHz"
@@ -29,6 +38,15 @@ puts "===> root=$repo_root"
 file mkdir $proj_wk
 create_project $proj_name $proj_wk -force
 set_property part $part_name [current_project]
+
+# 【A2】注册自研 IP 仓库（hw/ip 下三个 *_1_0 目录各含 component.xml）
+if {[file isdirectory $ip_repo]} {
+  set_property ip_repo_paths $ip_repo [current_project]
+  update_ip_catalog
+  puts "===> IP repo: $ip_repo"
+} else {
+  puts "FATAL: IP repo not found: $ip_repo"; exit 1
+}
 
 # 生成 BD
 if {![file exists $bd_script]} { puts "FATAL: Missing $bd_script"; exit 1 }
@@ -41,11 +59,22 @@ make_wrapper -files [get_files $bdpath] -top
 add_files "$proj_wk/$proj_name.srcs/sources_1/bd/top_bd/hdl/top_bd_wrapper.v"
 set_property top top_bd_wrapper [current_fileset]
 
+# 【A2】约束进构建流
+if {[file exists $xdc_file]} {
+  add_files -fileset constrs_1 $xdc_file
+  puts "===> XDC: $xdc_file"
+}
+
 # 综合/实现/bit
 launch_runs synth_1 -jobs 8
 wait_on_runs synth_1
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_runs impl_1
+
+# 收集报告（可选，失败不阻断）
+if {[file exists [file join $repo_root hw scripts collect_info.tcl]]} {
+  catch {source [file join $repo_root hw scripts collect_info.tcl]}
+}
 
 # 导出 XSA（含bit）
 file mkdir [file dirname $xsa_out]

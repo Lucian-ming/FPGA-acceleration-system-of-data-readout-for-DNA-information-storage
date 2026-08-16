@@ -18,6 +18,7 @@
 #include "lwip/tcp.h"
 #include "xil_io.h"
 #include "xil_cache.h"
+#include "ddr_layout.h"   /* 【C2/C3】按实际条数计算/校验 DDR 区间（主机可测） */
 
 /*=============================================================================
  * 协议定义
@@ -163,10 +164,14 @@
  *   0x00: CTRL_STATUS - 写:bit[0]=start_pulse, bit[1]=done_clr
  *                       读:bit[0]=idle, bit[1]=done
  *   0x04: IN_ADDR     - 输入DDR地址
- *   0x08: IN_BEATS    - 输入数据拍数 (设置为TOTAL_READS)
+ *   0x08: IN_BEATS    - 输入数据拍数 (设置为实际记录数)
  *   0x0C: OUT_ADDR    - 输出DDR地址
  *   0x10: OUT_BEATS   - 输出数据拍数 (1266)
- *   0x14: TOTAL_READS - 读段总数配置 (108000)
+ *   0x14: TOTAL_READS - 读段总数配置 (本次任务实际条数，C1)
+ *   0x30: SCORE_MIN   - 【D1/D2】比对分阈值；score < SCORE_MIN 的记录不投票。
+ *                       复位默认 0（不过滤）。注意 0x18~0x2C 是调试寄存器，
+ *                       06-implementation-plan 里写的 0x18 已被 DBG_STATE 占用。
+ *   （0x18/0x1C/0x20/0x24/0x28/0x2C/0x38 为只读调试寄存器）
  *============================================================================*/
 #define VOTER_BASEADDR              XPAR_DIFFERENTIAL_VOTER_0_S00_AXI_BASEADDR
 #define VOTER_REG_CTRL_STATUS       0x00U  /* START/STATUS合一 */
@@ -175,6 +180,13 @@
 #define VOTER_REG_OUT_ADDR          0x0CU  /* 输出地址 */
 #define VOTER_REG_OUT_BEATS         0x10U  /* 输出拍数 */
 #define VOTER_REG_TOTAL_READS       0x14U  /* 总读段数 */
+#define VOTER_REG_SCORE_MIN         0x30U  /* 【D1/D2】分数阈值 */
+
+/* 方案B 标定阈值 = int(0.45 × READ_BPS) = 67，与 tests/golden 的
+ * stage2_expect.hex（make_golden.py --min-score 0.45）严格一致；
+ * docs/04-roadmap.md P1 的 68 是四舍五入口径，噪声底 59~62，两者都在
+ * 分离带内，但判据向量按 67 生成，板端必须用同一值。 */
+#define VOTER_SCORE_MIN             67U
 
 /* 为保持代码兼容性，保留旧名称别名 */
 #define VOTER_REG_START             VOTER_REG_CTRL_STATUS

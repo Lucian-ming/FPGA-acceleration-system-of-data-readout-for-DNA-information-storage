@@ -1,26 +1,29 @@
 // =============================================================
 // tb_differential_voter.v — Stage2 差分投票核的文件型 Testbench
 //
-// 用黄金向量做判据，不是"能跑就算过"：
+// 用黄金向量做判据，不是"能跑就算过"。连跑三轮，覆盖两种语义：
 //   激励  tests/golden/stage2_in.hex         4,096 条 Stage1 输出记录
 //                                          （2048 读段 × 正向+反向互补，
 //                                           与 first.py orient="both" 一致）
-//   期望  tests/golden/stage2_rtl_expect.hex 81,000 bit 共识（64 bit/行）
-//   板端现行语义：Voter 不过滤比对分（D2 未修），全部记录参与投票。
+//   第1轮 SCORE_MIN=67（标定阈值，int(0.45×150)，与生成
+//        stage2_expect.hex 的 make_golden.py --min-score 0.45 一致）
+//        → 期望 tests/golden/stage2_expect.hex（阈值过滤版，D1 语义）
+//   第2轮 SCORE_MIN=67 再跑一遍 → 同一期望（验证累加器重新清零）
+//   第3轮 SCORE_MIN=0（复位默认，不过滤）
+//        → 期望 tests/golden/stage2_rtl_expect.hex（旧板端语义）
 //
 // 判据内容：
-//   1) 1,266 拍输出与黄金向量逐位相同（末拍只比低 40 bit）；
+//   1) 每轮 1,266 拍输出与对应黄金向量逐位相同（末拍只比低 40 bit）；
 //   2) AXI 协议：每次读突发恰 6 拍（ARLEN=5）；每次写单拍（WLAST=1）；
 //      末拍 WSTRB=0x1F（81000 bit = 1265×64 + 40）；
 //   3) done/idle 状态位、调试寄存器（写拍数/首写地址/错误标志）正确；
-//   4) 连跑两轮结果相同——第二轮若复用上一轮的累加器（不重新清零）
-//      会立刻暴露。
+//   4) SCORE_MIN 可从 AXI-Lite 0x30 读回。
 //
 // 运行：
 //   iverilog -g2005 -o /tmp/tb_voter \
 //       hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v \
 //       hw/ip/differential_voter_1_0/hdl/tb_differential_voter.v
-//   vvp /tmp/tb_voter
+//   vvp /tmp/tb_voter            # +dump_bram 可转储累加器做逐位置 diff
 // =============================================================
 `timescale 1ns/1ps
 
@@ -201,14 +204,21 @@ module tb_differential_voter;
     endtask
 
     // =========================================================
-    // 主流程：连跑两轮，各自与黄金向量逐位比对
+    // 主流程：连跑三轮，覆盖阈值/复位两种语义
+    //   第 1、2 轮 SCORE_MIN=67 → stage2_expect.hex（D1 阈值语义 + 清零复验）
+    //   第 3 轮   SCORE_MIN=0  → stage2_rtl_expect.hex（复位默认，不过滤）
     // =========================================================
+    localparam integer SCORE_MIN_THR = 67;   // = int(0.45×150)，与 make_golden 一致
+
     integer errors, bit_errors, proto_errors;
-    integer k, b, run, timeout, polls;
+    integer k, b, run, timeout, polls, score_min_run;
     integer w_count0, wlast0, arlen0;
     reg [63:0] got, exp, mask;
     reg [7:0]  wstrb_got;
     reg [31:0] status, errflags, dbg;
+
+    reg [63:0] expect_thr  [0:OUT_BEATS-1];  // 阈值版（stage2_expect.hex）
+    reg [63:0] exp_work    [0:OUT_BEATS-1];  // 本轮选用的期望
 
     // 看门狗
     initial begin
@@ -227,14 +237,25 @@ module tb_differential_voter;
 
         $readmemh("tests/golden/stage2_in.hex", mem_in);
         $readmemh("tests/golden/stage2_rtl_expect.hex", expect);
-        $display("[TB] 已载入激励 %0d 条记录 / 期望 %0d 拍", NUM_RECORDS, OUT_BEATS);
+        $readmemh("tests/golden/stage2_expect.hex", expect_thr);
+        $display("[TB] 已载入激励 %0d 条记录 / 阈值版与无阈值版期望各 %0d 拍",
+                 NUM_RECORDS, OUT_BEATS);
 
         repeat (10) @(posedge clk);
         rstn = 1;
         repeat (10) @(posedge clk);
 
         errors = 0;
-        for (run = 1; run <= 2; run = run + 1) begin
+        for (run = 1; run <= 3; run = run + 1) begin
+            // 本轮语义：1/2 轮阈值过滤，第 3 轮复位默认（不过滤）
+            if (run <= 2) begin
+                score_min_run = SCORE_MIN_THR;
+                for (k = 0; k < OUT_BEATS; k = k + 1) exp_work[k] = expect_thr[k];
+            end else begin
+                score_min_run = 0;
+                for (k = 0; k < OUT_BEATS; k = k + 1) exp_work[k] = expect[k];
+            end
+
             // 清输出区（DUT 空闲时无写活动，可与从机共存）
             for (k = 0; k < OUT_BEATS+16; k = k + 1) begin
                 mem_out[k] = 64'hx; written[k] = 1'b0;
@@ -246,8 +267,15 @@ module tb_differential_voter;
             axil_write(7'h0C, OUT_ADDR);               // OUT_ADDR
             axil_write(7'h10, OUT_BEATS);              // OUT_BEATS
             axil_write(7'h14, NUM_RECORDS);            // TOTAL_READS
+            axil_write(7'h30, score_min_run);          // SCORE_MIN（0x30）
+            axil_read (7'h30, dbg);                    // 读回校验
+            if (dbg != score_min_run) begin
+                $display("[TB] ✗ 第 %0d 轮 SCORE_MIN 读回 %0d（期望 %0d）",
+                         run, dbg, score_min_run);
+                errors = errors + 1;
+            end
             axil_write(7'h00, 32'd1);                  // START
-            $display("[TB] 第 %0d 轮：已配置寄存器并启动", run);
+            $display("[TB] 第 %0d 轮：SCORE_MIN=%0d，已启动", run, score_min_run);
 
             // 轮询 0x00 的 DONE（bit1）
             polls = 0; status = 32'd0;
@@ -310,7 +338,7 @@ module tb_differential_voter;
                      ? ((64'd1 << (OUT_BITS-64*(OUT_BEATS-1))) - 64'd1)
                      : {64{1'b1}};
                 got = mem_out[k] & mask;
-                exp = expect[k]  & mask;
+                exp = exp_work[k] & mask;
                 // WSTRB：末拍（第 1266 拍）只写低 5 字节，其余拍全字节
                 wstrb_got = wstrb_log[w_count0 + k];
                 if (k == OUT_BEATS-1 ? (wstrb_got != 8'h1F) : (wstrb_got != 8'hFF)) begin
@@ -337,7 +365,7 @@ module tb_differential_voter;
 
         $display("--------------------------------------------------");
         if (errors == 0)
-            $display("[TB] ✓ PASS  两轮结果均与黄金向量逐位相同（累加器确已清零）");
+            $display("[TB] ✓ PASS  阈值(67)两轮 + 无阈值(0)一轮均与黄金向量逐位相同");
         else
             $display("[TB] ✗ FAIL  共 %0d 项不符", errors);
         $display("--------------------------------------------------");

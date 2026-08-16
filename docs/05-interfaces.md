@@ -64,11 +64,12 @@ PC: ◄───────────────── 板: PKT_RESULT + 8,1
 | 0x00 | W | [0]=`start_pulse`，[1]=`done_clr` |
 | 0x00 | R | [0]=`idle`，[1]=`done` |
 | 0x04 | RW | `IN_ADDR` 输入 DDR 基址 |
-| 0x08 | RW | `IN_BEATS` 输入拍数（= 读段数 × 6） |
+| 0x08 | RW | `IN_BEATS` 输入拍数（= 记录数 × 6；硬件实际按 `TOTAL_READS` 计数） |
 | 0x0C | RW | `OUT_ADDR` 输出 DDR 基址 |
 | 0x10 | RW | `OUT_BEATS` 输出拍数（81,000 bit → 1,266） |
-| 0x14 | RW | `TOTAL_READS` 读段总数 |
-| 0x18 / 0x24 / 0x2C | R | 调试：状态计数 / 写计数 / 错误标志 |
+| 0x14 | RW | `TOTAL_READS` **本次任务实际记录数**（含补零尾批；2026-08-16 起 PS 下发 `conn->total_reads_received`，不再用 108,000 宏） |
+| 0x18 / 0x24 / 0x2C / 0x38 | R | 调试：状态计数 / 写计数 / 错误标志 / 最后 RRESP |
+| 0x30 | RW | `SCORE_MIN` 比对分阈值（2026-08-16 新增，D1 方案B）：`score < SCORE_MIN` 的记录在解析后直接跳过、不投票，补零记录（score=0）随之丢弃。复位默认 0=不过滤。PS 固定写 `VOTER_SCORE_MIN=67`（与 `stage2_expect.hex` 的生成阈值 `int(0.45×150)` 严格一致）。注意实施计划原写 0x18，但 0x18 已被 DBG_STATE 占用 |
 
 ### 3.3 Desparsification Decoder — `0x43C1_0000`
 
@@ -84,6 +85,11 @@ PC: ◄───────────────── 板: PKT_RESULT + 8,1
 > ⚠️ `bd.tcl` 注释把 Voter 与 Decoder 的地址写反了；以 XSA 内 `design_1.hwh` 为准。
 
 ## 4. DDR 布局（`sw/app/echo.h`，按 108,000 条读段预留）
+
+> 2026-08-16 起，cache flush/invalidate 与 Voter 配置均按**本次任务实际条数**计算
+> （`sw/app/ddr_layout.h`，主机可测，见 `tools/test_ddr_layout.c`）；下表尺寸是
+> 预留容量上限，不是运行时用量。另注意 `TOTAL_READS=108000` 本身不是 64 的倍数
+> （108000 = 64×1687+32），容量内最大的合法条数是 107,968。
 
 | 区间 | 用途 | 大小 |
 | --- | --- | --- |
@@ -101,13 +107,18 @@ Stage1 输出直接作为 Stage2 输入、Stage2 输出直接作为 Stage3 输�
 
 ## 5. 一次运行的 PS 控制流（`echo.c`）
 
+0. `process_post()` 入口校验（2026-08-16 起）：实际条数非零、为 64 的整数倍（C2）、
+   经 `ddr_layout_validate()` 按实际条数确认读段区 / Stage1 输出区不越界（C3），
+   任一不满足回 `PKT_ERROR` 且不启动流水线。
 1. `PIPE_WM_PREP` / `PIPE_WM_TX` / `PIPE_WM_WAIT`：把原始位平面水印展开为 50 个重叠区域；逐区域写
    `reg1=wm_sel` → 置 `reg0=preload` → DMA 957 个 32-bit 符号 → 清 preload。
 2. `PIPE_RX_PREP`：按**实际收到的条数**提交 S2MM BD（`total_reads × 48 B`）
 3. `PIPE_TX_PREFILL` / `PIPE_START_IP`：预填一帧（64 条）→ 写 `reg0=0x01` 启动
 4. `PIPE_TX_STREAM`：边回收 BD 边继续提交，直到 TX/RX 都完成
-5. `PIPE_VOTER_*`：invalidate cache → 配置 Voter 寄存器 → start → 轮询 done
+5. `PIPE_VOTER_*`：按实际条数 invalidate cache → 配置 Voter 寄存器
+   （含 `SCORE_MIN=67`）→ 回读校验 → start → 轮询 done
 6. `PIPE_DONE_STAGE2`：invalidate Voter 输出 → `apply_watermark_differential()` 对 10,125 B 做
-   LSB-first 逐字节 XOR → flush 回 DDR；该步骤已接入代码，但因 Stage2 未验证而未获得端到端判据。
+   LSB-first 逐字节 XOR → flush 回 DDR；Stage2 输出已有黄金 RTL 判据背书
+   （`run_sim.sh stage2`），整链端到端仍待上板。
 7. `PIPE_DEC_*`：配置 Decoder → start → 轮询 done → 校验写入拍数
 8. `send_result()`：invalidate → 通过 TCP 发 8,100 B

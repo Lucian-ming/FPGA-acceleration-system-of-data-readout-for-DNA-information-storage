@@ -24,14 +24,16 @@ module tb_dna_quick;
     reg start;
     reg preload;
     
-    // ========== AXI-Lite接口（完整实现） ==========
-    wire [3:0]  s_axi_lite_awaddr;
+    // ========== AXI-Lite接口（真正驱动 AWVALID/WVALID —— 修订 A9） ==========
+    // 原实现把 AWVALID/WVALID 恒置 0，控制寄存器（start/preload）从未被
+    // 真正写入，「测试1/测试3」实际什么都没做。现改为标准写任务驱动。
+    reg  [3:0]  s_axi_lite_awaddr;
     wire [2:0]  s_axi_lite_awprot;
-    wire        s_axi_lite_awvalid;
+    reg         s_axi_lite_awvalid;
     wire        s_axi_lite_awready;
-    wire [31:0] s_axi_lite_wdata;
+    reg  [31:0] s_axi_lite_wdata;
     wire [3:0]  s_axi_lite_wstrb;
-    wire        s_axi_lite_wvalid;
+    reg         s_axi_lite_wvalid;
     wire        s_axi_lite_wready;
     wire [1:0]  s_axi_lite_bresp;
     wire        s_axi_lite_bvalid;
@@ -44,20 +46,31 @@ module tb_dna_quick;
     wire [1:0]  s_axi_lite_rresp;
     wire        s_axi_lite_rvalid;
     wire        s_axi_lite_rready;
-    
-    // AXI-Lite简化控制
-    reg [31:0] ctrl_reg;
-    assign s_axi_lite_awaddr   = 4'h0;
-    assign s_axi_lite_awprot   = 3'b000;
-    assign s_axi_lite_awvalid  = 1'b0;  // 简化：不使用AXI-Lite写
-    assign s_axi_lite_wdata    = ctrl_reg;
-    assign s_axi_lite_wstrb    = 4'hF;
-    assign s_axi_lite_wvalid   = 1'b0;
-    assign s_axi_lite_bready   = 1'b1;
-    assign s_axi_lite_araddr   = 4'h0;
-    assign s_axi_lite_arprot   = 3'b000;
-    assign s_axi_lite_arvalid  = 1'b0;
-    assign s_axi_lite_rready   = 1'b1;
+
+    assign s_axi_lite_awprot  = 3'b000;
+    assign s_axi_lite_wstrb   = 4'hF;
+    assign s_axi_lite_bready  = 1'b1;
+    assign s_axi_lite_araddr  = 4'h0;
+    assign s_axi_lite_arprot  = 3'b000;
+    assign s_axi_lite_arvalid = 1'b0;
+    assign s_axi_lite_rready  = 1'b1;
+
+    // 标准AXI-Lite写（与 tb_desparsifier 的 BFM 同一模式）
+    task axil_write(input [3:0] addr, input [31:0] data);
+        begin
+            @(posedge clk);
+            s_axi_lite_awaddr  <= addr;
+            s_axi_lite_wdata   <= data;
+            s_axi_lite_awvalid <= 1'b1;
+            s_axi_lite_wvalid  <= 1'b1;
+            wait (s_axi_lite_awready && s_axi_lite_wready);
+            @(posedge clk);
+            s_axi_lite_awvalid <= 1'b0;
+            s_axi_lite_wvalid  <= 1'b0;
+            wait (s_axi_lite_bvalid);
+            @(posedge clk);
+        end
+    endtask
     
     // ========== AXIS输入接口 ==========
     wire        s_axis_tready;
@@ -155,7 +168,10 @@ module tb_dna_quick;
         rst_n = 0;
         start = 0;
         preload = 0;
-        ctrl_reg = 32'h0;
+        s_axi_lite_awvalid = 0;
+        s_axi_lite_wvalid = 0;
+        s_axi_lite_awaddr = 0;
+        s_axi_lite_wdata = 0;
         s_axis_tdata = 0;
         s_axis_tstrb = 4'hF;
         s_axis_tlast = 0;
@@ -184,7 +200,7 @@ module tb_dna_quick;
         // ==================================================
         $display("\n[%0t] ===== 测试1: 预加载参考序列 =====", $time);
         preload = 1;
-        ctrl_reg = 32'h0002;  // preload=1
+        axil_write(4'h0, 32'h0002);  // 【修订 A9】真正写入 preload=1
         
         #(CLK_PERIOD * 10);
         
@@ -199,7 +215,7 @@ module tb_dna_quick;
         end
         
         preload = 0;
-        ctrl_reg = 32'h0000;
+        axil_write(4'h0, 32'h0000);
         $display("[%0t] 预加载完成", $time);
         
         #(CLK_PERIOD * 50);
@@ -209,51 +225,10 @@ module tb_dna_quick;
         // ==================================================
         $display("\n[%0t] ===== 测试2: 发送DNA读取数据 =====", $time);
         
-        // 自动发送进程（在后台运行）
-        fork
-            begin
-                while (send_count < TEST_READS) begin
-                    // 生成测试数据
-                    current_read = generate_test_data(send_count);
-                    
-                    // 发送10个32位字（共300位）
-                    for (word_count = 0; word_count < 10; word_count = word_count + 1) begin
-                        @(posedge clk);
-                        while (!s_axis_tready) @(posedge clk);  // 等待ready
-                        
-                        s_axis_tvalid = 1;
-                        s_axis_tstrb = 4'hF;
-                        s_axis_tlast = (word_count == 9);
-                        
-                        // 选择对应的32位数据
-                        case (word_count)
-                            0: s_axis_tdata = current_read[31:0];
-                            1: s_axis_tdata = current_read[63:32];
-                            2: s_axis_tdata = current_read[95:64];
-                            3: s_axis_tdata = current_read[127:96];
-                            4: s_axis_tdata = current_read[159:128];
-                            5: s_axis_tdata = current_read[191:160];
-                            6: s_axis_tdata = current_read[223:192];
-                            7: s_axis_tdata = current_read[255:224];
-                            8: s_axis_tdata = current_read[287:256];
-                            9: s_axis_tdata = {{20{1'b0}}, current_read[299:288]};
-                        endcase
-                    end
-                    
-                    @(posedge clk);
-                    s_axis_tvalid = 0;
-                    s_axis_tlast = 0;
-                    
-                    send_count = send_count + 1;
-                    $display("[%0t] 已发送读取 #%0d/%0d", $time, send_count, TEST_READS);
-                    
-                    // 小延迟
-                    #(CLK_PERIOD * 5);
-                end
-                
-                $display("\n[%0t] 所有数据发送完成 (共%0d条)", $time, send_count);
-            end
-        join_none
+        // 启动后台发送进程（【修订 A9】fork/join_none 是 SystemVerilog
+        // 语法，-g2005 编译不过；改为独立 initial + 使能标志）
+        sender_go = 1;
+
         
         // 等待数据发送
         #(CLK_PERIOD * 100);
@@ -263,7 +238,7 @@ module tb_dna_quick;
         // ==================================================
         $display("\n[%0t] ===== 测试3: 启动比对处理 =====", $time);
         start = 1;
-        ctrl_reg = 32'h0001;  // start=1
+        axil_write(4'h0, 32'h0001);  // 【修订 A9】真正写入 start=1
         
         $display("[%0t] 等待处理结果...", $time);
         
@@ -271,7 +246,7 @@ module tb_dna_quick;
         #(CLK_PERIOD * 5000);
         
         start = 0;
-        ctrl_reg = 32'h0000;
+        axil_write(4'h0, 32'h0000);
         
         // 再等一段时间确保所有结果输出
         #(CLK_PERIOD * 1000);
@@ -303,6 +278,56 @@ module tb_dna_quick;
         // 注意：在Vivado中不需要$finish，让脚本控制仿真时间
     end
     
+
+    // ========== 后台发送进程（【修订 A9】替代 fork/join_none） ==========
+    reg sender_go;
+
+    initial begin : sender_proc
+        sender_go = 0;
+        wait (rst_n);
+        while (!sender_go) @(posedge clk);
+        while (send_count < TEST_READS) begin
+            // 生成测试数据
+            current_read = generate_test_data(send_count);
+
+            // 发送10个32位字（共300位）
+            for (word_count = 0; word_count < 10; word_count = word_count + 1) begin
+                @(posedge clk);
+                while (!s_axis_tready) @(posedge clk);  // 等待ready
+
+                s_axis_tvalid = 1;
+                s_axis_tstrb  = 4'hF;
+                s_axis_tlast  = (word_count == 9);
+
+                // 选择对应的32位数据
+                case (word_count)
+                    0: s_axis_tdata = current_read[31:0];
+                    1: s_axis_tdata = current_read[63:32];
+                    2: s_axis_tdata = current_read[95:64];
+                    3: s_axis_tdata = current_read[127:96];
+                    4: s_axis_tdata = current_read[159:128];
+                    5: s_axis_tdata = current_read[191:160];
+                    6: s_axis_tdata = current_read[223:192];
+                    7: s_axis_tdata = current_read[255:224];
+                    8: s_axis_tdata = current_read[287:256];
+                    9: s_axis_tdata = {{20{1'b0}}, current_read[299:288]};
+                endcase
+            end
+
+            @(posedge clk);
+            s_axis_tvalid = 0;
+            s_axis_tlast  = 0;
+
+            send_count = send_count + 1;
+            $display("[%0t] 已发送读取 #%0d/%0d", $time, send_count, TEST_READS);
+
+            // 小延迟
+            #(CLK_PERIOD * 5);
+        end
+
+        $display("\n[%0t] 所有数据发送完成 (共%0d条)", $time, send_count);
+    end
+
     // ========== 输出结果监测 ==========
     always @(posedge clk) begin
         if (rst_n && m_axis_tvalid && m_axis_tready) begin

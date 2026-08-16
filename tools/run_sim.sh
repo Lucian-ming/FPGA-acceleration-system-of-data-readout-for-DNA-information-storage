@@ -63,11 +63,26 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage2" ]; then
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
-    # PS 侧水印展开的主机单元测试（与固件共用 sw/app/wm_expand.h）
+    # PS 侧纯计算逻辑的主机单元测试（与固件共用头文件）
     printf '\n=== wm_expand（PS 侧水印展开，主机单元测试）===\n'
     if gcc -O2 -I sw/app -o "$BUILD/test_wm" tools/test_wm_expand.c 2>&1 \
        && "$BUILD/test_wm" tests/golden/watermark_packed.bin tests/golden/wm_regions.hex \
           | sed 's/^/  /'; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+
+    printf '\n=== ddr_layout（C2/C3 按实际条数校验，主机单元测试）===\n'
+    if gcc -O2 -Wall -I sw/app -o "$BUILD/test_ddr" tools/test_ddr_layout.c 2>&1 \
+       && "$BUILD/test_ddr" | sed 's/^/  /'; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+
+    printf '\n=== ldpc_decode（P5 纯 Python 硬判决译码，黄金数据自检）===\n'
+    if python3 tools/ldpc_decode.py verify | sed 's/^/  /'; then
         PASS=$((PASS+1))
     else
         FAIL=$((FAIL+1))

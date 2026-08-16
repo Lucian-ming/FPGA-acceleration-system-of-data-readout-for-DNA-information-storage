@@ -1,35 +1,36 @@
 # 03 · 现状与缺陷清单
 
-初始审计：2026-08-06；代码与回归复核：2026-08-10；Stage2 黄金 Testbench：2026-08-16。证据全部标注了 `文件:行号`，可直接跳转复核。
+初始审计：2026-08-06；代码与回归复核：2026-08-10；Stage2 黄金 Testbench：2026-08-16；
+离线任务全量完成（D1/D2、C1~C4、A2/A8/A9、P5）：2026-08-16 下午。证据全部标注了 `文件:行号`，可直接跳转复核。
 
 ---
 
 ## 一句话现状
 
-**代码已修复多处关键数据通路，但没有板端端到端正确性证据。** 未闭合的主路径是：
+**除「上开发板」本身以外的一切都已做完并有自动化判据；现在离正确结果只差一次上板。**
+硬件侧：Stage1/2/3 三级 RTL 全部有黄金向量逐位背书（含 D1 方案B 的 SCORE_MIN 阈值过滤），
+修改后的 Voter 已重新综合并在 100 MHz 收敛（WNS +2.48 ns）；
+PS 侧：按实际条数运行（C1~C3）、SCORE_MIN=67 已写入并回读校验，ELF 已用 xsct 重建；
+主机侧：纯 Python LDPC 译码器（P5）在 Linux 上完成黄金数据全链自检（重建 JPEG 与原图逐字节相同）。
 
-- **D1 反向互补的板端取舍未完成**：上位机已能发送两个方向，但 Stage1/Voter 尚未按 `score`
-  配对择优或加权，不能把“双份发送”等同于正确处理；
-- **C1～C3、A 类工程问题**仍在，尤其是读段条数、尾批、DDR 布局和可复现构建；
-- 所有 RTL/PS 回归均为离线仿真或构建，尚无“真实 FPGA 回传 → LDPC → 图片哈希”的验收。
+**唯一剩余主路径：用修复后的 RTL 重新生成比特流 → 烧板 → 真实回传 → LDPC → 图片哈希 = `fcd0cf90...b6b1f2c3`（G3）。**
+次要遗留：A3（bd.tcl 未固化 PS7 板级配置——需要板卡的具体 DDR/MIO 参数或从历史 XSA 反推）、
+A6/A7（LDPC EXE 仍在但已有 Linux 替代；LICENSE 需要用户选择）、P3 任务配置化、P7 Stage1 架构改造。
 
-**已完成**：
+**已完成（时间线）**：
 - 2026-08-07 · Stage3：B5、B6 修复；B7/B8/B9 通过重写控制层解决，最苛刻从机条件下逐位通过。
-- 2026-08-08 · Stage1：B2、B4 修复；又发现并修复 B10/B11/B12 三个流水线错位，
-  一批 64 条读段的 pos/score 与黄金模型完全一致。
-- 2026-08-08 · 上位机：`first.py` 补上反向互补（D1 的软件半边）与 LSB-first 打包，
-  编码逐字节与黄金模型相同。
-- 2026-08-10 · 复跑：黄金模型、Stage1、Stage3（数据通路与 AXI）、PS 水印展开主机单测
-  和综合顶层语法检查全部通过，详见 `docs/08-handoff-2026-08-10.md`。
-- 2026-08-13 · A10：`ldpc_pipeline.py` 已把 3 个 MinGW DLL 与 EXE 一起拷进临时工作目录，
-  同源性与拷贝逻辑均已验证，判据见下方 A10 行。
-- 2026-08-16 · **Stage2：黄金 RTL Testbench 建成并接入回归**（`tb_differential_voter.v`），
-  首跑即暴露 5 个先前未知的缺陷 B13/B14/B15/B16/C4，全部修复后
-  **4,096 条记录（正反两方向）投票 → 81,000 bit 共识与黄金向量逐位相同，连跑两轮一致**。
-
-**Stage1、Stage2、Stage3 的核心运算均已用黄金 RTL 仿真证明；B1 已用主机单测证明 PS 展开几何。**
-**B3 已接入 PS 状态机，其输入（Stage2 输出）现在有了黄金向量背书，但 PS 侧整链仍未上板验证。**
-剩余：D1 板端取舍、D2、C1～C3、A 类，以及整链/上板验证。
+- 2026-08-08 · Stage1：B2、B4 修复；又发现并修复 B10/B11/B12 三个流水线错位。
+- 2026-08-08 · 上位机：`first.py` 反向互补（D1 软件半边）与 LSB-first 打包。
+- 2026-08-10 · 复跑全部通过（见 `docs/08-handoff-2026-08-10.md`）。
+- 2026-08-13 · A10：`ldpc_pipeline.py` 把 3 个 MinGW DLL 与 EXE 一起拷贝，判据验证。
+- 2026-08-16 上午 · **Stage2 黄金 Testbench**：暴露并修复 B13/B14/B15/B16/C4，
+  两轮 4,096 条记录投票逐位相同（`run_sim.sh stage2`）。
+- 2026-08-16 下午 · **D1/D2 板端取舍**：Voter 新增 SCORE_MIN(0x30)，阈值 67 三轮 TB
+  逐位通过（`stage2_expect.hex` 改为方案B语义重新生成）；**C1~C3**：PS 按实际条数配置、
+  `ddr_layout.h` 主机单测、协议层 64 倍数校验；**C4** 二次任务清零；
+  **A2/A8/A9**：build.tcl 修路径/IP 仓库/XDC，top.xdc 与 collect_info.tcl 落盘，
+  tb_dna_quick 真正驱动 AXI-Lite；**P5**：纯 Python min-sum LDPC 译码器黄金自检通过。
+  Voter（D1 版）重新综合收敛；ELF 用 xsct 重建（920,472 B）。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到
@@ -81,14 +82,18 @@
 
 **即使其余 B 类修复都在，若不完成方向取舍也不会得到正确图片。** 方案见 `docs/04-roadmap.md`。
 
-### D2 比对分被算出来却从未使用
+### ~~D2 比对分被算出来却从未使用~~ ✅ 已随 D1 修复（SCORE_MIN 使用 parse_score 过滤）
 
-`srpe_batch` 输出 `score`，Voter 在 `differential_voter_v1_0.v:456` 把它存进
-`current_score`，然后**再也没有用过**。所有读段（包括比对失败的）等权投票
-——2026-08-16 的 Stage2 黄金判据正是在「不过滤分数」的板端现行语义下建立的
-（`stage2_rtl_expect.hex`）；实现 SCORE_MIN 后同一 TB 换用 `stage2_expect.hex` 验证。
-注意：实测简单阈值过滤会因丢失覆盖而更差（阈值 75 时误码率反升到 3.3%），
-应当用加权投票而不是直接砍掉。
+`current_score` 寄存器本身仍在（未删），过滤在解析拍用组合的 `parse_score` 完成。
+注意：实测简单阈值过滤会因丢失覆盖而更差（阈值 75 时误码率反升到 3.3%）——
+该结论针对「择优一条再过滤」的旧语义；方案B 语义下 67/68 都在分离带（噪声底 59~62）内，
+且 67 与黄金向量严格一致，已按 67 固化到 `VOTER_SCORE_MIN`。
+
+<details><summary>原始记录</summary>
+
+### D2（原始）比对分被算出来却从未使用
+
+`srpe_batch` 输出 `score`，Voter 曾把它存进 `current_score` 后再未使用。
 
 ---
 
@@ -368,7 +373,17 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 
 ## C 类 · 配置与健壮性
 
-### C1 读段条数由固定宏决定，而非实际收到的条数
+### ~~C1 读段条数由固定宏决定，而非实际收到的条数~~ ✅ 已修复（2026-08-16）
+
+**实现**：`echo.c` 的 `PIPE_VOTER_PREP` / `PIPE_VOTER_START` 两处 Voter 配置全部改用
+`conn->total_reads_received`（含 IN_BEATS、TOTAL_READS、cache invalidate/flush 范围、
+回读校验）；`PIPE_DONE_STAGE1` 的 flush 同样按实际条数。**判据**：xsct 重建 ELF 成功
+（920,472 B，`sw/workspace/dna_lwip_app/Debug/`，含全部改动）；
+`ddr_layout` 主机单测（`bash tools/run_sim.sh host` → PASS）。
+
+<details><summary>原始记录</summary>
+
+### C1（原始）读段条数由固定宏决定
 
 - `sw/app/echo.c:634-669,708-740,785,870-895` 用 `TOTAL_READS`（108,000）配置 Voter 的
   cache 范围、`IN_BEATS`/`TOTAL_READS`，而 SE150 实际只有 51,781 条
@@ -378,14 +393,33 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 - `dna_connection_t.total_reads_received` 已经存在且在 Stage1 里被正确使用
   （`echo.c:499-518`），Stage2 只是没用它。**这是一处低成本高收益的修复。**
 
-### C2 非 64 整数倍的尾批可能卡死
+### ~~C2 非 64 整数倍的尾批可能卡死~~ ✅ 已修复（2026-08-16）
+
+**实现**：`process_post()` 入口用 `ddr_layout_validate()` 强校验条数为
+`FRAME_READS(64)` 的整数倍，否则回 `PKT_ERROR` 不启动流水线；`process_batch()`
+增加容量防溢出（`total > TOTAL_READS` 即拒绝）。补零记录由 SCORE_MIN（0 分 < 67）
+在 Voter 内过滤。**判据**：`tools/test_ddr_layout.c` 主机单测钉死边界
+（4096/103616/107968 合法，0/100/103562/108000 非法，`run_sim.sh host` → PASS）。
+
+<details><summary>原始记录</summary>
+
+### C2（原始）非 64 整数倍的尾批可能卡死
 
 `srpe_batch` 每批固定处理 `BATCH=64` 条；51,781 = 64×809 + 5。官方 `first.py` 已将发送量
 向上补零到 64 的倍数，这避免了该客户端触发空 FIFO；但 PS 协议没有声明或校验此条件，
 任意第三方客户端或非 64 倍数任务仍会让 `PIPE_TX_PREFILL` 发送一整帧并读取 DDR 残留。
 要彻底支持任意条数，仍需引入“本批有效条数”或由 PS 在协议层显式填充并传递实际条数。
 
-### C3 DDR 布局按 108,000 条预留
+### ~~C3 DDR 布局按 108,000 条预留~~ ✅ 已修复（2026-08-16）
+
+**实现**：新增 `sw/app/ddr_layout.h`（纯计算、参数化、不依赖 Xilinx 头，
+固件与 `tools/test_ddr_layout.c` 共用），按实际条数计算区间大小并校验不越界；
+顺带发现并记录：`TOTAL_READS=108000` 本身不是 64 的倍数（=64×1687+32），
+容量内最大合法条数为 107,968。**判据**：同 C2 的主机单测。
+
+<details><summary>原始记录</summary>
+
+### C3（原始）DDR 布局按 108,000 条预留
 
 `echo.h:41-79` 的地址表按 108,000 条计算（Stage1 输出 5.184 MB）。
 实际条数变化时，各缓冲区上界、cache flush/invalidate 范围都要跟着算，
@@ -410,6 +444,7 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | `srpe_batch`（含 B2/B10/B11/B12 修复） | 3,304（18.8%） | 3,665（10.4%） | 8（13.3%） | 0 | **+0.777 ns** | ✓ 可综合、时序收敛 |
 | `desparsification_decoder_v1_0`（控制层重写版） | 939 | 770 | 0 | 0 | **+1.856 ns** | ✓ 可综合、时序收敛 |
+| `differential_voter_v1_0`（B13~B16/C4 + SCORE_MIN 版，2026-08-16） | 1,045 | 1,871 | 30 | 0 | **+2.480 ns** | ✓ 可综合、时序收敛（≈133 MHz 上限）；`hw/build/synth_differential_voter_v1_0/` |
 
 本轮所有 RTL 改动都已确认**可综合且在 100 MHz 收敛**，不只是仿真通过。
 
@@ -427,6 +462,10 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 
 **这意味着 B1、B3 等 PS 侧改动从此可以编译验证，不再只能靠代码审查。**
 
+2026-08-16 下午复跑：C1~C3/D1 的全部 PS 改动（实际条数、SCORE_MIN、ddr_layout、
+协议校验）重建 ELF 成功——`dna_lwip_app.elf` 920,472 B，
+text 140,603 / data 3,116 / bss 3,266,624。
+
 ---
 
 ## A 类 · 工程可复现性（不影响算法，但影响能否交付）
@@ -434,17 +473,17 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 | 编号 | 问题 | 证据 |
 | --- | --- | --- |
 | A1 | 旧 README 的一键命令、`requirements.txt`、`client.py`、`LICENSE` 全都不存在 | 已在本次整理中重写 |
-| A2 | `hw/scripts/build.tcl` 用 `[pwd]/../..` 推导仓库根；没有 `ip_repo_paths`/`update_ip_catalog`；不读 XDC | `hw/scripts/build.tcl` |
+| ~~A2~~ ✅ | ~~build.tcl 路径/IP 仓库/XDC 三缺失~~（2026-08-16 修复）：路径改由脚本自身位置推导；注册 `hw/ip` 为 IP 仓库并 `update_ip_catalog`；`hw/constr/top.xdc` 加入 constrs_1；综合后自动 source `collect_info.tcl` 收报告。⚠️ 未跑过完整 BD 构建（bd.tcl 的 A3 问题仍在） | `hw/scripts/build.tcl` |
 | A3 | `bd.tcl` 只调 `apply_bd_automation`，PS7 的 DDR 型号/MIO/PHY 全没保存；生成的是 `top_bd`，而 XSA 内是 `design_1`，两者不同源 | `hw/scripts/bd.tcl`，XSA 内 `design_1.hwh` |
 | ~~A4~~ ✅ | `clients/python/requirements.txt` 已补 `numpy` / `Pillow`；`first.py` 已移除 `dataclass(slots=True)`，当前最低 Python 为 3.8。 | `clients/python/requirements.txt`、`clients/python/first.py:114` |
 | ~~A5~~ ✅ | 已删除（2026-08-07） | 原：`gui_app.spec` 仍把 `dec_input.txt` 打进 EXE |
 | ~~A11~~ ✅ | **`sw/scripts/create_vitis.tcl` 有 4 处错误，脚本从未跑通过**（2026-08-08 全部修复）：① 第 90 行 Tcl 括号不配对，整个脚本解析即失败；② `platform reset` 在 Vitis 2022.2 里不是合法子命令；③ `domain create -runtime c` 非法（只接受 cpp/ocl）；④ workspace 为空时 `app list` 抛错而非返回空。另把相对路径改成按脚本自身位置推导。 | 实测 xsct 输出 |
 | ~~A12~~ ✅ | **`sw/app/main.c` 编译不过**（2026-08-08 修复）：① 自带的 `void sleep(unsigned int)` 弱符号与 BSP 的 `void sleep(u32)` 原型冲突，直接 `error: conflicting types`；② 未包含 `lwip/priv/tcp_priv.h`，`tcp_fasttmr/tcp_slowtmr` 是隐式声明。**说明仓库里交付的 PS 源码不是产出历史 ELF 的那一份。** | 实测 arm-none-eabi-gcc |
 | A5-orig | `gui_app.spec` 仍把 `dec_input.txt` 打进 EXE —— 这正是历史「用正确结果直接出图」的残留通道，必须删除 | `clients/python/gui_app.spec:10` |
-| A6 | LDPC 只有 Windows EXE，无源码/无 Linux 路径 | `clients/python/resources/` |
+| ~~A6~~ ✅ | ~~LDPC 只有 Windows EXE~~（2026-08-16，P5）：新增 `tools/ldpc_decode.py` 纯 Python min-sum 硬判决译码器（逆向了 pchk 二进制格式与 permutation 方向），黄金自检通过：88 bit 错误 5 轮收敛、info 0 错误、重建 JPEG 与 `Milk coronet.jpg` 逐字节相同。Windows EXE 仍保留给 GUI 用 | `tools/ldpc_decode.py`、`clients/python/resources/` |
 | A7 | 缺 LICENSE、第三方声明（Xilinx/lwIP）、`.gitignore` | 仓库根 |
-| A8 | `hw/constr/top.xdc` 与 `hw/scripts/collect_info.tcl` 均为 0 字节 | — |
-| A9 | `tb_dna_quick.v` 把 AXI-Lite `AWVALID`/`WVALID` 固定为 0，控制寄存器从未真正写入；`vivado_quick_sim.tcl` 的 part 写成 `xc7z020clg484-1`（实际是 `xc7z010clg400-1`） | `hw/ip/Dna_accelerator_core_1_0/hdl/` |
+| ~~A8~~ ✅ | ~~top.xdc 与 collect_info.tcl 均为 0 字节~~（2026-08-16 补齐）：top.xdc 含 PS7 FCLK 100 MHz 兜底约束（自动约束缺失时才创建，get_pins -quiet 静默跳过）；collect_info.tcl 产出 util/timing/summary 一页摘要 | `hw/constr/top.xdc`、`hw/scripts/collect_info.tcl` |
+| ~~A9~~ ✅ | ~~tb_dna_quick 把 AWVALID/WVALID 固定为 0；quick_sim part 写错~~（2026-08-16 修复）：TB 改为标准 axil_write 任务真正写入 preload/start；fork/join_none（SystemVerilog）重构为独立 initial+使能标志；quick_sim part 改为 xc7z010clg400-1。Icarus -g2005 语法通过（该 TB 仍是冒烟级，非黄金判据） | `hw/ip/Dna_accelerator_core_1_0/hdl/tb_dna_quick.v`、`vivado_quick_sim.tcl` |
 | ~~A10~~ ✅ | **LDPC EXE 缺 3 个 MinGW 运行时 DLL，在干净机器上会静默失败**（2026-08-13 已修复并验证）。缺 `libstdc++-6.dll`/`libgcc_s_seh-1.dll`/`libwinpthread-1.dll` 时 EXE 无输出、无报错、退出码 0。DLL 已提取进 `clients/python/resources/`，且 `run_ldpc_decoder()` 会把它们与 EXE/`.pchk`/`permutation64800` 一起拷进临时工作目录，缺失时打警告并提示 `tools/extract_ldpc_dlls.py`，运行后还有输出缺失检查兜底报错（不再静默）。**判据**：① 拷贝逻辑单元验证（2026-08-13 实测通过，可复跑）——3 个 DLL 经 `resource_path`/`_copy_resource` 拷入临时工作目录后 SHA-256 与源一致：
 ```bash
 python3 -c "import sys,tempfile,hashlib,pathlib,shutil;sys.path.insert(0,'clients/python');import ldpc_pipeline as lp;t=pathlib.Path(tempfile.mkdtemp(dir='.'));ok=all(hashlib.sha256(lp._copy_resource(t,d).read_bytes()).digest()==hashlib.sha256(lp.resource_path(d).read_bytes()).digest() for d in lp.DECODER_DLLS);shutil.rmtree(t,ignore_errors=True);sys.exit(0 if ok else 1)"

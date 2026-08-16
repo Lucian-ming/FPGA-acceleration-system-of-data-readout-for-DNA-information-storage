@@ -12,7 +12,7 @@
 | [05-interfaces.md](05-interfaces.md) | TCP 协议、寄存器、DDR 地址 | 写 PS 固件或上位机 |
 | [07-performance.md](07-performance.md) | CPU/FPGA 性能实测与加速价值分析 | 讨论选型、立项、答辩 |
 | [08-handoff-2026-08-10.md](08-handoff-2026-08-10.md) | 历史快照：Stage1/Stage3 修复与复核 | 追溯 2026-08-06~10 的工作 |
-| [09-handoff-2026-08-16.md](09-handoff-2026-08-16.md) | **当前可交接基线**、复跑判据与下一阻塞项（Stage2 黄金 TB / B13~B16/C4） | 接续开发前 |
+| [09-handoff-2026-08-16.md](09-handoff-2026-08-16.md) | **当前可交接基线**：Stage2 黄金 TB + 同日完成的 D1/C1~C4/P5 全部离线任务 | 接续开发前 |
 
 ## 参考资料（历史审计结果，只读）
 
@@ -33,6 +33,8 @@
 | `tools/make_golden.py` | 生成各级黄金向量到 `tests/golden/`（RTL Testbench 与端到端回归的判据） |
 | `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL（stage1/stage2/stage3/host/syntax） |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
+| `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
+| `tools/test_ddr_layout.c` | C2/C3 的主机单元测试：按实际条数校验 DDR 区间（与固件共用 `sw/app/ddr_layout.h`） |
 | `tools/readout.py` | **干净的纯软件读出实现**：只吃 FASTQ + 水印，产出 dec_input.txt，可 `--prove-inputs` 自证不碰参考答案 |
 | `tools/bench_align.py` + `tools/align.c` | Stage1 比对的 CPU 性能基准，以及「种子法为何失效」的实证 |
 

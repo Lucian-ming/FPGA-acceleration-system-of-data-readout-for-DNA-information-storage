@@ -628,11 +628,14 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
     	    xil_printf("[STAGE1] ✓ DNA Accelerator stage COMPLETE\n\r");
     	    xil_printf("[STAGE1] ========================================\n\r");
 
-    	    /* 直接进入 Stage2：使用 Stage1 输出来做投票 */
-    	    xil_printf("[STAGE1→STAGE2] Using Stage1 output directly\n\r");
-    	    xil_printf("  Output address: 0x%08X\n\r", DDR_DNA_ACC_OUT_BASE);
-    	    xil_printf("  Data format: 48 bytes/read × %u reads\n\r", TOTAL_READS);
-    	    xil_printf("  Total size: %u bytes\n\r", TOTAL_READS * 48);
+	    /* 直接进入 Stage2：使用 Stage1 输出来做投票 */
+	    xil_printf("[STAGE1→STAGE2] Using Stage1 output directly\n\r");
+	    xil_printf("  Output address: 0x%08X\n\r", DDR_DNA_ACC_OUT_BASE);
+	    xil_printf("  Data format: 48 bytes/read × %u reads (actual)\n\r",
+	               conn->total_reads_received);
+	    xil_printf("  Total size: %u bytes\n\r",
+	               (u32)ddr_layout_stage1_bytes(conn->total_reads_received,
+	                                            DNA_ACC_RESULT_PACKED_BYTES));
 
     	    /* 验证前 10 个 read 的数据新鲜度 */
     	    Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, 48U * 10U);
@@ -664,9 +667,11 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
     	        xil_printf("  3) Invalid input reads/watermark\n\r");
     	    }
 
-    	    /* 强制把数据刷新到 DDR（后续 Stage2 直接读取） */
-    	    xil_printf("\n\r[STAGE1] Flushing all output to DDR...\n\r");
-    	    Xil_DCacheFlushRange(DDR_DNA_ACC_OUT_BASE, TOTAL_READS * 48U);
+	    /* 强制把数据刷新到 DDR（后续 Stage2 直接读取；[C1] 按实际条数） */
+	    xil_printf("\n\r[STAGE1] Flushing all output to DDR...\n\r");
+	    Xil_DCacheFlushRange(DDR_DNA_ACC_OUT_BASE,
+	                         (u32)ddr_layout_stage1_bytes(conn->total_reads_received,
+	                                                       DNA_ACC_RESULT_PACKED_BYTES));
     	    __asm__ volatile("dsb sy");
     	    __asm__ volatile("isb");
     	    usleep(5000);
@@ -694,21 +699,26 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
      * ======================================================================== */
     case PIPE_VOTER_PREP: {
     	xil_printf("\n\r========================================\n\r");
-    	    xil_printf("[STAGE2] Voter Preparation\n\r");
-    	    xil_printf("========================================\n\r");
-    	   // clear_voter_out_region();
+	    xil_printf("[STAGE2] Voter Preparation\n\r");
+	    xil_printf("========================================\n\r");
+	   // clear_voter_out_region();
 
+        /* 【C1】本次任务的实际记录数：含上位机补零的尾批记录。
+         * 补零记录 score=0，会被 SCORE_MIN 过滤，不参与投票。 */
+        const u32 task_reads = conn->total_reads_received;
+        const u32 task_in_bytes = (u32)ddr_layout_stage1_bytes(task_reads,
+                                                    DNA_ACC_RESULT_PACKED_BYTES);
 
-        // ✅ Cache一致性修复: Invalidate输入区域cache
-        xil_printf("[STAGE2] Invalidating input cache...\n\r");
+        // ✅ Cache一致性修复: Invalidate输入区域cache（按实际大小，不按预留容量）
+        xil_printf("[STAGE2] Invalidating input cache (%u bytes)...\n\r", task_in_bytes);
         const u32 VOTER_IN_TEMP = DDR_VOTER_IN_BASE;
         const u32 INV_CHUNK = 256*1024;
         u32 inv_done = 0;
 
-        while (inv_done < VOTER_INPUT_TOTAL_BYTES) {
-            u32 chunk = (VOTER_INPUT_TOTAL_BYTES - inv_done > INV_CHUNK)
+        while (inv_done < task_in_bytes) {
+            u32 chunk = (task_in_bytes - inv_done > INV_CHUNK)
                         ? INV_CHUNK
-                        : (VOTER_INPUT_TOTAL_BYTES - inv_done);
+                        : (task_in_bytes - inv_done);
             Xil_DCacheInvalidateRange(VOTER_IN_TEMP + inv_done, chunk);
             inv_done += chunk;
         }
@@ -722,22 +732,24 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         /* -------------------- 配置Voter寄存器（修复 OUT_BEATS 计算） -------------------- */
         const u32 VOTER_IN_ADDR        = DDR_VOTER_IN_BASE;
         const u32 VOTER_OUT_ADDR       = DDR_VOTER_OUT_BASE;
-        const u32 VOTER_IN_BEATS       = TOTAL_READS * 6u;              /* 每个 read 6 个 u64 */
-        const u32 VOTER_OUT_BEATS_EXP  = VOTER_EXPECTED_OUT_BEATS;      // [FIX] 期望拍数 = ceil(81000/64) = 1266
+        const u32 VOTER_IN_BEATS       = task_reads * 6u;                 /* 每个 read 6 个 u64 */
+        const u32 VOTER_OUT_BEATS_EXP  = VOTER_EXPECTED_OUT_BEATS;        // [FIX] 期望拍数 = ceil(81000/64) = 1266
 
         xil_printf("[STAGE2] Configuration:\n\r");
         xil_printf("  Input address:  0x%08X (Stage1 output)\n\r", VOTER_IN_ADDR);
         xil_printf("  Output address: 0x%08X\n\r", VOTER_OUT_ADDR);
         xil_printf("  Input beats:    %u (6 u64 / read)\n\r", VOTER_IN_BEATS);
         xil_printf("  Output beats:   %u (expected)\n\r", VOTER_OUT_BEATS_EXP);
-        xil_printf("  Total reads:    %u\n\r", TOTAL_READS);
+        xil_printf("  Total reads:    %u (actual, C1)\n\r", task_reads);
+        xil_printf("  Score min:      %u (D1 Plan-B)\n\r", (u32)VOTER_SCORE_MIN);
 
         /* 下发寄存器（关键：OUT_BEATS 用期望拍数） */
         write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR,     VOTER_IN_ADDR);
         write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS,    VOTER_IN_BEATS);
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    VOTER_OUT_ADDR);
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   VOTER_OUT_BEATS_EXP);  // [FIX]
-        write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, TOTAL_READS);
+        write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, task_reads);           // [C1]
+        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN);      // [D1/D2]
         __asm__ volatile("dsb sy"); __asm__ volatile("isb"); usleep(10);
 
         /* 回读寄存器并强校验（包含 OUT_BEATS 一致性） */
@@ -747,19 +759,22 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         u32 out_addr_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
         u32 out_beats_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS);
         u32 total_reads_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS);
+        u32 score_min_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN);
 
         xil_printf("  IN_ADDR     : 0x%08X\n\r", in_addr_rb);
         xil_printf("  IN_BEATS    : %u\n\r",    in_beats_rb);
         xil_printf("  OUT_ADDR    : 0x%08X\n\r", out_addr_rb);
         xil_printf("  OUT_BEATS   : %u (expected %u)\n\r", out_beats_rb, VOTER_OUT_BEATS_EXP);
         xil_printf("  TOTAL_READS : %u\n\r",    total_reads_rb);
+        xil_printf("  SCORE_MIN   : %u\n\r",    score_min_rb);
 
         /* [FIX] 任何一项不一致 → 立即失败，避免后续 DONE 护栏卡死 */
         if (in_addr_rb  != VOTER_IN_ADDR      ||
             in_beats_rb != VOTER_IN_BEATS     ||
             out_addr_rb != VOTER_OUT_ADDR     ||
             out_beats_rb!= VOTER_OUT_BEATS_EXP||
-            total_reads_rb != TOTAL_READS)
+            total_reads_rb != task_reads      ||
+            score_min_rb   != VOTER_SCORE_MIN)
         {
             xil_printf("\n\r[ERROR] Voter configuration verification failed!\n\r");
             xil_printf("       OUT_BEATS mismatch will cause DONE guard to stall.\n\r");
@@ -782,7 +797,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         const u32 voter_in_addr      = DDR_DNA_ACC_OUT_BASE;
         const u32 voter_out_addr     = DDR_VOTER_OUT_BASE;
-        const u32 voter_total_reads  = TOTAL_READS;
+        const u32 voter_total_reads  = conn->total_reads_received;  /* [C1] 实际条数 */
         const u32 voter_out_beats    = VOTER_OUTPUT_BEATS;
 
         /* -------------------- Pre-start Input Validation（全部字节视图） -------------------- */
@@ -872,6 +887,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    voter_out_addr);
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   voter_out_beats);
         write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, voter_total_reads);
+        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN);  /* [D1/D2] */
         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
         usleep(10);
         // 验证硬件收到的配置
@@ -887,12 +903,13 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         u32 out_addr_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
         u32 out_beats_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS);
         u32 total_reads_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS);
+        u32 score_min_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN);
 
 
 
         if (in_addr_rb != voter_in_addr || in_beats_rb != voter_total_reads ||
             out_addr_rb != voter_out_addr || out_beats_rb != VOTER_OUTPUT_BEATS ||
-            total_reads_rb != TOTAL_READS) {
+            total_reads_rb != voter_total_reads || score_min_rb != VOTER_SCORE_MIN) {
             xil_printf("\n\r[ERROR] Configuration verification failed!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
@@ -1712,6 +1729,14 @@ void process_batch(dna_connection_t *conn, u8 *data, u32 len)
     u32 data_size = num_reads * READ_SIZE_BYTES;
     if (len < 4 + data_size) return;
 
+    /* 【C3】容量防溢出：DDR 只预留了 TOTAL_READS 条的空间 */
+    if (conn->total_reads_received + num_reads > TOTAL_READS) {
+        xil_printf("[BATCH] ✗ capacity exceeded: %u + %u > %u\n\r",
+                   conn->total_reads_received, num_reads, (u32)TOTAL_READS);
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
+
     u32 offset  = conn->total_reads_received * READ_SIZE_BYTES;
     u32 dst     = DDR_READS_BASE + offset;
 
@@ -1731,9 +1756,29 @@ void process_post(dna_connection_t *conn)
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
+
+    /* 【C2/C3】进入流水线前做协议与 DDR 布局校验：
+     * - 条数必须是 FRAME_READS(64) 的整数倍（尾批由上位机补零；
+     *   补零记录 score=0，会被 Voter 的 SCORE_MIN 过滤）；
+     * - 按实际条数检查读段区 / Stage1 输出区不越界。 */
+    int layout_rc = ddr_layout_validate(conn->total_reads_received,
+                                        FRAME_READS, TOTAL_READS,
+                                        DDR_READS_BASE, DDR_DNA_ACC_OUT_BASE,
+                                        DDR_DNA_ACC_OUT_BASE, DDR_VOTER_OUT_BASE,
+                                        READ_SIZE_BYTES,
+                                        DNA_ACC_RESULT_PACKED_BYTES);
+    if (layout_rc != 0) {
+        xil_printf("[POST] ✗ DDR layout validation failed (rc=%d, reads=%u)\n\r",
+                   layout_rc, conn->total_reads_received);
+        xil_printf("[POST]    -1=空任务 -2=非64整数倍(补零缺失) "
+                   "-3=超容量 -4/-5=区间越界\n\r");
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
+
     xil_printf("\n\r========================================\n\r");
     xil_printf("Starting Processing Pipeline\n\r");
-    xil_printf("Total Reads: %u\n\r", conn->total_reads_received);
+    xil_printf("Total Reads: %u (actual)\n\r", conn->total_reads_received);
     xil_printf("Watermark:   %u bytes\n\r", conn->watermark_size);
     xil_printf("========================================\n\r");
     conn->state = STATE_PROCESSING;
