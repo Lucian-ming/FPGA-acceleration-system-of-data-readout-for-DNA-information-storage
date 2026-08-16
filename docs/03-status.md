@@ -440,6 +440,34 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 约 50 ms 的任务时长可忽略），START 时同步复位 `init_addr`。
 **判据**：`tb_differential_voter.v` 连跑两轮，输出逐位相同（见 B13~B16 判据）。
 
+### ~~C5 PS 失败 ACK 与成功 ACK 叠加~~ ✅ 已修复（2026-08-16，R1）
+
+`process_complete_packet()` 现在依据 `process_watermark()` / `process_batch()` 的返回值只发
+一次 `WM_OK`、`BATCH_OK` 或 `PKT_ERROR`；两个处理函数不再自行发送错误 ACK。BATCH 达到声明条数
+也不再隐式调用 `process_post()`，流水线只由显式 `PKT_POST` 触发，避免客户端收到第二个裸字节。
+
+**判据**：`bash tools/run_sim.sh` 通过 8 项、失败 0 项；xsct 重建 ELF 成功
+（941,888 B，text 144,519 / data 3,148 / bss 3,266,624）。
+
+### ~~C6 分帧响应非原子重试~~ ✅ 已修复（2026-08-16，R1）
+
+`send_framed_pkt()` 将 8 字节包头与小型负载合并为一次 `tcp_write(TCP_WRITE_FLAG_COPY)`，
+只有整包入队成功才返回 `ERR_OK`；`ERR_MEM`/`ERR_WOULDBLOCK` 重试不会重复排队包头，调用方记录
+发送失败。
+
+### ~~C7 超大 TCP payload 令接收状态永久等待~~ ✅ 已修复（2026-08-16，R1）
+
+`recv_callback()` 解析包头后立即检查声明长度是否超过接收缓冲容量；缓冲溢出或超限时发送
+`PKT_ERROR`、清理回调与偏移并关闭连接，不再等待一个永远无法收满的包。BATCH 还严格校验条数、
+精确负载长度和 32 位乘法边界。
+
+### ~~C8 Voter 两处配置语义漂移~~ ✅ 已修复（2026-08-16，R1）
+
+`voter_configure_and_verify()` 成为唯一寄存器配置/回读入口，`IN_BEATS` 固定按
+`records × 6` 下发；`PIPE_VOTER_PREP` 只做 cache 准备，`PIPE_VOTER_START` 统一调用 helper。
+经 `rg` 确认 `validate_ddr_addresses()` 与 `analyze_decoder_output()` 无调用后删除，保留实际使用的
+`validate_decoder_written_beats()`。
+
 ---
 
 ## 已验证的构建结果（2026-08-08，Vivado/Vitis 2022.2，WSL `/tools/Xilinx`）

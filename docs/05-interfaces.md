@@ -101,6 +101,10 @@ PC: ◄───────────────── 板: PKT_RESULT + 8,1
 ```
 
 未 CONFIG 先发 WM/BATCH/POST → `PKT_ERROR`；声明条数与实际收到不符 → `PKT_ERROR`。
+每个 `PKT_BATCH` 只负责写入一批读段并返回一个裸 `BATCH_OK`/`PKT_ERROR`；即使达到声明条数，
+板端也不会隐式启动流水线，客户端仍须发送显式 `PKT_POST`。
+包头声明的 `payload_len` 若超过接收缓冲可容纳的 `99,992` 字节，或接收缓存溢出，板端先回
+`PKT_ERROR` 再清理回调并关闭连接，以便下一次连接恢复。
 
 ## 3. IP 寄存器
 

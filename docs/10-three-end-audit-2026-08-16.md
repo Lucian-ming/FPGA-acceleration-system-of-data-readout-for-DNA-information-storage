@@ -1,0 +1,71 @@
+# 10 · 三端代码审查与可维护性重构日志（2026-08-16）
+
+## 回退基线
+
+- 稳定基线：`main@81986bc`（P3 任务配置化完成；全量回归 8 项全过）
+- 工作分支：`refactor/three-end-audit-20260816`
+- 总体回退（仅在明确要放弃本分支时）：切回 `main`；不要重置 `data/`、`archive/` 或 XSA。
+- 单批回退：每节记录对应提交号，使用 `git revert <commit>`，避免破坏历史。
+
+## 原则
+
+1. 先修真 bug，再做解耦；每批保持全量回归可跑。
+2. PS / 上位机 / PL 分批提交，禁止一个跨三端的大提交。
+3. 改协议/寄存器/数据格式先更新 `02-data-contract.md` 或 `05-interfaces.md`。
+4. 所有行为变更在 `03-status.md` 留证据；历史问题不静默删除。
+5. `data/R0.83_data/`、`archive/`、两份 XSA 保持只读。
+
+## 批次计划与状态
+
+| 批次 | 范围 | 计划 | 判据 | 提交 / 回退 |
+| --- | --- | --- | --- | --- |
+| R1 | PS 协议与 Voter 控制 | 已完成：修复失败 ACK、分帧原子发送、超大 payload 恢复；合并 Voter 配置；清理死函数 | `run_sim.sh` 8/8；xsct ELF 941,888 B | 提交后回填 |
+| R2 | 上位机 | 提取 TaskSpec/协议纯函数；严格水印校验；修正错误应答；LDPC 原生回退 | Python 单测/`--dry-run`/host 回归 | 待提交 |
+| R3 | PL | 审查三个 IP；删除不影响接口的死寄存器；标记遗留死 RTL；统一乱码注释；必要 bug 用黄金 TB 钉死 | RTL 全量回归 + Voter 综合 | 待提交 |
+| R4 | 文档与收尾 | 同步 03/05/06/09/README；全量回归、ELF、综合复跑 | 全绿 | 待提交 |
+
+## R1 审查发现（实现完成，待提交）
+
+### 已确认真 bug
+
+1. **PS-1：WM/BATCH 失败仍无条件回 OK**
+   `process_complete_packet()` 调用 `process_watermark/process_batch` 后无论返回结果都发
+   `WM_OK/BATCH_OK`；而两个函数内部失败时还可能自己发 `PKT_ERROR`。客户端会读到
+   `ERROR+OK` 两个字节，第二个字节污染下一次 ACK，连接协议失步。
+   修复：`process_complete_packet()` 统一依据返回值发送一次 ACK；BATCH 不再隐式触发 POST。
+   证据：`sw/app/echo.c`（当前 `process_complete_packet/process_watermark/process_batch`）。
+
+2. **PS-2：`send_framed_pkt()` 不是事务安全的**
+   header `tcp_write` 成功而 payload `tcp_write` 因 `ERR_MEM` 失败时，循环重试会再次排队
+   header，形成重复/嵌套包头；函数无返回值，上层也无法报告发送失败。
+   修复：包头与负载合并为一次 `tcp_write(TCP_WRITE_FLAG_COPY)`，返回 `err_t` 并由调用方记录失败。
+   证据：`sw/app/echo.c`（当前 `send_framed_pkt`）。
+
+3. **PS-3：接收超大 payload 可永久卡住连接**
+   包头声明 `payload_len > tcp_recv_buffer` 时，`recv_callback()` 一直等待不可能装下的包；
+   后续收到数据才以 `ERR_MEM` 返回但不清缓冲、不关闭连接，状态无法恢复。
+   修复：头部解析后立即拒绝超过 `sizeof(tcp_recv_buffer)-8` 的声明，清理回调、发送错误并关闭连接；
+   缓冲溢出走同一恢复路径。证据：`sw/app/echo.c`（当前 `recv_callback`）。
+
+### 结构问题
+
+4. **PS-S1：Voter 寄存器配置/回读验证重复两遍**
+   `PIPE_VOTER_PREP` 与 `PIPE_VOTER_START` 都写同一组 IN/OUT/TOTAL/SCORE 寄存器并回读；
+   两份代码曾经出现 `IN_BEATS` 语义不一致（一个写 `reads*6`、一个写 `reads`），虽然
+   硬件当前忽略 `IN_BEATS`，但复制分支会继续制造维护漂移。已合并到 `voter_configure_and_verify()`，统一按
+   `records*6` 写入并逐项回读。
+
+5. **PS-S2：`echo.c` 仍约 2,100 行，混合 DMA、三级流水线、TCP 协议、调试输出**
+   本批先做低风险函数解耦和死代码清理；跨文件拆分（`protocol.c/pipeline_*.c`）需要调整
+   Vitis 导入/全局状态边界，留到 helper 行为稳定后再分批，避免一次性扩大回归面。
+
+## R2 / R3
+
+### R1 验证
+
+- `bash tools/run_sim.sh`：通过 8 项，失败 0 项。
+- `env DISPLAY=:0 /tools/Xilinx/Vitis/2022.2/bin/xsct sw/scripts/create_vitis.tcl`：成功；
+  `dna_lwip_app.elf` 941,888 B，text 144,519 / data 3,148 / bss 3,266,624。
+- `git diff --check`：通过。
+
+R2 / R3 在 R1 提交后继续补充。

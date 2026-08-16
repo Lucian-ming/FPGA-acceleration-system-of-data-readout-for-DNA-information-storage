@@ -58,8 +58,8 @@
  *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*807 + 150 = 40,500
  *   水印比特数 = 2 * L = 81,000
  *
- * 【修订 B1】MAX_WATERMARK_SIZE 原为 10120，小于 81,000 bit 所需的 10,125 B，
- * 而且 process_watermark() 还会静默截断，尾部 40 bit 直接丢掉。
+ * 【修订 B1】MAX_WATERMARK_SIZE 原为 10120，小于 81,000 bit 所需的 10,125 B；
+ * 当前 process_watermark() 对长度不足或超限严格拒绝，不再静默截断。
  *============================================================================*/
 #define WM_NUM_LC               50U
 #define WM_STRIDE               807U
@@ -174,7 +174,7 @@
  *   0x00: CTRL_STATUS - 写:bit[0]=start_pulse, bit[1]=done_clr
  *                       读:bit[0]=idle, bit[1]=done
  *   0x04: IN_ADDR     - 输入DDR地址
- *   0x08: IN_BEATS    - 输入数据拍数 (设置为实际记录数)
+ *   0x08: IN_BEATS    - 输入数据拍数 (实际记录数 × 6)
  *   0x0C: OUT_ADDR    - 输出DDR地址
  *   0x10: OUT_BEATS   - 输出数据拍数 (1266)
  *   0x14: TOTAL_READS - 读段总数配置 (本次任务实际条数，C1)
@@ -274,28 +274,20 @@ int  start_application(void);
 int  dna_accelerator_init(void);
 
 /* 数据处理函数 */
-void process_watermark(dna_connection_t *conn, u8 *data, u32 len);
+int  process_watermark(dna_connection_t *conn, u8 *data, u32 len);
 /* 把打包水印展开成 NUM_LC 个区域写进 DDR（修订 B1） */
 int  expand_watermark_regions(dna_connection_t *conn);
 /* Stage2 共识 ⊕ 水印 → 稀疏流，供 Stage3 使用（修订 B3） */
 int  apply_watermark_differential(void);
-void process_batch(dna_connection_t *conn, u8 *data, u32 len);
+int  process_batch(dna_connection_t *conn, u8 *data, u32 len);
 void process_post(dna_connection_t *conn);
 void send_result(dna_connection_t *conn);
 
 /* 流水线控制 */
 int  run_processing_pipeline(dna_connection_t *conn);
 
-/* 网络回调 */
-static err_t poll_callback(void *arg, struct tcp_pcb *tpcb);
-
 /* 【P3】任务配置与能力查询（docs/05-interfaces.md 1.1~1.3 节） */
 void process_config(dna_connection_t *conn, u8 *data, u32 len);
 void process_caps(dna_connection_t *conn);
-
-/* 调试与分析函数 */
-static void analyze_decoder_output(u32 out_addr, u32 total_beats);
-static int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats);
-
 
 #endif /* __ECHO_H__ */

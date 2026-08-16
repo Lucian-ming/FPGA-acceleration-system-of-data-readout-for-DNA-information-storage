@@ -22,10 +22,6 @@
 #define VOTER_EXPECTED_TIME_MS  500
 #define VOTER_TIMEOUT_POLLS     5000000
 #define VOTER_REPORT_INTERVAL   10000
-#ifndef VOTER_TOTAL_BITS
-#define VOTER_TOTAL_BITS          (81000u)
-#endif
-#define VOTER_EXPECTED_OUT_BEATS  ((VOTER_TOTAL_BITS + 63u) / 64u)  /* =1266 */
 /* ===== Fallback: Voter 调试寄存器偏移（如果 echo.h 未定义时启用） ===== */
 #ifndef VOTER_REG_DBG_STATE
 #define VOTER_REG_DBG_STATE     0x18u
@@ -42,6 +38,13 @@ extern struct netif *echo_netif;
 
 /*================ 前向声明 ================*/
 static err_t send_ack_byte(struct tcp_pcb *tpcb, u8 ack_type);
+static err_t send_framed_pkt(struct tcp_pcb *tpcb, u8 type,
+                             const u8 *payload, u32 len);
+static err_t reject_and_close_connection(dna_connection_t *conn,
+                                         struct tcp_pcb *tpcb,
+                                         struct pbuf *p);
+static int validate_decoder_written_beats(u32 out_addr, u32 total_beats,
+                                          u32 *written_beats);
 static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32 total_len);
 static int   parse_header(u8 *buf, u16 *magic, u8 *pkt_type, u32 *payload_len);
 static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
@@ -689,6 +692,57 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 /*============================================================================
  * 第二级: Voter (投票)
  *============================================================================*/
+static int voter_configure_and_verify(const dna_connection_t *conn)
+{
+    const u32 in_addr = DDR_VOTER_IN_BASE;
+    const u32 out_addr = DDR_VOTER_OUT_BASE;
+    const u32 total_reads = conn->total_reads_received;
+    const u32 in_beats = total_reads * 6u;
+    const u32 out_beats = VOTER_OUTPUT_BEATS;
+    const u32 score_min = conn->cfg.score_min;
+
+    xil_printf("[STAGE2] Configuration:\n\r");
+    xil_printf("  IN_ADDR:     0x%08X\n\r", in_addr);
+    xil_printf("  IN_BEATS:    %u (6 beats/read)\n\r", in_beats);
+    xil_printf("  OUT_ADDR:    0x%08X\n\r", out_addr);
+    xil_printf("  OUT_BEATS:   %u\n\r", out_beats);
+    xil_printf("  TOTAL_READS: %u\n\r", total_reads);
+    xil_printf("  SCORE_MIN:   %u\n\r", score_min);
+
+    write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR, in_addr);
+    write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS, in_beats);
+    write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR, out_addr);
+    write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS, out_beats);
+    write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, total_reads);
+    write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN, score_min);
+    __asm__ volatile("dsb sy");
+    __asm__ volatile("isb");
+    usleep(10);
+
+    const u32 in_addr_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR);
+    const u32 in_beats_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS);
+    const u32 out_addr_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
+    const u32 out_beats_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS);
+    const u32 total_reads_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS);
+    const u32 score_min_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN);
+
+    if (in_addr_rb != in_addr || in_beats_rb != in_beats ||
+        out_addr_rb != out_addr || out_beats_rb != out_beats ||
+        total_reads_rb != total_reads || score_min_rb != score_min) {
+        xil_printf("[ERROR] Voter configuration readback mismatch:\n\r");
+        xil_printf("  IN_ADDR     0x%08X != 0x%08X\n\r", in_addr_rb, in_addr);
+        xil_printf("  IN_BEATS    %u != %u\n\r", in_beats_rb, in_beats);
+        xil_printf("  OUT_ADDR    0x%08X != 0x%08X\n\r", out_addr_rb, out_addr);
+        xil_printf("  OUT_BEATS   %u != %u\n\r", out_beats_rb, out_beats);
+        xil_printf("  TOTAL_READS %u != %u\n\r", total_reads_rb, total_reads);
+        xil_printf("  SCORE_MIN   %u != %u\n\r", score_min_rb, score_min);
+        return XST_FAILURE;
+    }
+
+    xil_printf("[STAGE2] Configuration readback verified\n\r");
+    return XST_SUCCESS;
+}
+
 static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 {
 
@@ -729,62 +783,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         xil_printf("[STAGE2] ✓ Cache invalidated (%u bytes)\n\r", inv_done);
 
-        /* -------------------- 配置Voter寄存器（修复 OUT_BEATS 计算） -------------------- */
-        const u32 VOTER_IN_ADDR        = DDR_VOTER_IN_BASE;
-        const u32 VOTER_OUT_ADDR       = DDR_VOTER_OUT_BASE;
-        const u32 VOTER_IN_BEATS       = task_reads * 6u;                 /* 每个 read 6 个 u64 */
-        const u32 VOTER_OUT_BEATS_EXP  = VOTER_EXPECTED_OUT_BEATS;        // [FIX] 期望拍数 = ceil(81000/64) = 1266
-
-        xil_printf("[STAGE2] Configuration:\n\r");
-        xil_printf("  Input address:  0x%08X (Stage1 output)\n\r", VOTER_IN_ADDR);
-        xil_printf("  Output address: 0x%08X\n\r", VOTER_OUT_ADDR);
-        xil_printf("  Input beats:    %u (6 u64 / read)\n\r", VOTER_IN_BEATS);
-        xil_printf("  Output beats:   %u (expected)\n\r", VOTER_OUT_BEATS_EXP);
-        xil_printf("  Total reads:    %u (actual, C1)\n\r", task_reads);
-        const u32 VOTER_SCORE_MIN_CFG = conn->cfg.score_min;   /* 【P3】运行时下发 */
-        xil_printf("  Score min:      %u (from PKT_CONFIG)\n\r", VOTER_SCORE_MIN_CFG);
-
-        /* 下发寄存器（关键：OUT_BEATS 用期望拍数） */
-        write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR,     VOTER_IN_ADDR);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS,    VOTER_IN_BEATS);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    VOTER_OUT_ADDR);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   VOTER_OUT_BEATS_EXP);  // [FIX]
-        write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, task_reads);           // [C1]
-        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN_CFG);  // [P3]
-        __asm__ volatile("dsb sy"); __asm__ volatile("isb"); usleep(10);
-
-        /* 回读寄存器并强校验（包含 OUT_BEATS 一致性） */
-        xil_printf("\n\r[VERIFY] Configuration readback:\n\r");
-        u32 in_addr_rb     = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR);
-        u32 in_beats_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS);
-        u32 out_addr_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
-        u32 out_beats_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS);
-        u32 total_reads_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS);
-        u32 score_min_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN);
-
-        xil_printf("  IN_ADDR     : 0x%08X\n\r", in_addr_rb);
-        xil_printf("  IN_BEATS    : %u\n\r",    in_beats_rb);
-        xil_printf("  OUT_ADDR    : 0x%08X\n\r", out_addr_rb);
-        xil_printf("  OUT_BEATS   : %u (expected %u)\n\r", out_beats_rb, VOTER_OUT_BEATS_EXP);
-        xil_printf("  TOTAL_READS : %u\n\r",    total_reads_rb);
-        xil_printf("  SCORE_MIN   : %u\n\r",    score_min_rb);
-
-        /* [FIX] 任何一项不一致 → 立即失败，避免后续 DONE 护栏卡死 */
-        if (in_addr_rb  != VOTER_IN_ADDR      ||
-            in_beats_rb != VOTER_IN_BEATS     ||
-            out_addr_rb != VOTER_OUT_ADDR     ||
-            out_beats_rb!= VOTER_OUT_BEATS_EXP||
-            total_reads_rb != task_reads      ||
-            score_min_rb   != VOTER_SCORE_MIN_CFG)
-        {
-            xil_printf("\n\r[ERROR] Voter configuration verification failed!\n\r");
-            xil_printf("       OUT_BEATS mismatch will cause DONE guard to stall.\n\r");
-            pipeline_set_state(PIPE_FAIL);
-            return PIPE_STEP_FAIL;
-        }
-        xil_printf("[STAGE2] ✓ Configuration successful\n\r");
-
-    	    pipeline_set_state(PIPE_VOTER_START);
+        pipeline_set_state(PIPE_VOTER_START);
     	    return PIPE_STEP_PROGRESS;
     }
     /* ========================================================================
@@ -797,9 +796,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         xil_printf("========================================\n\r");
 
         const u32 voter_in_addr      = DDR_DNA_ACC_OUT_BASE;
-        const u32 voter_out_addr     = DDR_VOTER_OUT_BASE;
         const u32 voter_total_reads  = conn->total_reads_received;  /* [C1] 实际条数 */
-        const u32 voter_out_beats    = VOTER_OUTPUT_BEATS;
 
         /* -------------------- Pre-start Input Validation（全部字节视图） -------------------- */
         xil_printf("\n\r[STAGE2] Pre-start Input Validation:\n\r");
@@ -880,39 +877,8 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             xil_printf("[STAGE2] ✓ Reset successful\n\r");
         }
 
-        /* -------------------- Step 4: 配置寄存器 + 回读校验 -------------------- */
-        xil_printf("\n\r[STAGE2] Writing configuration registers...\n\r");
-
-        write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR,     voter_in_addr);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS,    voter_total_reads);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    voter_out_addr);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   voter_out_beats);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, voter_total_reads);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   conn->cfg.score_min);  /* [P3] */
-        __asm__ volatile("dsb sy"); __asm__ volatile("isb");
-        usleep(10);
-        // 验证硬件收到的配置
-        xil_printf("\n\r[VERIFY] Configuration readback:\n\r");
-        u32 hw_out_addr = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
-        xil_printf("  Expected OUT_ADDR: 0x%08X\n\r", DDR_VOTER_OUT_BASE);
-        xil_printf("  Hardware OUT_ADDR: 0x%08X\n\r", hw_out_addr);
-        if (hw_out_addr != DDR_VOTER_OUT_BASE) {
-            xil_printf("  ⚠️  ADDRESS MISMATCH!\n\r");
-        }
-        u32 in_addr_rb     = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR);
-        u32 in_beats_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS);
-        u32 out_addr_rb    = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR);
-        u32 out_beats_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS);
-        u32 total_reads_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS);
-        u32 score_min_rb   = read_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN);
-
-
-
-        if (in_addr_rb != voter_in_addr || in_beats_rb != voter_total_reads ||
-            out_addr_rb != voter_out_addr || out_beats_rb != VOTER_OUTPUT_BEATS ||
-            total_reads_rb != voter_total_reads ||
-            score_min_rb   != conn->cfg.score_min) {
-            xil_printf("\n\r[ERROR] Configuration verification failed!\n\r");
+        /* -------------------- Step 4: 唯一配置入口 + 回读校验 -------------------- */
+        if (voter_configure_and_verify(conn) != XST_SUCCESS) {
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -1509,34 +1475,61 @@ static task_caps_t board_caps(void)
     return c;
 }
 
-/* 发送一个带 8B 包头的小包（CONFIG_OK / CAPS_INFO），语义与 send_result 一致 */
-static void send_framed_pkt(struct tcp_pcb *tpcb, u8 type,
+/* 发送一个带 8B 包头的小包（CONFIG_OK / CAPS_INFO）。
+ * 单次 tcp_write 保证“包头+负载”要么整体入队，要么整体失败。 */
+static err_t send_framed_pkt(struct tcp_pcb *tpcb, u8 type,
                              const u8 *payload, u32 len)
 {
-    u8 hdr[PROTOCOL_HDR_SIZE];
-    hdr[0] = (PROTOCOL_MAGIC >> 8) & 0xFF;
-    hdr[1] = PROTOCOL_MAGIC & 0xFF;
-    hdr[2] = type;
-    hdr[3] = 0;
-    hdr[4] = (len >> 24) & 0xFF; hdr[5] = (len >> 16) & 0xFF;
-    hdr[6] = (len >> 8) & 0xFF;  hdr[7] = len & 0xFF;
+    u8 frame[PROTOCOL_HDR_SIZE + TASK_CAPS_INFO_LEN];
+    if (tpcb == NULL || len > TASK_CAPS_INFO_LEN || (len != 0u && payload == NULL)) {
+        return ERR_ARG;
+    }
+
+    frame[0] = (PROTOCOL_MAGIC >> 8) & 0xFF;
+    frame[1] = PROTOCOL_MAGIC & 0xFF;
+    frame[2] = type;
+    frame[3] = 0;
+    frame[4] = (len >> 24) & 0xFF; frame[5] = (len >> 16) & 0xFF;
+    frame[6] = (len >> 8) & 0xFF;  frame[7] = len & 0xFF;
+    if (len != 0u) memcpy(frame + PROTOCOL_HDR_SIZE, payload, len);
 
     for (int attempt = 0; attempt < 100; attempt++) {
-        err_t e1 = tcp_write(tpcb, hdr, sizeof hdr, TCP_WRITE_FLAG_COPY);
-        err_t e2 = (e1 == ERR_OK)
-                   ? tcp_write(tpcb, payload, len, TCP_WRITE_FLAG_COPY)
-                   : e1;
-        if (e1 == ERR_OK && e2 == ERR_OK) {
+        err_t e = tcp_write(tpcb, frame, PROTOCOL_HDR_SIZE + len,
+                            TCP_WRITE_FLAG_COPY);
+        if (e == ERR_OK) {
             tcp_output(tpcb);
-            return;
+            return ERR_OK;
         }
-        if (e1 != ERR_OK && e1 != ERR_MEM) { tcp_output(tpcb); return; }
-        if (e2 != ERR_OK && e2 != ERR_MEM) { tcp_output(tpcb); return; }
+        if (e != ERR_MEM && e != ERR_WOULDBLOCK) return e;
         tcp_output(tpcb);
         keep_tcp_alive();
         usleep(1000);
     }
     xil_printf("[PKT] send_framed_pkt(%02X) giving up\n\r", type);
+    return ERR_MEM;
+}
+
+static err_t reject_and_close_connection(dna_connection_t *conn,
+                                         struct tcp_pcb *tpcb,
+                                         struct pbuf *p)
+{
+    if (p != NULL) {
+        tcp_recved(tpcb, p->tot_len);
+        pbuf_free(p);
+    }
+    send_ack_byte(tpcb, PKT_ERROR);
+    tcp_recv_offset = 0;
+    if (conn != NULL) conn->tpcb = NULL;
+
+    tcp_arg(tpcb, NULL);
+    tcp_recv(tpcb, NULL);
+    tcp_poll(tpcb, NULL, 0);
+    err_t close_rc = tcp_close(tpcb);
+    if (close_rc != ERR_OK) {
+        tcp_abort(tpcb);
+        return ERR_ABRT;
+    }
+    return ERR_OK;
 }
 
 void process_caps(dna_connection_t *conn)
@@ -1548,7 +1541,9 @@ void process_caps(dna_connection_t *conn)
                "max_symbols=%u max_reads=%u features=%u\n\r",
                (u32)caps.version, (u32)caps.read_bps, caps.num_lc, caps.stride,
                caps.max_symbols, caps.max_reads, caps.features);
-    if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CAPS_INFO, payload, sizeof payload);
+    if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CAPS_INFO,
+                                      payload, sizeof payload) != ERR_OK)
+        xil_printf("[CAPS] ERROR: response enqueue failed\n\r");
 }
 
 void process_config(dna_connection_t *conn, u8 *data, u32 len)
@@ -1565,13 +1560,17 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
     if (conn->configured) {                    /* 拒绝码 8：重复配置 */
         xil_printf("[CONFIG] rejected: already configured\n\r");
         wr_u32_be(ok, 8u);
-        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
+                                          ok, sizeof ok) != ERR_OK)
+            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
     if (conn->watermark_size != 0u || conn->total_reads_received != 0u) {
         wr_u32_be(ok, 9u);                      /* 拒绝码 9：顺序非法 */
         xil_printf("[CONFIG] rejected: data already received\n\r");
-        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
+                                          ok, sizeof ok) != ERR_OK)
+            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
 
@@ -1590,7 +1589,9 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
         xil_printf("[CONFIG] rejected (%d): %s\n\r", rc,
                    (rc >= 1 && rc <= 7) ? why[rc] : "?");
         wr_u32_be(ok, (u32)rc);
-        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
+                                          ok, sizeof ok) != ERR_OK)
+            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
 
@@ -1600,7 +1601,9 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
                (u32)cfg.version, (u32)cfg.read_bps, cfg.symbols,
                cfg.num_lc, cfg.stride, cfg.total_reads, cfg.score_min);
     wr_u32_be(ok, 0u);
-    if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+    if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
+                                      ok, sizeof ok) != ERR_OK)
+        xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
 }
 
 
@@ -1624,8 +1627,18 @@ static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32
     /* 【P3】CONFIG/CAPS 自己发带包头的应答，不走裸 ACK */
     case PKT_CONFIG: process_config(conn, payload, payload_len); break;
     case PKT_CAPS:   process_caps(conn); break;
-    case PKT_WM:   process_watermark(conn, payload, payload_len); send_ack_byte(conn->tpcb, PKT_WM_OK); break;
-    case PKT_BATCH:process_batch(conn, payload, payload_len);     send_ack_byte(conn->tpcb, PKT_BATCH_OK); break;
+    case PKT_WM:
+        if (conn->tpcb)
+            send_ack_byte(conn->tpcb,
+                          process_watermark(conn, payload, payload_len) == 0
+                          ? PKT_WM_OK : PKT_ERROR);
+        break;
+    case PKT_BATCH:
+        if (conn->tpcb)
+            send_ack_byte(conn->tpcb,
+                          process_batch(conn, payload, payload_len) == 0
+                          ? PKT_BATCH_OK : PKT_ERROR);
+        break;
     case PKT_POST: process_post(conn); break;
     default:       xil_printf("[PKT] Unknown type\n\r"); send_ack_byte(conn->tpcb, PKT_ERROR); break;
     }
@@ -1635,12 +1648,18 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
 {
     dna_connection_t *conn = (dna_connection_t *)arg;
 
-    if (p == NULL) { tcp_recv_offset = 0; tcp_close(tpcb); return ERR_OK; }
+    if (p == NULL) {
+        tcp_recv_offset = 0;
+        if (conn) conn->tpcb = NULL;
+        tcp_close(tpcb);
+        return ERR_OK;
+    }
     if (err != ERR_OK) { pbuf_free(p); return err; }
 
     u16 received_len = p->tot_len;
     if (tcp_recv_offset + received_len > sizeof(tcp_recv_buffer)) {
-        xil_printf("[TCP] Buffer overflow\n\r"); pbuf_free(p); return ERR_MEM;
+        xil_printf("[TCP] Buffer overflow; closing connection\n\r");
+        return reject_and_close_connection(conn, tpcb, p);
     }
 
     pbuf_copy_partial(p, tcp_recv_buffer + tcp_recv_offset, received_len, 0);
@@ -1652,6 +1671,13 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
             memmove(tcp_recv_buffer, tcp_recv_buffer + 1, tcp_recv_offset - 1);
             tcp_recv_offset--;
             continue;
+        }
+        if (payload_len > sizeof(tcp_recv_buffer) - PROTOCOL_HDR_SIZE) {
+            xil_printf("[TCP] Declared payload %u exceeds receive capacity %u; "
+                       "closing connection\n\r",
+                       payload_len,
+                       (u32)(sizeof(tcp_recv_buffer) - PROTOCOL_HDR_SIZE));
+            return reject_and_close_connection(conn, tpcb, p);
         }
         u32 need = PROTOCOL_HDR_SIZE + payload_len;
         if (tcp_recv_offset < need) break;
@@ -1742,13 +1768,13 @@ int start_application(void)
 /*============================================================================
  * 数据接收流程
  *============================================================================*/
-void process_watermark(dna_connection_t *conn, u8 *data, u32 len)
+int process_watermark(dna_connection_t *conn, u8 *data, u32 len)
 {
     /* 【P3】强制 CONFIG：未配置直接拒绝 */
     if (!conn->configured) {
         xil_printf("[WM] rejected: no PKT_CONFIG on this connection\n\r");
         conn->watermark_size = 0;
-        return;
+        return -1;
     }
     /* 【修订 B1】原实现是 `if (len > MAX) len = MAX;` —— 静默截断。
        MAX 当时还是 10120，比 81,000 bit 所需的 10,125 B 还小，
@@ -1757,19 +1783,20 @@ void process_watermark(dna_connection_t *conn, u8 *data, u32 len)
         xil_printf("[WM] ERROR: %u bytes exceeds MAX_WATERMARK_SIZE %u\n\r",
                    len, (u32)MAX_WATERMARK_SIZE);
         conn->watermark_size = 0;
-        return;                      /* 上层据此回 PKT_ERROR */
+        return -1;
     }
     if (len < WM_PACKED_BYTES) {
         xil_printf("[WM] ERROR: %u bytes < required %u (%u bits)\n\r",
                    len, (u32)WM_PACKED_BYTES, (u32)WM_TOTAL_BITS);
         conn->watermark_size = 0;
-        return;
+        return -1;
     }
     memcpy((void *)DDR_WATERMARK_BASE, data, len);
     Xil_DCacheFlushRange(DDR_WATERMARK_BASE, len);
     conn->watermark_size = len;
     xil_printf("[WM] Stored %u bytes (%u bits, %u symbols)\n\r",
                len, (u32)WM_TOTAL_BITS, (u32)WM_SYMBOLS);
+    return 0;
 }
 
 /*============================================================================
@@ -1849,31 +1876,41 @@ int apply_watermark_differential(void)
     return 0;
 }
 
-void process_batch(dna_connection_t *conn, u8 *data, u32 len)
+int process_batch(dna_connection_t *conn, u8 *data, u32 len)
 {
     /* 【P3】强制 CONFIG */
     if (!conn->configured) {
         xil_printf("[BATCH] rejected: no PKT_CONFIG on this connection\n\r");
-        return;
+        return -1;
     }
-    if (len < 4) return;
+    if (len < 4u) {
+        xil_printf("[BATCH] invalid payload: %u bytes\n\r", len);
+        return -1;
+    }
     u32 num_reads = (data[0]<<24)|(data[1]<<16)|(data[2]<<8)|data[3];
+    if (num_reads == 0u || num_reads > (len - 4u) / READ_SIZE_BYTES) {
+        xil_printf("[BATCH] invalid read count %u for payload %u\n\r",
+                   num_reads, len);
+        return -1;
+    }
     u32 data_size = num_reads * READ_SIZE_BYTES;
-    if (len < 4 + data_size) return;
+    if (len != 4u + data_size) {
+        xil_printf("[BATCH] size mismatch: payload=%u expected=%u\n\r",
+                   len, 4u + data_size);
+        return -1;
+    }
 
     /* 【C3】容量防溢出：DDR 只预留了 TOTAL_READS 条的空间；
      * 【P3】也不得超过声明的本任务条数 */
     if (conn->total_reads_received + num_reads > TOTAL_READS) {
         xil_printf("[BATCH] ✗ capacity exceeded: %u + %u > %u\n\r",
                    conn->total_reads_received, num_reads, (u32)TOTAL_READS);
-        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
-        return;
+        return -1;
     }
     if (conn->total_reads_received + num_reads > conn->cfg.total_reads) {
         xil_printf("[BATCH] ✗ exceeds declared total_reads: %u + %u > %u\n\r",
                    conn->total_reads_received, num_reads, conn->cfg.total_reads);
-        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
-        return;
+        return -1;
     }
 
     u32 offset  = conn->total_reads_received * READ_SIZE_BYTES;
@@ -1882,10 +1919,7 @@ void process_batch(dna_connection_t *conn, u8 *data, u32 len)
     memcpy((void *)dst, data + 4, data_size);
     conn->total_reads_received += num_reads;
 
-    if (conn->total_reads_received >= conn->cfg.total_reads) {
-        xil_printf("[BATCH] Declared target reached, auto-trigger\n\r");
-        process_post(conn);
-    }
+    return 0;
 }
 
 void process_post(dna_connection_t *conn)
@@ -1992,37 +2026,7 @@ void send_result(dna_connection_t *conn)
     conn->state = STATE_IDLE;
 }
 
-/*============================================================================
- * DDR地址合法性检查(可用于调试)
- *============================================================================*/
-static int validate_ddr_addresses(void)
-{
-    u32 wm_end    = DDR_WATERMARK_BASE + MAX_WATERMARK_SIZE;
-    u32 reads_end = DDR_READS_BASE + (TOTAL_READS * READ_SIZE_BYTES);
-    u32 dna_end   = DDR_DNA_ACC_OUT_BASE + DNA_ACC_OUTPUT_SIZE_BYTES;
-
-    xil_printf("\n\r[MEM] DDR Address Map:\n\r");
-    xil_printf("  WM:     0x%08X - 0x%08X (size: %u bytes)\n\r", DDR_WATERMARK_BASE, wm_end, MAX_WATERMARK_SIZE);
-    xil_printf("  READS:  0x%08X - 0x%08X (size: %u bytes)\n\r", DDR_READS_BASE, reads_end, TOTAL_READS * READ_SIZE_BYTES);
-    xil_printf("  DNA_OUT:0x%08X - 0x%08X (size: %u bytes)\n\r", DDR_DNA_ACC_OUT_BASE, dna_end, DNA_ACC_OUTPUT_SIZE_BYTES);
-    xil_printf("  VOTER:  0x%08X\n\r", DDR_VOTER_OUT_BASE);
-    xil_printf("  DECODE: 0x%08X\n\r", DDR_DECODER_OUT_BASE);
-
-    if (wm_end > DDR_READS_BASE) { xil_printf("[ERROR] WM overlaps with READS!\n\r"); return XST_FAILURE; }
-    if (reads_end > DDR_DNA_ACC_OUT_BASE) { xil_printf("[ERROR] READS overlaps with DNA_OUT!\n\r"); return XST_FAILURE; }
-
-    xil_printf("[MEM] Address map OK\n\r\n\r");
-    return XST_SUCCESS;
-}
-
-
-
-/*============================================================================
- * 可选的 Stage1 直接截取函数(保留工具函数)
- *============================================================================*/
-
-
- int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats)
+static int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats)
 {
     Xil_DCacheInvalidateRange(out_addr, total_beats * 8);
     u64 *data = (u64*)out_addr;
@@ -2045,67 +2049,3 @@ static int validate_ddr_addresses(void)
 
     return 0;
 }
- void analyze_decoder_output(u32 out_addr, u32 total_beats)
- {
-     /* 采样验证 cache 可见性 */
-     for (int sample = 0; sample < 3; sample++) {
-         usleep(1000);
-         Xil_DCacheInvalidateRange(out_addr, 1 * 8);
-         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
-         /* 不打印 64 位字面量，改用字节视图 */
-         xil_printf("[Sample %d] First beat (bytes):\n\r", sample);
-         dump_u64_bytes_window((const void*)out_addr, 0, 1, "First beat");
-     }
-
-     Xil_DCacheInvalidateRange(out_addr, total_beats * 8U);
-     __asm__ volatile("dsb sy"); __asm__ volatile("isb");
-
-     const volatile u64 *data = (const volatile u64*)out_addr;
-
-     u32 sentinel_count = 0, zero_count = 0, nonzero_count = 0;
-     u32 bit_ones = 0, bit_zeros = 0;
-
-     for (u32 i = 0; i < total_beats; i++) {
-         u64 w = data[i];
-         if (w == DECODER_SENTINEL_U64) {
-             sentinel_count++;
-             bit_zeros += 64;
-         } else if (w == 0ULL) {
-             zero_count++;
-             bit_zeros += 64;
-         } else {
-             nonzero_count++;
-             for (int b = 0; b < 64; b++) (w & (1ULL << b)) ? bit_ones++ : bit_zeros++;
-         }
-     }
-
-     const u32 written_beats = zero_count + nonzero_count;
-     const u32 total_bits = bit_ones + bit_zeros;
-
-     xil_printf("\n[ANALYSIS] Decoder Output Analysis:\n\r");
-     xil_printf("========================================\n\r");
-     xil_printf("Beat Statistics:\n\r");
-     xil_printf("  Total beats:        %u\n\r", total_beats);
-     xil_printf("  Sentinel (未写入):  %u (%.1f%%)\n\r", sentinel_count, (float)sentinel_count * 100.0f / total_beats);
-     xil_printf("  Zero (已写入):      %u (%.1f%%)\n\r", zero_count, (float)zero_count * 100.0f / total_beats);
-     xil_printf("  Non-zero (已写入):  %u (%.1f%%)\n\r", nonzero_count, (float)nonzero_count * 100.0f / total_beats);
-     xil_printf("  Written total:      %u (%.1f%%)\n\r", written_beats, (float)written_beats * 100.0f / total_beats);
-
-     if (total_bits > 0) {
-         xil_printf("\nBit Distribution:\n\r");
-         xil_printf("  Total bits:   %u\n\r", total_bits);
-         xil_printf("  Ones:         %u (%.1f%%)\n\r", bit_ones, (float)bit_ones * 100.0f / total_bits);
-         xil_printf("  Zeros:        %u (%.1f%%)\n\r", bit_zeros, (float)bit_zeros * 100.0f / total_bits);
-     }
-
-     /* 样本窗口（字节视图） */
-     xil_printf("\nFirst 8 beats (bytes):\n\r");
-     dump_u64_bytes_window((const void*)out_addr, 0, (total_beats < 8 ? total_beats : 8), "First 8");
-
-     if (total_beats >= 4) {
-         xil_printf("\nLast 4 beats (bytes):\n\r");
-         dump_u64_bytes_window((const void*)out_addr, total_beats - 4, 4, "Last 4");
-     }
-
-     xil_printf("========================================\n\r");
- }
