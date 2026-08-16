@@ -31,142 +31,27 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent
 RES = REPO / "clients" / "python" / "resources"
+CLIENT_DIR = REPO / "clients" / "python"
+if str(CLIENT_DIR) not in sys.path:
+    sys.path.insert(0, str(CLIENT_DIR))
 
-M_ROWS = 10800
-N_BITS = 64800
-K_INFO = 54000
-PARITY_COLS = 10800          # 自然顺序：列 0..10799 是校验位，10800..64799 是信息位
-
-
-def load_pchk(path: Path):
-    """返回 (行→列地址 数组列表)。"""
-    raw = np.fromfile(path, dtype="<i4")
-    if int(raw[0]) != 0x5080:
-        raise ValueError(f"pchk 魔数不符: {hex(int(raw[0]))}")
-    m, n = int(raw[1]), int(raw[2])
-    if (m, n) != (M_ROWS, N_BITS):
-        raise ValueError(f"pchk 尺寸不符: {m}×{n}")
-
-    rows, cur = [], []
-    for v in raw[3:]:
-        if v < 0:
-            rows.append(cur)
-            cur = []
-        else:
-            cur.append(int(v))
-    rows.append(cur)
-    rows = rows[1:]                       # 首个标记前的空段
-
-    out = []
-    for seg in rows:
-        cols = [v - 1 for v in seg if v > 0]   # 1-based → 0-based，丢弃填充 0
-        if any(c < 0 or c >= N_BITS for c in cols):
-            raise ValueError("pchk 列地址越界")
-        out.append(np.array(cols, dtype=np.int64))
-    if len(out) != M_ROWS:
-        raise ValueError(f"行数 {len(out)} != {M_ROWS}")
-    return out
-
-
-def load_permutation(path: Path) -> np.ndarray:
-    perm = np.fromfile(path, dtype="<u4").astype(np.int64)
-    if perm.size != N_BITS or len(np.unique(perm)) != N_BITS:
-        raise ValueError("permutation 表不是 64800 的排列")
-    return perm
-
-
-def deinterleave(rx: np.ndarray, perm: np.ndarray) -> np.ndarray:
-    """接收流 → 自然码字顺序（校验位在前）。"""
-    natural = np.empty_like(rx)
-    natural[perm] = rx
-    return natural
-
-
-def hard_decode(natural: np.ndarray, rows, max_iter: int = 50,
-                verbose: bool = False) -> tuple[np.ndarray, int, int]:
-    """对硬判决比特做 min-sum 置信传播（LLR 域，2-min 近似），全 numpy 向量化。
-
-    简单多数翻转在 DVB-S2 的度 2 校验列上会振荡（实测 60 轮不收敛）；
-    min-sum 是硬判决 LDPC 的标准做法，几十个错误一两轮即收敛。
-    返回 (码字, 起始失败校验数, 迭代轮数)。
-    """
-    W = max(len(r) for r in rows)              # 行重上限（本矩阵 23）
-    M = len(rows)
-    # 行主序矩阵（不足补 dummy，列号 0 但消息权重恒 0）
-    C = np.zeros((M, W), dtype=np.int64)
-    valid = np.zeros((M, W), dtype=bool)
-    for j, r in enumerate(rows):
-        C[j, : len(r)] = r
-        valid[j, : len(r)] = True
-
-    llr0 = np.where(natural == 1, 3.0, -3.0)   # BSC 硬判决初始置信
-    llr = llr0.copy()
-
-    def synd(yv):
-        ym = yv[C]
-        ym[~valid] = 0
-        return ym.sum(axis=1) & 1
-
-    y = natural.copy()
-    s0 = int(synd(y).sum())
-    if s0 == 0:
-        return y, 0, 0
-
-    BIG = 1e9
-    for it in range(1, max_iter + 1):
-        A = np.abs(llr)[C]                     # |LLR| 矩阵
-        A[~valid] = BIG
-        sgn = np.sign(llr)[C]
-        sgn[~valid] = 1.0
-        row_sgn = np.prod(sgn, axis=1)
-
-        srt = np.sort(A, axis=1)
-        min1, min2 = srt[:, 0], srt[:, 1]
-        eq = (A == min1[:, None])              # 等于行最小（并列取首个）
-        prev = np.zeros_like(eq)
-        prev[:, 1:] = np.cumsum(eq.astype(np.int8), axis=1)[:, :-1]
-        first = eq & (prev == 0)
-
-        msg = row_sgn[:, None] * sgn * np.where(first, min2[:, None], min1[:, None])
-        msg[~valid] = 0.0
-        llr = llr0 + np.bincount(C.ravel(), weights=msg.ravel(),
-                                 minlength=N_BITS)
-
-        y = (llr > 0).astype(np.int64)
-        s = int(synd(y).sum())
-        if verbose:
-            print(f"  iter {it}: 剩余失败校验 {s}")
-        if s == 0:
-            return y.astype(np.uint8), s0, it
-
-    raise RuntimeError(f"LDPC 译码未收敛（{max_iter} 轮后仍有 {s} 个失败校验）")
-
-
-def bits_to_jpeg_bytes(bits: np.ndarray) -> bytes:
-    """54,000 bit → 字节（MSB-first），再按 JPEG 的 FFD9 结束标记截断。"""
-    pad = (-bits.size) % 8
-    b = np.concatenate([bits, np.zeros(pad, dtype=np.uint8)])
-    vals = b.reshape(-1, 8) @ np.array([128, 64, 32, 16, 8, 4, 2, 1], dtype=np.uint16)
-    data = vals.astype(np.uint8).tobytes()
-    eoi = data.rfind(b"\xff\xd9")
-    return data if eoi < 0 else data[: eoi + 2]
+from native_ldpc import (  # noqa: E402
+    PARITY_COLS,
+    bits_to_jpeg_bytes,
+    decode_file as decode_native_file,
+    deinterleave,
+    hard_decode,
+    load_pchk,
+    load_permutation,
+)
 
 
 def decode_file(rx_path: Path, pchk: Path = None, perm_path: Path = None):
-    pchk = pchk or (RES / "dvb_s2_r5_6.pchk")
-    perm_path = perm_path or (RES / "permutation64800")
-
-    text = "".join(c for c in rx_path.read_text(encoding="utf-8") if c in "01")
-    if len(text) != N_BITS:
-        raise ValueError(f"输入应为 {N_BITS} bit，实得 {len(text)}")
-    rx = np.frombuffer(text.encode(), dtype=np.uint8) - ord("0")
-
-    rows = load_pchk(pchk)
-    perm = load_permutation(perm_path)
-    natural = deinterleave(rx, perm)
-    codeword, synd0, iters = hard_decode(natural, rows)
-    info = codeword[PARITY_COLS:]
-    return info, codeword, synd0, iters
+    return decode_native_file(
+        rx_path,
+        pchk or (RES / "dvb_s2_r5_6.pchk"),
+        perm_path or (RES / "permutation64800"),
+    )
 
 
 # ---------------------------------------------------------------- 自检

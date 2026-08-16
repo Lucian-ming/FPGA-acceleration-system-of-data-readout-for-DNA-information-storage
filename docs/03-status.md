@@ -468,6 +468,29 @@ DUT 会在进入该状态之前就把它消费掉（`if (BVALID && BREADY)` 分�
 经 `rg` 确认 `validate_ddr_addresses()` 与 `analyze_decoder_output()` 无调用后删除，保留实际使用的
 `validate_decoder_written_beats()`。
 
+### ~~C9 上位机静默截断/补齐协议输入~~ ✅ 已修复（2026-08-16，R2）
+
+`first.py` 原来把超过 81,000 bit 的水印静默截到 81,000 bit，读段生成数不符也只打印 WARN；
+`ClientConfig.resolve_total()` 还会把超上限数量静默压到 `MAX_TOTAL_READS`。现在水印只读一次并由
+`TaskSpec.watermark_bits` 严格校验，非 0/1 字符、位数不符、读段文件提前结束、非法 batch/limit
+和超容量全部抛出可诊断异常。
+
+### ~~C10 上位机协议/任务配置散落在 first.py~~ ✅ 已重构（2026-08-16，R2）
+
+新增 `clients/python/task_protocol.py`（`TaskSpec`/`TaskCaps`、几何、CONFIG CRC）与
+`clients/python/protocol.py`（包编解码、ACK、CAPS/CONFIG）；`first.py` 只保留文件编码与会话编排，
+GUI 继续只调用其公共入口。`PKT_RESULT` 同时新增 8,100 B 精确长度校验，`--no-post` 不再继续等待结果。
+
+### ~~C11 GUI LDPC 路径仍强制 Windows EXE~~ ✅ 已修复（2026-08-16，R2）
+
+新增 `clients/python/native_ldpc.py` 承接 P5 的可审计核心；`ldpc_pipeline.py` 的 `auto`/`native`
+均使用原生实现，只有显式 `external` 才启动 EXE，且 DLL 缺失会在启动前报错。`tools/ldpc_decode.py`
+与 GUI 共用同一核心，避免两份算法漂移。
+
+**判据**：12 项 Python 单测通过；`bash tools/run_sim.sh` 通过 9 项、失败 0 项；
+真实 `ldpc_pipeline(auto)` 对 `tests/golden/dec_input.txt` 5 轮收敛，输出 54,000 bit，JPEG SHA-256
+为 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
+
 ---
 
 ## 已验证的构建结果（2026-08-08，Vivado/Vitis 2022.2，WSL `/tools/Xilinx`）

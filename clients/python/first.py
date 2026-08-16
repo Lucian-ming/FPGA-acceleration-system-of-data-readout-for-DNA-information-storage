@@ -7,11 +7,46 @@ from __future__ import annotations
 import argparse
 import socket
 import struct
-import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from typing import Callable, Iterable, Optional, Sequence
+
+from protocol import (
+    HDR_FMT,
+    HDR_SZ,
+    MAGIC,
+    NetStats,
+    PKT_BATCH,
+    PKT_BATCH_OK,
+    PKT_CAPS,
+    PKT_CAPS_INFO,
+    PKT_CONFIG,
+    PKT_CONFIG_OK,
+    PKT_ERROR,
+    PKT_POST,
+    PKT_RESULT,
+    PKT_WM,
+    PKT_WM_OK,
+    expect_ack,
+    make_header,
+    make_packet,
+    query_caps,
+    recv_ack_byte,
+    recv_exact,
+    recv_packet,
+    send_config,
+    sendall_count,
+)
+from task_protocol import (
+    FRAME_READS,
+    MAX_TOTAL_READS,
+    READ_BASES,
+    TASK_NUM_LC,
+    TASK_PROTO_VERSION,
+    TaskSpec,
+    build_config_payload,
+)
 
 # ============================================================================
 # 基础常量
@@ -26,42 +61,12 @@ DEFAULT_OUTPUT_FILE = "dec_input.txt"
 
 DEFAULT_FORMAT = "auto"
 
-MAGIC = 0xBEEF
-HDR_FMT = ">HBBI"
-HDR_SZ = struct.calcsize(HDR_FMT)
-
-PKT_CONFIG = 0x05           # 【P3】任务配置，必须在 WM/BATCH/POST 之前
-PKT_CAPS = 0x06             # 【P3】查询板端能力
-PKT_WM = 0x01
-PKT_BATCH = 0x02
-PKT_POST = 0x03
-PKT_RESULT = 0x04
-PKT_WM_OK = 0x11
-PKT_BATCH_OK = 0x12
-PKT_CONFIG_OK = 0x15        # 【P3】带包头，4B 状态码
-PKT_CAPS_INFO = 0x16        # 【P3】带包头，24B 能力描述
-PKT_ERROR = 0xEE
-
-# 【P3】任务配置（docs/05-interfaces.md 1.1~1.3）
-TASK_PROTO_VERSION = 1
-TASK_NUM_LC = 50            # 与比特流综合参数一致（换档位需重新综合）
-CONFIG_REJECT_REASONS = {
-    1: "协议版本不支持", 2: "read_bps 不被支持", 3: "几何与比特流不符",
-    4: "symbols 契约不满足", 5: "total_reads 非法", 6: "score_min 超范围",
-    7: "CRC32 不符", 8: "重复 CONFIG", 9: "顺序非法",
-}
-
 READ_SIZE_BYTES = 40
-READ_BASES = 150            # 当前比特流只支持 150 bp；换档位需重新综合
 DEFAULT_TOTAL_READS = 2_048  # 实测约 1,080 条即可完整还原，2,048 留足余量
-MAX_TOTAL_READS = 107_968   # 板端容量内最大的 64 对齐条数（108000 不是 64 的倍数）
 DEFAULT_BATCH_SIZE = 1_000
-RESULT_BYTES = 8 * 1024
+RESULT_BYTES = 8_100
 MAX_WATERMARK = 10_128
 WM_ALIGN = 8
-
-# srpe_batch 固定每批 64 条，发送总量必须是它的整数倍，否则尾批会饿死（C2）
-FRAME_READS = 64
 
 BASE2BITS = {
     "A": "00",
@@ -92,28 +97,6 @@ def reverse_complement(seq: str) -> str:
 
 class OperationCancelled(RuntimeError):
     """Raised when a stop event or user cancellation is detected."""
-
-
-class NetStats:
-    """Keep track of upload/download metrics for reporting."""
-
-    def __init__(self) -> None:
-        self.upload = 0
-        self.download = 0
-        self.t_wm = 0.0
-        self.t_batches = 0.0
-        self.t_result = 0.0
-        self.t_total = 0.0
-        self.batches = 0
-
-    @property
-    def total_bytes(self) -> int:
-        return self.upload + self.download
-
-    def mbps(self, bytes_: int, seconds: float) -> float:
-        if seconds <= 0:
-            return 0.0
-        return (bytes_ * 8) / seconds / 1e6
 
 
 @dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
@@ -153,14 +136,26 @@ class ClientConfig:
         「声明条数 == 实发条数」，此处必须算对：
           --total-reads N → 恰好 N 条；--limit N → 至多 N 条。
         """
+        if detected <= 0:
+            raise ValueError("读段文件中没有完整记录")
         resolved = detected if self.total is None else self.total
         if self.total is not None and self.total <= 0:
             raise ValueError("--total-reads must be positive")
-        if self.send_limit and self.send_limit > 0:
+        if self.total is not None and self.total > detected:
+            raise ValueError(
+                f"--total-reads={self.total} 超过文件内实际读段数 {detected}"
+            )
+        if self.send_limit is not None and self.send_limit <= 0:
+            raise ValueError("--limit must be positive")
+        if self.send_limit is not None:
             resolved = min(resolved, self.send_limit)
-        resolved = min(resolved, MAX_TOTAL_READS)
         if resolved < 1:
             raise ValueError("Resolved read count must be >= 1")
+        if resolved > MAX_TOTAL_READS:
+            raise ValueError(
+                f"源读段数量 {resolved} 超过客户端上限 {MAX_TOTAL_READS}，"
+                "请显式使用 --limit"
+            )
         return resolved
 
 
@@ -309,6 +304,8 @@ def iter_reads(
     （docs/06-implementation-plan.md P1）。这是必需的：测序数据里约一半读段
     是反向互补的，不发的话即使用满全部读段也无法译码。
     """
+    if orient not in {"both", "forward"}:
+        raise ValueError(f"未知 orient={orient!r}")
     for seq in iter_source_seqs(path, limit, format_type):
         yield seq_to_40B(seq)
         if orient == "both":
@@ -329,8 +326,16 @@ def iter_read_batches(
     orient: str = "both",
 ) -> Iterable[bytes]:
     """产出 PKT_BATCH 的负载块；不足 send_total 的部分补零读段。"""
+    if source_reads <= 0 or send_total <= 0:
+        raise ValueError("source_reads 与 send_total 必须为正数")
+    if batch_size <= 0:
+        raise ValueError("batch_size 必须为正数")
+    if send_total % FRAME_READS:
+        raise ValueError(f"send_total 必须为 {FRAME_READS} 的整数倍")
+
     batch: list = []
     count = 0
+    expected_real = min(source_reads * (2 if orient == "both" else 1), send_total)
 
     def flush():
         header = struct.pack(">I", len(batch))
@@ -345,6 +350,11 @@ def iter_read_batches(
             yield flush()
             batch.clear()
 
+    if count != expected_real:
+        raise ValueError(
+            f"读段文件提前结束：预期生成 {expected_real} 条有效方向记录，实得 {count} 条"
+        )
+
     # 补零到 64 的整数倍（这些补零读段的比对分接近 0，会被板端阈值丢掉）
     while count < send_total:
         batch.append(b"\x00" * READ_SIZE_BYTES)
@@ -357,113 +367,37 @@ def iter_read_batches(
         yield flush()
 
     if count != send_total:
-        print(f"[WARN] 预期发送 {send_total} 条读段, 实际生成 {count} 条")
-
-
-# ============================================================================
-# 网络传输
-# ============================================================================
-def sendall_count(stats: NetStats, sock: socket.socket, data: bytes) -> None:
-    sock.sendall(data)
-    stats.upload += len(data)
-
-
-def make_header(pkt_type: int, payload_len: int) -> bytes:
-    return struct.pack(HDR_FMT, MAGIC, pkt_type, 0, payload_len)
-
-
-def make_packet(pkt_type: int, payload: bytes = b"") -> bytes:
-    return make_header(pkt_type, len(payload)) + (payload or b"")
-
-
-def recv_exact(sock: socket.socket, n: int, stats: NetStats, timeout: float = 60.0) -> bytes:
-    sock.settimeout(timeout)
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("Connection closed while receiving")
-        buf.extend(chunk)
-        stats.download += len(chunk)
-    return bytes(buf)
-
-
-def recv_packet(sock: socket.socket, stats: NetStats, timeout: float = 60.0) -> tuple[int, bytes]:
-    header = recv_exact(sock, HDR_SZ, stats, timeout=timeout)
-    magic, pkt_type, _rsv, length = struct.unpack(HDR_FMT, header)
-    if magic != MAGIC:
-        raise ValueError(f"Unexpected magic value: 0x{magic:04X}")
-    payload = b""
-    if length > 0:
-        payload = recv_exact(sock, length, stats, timeout=timeout)
-    return pkt_type, payload
-
-
-def recv_ack_byte(sock: socket.socket, stats: NetStats, expected: int, timeout: float = 10.0) -> bool:
-    ack = recv_exact(sock, 1, stats, timeout=timeout)
-    return ack[0] == expected
-
-
-# ============================================================================
-# 【P3】任务配置：CAPS 查询 + CONFIG 下发（docs/05-interfaces.md 1.1~1.3）
-# ============================================================================
-def query_caps(sock: socket.socket, stats: NetStats) -> dict:
-    """查询板端能力；板端不实现该协议时给出明确报错。"""
-    sendall_count(stats, sock, make_packet(PKT_CAPS, b""))
-    pkt_type, payload = recv_packet(sock, stats, timeout=30.0)
-    if pkt_type != PKT_CAPS_INFO or len(payload) != 24:
-        raise RuntimeError(
-            f"板端未按 P3 协议应答 PKT_CAPS（得到 0x{pkt_type:02X}/{len(payload)}B）。"
-            "请确认固件是 2026-08-16 之后构建的 ELF")
-    version, read_bps, _rsv, num_lc, stride, max_symbols, max_reads, features = \
-        struct.unpack(">BBHIIIII", payload)
-    return {"version": version, "read_bps": read_bps, "num_lc": num_lc,
-            "stride": stride, "max_symbols": max_symbols,
-            "max_reads": max_reads, "features": features}
-
-
-def build_config_payload(*, read_bps: int, num_lc: int, stride: int,
-                         symbols: int, total_reads: int, score_min: int) -> bytes:
-    """44B PKT_CONFIG 负载：40B 描述 + CRC-32/IEEE（与 zlib.crc32 一致）。"""
-    body = struct.pack(">BBHIIIII", TASK_PROTO_VERSION, read_bps, 0,
-                       num_lc, stride, symbols, total_reads, score_min) + b"\x00" * 16
-    return body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-
-
-def send_config(sock: socket.socket, stats: NetStats,
-                *, read_bps: int, num_lc: int, stride: int, symbols: int,
-                total_reads: int, score_min: int,
-                log: Optional[Callable[[str], None]] = None) -> None:
-    """下发任务配置；板端严格拒绝（非 0 状态码）时抛错。"""
-    payload = build_config_payload(read_bps=read_bps, num_lc=num_lc, stride=stride,
-                                   symbols=symbols, total_reads=total_reads,
-                                   score_min=score_min)
-    sendall_count(stats, sock, make_packet(PKT_CONFIG, payload))
-    pkt_type, resp = recv_packet(sock, stats, timeout=30.0)
-    if pkt_type != PKT_CONFIG_OK or len(resp) != 4:
-        raise RuntimeError(f"板端未按 P3 协议应答 PKT_CONFIG（得到 0x{pkt_type:02X}）")
-    code = struct.unpack(">I", resp)[0]
-    if code != 0:
-        raise RuntimeError(f"PKT_CONFIG 被拒绝（码 {code}）："
-                           f"{CONFIG_REJECT_REASONS.get(code, '未知')}")
-    log_info(log, f"[INFO] CONFIG 接受：L={symbols} ({num_lc}×{stride}+{read_bps}), "
-                  f"reads={total_reads}, score_min={score_min}")
+        raise RuntimeError(f"预期生成 {send_total} 条读段，实际生成 {count} 条")
 
 
 # ============================================================================
 # 业务流程
 # ============================================================================
-def send_watermark(sock: socket.socket, wm_file: Path, stats: NetStats) -> int:
-    """Encode watermark file and push to the board."""
-    text = wm_file.read_text(encoding="utf-8")
-    filtered = "".join(ch for ch in text if ch in "01")
-    if len(filtered) > 81_000:
-        filtered = filtered[:81_000]
+def parse_watermark_text(text: str) -> str:
+    """只接受 0/1 与空白，返回去除空白后的逻辑位流。"""
+    invalid = {char for char in text if char not in "01 \t\r\n"}
+    if invalid:
+        sample = "".join(sorted(invalid))[:16]
+        raise ValueError(f"水印含非 0/1/空白字符: {sample!r}")
+    bits = "".join(char for char in text if char in "01")
+    if not bits:
+        raise ValueError("水印不含任何 0/1 bit")
+    return bits
+
+
+def load_watermark_bits(path: Path) -> str:
+    return parse_watermark_text(path.read_text(encoding="utf-8"))
+
+
+def pack_watermark_bits(bits: str, task: TaskSpec) -> bytes:
+    if len(bits) != task.watermark_bits:
+        raise ValueError(
+            f"水印位数必须严格等于任务声明 {task.watermark_bits}，实得 {len(bits)}"
+        )
 
     # 与读段一致：码流顺序 + 字节内 LSB-first（docs/02-data-contract.md）。
-    # 原实现是 MSB-first，与 RTL / PS 的取位方式对不上。
-    payload = bytearray((len(filtered) + 7) // 8)
-    for idx, ch in enumerate(filtered):
+    payload = bytearray((len(bits) + 7) // 8)
+    for idx, ch in enumerate(bits):
         if ch == "1":
             payload[idx >> 3] |= 1 << (idx & 7)
 
@@ -473,10 +407,20 @@ def send_watermark(sock: socket.socket, wm_file: Path, stats: NetStats) -> int:
 
     if len(payload) > MAX_WATERMARK:
         raise ValueError(f"Watermark payload too large: {len(payload)} bytes > {MAX_WATERMARK} bytes")
+    return bytes(payload)
 
-    sendall_count(stats, sock, make_packet(PKT_WM, bytes(payload)))
-    if not recv_ack_byte(sock, stats, PKT_WM_OK, timeout=120.0):
-        raise RuntimeError("Watermark ACK failed")
+
+def send_watermark(
+    sock: socket.socket,
+    watermark_bits: str,
+    stats: NetStats,
+    task: TaskSpec,
+) -> int:
+    """编码并发送已读取的水印位流。"""
+    payload = pack_watermark_bits(watermark_bits, task)
+
+    sendall_count(stats, sock, make_packet(PKT_WM, payload))
+    expect_ack(sock, stats, PKT_WM_OK, operation="水印上传", timeout=120.0)
     return len(payload)
 
 
@@ -505,8 +449,8 @@ def send_batches(
         sendall_count(stats, sock, make_packet(PKT_BATCH, payload))
         stats.batches += 1
 
-        if not recv_ack_byte(sock, stats, PKT_BATCH_OK):
-            raise RuntimeError(f"Batch #{batch_index} ACK failed")
+        expect_ack(sock, stats, PKT_BATCH_OK,
+                   operation=f"读段批次 #{batch_index}")
 
         batch_reads = (len(payload) - 4) // READ_SIZE_BYTES
         total_sent += batch_reads
@@ -533,6 +477,10 @@ def recv_result(
     pkt_type, payload = recv_packet(sock, stats, timeout=timeout)
     if pkt_type != PKT_RESULT:
         raise RuntimeError(f"Expected PKT_RESULT (0x04), got 0x{pkt_type:02X}")
+    if len(payload) != RESULT_BYTES:
+        raise RuntimeError(
+            f"PKT_RESULT 长度应为 {RESULT_BYTES} B，实得 {len(payload)} B"
+        )
 
     bit_string = "".join("01"[(payload[idx // 8] >> (idx % 8)) & 1] for idx in range(len(payload) * 8))
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -561,11 +509,15 @@ def run_client(
 
     if not reads_path.exists():
         raise FileNotFoundError(f"Reads file does not exist: {reads_path}")
-    if not config.skip_wm and not watermark_path.exists():
+    if not watermark_path.exists():
         raise FileNotFoundError(f"Watermark file does not exist: {watermark_path}")
+    if config.skip_wm and config.post:
+        raise ValueError("--skip-watermark 只能与 --no-post 一起用于协议调试")
 
     info = analyze_reads_file(reads_path, config.format)
-    source_reads = config.resolve_total(info.total_reads if info.total_reads else DEFAULT_TOTAL_READS)
+    source_reads = config.resolve_total(info.total_reads)
+    if config.batch <= 0:
+        raise ValueError("--batch must be positive")
     per_read = 2 if config.orient == "both" else 1
     send_total = round_up_frames(source_reads * per_read)
     if send_total > MAX_TOTAL_READS:
@@ -573,31 +525,20 @@ def run_client(
             f"发送量 {send_total} 条超过板端上限 {MAX_TOTAL_READS}"
             f"（源读段 {source_reads} 条 × {per_read} 个方向，向上取整到 {FRAME_READS} 的倍数）")
 
-    # 【P3】从水印文件推导任务几何（数据契约：L = NUM_LC×STRIDE + READ_BPS）
-    wm_bits = sum(1 for ch in watermark_path.read_text(encoding="utf-8") if ch in "01")
-    if wm_bits == 0 or wm_bits % 2:
-        raise ValueError(f"水印文件 {watermark_path} 的 0/1 位数异常：{wm_bits}")
-    symbols = wm_bits // 2
-    read_bps = READ_BASES
-    if symbols <= read_bps:
-        raise ValueError(f"水印符号数 {symbols} ≤ 读段长度 {read_bps}，无法推导几何")
-    stride = (symbols - read_bps) // TASK_NUM_LC
-    if TASK_NUM_LC * stride + read_bps != symbols:
-        raise ValueError(
-            f"水印符号数 {symbols} 不满足契约 L={TASK_NUM_LC}×STRIDE+{read_bps}"
-            f"（STRIDE={stride} 有余数）——换档位需重新综合比特流")
-    if config.score_min > 1023:
-        raise ValueError(f"score_min={config.score_min} 超过比对分 10 bit 上限 1023")
+    # 水印只读取一次；同一份 bit 字符串同时驱动 TaskSpec 与实际上传。
+    watermark_bits = load_watermark_bits(watermark_path)
+    task = TaskSpec.from_watermark_bits(
+        len(watermark_bits),
+        total_reads=send_total,
+        score_min=config.score_min,
+    )
 
     if config.dry_run:
-        payload = build_config_payload(read_bps=read_bps, num_lc=TASK_NUM_LC,
-                                       stride=stride, symbols=symbols,
-                                       total_reads=send_total,
-                                       score_min=config.score_min)
+        payload = task.config_payload()
         print("[dry-run] 将下发 PKT_CONFIG(0x05) 44B：")
-        print(f"  version={TASK_PROTO_VERSION} read_bps={read_bps} "
-              f"num_lc={TASK_NUM_LC} stride={stride} symbols={symbols}")
-        print(f"  total_reads={send_total} score_min={config.score_min}")
+        print(f"  version={task.version} read_bps={task.read_bps} "
+              f"num_lc={task.num_lc} stride={task.stride} symbols={task.symbols}")
+        print(f"  total_reads={task.total_reads} score_min={task.score_min}")
         print(f"  payload hex = {payload.hex()}")
         return stats
 
@@ -619,19 +560,11 @@ def run_client(
 
         # 【P3】先查能力再下发配置（严格拒绝模式：不匹配直接失败）
         caps = query_caps(sock, stats)
-        log_info(log, f"[CAPS] v{caps['version']} read_bps={caps['read_bps']} "
-                      f"num_lc={caps['num_lc']} stride={caps['stride']} "
-                      f"max_reads={caps['max_reads']} features=0x{caps['features']:X}")
-        if caps["read_bps"] != read_bps:
-            raise ValueError(f"板端只支持 {caps['read_bps']}bp，本任务需要 {read_bps}bp")
-        if caps["num_lc"] != TASK_NUM_LC or caps["stride"] != stride:
-            raise ValueError(f"板端几何 {caps['num_lc']}×{caps['stride']} 与任务 "
-                             f"{TASK_NUM_LC}×{stride} 不符")
-        if send_total > caps["max_reads"]:
-            raise ValueError(f"发送量 {send_total} 超过板端容量 {caps['max_reads']}")
-        send_config(sock, stats, read_bps=read_bps, num_lc=TASK_NUM_LC,
-                    stride=stride, symbols=symbols, total_reads=send_total,
-                    score_min=config.score_min, log=log)
+        log_info(log, f"[CAPS] v{caps.version} read_bps={caps.read_bps} "
+                      f"num_lc={caps.num_lc} stride={caps.stride} "
+                      f"max_reads={caps.max_reads} features=0x{caps.features:X}")
+        task.validate_caps(caps)
+        send_config(sock, stats, task, log=log)
 
         if config.skip_wm:
             log_info(log, "[1/4] Skipping watermark upload (user request)")
@@ -640,7 +573,7 @@ def run_client(
                 raise OperationCancelled("Operation cancelled")
             progress.set_status("上传水印...")
             t0 = perf_counter()
-            wm_size = send_watermark(sock, watermark_path, stats)
+            wm_size = send_watermark(sock, watermark_bits, stats, task)
             stats.t_wm = perf_counter() - t0
             log_info(
                 log,
@@ -682,6 +615,10 @@ def run_client(
             progress.set_status("发送POST命令...")
             progress.set_stage("POST")
             send_post(sock, stats)
+        else:
+            stats.t_total = perf_counter() - t_start
+            progress.set_status("上传完成（未触发 POST）")
+            return stats
 
         if stop_requested():
             raise OperationCancelled("Operation cancelled")
@@ -780,7 +717,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     stats = run_client(config, log=lambda msg: print(msg))
     print(format_metric_report(stats))
-    print(f"\n结果已保存到: {Path(config.out).resolve()}")
+    if not config.dry_run:
+        print(f"\n结果已保存到: {Path(config.out).resolve()}")
 
 
 if __name__ == "__main__":

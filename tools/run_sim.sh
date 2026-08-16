@@ -89,6 +89,14 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
         FAIL=$((FAIL+1))
     fi
 
+    printf '\n=== client_core（上位机任务模型/协议/批处理单元测试）===\n'
+    if python3 -m unittest discover -s clients/python/tests -p 'test_*.py' \
+       | sed 's/^/  /'; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+
     printf '\n=== ldpc_decode（P5 纯 Python 硬判决译码，黄金数据自检）===\n'
     if python3 tools/ldpc_decode.py verify | sed 's/^/  /'; then
         PASS=$((PASS+1))

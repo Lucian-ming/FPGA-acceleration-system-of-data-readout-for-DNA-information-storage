@@ -20,7 +20,7 @@
 | 批次 | 范围 | 计划 | 判据 | 提交 / 回退 |
 | --- | --- | --- | --- | --- |
 | R1 | PS 协议与 Voter 控制 | 已完成：修复失败 ACK、分帧原子发送、超大 payload 恢复；合并 Voter 配置；清理死函数 | `run_sim.sh` 8/8；xsct ELF 941,888 B | `80f53b9` / `git revert 80f53b9` |
-| R2 | 上位机 | 提取 TaskSpec/协议纯函数；严格水印校验；修正错误应答；LDPC 原生回退 | Python 单测/`--dry-run`/host 回归 | 待提交 |
+| R2 | 上位机 | 已完成：提取 TaskSpec/协议模块；严格水印/读段/结果校验；LDPC 默认原生 | 12 项单测；全量 9/9；dry-run/auto LDPC 通过 | 提交后回填 |
 | R3 | PL | 审查三个 IP；删除不影响接口的死寄存器；标记遗留死 RTL；统一乱码注释；必要 bug 用黄金 TB 钉死 | RTL 全量回归 + Voter 综合 | 待提交 |
 | R4 | 文档与收尾 | 同步 03/05/06/09/README；全量回归、ELF、综合复跑 | 全绿 | 待提交 |
 
@@ -59,8 +59,6 @@
    本批先做低风险函数解耦和死代码清理；跨文件拆分（`protocol.c/pipeline_*.c`）需要调整
    Vitis 导入/全局状态边界，留到 helper 行为稳定后再分批，避免一次性扩大回归面。
 
-## R2 / R3
-
 ### R1 验证
 
 - `bash tools/run_sim.sh`：通过 8 项，失败 0 项。
@@ -68,4 +66,33 @@
   `dna_lwip_app.elf` 941,888 B，text 144,519 / data 3,148 / bss 3,266,624。
 - `git diff --check`：通过。
 
-R2 / R3 在 R1 提交后继续补充。
+## R2 上位机模块化与严格校验（实现完成，待提交）
+
+### 行为修复
+
+1. 水印不再 `[:81000]` 静默截断；只读取一次，位数必须等于 `TaskSpec.watermark_bits`。
+2. 读段文件提前结束、非法 batch/limit、超容量全部抛错；`iter_read_batches()` 不再只打印 WARN。
+3. 裸 ACK 收到 `PKT_ERROR` 时报告具体操作；`PKT_RESULT` 必须精确为 8,100 B。
+4. `--no-post` 上传结束后直接返回，不再等待一个不会到来的结果。
+5. LDPC `auto` 固定选择 native；`external` 仅显式调用，DLL 缺失提前失败。
+
+### 模块边界
+
+- `task_protocol.py`：`TaskSpec` / `TaskCaps` / CONFIG CRC。
+- `protocol.py`：TCP 包、ACK、CAPS/CONFIG 与网络统计。
+- `native_ldpc.py`：GUI 与 `tools/ldpc_decode.py` 共用的译码核心。
+- `first.py`：文件编码和会话编排；`gui_app.py` 继续只依赖公共入口。
+
+### R2 验证
+
+- Python `unittest`：12 项通过。
+- `bash tools/run_sim.sh`：通过 9 项，失败 0 项。
+- R0.83 `--dry-run`：CONFIG CRC `0xD5BC6633`。
+- `ldpc_pipeline(auto)`：5 轮收敛、54,000 bit，JPEG SHA-256 `fcd0cf90...b6b1f2c3`。
+- `py_compile` / `git diff --check`：通过。
+- 当前系统未安装 `tkinter`，GUI 窗口未做运行时启动；`gui_app.py` 已通过 `py_compile`，
+  其调用的 `run_client()` / `run_ldpc_decoder(auto)` 已由上述单元与集成判据覆盖。
+
+## R3
+
+待 R2 提交后继续补充。

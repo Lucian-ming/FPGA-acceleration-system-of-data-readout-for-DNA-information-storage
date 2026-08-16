@@ -5,11 +5,11 @@
 #   pip install -r clients/python/requirements.txt
 #
 # 说明：
-#   - numpy  : 读段编码、反向互补、比对与投票
+#   - numpy  : 原生 DVB-S2 LDPC 译码及向量运算
 #   - Pillow : gui_app.py 显示 LDPC 译码出的图像
-#   - LDPC 解码器本身是随仓库交付的 Windows 可执行文件
-#     （clients/python/resources/R5_6_LDPC_hard_decoder.exe），
-#      不通过 pip 安装；它依赖同目录下的三个 MinGW 运行时 DLL。
+#   - GUI/auto 默认使用 native_ldpc.py，不依赖 Windows EXE。
+#   - 只有显式 backend=external 时才调用 resources 下的 EXE；
+#     此时三个 MinGW 运行时 DLL 必须齐全，否则会在启动前明确报错。
 
 numpy>=1.21
 Pillow>=9.0
