@@ -26,7 +26,9 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 - ✅ C1~C4 完成：PS 按实际条数配置 Voter、DDR 布局主机单测、协议层 64 倍数校验、
   二次任务清零累加器；修改后的 Voter 重新综合在 100 MHz 收敛（WNS +2.48 ns），
   ELF 已用 xsct 重建。
-- ⚠️ 运行时任务配置（P3）、板级构建一键复现（A3）和板上端到端验证未完成。
+- ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
+  推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
+- ⚠️ 板级构建一键复现（A3）和板上端到端验证未完成（P3 的板端握手联调也待上板）。
 - ✅ LDPC 有纯 Python 参考实现（`tools/ldpc_decode.py`，Linux 可跑）：黄金自检
   88 bit 错误 5 轮收敛、重建 JPEG 与原图逐字节相同（Windows EXE 保留给 GUI）。
 
@@ -107,7 +109,7 @@ xsct sw/scripts/create_vitis.tcl
 详细实施计划见 [`docs/06-implementation-plan.md`](docs/06-implementation-plan.md)，
 方向性说明见 [`docs/04-roadmap.md`](docs/04-roadmap.md)。一句话版本：
 **除上板本身外，全部离线任务已于 2026-08-16 完成**（D1/D2 方案B、C1~C4、
-A2/A6/A8/A9、P5 纯 Python LDPC）。下一步只有一条主路径：
+A2/A6/A8/A9、P5 纯 Python LDPC、P3 任务配置化）。下一步只有一条主路径：
 用修复后的 RTL 重新生成比特流（历史 XSA 里的 Voter 是 B13~B16 修复之前的版本，
 **直接烧旧比特流必错**）→ 烧板 → 2,048 条读段双向发送 → 真实回传 →
 `python3 tools/ldpc_decode.py decode` → 图片 SHA-256 必须等于 `fcd0cf90...b6b1f2c3`。

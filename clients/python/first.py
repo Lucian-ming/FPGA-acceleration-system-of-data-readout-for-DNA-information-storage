@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import socket
 import struct
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
@@ -29,18 +30,31 @@ MAGIC = 0xBEEF
 HDR_FMT = ">HBBI"
 HDR_SZ = struct.calcsize(HDR_FMT)
 
+PKT_CONFIG = 0x05           # 【P3】任务配置，必须在 WM/BATCH/POST 之前
+PKT_CAPS = 0x06             # 【P3】查询板端能力
 PKT_WM = 0x01
 PKT_BATCH = 0x02
 PKT_POST = 0x03
 PKT_RESULT = 0x04
 PKT_WM_OK = 0x11
 PKT_BATCH_OK = 0x12
+PKT_CONFIG_OK = 0x15        # 【P3】带包头，4B 状态码
+PKT_CAPS_INFO = 0x16        # 【P3】带包头，24B 能力描述
 PKT_ERROR = 0xEE
+
+# 【P3】任务配置（docs/05-interfaces.md 1.1~1.3）
+TASK_PROTO_VERSION = 1
+TASK_NUM_LC = 50            # 与比特流综合参数一致（换档位需重新综合）
+CONFIG_REJECT_REASONS = {
+    1: "协议版本不支持", 2: "read_bps 不被支持", 3: "几何与比特流不符",
+    4: "symbols 契约不满足", 5: "total_reads 非法", 6: "score_min 超范围",
+    7: "CRC32 不符", 8: "重复 CONFIG", 9: "顺序非法",
+}
 
 READ_SIZE_BYTES = 40
 READ_BASES = 150            # 当前比特流只支持 150 bp；换档位需重新综合
 DEFAULT_TOTAL_READS = 2_048  # 实测约 1,080 条即可完整还原，2,048 留足余量
-MAX_TOTAL_READS = 108_000
+MAX_TOTAL_READS = 107_968   # 板端容量内最大的 64 对齐条数（108000 不是 64 的倍数）
 DEFAULT_BATCH_SIZE = 1_000
 RESULT_BYTES = 8 * 1024
 MAX_WATERMARK = 10_128
@@ -127,15 +141,24 @@ class ClientConfig:
     orient: str = "both"        # both = 每条读段发正向+反向互补（必需，见 D1）
     post: bool = True
     format: str = DEFAULT_FORMAT
+    score_min: int = 67         # 【P3】经 PKT_CONFIG 下发；67=int(0.45×150)，与黄金向量一致
+    dry_run: bool = False       # 【P3】只打印将下发的配置，不连接板端
 
     def resolve_total(self, detected: int) -> int:
-        """Return number of reads to send after applying limits."""
-        candidates = [detected]
-        if self.total and self.total > 0:
-            candidates.append(self.total)
+        """Return number of source reads to send.
+
+        【P3 修正】原实现 `min(max(candidates))` 把 --total-reads 和 --limit
+        都当成了「抬底」，--limit 2048 在 51,781 条的文件上会取 51,781——
+        与帮助文本「最多发送多少条」相反。现在 PKT_CONFIG 会校验
+        「声明条数 == 实发条数」，此处必须算对：
+          --total-reads N → 恰好 N 条；--limit N → 至多 N 条。
+        """
+        resolved = detected if self.total is None else self.total
+        if self.total is not None and self.total <= 0:
+            raise ValueError("--total-reads must be positive")
         if self.send_limit and self.send_limit > 0:
-            candidates.append(self.send_limit)
-        resolved = min(max(candidates), MAX_TOTAL_READS)
+            resolved = min(resolved, self.send_limit)
+        resolved = min(resolved, MAX_TOTAL_READS)
         if resolved < 1:
             raise ValueError("Resolved read count must be >= 1")
         return resolved
@@ -382,6 +405,52 @@ def recv_ack_byte(sock: socket.socket, stats: NetStats, expected: int, timeout: 
 
 
 # ============================================================================
+# 【P3】任务配置：CAPS 查询 + CONFIG 下发（docs/05-interfaces.md 1.1~1.3）
+# ============================================================================
+def query_caps(sock: socket.socket, stats: NetStats) -> dict:
+    """查询板端能力；板端不实现该协议时给出明确报错。"""
+    sendall_count(stats, sock, make_packet(PKT_CAPS, b""))
+    pkt_type, payload = recv_packet(sock, stats, timeout=30.0)
+    if pkt_type != PKT_CAPS_INFO or len(payload) != 24:
+        raise RuntimeError(
+            f"板端未按 P3 协议应答 PKT_CAPS（得到 0x{pkt_type:02X}/{len(payload)}B）。"
+            "请确认固件是 2026-08-16 之后构建的 ELF")
+    version, read_bps, _rsv, num_lc, stride, max_symbols, max_reads, features = \
+        struct.unpack(">BBHIIIII", payload)
+    return {"version": version, "read_bps": read_bps, "num_lc": num_lc,
+            "stride": stride, "max_symbols": max_symbols,
+            "max_reads": max_reads, "features": features}
+
+
+def build_config_payload(*, read_bps: int, num_lc: int, stride: int,
+                         symbols: int, total_reads: int, score_min: int) -> bytes:
+    """44B PKT_CONFIG 负载：40B 描述 + CRC-32/IEEE（与 zlib.crc32 一致）。"""
+    body = struct.pack(">BBHIIIII", TASK_PROTO_VERSION, read_bps, 0,
+                       num_lc, stride, symbols, total_reads, score_min) + b"\x00" * 16
+    return body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+
+def send_config(sock: socket.socket, stats: NetStats,
+                *, read_bps: int, num_lc: int, stride: int, symbols: int,
+                total_reads: int, score_min: int,
+                log: Optional[Callable[[str], None]] = None) -> None:
+    """下发任务配置；板端严格拒绝（非 0 状态码）时抛错。"""
+    payload = build_config_payload(read_bps=read_bps, num_lc=num_lc, stride=stride,
+                                   symbols=symbols, total_reads=total_reads,
+                                   score_min=score_min)
+    sendall_count(stats, sock, make_packet(PKT_CONFIG, payload))
+    pkt_type, resp = recv_packet(sock, stats, timeout=30.0)
+    if pkt_type != PKT_CONFIG_OK or len(resp) != 4:
+        raise RuntimeError(f"板端未按 P3 协议应答 PKT_CONFIG（得到 0x{pkt_type:02X}）")
+    code = struct.unpack(">I", resp)[0]
+    if code != 0:
+        raise RuntimeError(f"PKT_CONFIG 被拒绝（码 {code}）："
+                           f"{CONFIG_REJECT_REASONS.get(code, '未知')}")
+    log_info(log, f"[INFO] CONFIG 接受：L={symbols} ({num_lc}×{stride}+{read_bps}), "
+                  f"reads={total_reads}, score_min={score_min}")
+
+
+# ============================================================================
 # 业务流程
 # ============================================================================
 def send_watermark(sock: socket.socket, wm_file: Path, stats: NetStats) -> int:
@@ -504,6 +573,34 @@ def run_client(
             f"发送量 {send_total} 条超过板端上限 {MAX_TOTAL_READS}"
             f"（源读段 {source_reads} 条 × {per_read} 个方向，向上取整到 {FRAME_READS} 的倍数）")
 
+    # 【P3】从水印文件推导任务几何（数据契约：L = NUM_LC×STRIDE + READ_BPS）
+    wm_bits = sum(1 for ch in watermark_path.read_text(encoding="utf-8") if ch in "01")
+    if wm_bits == 0 or wm_bits % 2:
+        raise ValueError(f"水印文件 {watermark_path} 的 0/1 位数异常：{wm_bits}")
+    symbols = wm_bits // 2
+    read_bps = READ_BASES
+    if symbols <= read_bps:
+        raise ValueError(f"水印符号数 {symbols} ≤ 读段长度 {read_bps}，无法推导几何")
+    stride = (symbols - read_bps) // TASK_NUM_LC
+    if TASK_NUM_LC * stride + read_bps != symbols:
+        raise ValueError(
+            f"水印符号数 {symbols} 不满足契约 L={TASK_NUM_LC}×STRIDE+{read_bps}"
+            f"（STRIDE={stride} 有余数）——换档位需重新综合比特流")
+    if config.score_min > 1023:
+        raise ValueError(f"score_min={config.score_min} 超过比对分 10 bit 上限 1023")
+
+    if config.dry_run:
+        payload = build_config_payload(read_bps=read_bps, num_lc=TASK_NUM_LC,
+                                       stride=stride, symbols=symbols,
+                                       total_reads=send_total,
+                                       score_min=config.score_min)
+        print("[dry-run] 将下发 PKT_CONFIG(0x05) 44B：")
+        print(f"  version={TASK_PROTO_VERSION} read_bps={read_bps} "
+              f"num_lc={TASK_NUM_LC} stride={stride} symbols={symbols}")
+        print(f"  total_reads={send_total} score_min={config.score_min}")
+        print(f"  payload hex = {payload.hex()}")
+        return stats
+
     progress = progress or ProgressCallbacks()
 
     log_info(log, f"[INFO] Connecting to {config.ip}:{config.port}")
@@ -519,6 +616,22 @@ def run_client(
 
     with socket.create_connection((config.ip, config.port)) as sock:
         t_start = perf_counter()
+
+        # 【P3】先查能力再下发配置（严格拒绝模式：不匹配直接失败）
+        caps = query_caps(sock, stats)
+        log_info(log, f"[CAPS] v{caps['version']} read_bps={caps['read_bps']} "
+                      f"num_lc={caps['num_lc']} stride={caps['stride']} "
+                      f"max_reads={caps['max_reads']} features=0x{caps['features']:X}")
+        if caps["read_bps"] != read_bps:
+            raise ValueError(f"板端只支持 {caps['read_bps']}bp，本任务需要 {read_bps}bp")
+        if caps["num_lc"] != TASK_NUM_LC or caps["stride"] != stride:
+            raise ValueError(f"板端几何 {caps['num_lc']}×{caps['stride']} 与任务 "
+                             f"{TASK_NUM_LC}×{stride} 不符")
+        if send_total > caps["max_reads"]:
+            raise ValueError(f"发送量 {send_total} 超过板端容量 {caps['max_reads']}")
+        send_config(sock, stats, read_bps=read_bps, num_lc=TASK_NUM_LC,
+                    stride=stride, symbols=symbols, total_reads=send_total,
+                    score_min=config.score_min, log=log)
 
         if config.skip_wm:
             log_info(log, "[1/4] Skipping watermark upload (user request)")
@@ -637,6 +750,10 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--orient", choices=["both", "forward"], default="both",
                         help="both=每条读段发正向+反向互补（默认，必需）；forward=只发正向（仅作对照实验）")
     parser.add_argument("--skip-watermark", action="store_true", help="跳过水印发送")
+    parser.add_argument("--score-min", type=int, default=67,
+                        help="PKT_CONFIG 下发的比对分阈值（默认 67=int(0.45×150)，与黄金向量一致）")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="只打印将下发的 PKT_CONFIG 内容，不连接板端")
     parser.add_argument("--no-post", action="store_true", help="不发送POST触发命令")
     return parser.parse_args(argv)
 
@@ -657,6 +774,8 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         orient=args.orient,
         post=not args.no_post,
         format=args.format,
+        score_min=args.score_min,
+        dry_run=args.dry_run,
     )
 
     stats = run_client(config, log=lambda msg: print(msg))

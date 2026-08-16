@@ -15,7 +15,8 @@ PS 侧：按实际条数运行（C1~C3）、SCORE_MIN=67 已写入并回读校�
 
 **唯一剩余主路径：用修复后的 RTL 重新生成比特流 → 烧板 → 真实回传 → LDPC → 图片哈希 = `fcd0cf90...b6b1f2c3`（G3）。**
 次要遗留：A3（bd.tcl 未固化 PS7 板级配置——需要板卡的具体 DDR/MIO 参数或从历史 XSA 反推）、
-A6/A7（LDPC EXE 仍在但已有 Linux 替代；LICENSE 需要用户选择）、P3 任务配置化、P7 Stage1 架构改造。
+A7（LICENSE 需要用户选择许可证类型与权属确认）、P7 Stage1 架构改造。
+P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线部分，见 changelog。
 
 **已完成（时间线）**：
 - 2026-08-07 · Stage3：B5、B6 修复；B7/B8/B9 通过重写控制层解决，最苛刻从机条件下逐位通过。
@@ -31,6 +32,11 @@ A6/A7（LDPC EXE 仍在但已有 Linux 替代；LICENSE 需要用户选择）、
   **A2/A8/A9**：build.tcl 修路径/IP 仓库/XDC，top.xdc 与 collect_info.tcl 落盘，
   tb_dna_quick 真正驱动 AXI-Lite；**P5**：纯 Python min-sum LDPC 译码器黄金自检通过。
   Voter（D1 版）重新综合收敛；ELF 用 xsct 重建（920,472 B）。
+- 2026-08-16 傍晚 · **P3 任务配置化（离线部分）**：协议 PKT_CONFIG(0x05,44B+CRC32)/
+  PKT_CAPS(0x06→0x16,24B) 落地（严格拒绝、强制 CONFIG、v1 只支持 SE150 三项决策）；
+  `sw/app/task_config.h` 解析/校验/CRC 主机单测全过（黄金 CRC 与 zlib 交叉验证）；
+  `first.py` 自动推导几何并下发（`--dry-run` 可预览，顺带修正 `resolve_total` 把
+  `--limit` 当抬底的既有 bug）；ELF 重建（943,120 B）。板端握手联调待上板。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到
@@ -465,6 +471,7 @@ ELF     : sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf  (917,780 B)
 2026-08-16 下午复跑：C1~C3/D1 的全部 PS 改动（实际条数、SCORE_MIN、ddr_layout、
 协议校验）重建 ELF 成功——`dna_lwip_app.elf` 920,472 B，
 text 140,603 / data 3,116 / bss 3,266,624。
+2026-08-16 傍晚（P3 后）：`dna_lwip_app.elf` 943,120 B。
 
 ---
 

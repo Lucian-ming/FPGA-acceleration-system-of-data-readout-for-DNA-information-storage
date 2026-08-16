@@ -21,25 +21,86 @@
 
 | type | 名称 | 方向 | 负载 |
 | --- | --- | --- | --- |
+| 0x05 | `PKT_CONFIG` | PC→板 | 44 B 任务描述（见 1.1 节；**必须在 WM/BATCH/POST 之前**） |
+| 0x06 | `PKT_CAPS` | PC→板 | 空，查询板端能力 |
 | 0x01 | `PKT_WM` | PC→板 | 打包水印：逻辑有效载荷 10,125 B；当前客户端按 8 B 对齐发送 10,128 B，PS 上限 10,240 B |
 | 0x02 | `PKT_BATCH` | PC→板 | `u32 BE` 本批条数 + 条数 × 40 B 读段 |
 | 0x03 | `PKT_POST` | PC→板 | 空，触发流水线 |
 | 0x04 | `PKT_RESULT` | 板→PC | 8,100 B 码字 |
+| 0x15 | `CONFIG_OK` | 板→PC | **带包头**，4 B 状态码（0=接受，非 0=拒绝码，见 1.2 节） |
+| 0x16 | `CAPS_INFO` | 板→PC | **带包头**，24 B 能力描述（见 1.3 节） |
 | 0x11 / 0x12 | `WM_OK` / `BATCH_OK` | 板→PC | **裸 1 字节，无包头** |
-| 0xEE | `PKT_ERROR` | 板→PC | 错误 |
+| 0xEE | `PKT_ERROR` | 板→PC | 裸 1 字节：包头级错误（magic/长度/类型未知/顺序非法） |
 
-> ⚠️ ACK 是裸字节而 RESULT 带包头，这种不对称已经固化在两端，改协议时要成对修改。
-> 目前包头里没有任何任务配置（水印长度、读段数、读段碱基数），这正是
-> `docs/04-roadmap.md` P2 要补的东西。
+> ⚠️ ACK（0x11/0x12/0xEE）是裸字节而 RESULT/CONFIG_OK/CAPS_INFO 带包头，这种不对称已经固化在两端，改协议时要成对修改。
+
+### 1.1 PKT_CONFIG（0x05，PC→板，44 B，2026-08-16 新增 · P3）
+
+任务参数在发数据前显式声明（G1/G2 语义）。**强制**：未收到合法 CONFIG 前，
+板端对 WM/BATCH/POST 一律回 `PKT_ERROR`（决策：无兼容模式）；
+校验失败**严格拒绝**（决策），状态码经 `CONFIG_OK(0x15)` 非 0 值返回。
+
+| payload 偏移 | 字段 | 类型 | 约束（v1） |
+| --- | --- | --- | --- |
+| 0 | `version` | u8 | =1 |
+| 1 | `read_bps` | u8 | 必须等于比特流值 150（SE250 留给 P7） |
+| 2 | `reserved` | u16 | 0 |
+| 4 | `num_lc` | u32 | 必须等于比特流综合参数 50 |
+| 8 | `stride` | u32 | 必须等于 807 |
+| 12 | `symbols` | u32 | 水印符号数 L，须满足 `symbols = num_lc×stride + read_bps`（当前 40,500） |
+| 16 | `total_reads` | u32 | 本任务条数（含补零尾批）：64 的倍数，≤ `max_reads` |
+| 20 | `score_min` | u32 | ≤ 1023（比对分 10 bit）；0=不过滤 |
+| 24 | `reserved` | u32 | 0 |
+| 28..39 | `reserved` | 12 B | 0（版本化扩展区） |
+| 40 | `crc32` | u32 | CRC-32/IEEE（zlib 兼容，多项式 0xEDB88320，初值/终值 0xFFFFFFFF），覆盖 payload 前 40 B |
+
+数值一律大端（与包头一致）。校验通过后板端把值用于：
+Voter 的 `TOTAL_READS`/`SCORE_MIN`、cache/DDR 范围（`ddr_layout`）、
+Voter/Decoder 的 `OUT_BEATS = ceil(2×symbols/64)`（v1 即 1,266/1,013），
+且 `POST` 时校验实际收到条数 = 声明条数。
+
+### 1.2 CONFIG_OK 状态码（4 B，大端）
+
+| 码 | 含义 |
+| --- | --- |
+| 0 | 接受 |
+| 1 | 协议版本不支持 |
+| 2 | read_bps 不被当前比特流支持 |
+| 3 | 几何不匹配（num_lc/stride/symbols 与比特流不符） |
+| 4 | symbols 违反契约 `num_lc×stride + read_bps` |
+| 5 | total_reads 非法（0 / 非 64 倍数 / 超容量 / DDR 越界） |
+| 6 | score_min > 1023 |
+| 7 | CRC32 不符 |
+| 8 | 重复 CONFIG（本连接已配置） |
+| 9 | 顺序非法（已收到 WM/BATCH 后才发 CONFIG） |
+
+### 1.3 PKT_CAPS（0x06）/ CAPS_INFO（0x16，24 B）
+
+连接后任意时刻可查。如实反映**当前比特流**的能力（决策：第一版只支持 SE150）：
+
+| payload 偏移 | 字段 | 类型 | 当前值 |
+| --- | --- | --- | --- |
+| 0 | `version` | u8 | 1 |
+| 1 | `read_bps` | u8 | 150 |
+| 2 | `reserved` | u16 | 0 |
+| 4 | `num_lc` | u32 | 50 |
+| 8 | `stride` | u32 | 807 |
+| 12 | `max_symbols` | u32 | 40,500（水印 BRAM 几何） |
+| 16 | `max_reads` | u32 | 107,968（容量内最大 64 对齐条数） |
+| 20 | `features` | u32 | bit0=支持 SCORE_MIN 寄存器（=1），其余保留 |
 
 ## 2. 时序
 
 ```
+PC: CAPS ─────────────► 板: CAPS_INFO（24 B，任意时刻可查）
+PC: CONFIG ───────────► 板: 校验 ──► CONFIG_OK(0)（4 B）
 PC: WM  ──────────────► 板: 存入 DDR 水印区 ──► ACK 0x11
 PC: BATCH ×N ─────────► 板: 写 DDR 读段区   ──► ACK 0x12（每批一个）
 PC: POST ─────────────► 板: 展开 50 个水印区域并预载 → Stage1 → Stage2 → PS XOR 水印 → Stage3
 PC: ◄───────────────── 板: PKT_RESULT + 8,100 B
 ```
+
+未 CONFIG 先发 WM/BATCH/POST → `PKT_ERROR`；声明条数与实际收到不符 → `PKT_ERROR`。
 
 ## 3. IP 寄存器
 

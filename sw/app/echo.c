@@ -741,7 +741,8 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         xil_printf("  Input beats:    %u (6 u64 / read)\n\r", VOTER_IN_BEATS);
         xil_printf("  Output beats:   %u (expected)\n\r", VOTER_OUT_BEATS_EXP);
         xil_printf("  Total reads:    %u (actual, C1)\n\r", task_reads);
-        xil_printf("  Score min:      %u (D1 Plan-B)\n\r", (u32)VOTER_SCORE_MIN);
+        const u32 VOTER_SCORE_MIN_CFG = conn->cfg.score_min;   /* 【P3】运行时下发 */
+        xil_printf("  Score min:      %u (from PKT_CONFIG)\n\r", VOTER_SCORE_MIN_CFG);
 
         /* 下发寄存器（关键：OUT_BEATS 用期望拍数） */
         write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR,     VOTER_IN_ADDR);
@@ -749,7 +750,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    VOTER_OUT_ADDR);
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   VOTER_OUT_BEATS_EXP);  // [FIX]
         write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, task_reads);           // [C1]
-        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN);      // [D1/D2]
+        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN_CFG);  // [P3]
         __asm__ volatile("dsb sy"); __asm__ volatile("isb"); usleep(10);
 
         /* 回读寄存器并强校验（包含 OUT_BEATS 一致性） */
@@ -774,7 +775,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             out_addr_rb != VOTER_OUT_ADDR     ||
             out_beats_rb!= VOTER_OUT_BEATS_EXP||
             total_reads_rb != task_reads      ||
-            score_min_rb   != VOTER_SCORE_MIN)
+            score_min_rb   != VOTER_SCORE_MIN_CFG)
         {
             xil_printf("\n\r[ERROR] Voter configuration verification failed!\n\r");
             xil_printf("       OUT_BEATS mismatch will cause DONE guard to stall.\n\r");
@@ -887,7 +888,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR,    voter_out_addr);
         write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS,   voter_out_beats);
         write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, voter_total_reads);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   VOTER_SCORE_MIN);  /* [D1/D2] */
+        write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN,   conn->cfg.score_min);  /* [P3] */
         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
         usleep(10);
         // 验证硬件收到的配置
@@ -909,7 +910,8 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         if (in_addr_rb != voter_in_addr || in_beats_rb != voter_total_reads ||
             out_addr_rb != voter_out_addr || out_beats_rb != VOTER_OUTPUT_BEATS ||
-            total_reads_rb != voter_total_reads || score_min_rb != VOTER_SCORE_MIN) {
+            total_reads_rb != voter_total_reads ||
+            score_min_rb   != conn->cfg.score_min) {
             xil_printf("\n\r[ERROR] Configuration verification failed!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
@@ -1486,6 +1488,122 @@ static int parse_header(u8 *buf, u16 *magic, u8 *pkt_type, u32 *payload_len)
     return 0;
 }
 
+/*============================================================================
+ * 【P3】任务配置化：PKT_CONFIG / PKT_CAPS（docs/05-interfaces.md 1.1~1.3）
+ * 语义：严格拒绝（无降级）、强制 CONFIG（WM/BATCH/POST 前必须配置）、
+ *       v1 只支持 SE150。校验逻辑在 sw/app/task_config.h（主机可测）。
+ *============================================================================*/
+
+/* 当前比特流的能力（如实反映综合参数） */
+static task_caps_t board_caps(void)
+{
+    task_caps_t c;
+    memset(&c, 0, sizeof c);
+    c.version     = 1;
+    c.read_bps    = READ_BASES_PER_READ;
+    c.num_lc      = WM_NUM_LC;
+    c.stride      = WM_STRIDE;
+    c.max_symbols = WM_SYMBOLS;
+    c.max_reads   = TASK_MAX_READS;
+    c.features    = 1u;              /* bit0：SCORE_MIN 寄存器可用 */
+    return c;
+}
+
+/* 发送一个带 8B 包头的小包（CONFIG_OK / CAPS_INFO），语义与 send_result 一致 */
+static void send_framed_pkt(struct tcp_pcb *tpcb, u8 type,
+                             const u8 *payload, u32 len)
+{
+    u8 hdr[PROTOCOL_HDR_SIZE];
+    hdr[0] = (PROTOCOL_MAGIC >> 8) & 0xFF;
+    hdr[1] = PROTOCOL_MAGIC & 0xFF;
+    hdr[2] = type;
+    hdr[3] = 0;
+    hdr[4] = (len >> 24) & 0xFF; hdr[5] = (len >> 16) & 0xFF;
+    hdr[6] = (len >> 8) & 0xFF;  hdr[7] = len & 0xFF;
+
+    for (int attempt = 0; attempt < 100; attempt++) {
+        err_t e1 = tcp_write(tpcb, hdr, sizeof hdr, TCP_WRITE_FLAG_COPY);
+        err_t e2 = (e1 == ERR_OK)
+                   ? tcp_write(tpcb, payload, len, TCP_WRITE_FLAG_COPY)
+                   : e1;
+        if (e1 == ERR_OK && e2 == ERR_OK) {
+            tcp_output(tpcb);
+            return;
+        }
+        if (e1 != ERR_OK && e1 != ERR_MEM) { tcp_output(tpcb); return; }
+        if (e2 != ERR_OK && e2 != ERR_MEM) { tcp_output(tpcb); return; }
+        tcp_output(tpcb);
+        keep_tcp_alive();
+        usleep(1000);
+    }
+    xil_printf("[PKT] send_framed_pkt(%02X) giving up\n\r", type);
+}
+
+void process_caps(dna_connection_t *conn)
+{
+    task_caps_t caps = board_caps();
+    u8 payload[TASK_CAPS_INFO_LEN];
+    task_caps_serialize(&caps, payload);
+    xil_printf("[CAPS] version=%u read_bps=%u num_lc=%u stride=%u "
+               "max_symbols=%u max_reads=%u features=%u\n\r",
+               (u32)caps.version, (u32)caps.read_bps, caps.num_lc, caps.stride,
+               caps.max_symbols, caps.max_reads, caps.features);
+    if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CAPS_INFO, payload, sizeof payload);
+}
+
+void process_config(dna_connection_t *conn, u8 *data, u32 len)
+{
+    u8 ok[4];
+
+    if (len != TASK_CONFIG_PAYLOAD_LEN) {
+        xil_printf("[CONFIG] ERROR: payload %u != %u\n\r",
+                   len, (u32)TASK_CONFIG_PAYLOAD_LEN);
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
+
+    if (conn->configured) {                    /* 拒绝码 8：重复配置 */
+        xil_printf("[CONFIG] rejected: already configured\n\r");
+        wr_u32_be(ok, 8u);
+        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        return;
+    }
+    if (conn->watermark_size != 0u || conn->total_reads_received != 0u) {
+        wr_u32_be(ok, 9u);                      /* 拒绝码 9：顺序非法 */
+        xil_printf("[CONFIG] rejected: data already received\n\r");
+        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        return;
+    }
+
+    task_caps_t caps = board_caps();
+    task_config_t cfg;
+    int rc = task_config_parse(data, &caps, FRAME_READS,
+                               DDR_READS_BASE, DDR_DNA_ACC_OUT_BASE,
+                               DDR_DNA_ACC_OUT_BASE, DDR_VOTER_OUT_BASE,
+                               READ_SIZE_BYTES, DNA_ACC_RESULT_PACKED_BYTES,
+                               &cfg);
+    if (rc != 0) {                              /* 严格拒绝：1..7 */
+        static const char *why[] = {
+            "", "version", "read_bps", "geometry", "symbols contract",
+            "total_reads", "score_min", "CRC32"
+        };
+        xil_printf("[CONFIG] rejected (%d): %s\n\r", rc,
+                   (rc >= 1 && rc <= 7) ? why[rc] : "?");
+        wr_u32_be(ok, (u32)rc);
+        if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+        return;
+    }
+
+    conn->cfg = cfg;
+    conn->configured = 1;
+    xil_printf("[CONFIG] accepted: v%u %ubp L=%u (%ux%u) reads=%u score_min=%u\n\r",
+               (u32)cfg.version, (u32)cfg.read_bps, cfg.symbols,
+               cfg.num_lc, cfg.stride, cfg.total_reads, cfg.score_min);
+    wr_u32_be(ok, 0u);
+    if (conn->tpcb) send_framed_pkt(conn->tpcb, PKT_CONFIG_OK, ok, sizeof ok);
+}
+
+
 static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32 total_len)
 {
     u16 magic; u8 pkt_type; u32 payload_len;
@@ -1503,6 +1621,9 @@ static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32
     u8 *payload = packet_data + PROTOCOL_HDR_SIZE;
 
     switch (pkt_type) {
+    /* 【P3】CONFIG/CAPS 自己发带包头的应答，不走裸 ACK */
+    case PKT_CONFIG: process_config(conn, payload, payload_len); break;
+    case PKT_CAPS:   process_caps(conn); break;
     case PKT_WM:   process_watermark(conn, payload, payload_len); send_ack_byte(conn->tpcb, PKT_WM_OK); break;
     case PKT_BATCH:process_batch(conn, payload, payload_len);     send_ack_byte(conn->tpcb, PKT_BATCH_OK); break;
     case PKT_POST: process_post(conn); break;
@@ -1623,6 +1744,12 @@ int start_application(void)
  *============================================================================*/
 void process_watermark(dna_connection_t *conn, u8 *data, u32 len)
 {
+    /* 【P3】强制 CONFIG：未配置直接拒绝 */
+    if (!conn->configured) {
+        xil_printf("[WM] rejected: no PKT_CONFIG on this connection\n\r");
+        conn->watermark_size = 0;
+        return;
+    }
     /* 【修订 B1】原实现是 `if (len > MAX) len = MAX;` —— 静默截断。
        MAX 当时还是 10120，比 81,000 bit 所需的 10,125 B 还小，
        尾部 40 bit 直接被丢掉，而上位机完全无从得知。 */
@@ -1724,15 +1851,27 @@ int apply_watermark_differential(void)
 
 void process_batch(dna_connection_t *conn, u8 *data, u32 len)
 {
+    /* 【P3】强制 CONFIG */
+    if (!conn->configured) {
+        xil_printf("[BATCH] rejected: no PKT_CONFIG on this connection\n\r");
+        return;
+    }
     if (len < 4) return;
     u32 num_reads = (data[0]<<24)|(data[1]<<16)|(data[2]<<8)|data[3];
     u32 data_size = num_reads * READ_SIZE_BYTES;
     if (len < 4 + data_size) return;
 
-    /* 【C3】容量防溢出：DDR 只预留了 TOTAL_READS 条的空间 */
+    /* 【C3】容量防溢出：DDR 只预留了 TOTAL_READS 条的空间；
+     * 【P3】也不得超过声明的本任务条数 */
     if (conn->total_reads_received + num_reads > TOTAL_READS) {
         xil_printf("[BATCH] ✗ capacity exceeded: %u + %u > %u\n\r",
                    conn->total_reads_received, num_reads, (u32)TOTAL_READS);
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
+    if (conn->total_reads_received + num_reads > conn->cfg.total_reads) {
+        xil_printf("[BATCH] ✗ exceeds declared total_reads: %u + %u > %u\n\r",
+                   conn->total_reads_received, num_reads, conn->cfg.total_reads);
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
@@ -1743,16 +1882,29 @@ void process_batch(dna_connection_t *conn, u8 *data, u32 len)
     memcpy((void *)dst, data + 4, data_size);
     conn->total_reads_received += num_reads;
 
-    if (conn->total_reads_received >= TOTAL_READS) {
-        xil_printf("[BATCH] Target reached, auto-trigger\n\r");
+    if (conn->total_reads_received >= conn->cfg.total_reads) {
+        xil_printf("[BATCH] Declared target reached, auto-trigger\n\r");
         process_post(conn);
     }
 }
 
 void process_post(dna_connection_t *conn)
 {
+    /* 【P3】强制 CONFIG */
+    if (!conn->configured) {
+        xil_printf("[POST] rejected: no PKT_CONFIG on this connection\n\r");
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
     if (conn->total_reads_received == 0 || conn->watermark_size == 0) {
         xil_printf("[POST] No data\n\r");
+        if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
+        return;
+    }
+    /* 【P3】声明条数与实际收到的必须一致 */
+    if (conn->total_reads_received != conn->cfg.total_reads) {
+        xil_printf("[POST] ✗ count mismatch: declared %u, received %u\n\r",
+                   conn->cfg.total_reads, conn->total_reads_received);
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }

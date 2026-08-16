@@ -27,10 +27,13 @@
 - `sw/workspace/dna_lwip_app/Debug/dna_lwip_app.elf` 已于 2026-08-08 用 Vitis 2022.2 构建
   （注意：该 ELF 早于 B13--B16 修复，但其 PS 侧代码不涉及本次 RTL 改动，仍可作基线）。
 
-尚未完成：动态任务配置（P3）、板级重建（**上板必须用修复后的 RTL 重新综合**）与
+尚未完成：板级重建（**上板必须用修复后的 RTL 重新综合**）与
 “真实板端回传 → LDPC → 图片哈希”验收。D1/D2（SCORE_MIN 方案B）、C1~C4 已于
 2026-08-16 完成并各有离线判据（见 03-status.md）。
 P5（LDPC 软件参考实现）已完成：`tools/ldpc_decode.py` 黄金自检通过。
+P3（任务配置化）离线部分已于 2026-08-16 傍晚完成：PKT_CONFIG/PKT_CAPS 协议 +
+`task_config.h` 主机单测 + `first.py` 下发与 `--dry-run` + ELF 重建；
+板端握手联调随上板进行。PL 几何参数寄存器化（P3 的 G1 深水区）与 P7 绑定，未动。
 
 关键量化结论，后面所有排期都建立在它之上：
 

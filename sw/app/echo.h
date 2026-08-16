@@ -19,17 +19,27 @@
 #include "xil_io.h"
 #include "xil_cache.h"
 #include "ddr_layout.h"   /* 【C2/C3】按实际条数计算/校验 DDR 区间（主机可测） */
+#include "task_config.h"  /* 【P3】PKT_CONFIG 解析/校验/CRC（主机可测） */
+
+/* 【P3】读段碱基数：当前比特流为 SE150 综合参数（SE250 需 P7 换 RTL 参数） */
+#define READ_BASES_PER_READ     150U
+/* 容量内最大的 64 对齐条数：TOTAL_READS=108000 本身不是 64 的倍数 */
+#define TASK_MAX_READS          ((TOTAL_READS / FRAME_READS) * FRAME_READS)
 
 /*=============================================================================
  * 协议定义
  *============================================================================*/
 #define PROTOCOL_MAGIC          0xBEEF
+#define PKT_CONFIG              0x05    /* 【P3】任务配置，必须在 WM/BATCH/POST 前 */
+#define PKT_CAPS                0x06    /* 【P3】查询板端能力 */
 #define PKT_WM                  0x01
 #define PKT_BATCH               0x02
 #define PKT_POST                0x03
 #define PKT_RESULT              0x04
 #define PKT_WM_OK               0x11
 #define PKT_BATCH_OK            0x12
+#define PKT_CONFIG_OK           0x15    /* 【P3】带包头，4B 状态码（0=接受，1..9=拒绝码） */
+#define PKT_CAPS_INFO           0x16    /* 【P3】带包头，24B 能力描述 */
 #define PKT_ERROR               0xEE
 #define PROTOCOL_HDR_SIZE       8
 
@@ -182,10 +192,10 @@
 #define VOTER_REG_TOTAL_READS       0x14U  /* 总读段数 */
 #define VOTER_REG_SCORE_MIN         0x30U  /* 【D1/D2】分数阈值 */
 
-/* 方案B 标定阈值 = int(0.45 × READ_BPS) = 67，与 tests/golden 的
- * stage2_expect.hex（make_golden.py --min-score 0.45）严格一致；
- * docs/04-roadmap.md P1 的 68 是四舍五入口径，噪声底 59~62，两者都在
- * 分离带内，但判据向量按 67 生成，板端必须用同一值。 */
+/* 【P3】推荐阈值默认值（客户端参考）：固件不再固定使用，而是经 PKT_CONFIG
+ * 的 score_min 字段运行时下发。67 = int(0.45 × READ_BPS)，与 tests/golden 的
+ * stage2_expect.hex（make_golden.py --min-score 0.45）严格一致；噪声底 59~62，
+ * 分离带内 67/68 均可，但判据向量按 67 生成。 */
 #define VOTER_SCORE_MIN             67U
 
 /* 为保持代码兼容性，保留旧名称别名 */
@@ -251,6 +261,8 @@ typedef struct {
     app_state_t     state;
     u32             watermark_size;
     u32             total_reads_received;
+    int             configured;      /* 【P3】已收到合法 PKT_CONFIG（每连接一次） */
+    task_config_t   cfg;             /* 【P3】本连接的任务配置 */
 } dna_connection_t;
 
 /*=============================================================================
@@ -276,6 +288,10 @@ int  run_processing_pipeline(dna_connection_t *conn);
 
 /* 网络回调 */
 static err_t poll_callback(void *arg, struct tcp_pcb *tpcb);
+
+/* 【P3】任务配置与能力查询（docs/05-interfaces.md 1.1~1.3 节） */
+void process_config(dna_connection_t *conn, u8 *data, u32 len);
+void process_caps(dna_connection_t *conn);
 
 /* 调试与分析函数 */
 static void analyze_decoder_output(u32 out_addr, u32 total_beats);
