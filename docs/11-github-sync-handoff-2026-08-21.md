@@ -10,8 +10,37 @@
 | `refactor/three-end-audit-20260816` | 本交接提交推送后与远端同名分支对齐 | 当前完整可上板基线，包含三端审查修复、可复现构建和独立启动制品 |
 
 两个分支不是相互冲突的两套历史：`main@81986bc` 是审查分支的祖先。审查分支包含
-`main` 的全部内容，并在其上增加 R1~R5 审查修复、构建制品和本交接记录。上板与后续开发
-应从 `refactor/three-end-audit-20260816` 继续；`main` 保留为较小、稳定的离线基线。
+`main` 的全部内容，并在其上增加 R1~R5 审查修复、构建制品和本交接记录。当前应在
+`refactor/three-end-audit-20260816` 完成剩余核查；核查通过后必须及时合并并推送到
+`main`，后续开发回到 `main`，不得把临时审查分支长期当作事实主线。
+
+## 审查分支定位与合并规则
+
+`refactor/three-end-audit-20260816` 是**针对主分支的临时审查修改分支**，不是与 `main`
+并列维护的长期版本。它用于隔离代码审查中发现的修复、回归证据、构建制品和交接记录。
+
+必须遵守以下闭环：
+
+1. 合并前逐项核对 `main..refactor/three-end-audit-20260816` 的提交和文件差异，确认只包含
+   预期审查修改，没有误带数据、历史归档、缓存或未说明的行为变化。
+2. 运行受影响范围的回归并核对交接文档；硬件构建相关修改还需核对 bitstream/XSA/ELF/
+   BOOT.bin 同源性和 SHA-256。板端 G3 若仍未完成，必须在状态文档中保持明确未验收，
+   不能把“已合并”写成“板端端到端正确”。
+3. 上述审查无未解决问题后，必须及时通过 Pull Request 或 `--ff-only` 合并到 `main`，
+   随即推送 `origin/main`，不得无故长期悬置已验证修改。
+4. 合并后确认 `main...origin/main` 为 `0 0`，并以 `main` 作为后续开发基线。审查分支仅在
+   需要保留追溯窗口时短期保留；删除前再次确认其提交已全部进入 `main`。
+5. 若核查未通过，则不合并，并在 `03-status.md` 或交接文档中写明具体阻塞项、证据和下一判据。
+
+当前分支结构允许在 `main` 未产生新提交时使用快进合并：
+
+```bash
+git fetch --prune origin
+git switch main
+git merge --ff-only refactor/three-end-audit-20260816
+git push origin main
+git rev-list --left-right --count main...origin/main  # 必须为 0 0
+```
 
 ## 本次实际上传
 
@@ -85,8 +114,9 @@ git rev-list --left-right --count \
 
 ## 接手后的唯一主路径
 
-1. 检出 `refactor/three-end-audit-20260816`，先执行 `sha256sum -c SHA256SUMS`。
-2. 使用 `hw/build/export/BOOT.bin` 启动开发板，不得改用两份历史 XSA 对应的旧 bitstream。
+1. 在 `refactor/three-end-audit-20260816` 完成上述审查闭环，核查无误后及时合并并推送 `main`。
+2. 从合并后的 `main` 执行 `(cd hw/build/export && sha256sum -c SHA256SUMS)`，再使用
+   `hw/build/export/BOOT.bin` 启动开发板，不得改用两份历史 XSA 对应的旧 bitstream。
 3. 用 `clients/python/first.py` 完成 CAPS/CONFIG/WM/BATCH/POST 联调并保存真实 FPGA 回传。
 4. 对真实回传执行 `tools/ldpc_decode.py decode`；只有重建图片 SHA-256 等于
    `fcd0cf90bd680e7b...b6b1f2c3`，才可关闭 G3 并宣称端到端正确。
