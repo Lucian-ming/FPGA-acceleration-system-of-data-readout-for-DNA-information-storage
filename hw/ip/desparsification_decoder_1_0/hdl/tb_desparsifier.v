@@ -248,13 +248,19 @@ module tb_desparsifier;
     integer k, b;
     reg [63:0] got, exp, mask;
     integer timeout;
+    reg [8*256-1:0] input_path, expect_path;
+    integer plusarg_result;
 
     initial begin
         s_awvalid=0; s_wvalid=0; s_bready=0; s_arvalid=0; s_rready=1;
         s_awaddr=0; s_wdata=0; s_wstrb=0; s_araddr=0;
 
-        $readmemh("tests/golden/sparse_ideal.hex", mem_in);
-        $readmemh("tests/golden/stage3_ideal_expect.hex", expect);
+        input_path = "tests/golden/sparse_ideal.hex";
+        expect_path = "tests/golden/stage3_ideal_expect.hex";
+        plusarg_result = $value$plusargs("input=%s", input_path);
+        plusarg_result = $value$plusargs("expect=%s", expect_path);
+        $readmemh(input_path, mem_in);
+        $readmemh(expect_path, expect);
         $display("[TB] 已载入激励 %0d 拍 / 期望 %0d 拍", IN_BEATS, OUT_BEATS);
 
         repeat (10) @(posedge clk);

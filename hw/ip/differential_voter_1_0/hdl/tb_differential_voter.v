@@ -27,10 +27,12 @@
 // =============================================================
 `timescale 1ns/1ps
 
-module tb_differential_voter;
+module tb_differential_voter #(
+    parameter integer NUM_RECORDS = 4096,
+    parameter integer RUNS = 3
+);
 
     // 黄金向量由 make_golden.py --limit 2048 生成：2,048 × (正向+反向互补)
-    localparam integer NUM_RECORDS = 4096;
     localparam integer WORDS_PER_REC = 6;             // 每条记录 48 B
     localparam integer IN_WORDS  = NUM_RECORDS * WORDS_PER_REC;
     localparam integer OUT_BEATS = 1266;              // ceil(81000/64)
@@ -226,7 +228,7 @@ module tb_differential_voter;
     localparam integer SCORE_MIN_THR = 67;   // = int(0.45×150)，与 make_golden 一致
 
     integer errors, bit_errors, proto_errors;
-    integer k, b, run, timeout, polls, score_min_run;
+    integer k, b, j, run, timeout, polls, score_min_run, run_limit;
     integer w_count0, wlast0, arlen0;
     reg [63:0] got, exp, mask;
     reg [7:0]  wstrb_got;
@@ -234,6 +236,15 @@ module tb_differential_voter;
 
     reg [63:0] expect_thr  [0:OUT_BEATS-1];  // 阈值版（stage2_expect.hex）
     reg [63:0] exp_work    [0:OUT_BEATS-1];  // 本轮选用的期望
+    reg [8*256-1:0] input_path, expect_path, expect_thr_path;
+    reg [8*256-1:0] dump_stage2_path;
+    integer dump_stage2_en;
+    integer plusarg_result;
+    integer dump_fd;
+
+    // Optional checkpoint export.  The file is emitted from the actual AXI
+    // write memory, never from a golden vector.
+    initial dump_stage2_en = $value$plusargs("dump_stage2=%s", dump_stage2_path);
 
     // 看门狗
     initial begin
@@ -250,9 +261,17 @@ module tb_differential_voter;
         s_awvalid=0; s_wvalid=0; s_bready=0; s_arvalid=0; s_rready=1;
         s_awaddr=0; s_wdata=0; s_wstrb=0; s_araddr=0;
 
-        $readmemh("tests/golden/stage2_in.hex", mem_in);
-        $readmemh("tests/golden/stage2_rtl_expect.hex", expect);
-        $readmemh("tests/golden/stage2_expect.hex", expect_thr);
+        input_path = "tests/golden/stage2_in.hex";
+        expect_path = "tests/golden/stage2_rtl_expect.hex";
+        expect_thr_path = "tests/golden/stage2_expect.hex";
+        run_limit = RUNS;
+        plusarg_result = $value$plusargs("input=%s", input_path);
+        plusarg_result = $value$plusargs("expect=%s", expect_path);
+        plusarg_result = $value$plusargs("expect_thr=%s", expect_thr_path);
+        plusarg_result = $value$plusargs("runs=%d", run_limit);
+        $readmemh(input_path, mem_in);
+        $readmemh(expect_path, expect);
+        $readmemh(expect_thr_path, expect_thr);
         $display("[TB] 已载入激励 %0d 条记录 / 阈值版与无阈值版期望各 %0d 拍",
                  NUM_RECORDS, OUT_BEATS);
 
@@ -261,7 +280,7 @@ module tb_differential_voter;
         repeat (10) @(posedge clk);
 
         errors = 0;
-        for (run = 1; run <= 3; run = run + 1) begin
+        for (run = 1; run <= run_limit; run = run + 1) begin
             // 本轮语义：1/2 轮阈值过滤，第 3 轮复位默认（不过滤）
             if (run <= 2) begin
                 score_min_run = SCORE_MIN_THR;
@@ -376,11 +395,22 @@ module tb_differential_voter;
             end
             if (bit_errors == 0 && errors == 0)
                 $display("[TB] 第 %0d 轮：1,266 拍 / 81,000 bit 与黄金向量逐位相同", run);
+            if (dump_stage2_en && run == run_limit) begin
+                dump_fd = $fopen(dump_stage2_path, "w");
+                if (dump_fd == 0) begin
+                    $display("[TB] ✗ 无法打开 Stage2 checkpoint: %s", dump_stage2_path);
+                    $fatal(1);
+                end
+                for (j = 0; j < OUT_BEATS; j = j + 1)
+                    $fdisplay(dump_fd, "%016h", mem_out[j]);
+                $fclose(dump_fd);
+                $display("[TB] ✓ 已导出实际 Stage2 checkpoint: %s", dump_stage2_path);
+            end
         end
 
         $display("--------------------------------------------------");
         if (errors == 0)
-            $display("[TB] ✓ PASS  阈值(67)两轮 + 无阈值(0)一轮均与黄金向量逐位相同");
+            $display("[TB] ✓ PASS  %0d 轮与黄金向量逐位相同", run_limit);
         else
             $display("[TB] ✗ FAIL  共 %0d 项不符", errors);
         $display("--------------------------------------------------");

@@ -107,10 +107,19 @@ module tb_srpe_batch;
     end
 
     // ---------------- 主流程 ----------------
-    integer fd, i, lc, row, idx, code, dummy;
+    integer fd, i, j, lc, row, idx, code, dummy;
     integer sc_err, pos_err, pos_tie, cw_err;
     reg [CODEBITS-1:0] exp_cw;
     integer timeout;
+    reg [8*256-1:0] dump_stage1_path;
+    integer dump_stage1_en;
+    integer dump_fd;
+    reg [383:0] dump_rec;
+
+    // Optional checkpoint export for a real stage-to-stage regression.  The
+    // default golden test remains unchanged; when requested, this file is
+    // the actual Stage1 result, six LSB-first 64-bit words per record.
+    initial dump_stage1_en = $value$plusargs("dump_stage1=%s", dump_stage1_path);
 
     initial begin
         $readmemh("tests/golden/wm_regions.hex", wm_sym);
@@ -208,6 +217,23 @@ module tb_srpe_batch;
             $fatal(1);
         end
         $display("--------------------------------------------------");
+        if (dump_stage1_en) begin
+            dump_fd = $fopen(dump_stage1_path, "w");
+            if (dump_fd == 0) begin
+                $display("[TB] ✗ 无法打开 Stage1 checkpoint: %s", dump_stage1_path);
+                $fatal(1);
+            end
+            for (i = 0; i < BATCH; i = i + 1) begin
+                dump_rec = {RESULT_W{1'b0}};
+                dump_rec[SCORE_W-1:0] = got_sc[i];
+                dump_rec[SCORE_W+POS_W-1:SCORE_W] = got_pos[i];
+                dump_rec[RESULT_W-1:SCORE_W+POS_W] = got_cw[i];
+                for (j = 0; j < 6; j = j + 1)
+                    $fdisplay(dump_fd, "%016h", dump_rec[j*64 +: 64]);
+            end
+            $fclose(dump_fd);
+            $display("[TB] ✓ 已导出实际 Stage1 checkpoint: %s", dump_stage1_path);
+        end
         $finish;
     end
 
