@@ -16,6 +16,7 @@
 | [10-three-end-audit-2026-08-16.md](10-three-end-audit-2026-08-16.md) | 三端审查、R1/R2/R3 提交与回退记录 | 追踪本轮修复与验证 |
 | [11-github-sync-handoff-2026-08-21.md](11-github-sync-handoff-2026-08-21.md) | 两分支 GitHub 同步、可上板制品与排除项 | 获取代码或准备上板前 |
 | [12-main-handoff-2026-08-21.md](12-main-handoff-2026-08-21.md) | **当前主分支最终交接**：接手顺序、验证、构建、上板和风险 | 新开发者首先阅读 |
+| [13-xsim-simulation-plan.md](13-xsim-simulation-plan.md) | **XSim 高质量仿真提示与计划**：单 IP、三级流水线、Block Design、网表 | 开始完整仿真前 |
 
 ## 参考资料（历史审计结果，只读）
 
@@ -35,6 +36,7 @@
 | `tools/extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC EXE 缺失的 3 个 MinGW 运行时 DLL |
 | `tools/make_golden.py` | 生成各级黄金向量到 `tests/golden/`（RTL Testbench 与端到端回归的判据） |
 | `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL（含 DNA ingress/AXI-Lite、stage1/2/3/host/syntax） |
+| `tools/verify_repo_binding.sh` | 开发前 Git 强制门禁：核对唯一目录、main、origin 和私有仓库推送权限 |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
 | `tools/test_ddr_layout.c` | C2/C3 的主机单元测试：按实际条数校验 DDR 区间（与固件共用 `sw/app/ddr_layout.h`） |

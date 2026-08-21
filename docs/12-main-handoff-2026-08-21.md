@@ -6,7 +6,8 @@
 ## 1. 三十秒结论
 
 - 当前开发基线是 `main`。`refactor/three-end-audit-20260816@ce41269` 的 14 个审查提交已在
-  2026-08-21 经核查后用 `git merge --ff-only` 纳入本地主分支；审查分支仅保留追溯用途。
+  2026-08-21 经核查后用 `git merge --ff-only` 纳入主分支；无额外价值的审查分支随后已在
+  本地和 GitHub 删除，后续只在 `main` 开发。
 - 离线算法、Stage1/Stage2/Stage3 黄金 RTL、PS/主机单测、Python LDPC、完整 Vivado/Vitis
   构建和 Bootgen 制品复现均已通过。
 - **项目仍未完成 G3 板端端到端验收。** 构建成功、GUI 成功、TCP 返回结果、生成图片或程序
@@ -17,6 +18,38 @@
 
 ## 2. Git 与工作区状态
 
+### 2.0 接手前强制 Git 门禁
+
+本项目只允许直接使用 `/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`，并绑定：
+
+```text
+https://github.com/Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage.git
+```
+
+禁止 `git init`、另行 clone 后另建项目或在本目录中创建嵌套仓库。任何 Agent 开始工作前必须运行：
+
+```bash
+cd /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
+bash tools/verify_repo_binding.sh --remote
+```
+
+未通过绝对路径、`main`、`origin/main`、指定远端及 fetch/push 权限检查时，必须立即停止，且不得转去
+其他项目。所有有意义修改都必须提交并立即 `git push origin main`；交接前必须运行
+`bash tools/verify_repo_binding.sh --require-synced`，确认本地没有未推送提交。大型 Vivado/XSim 生成
+目录继续只保存在本机，但可复现脚本、manifest、摘要和交接结论必须提交远端。
+
+私有仓库接手者还必须满足以下条件：
+
+1. 接受 GitHub 仓库邀请；仓库设置中应从 `Pending Invite` 变为已加入的 collaborator。
+2. 账号至少具有 `Write` 权限，并使用 SSH key、HTTPS PAT/Git Credential Manager 或
+   `gh auth login` 完成 GitHub 身份认证；GitHub 账号密码不能直接用于 Git push。
+3. 配置 `git user.name` 和 `git user.email`，然后在现有项目目录运行门禁。禁止为验证权限而
+   新建仓库或新 clone。
+4. 若仓库 ruleset/branch protection 禁止直接推送 `main`，即使已有 `Write` 权限也不能直接推送；
+   仓库所有者必须赋予 bypass 或调整规则，使本项目要求的 `git push origin main` 可以执行。
+5. 第一次工作前必须看到 `git fetch origin` 和 `git push --dry-run origin HEAD:main` 成功；每次
+   提交后实际推送，交接前确认 `main...origin/main` 为 `0 0`。
+
 ### 2.1 分支关系
 
 合并前基线为：
@@ -26,8 +59,9 @@
 | 原 `main` | `81986bc` | Stage2、D1/D2、C1~C4、P3/P5 离线基线 |
 | 审查分支 | `ce41269` | 在原 main 上增加 R1~R5 三端修复、构建制品和交接记录 |
 
-2026-08-21 合并使用 `--ff-only`，没有生成合并提交，没有改写历史，也没有删除审查分支。
-本交接文档提交后，`main` 会比 `ce41269` 再多一个纯文档提交。
+2026-08-21 合并使用 `--ff-only`，没有生成合并提交，也没有改写历史。审查分支确认没有未合并
+价值后已在本地和 GitHub 删除；历史提交仍可从 `main` 追溯。当前只保留 `main` 与
+`origin/main`，不得从旧审查提交另建长期分支。
 
 接手后先执行：
 
@@ -296,6 +330,8 @@ sha256sum /tmp/fpga-decoded.jpg
 - 不得把历史 `hardware.xsa`/`design_2_wrapper.xsa` 用作当前 RTL 的构建证据。
 - 不得把 GUI、EXE 退出码、图片存在或仿真编译通过当正确性判据。
 - 不得在当前项目目录中再套一层 clone/repository；直接使用此 checkout。
+- 不得把本项目复制或 clone 成平行项目继续开发；其他 Agent 必须绑定并直接推送上述 GitHub 仓库。
+- 不得留下仅本地提交；每次提交都必须推送 `origin/main` 并核对 `main...origin/main`。
 - 不得为清理工作区删除 `data/`、`archive/`、`sw/workspace/` 或 Vivado 构建结果。
 - Git 清理前先看 `git status` 和 `.gitignore`；生成目录被忽略是预期状态，不是未提交代码。
 

@@ -12,6 +12,7 @@ hw/build/dna_accel.runs/
 hw/build/dna_accel.srcs/
 hw/build/dna_accel.xpr
 hw/build/reports/
+hw/build/xsim/
 sw/workspace/
 *.jou
 *.log

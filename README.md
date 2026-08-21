@@ -16,6 +16,10 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 接手开发请先读 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)
 和 [`docs/03-status.md`](docs/03-status.md)。
 
+接手者必须直接使用本项目 checkout 并绑定当前 GitHub 私有仓库，禁止另建仓库、平行 clone 或
+嵌套项目。开始开发前先运行 `bash tools/verify_repo_binding.sh --remote`；所有提交必须推送
+`origin/main`，交接前用 `--require-synced` 确认本地与远端同步。
+
 - ✅ **算法链路已在软件上端到端跑通并验证**：原始 FASTQ → 比对 → 投票 → 反稀疏化 → LDPC
   → 还原出的 JPEG 与 `Milk coronet.jpg` 的 SHA-256 完全相同。
 - ✅ **反向互补板端取舍已完成（方案B，离线判据闭环）**：Voter 新增 `SCORE_MIN`(0x30)
@@ -65,6 +69,12 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 ```
 
 ## 🚀 快速开始
+
+### 核验唯一仓库绑定（任何开发前强制执行）
+
+```bash
+bash tools/verify_repo_binding.sh --remote
+```
 
 ### 验证算法契约（不需要板子，1 秒）
 
