@@ -17,7 +17,16 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 > 通过 Vivado Simulator 2022.2 复跑 6 个既有黄金 Testbench：Stage3 数据通路、Stage3 AXI、
 > DNA ingress、DNA AXI-Lite、Stage1 `srpe_batch`、Stage2 `differential_voter`，结果为 **6/6 PASS**。
 > 每例均完成 xvlog → xelab → xsim，显式 PASS 比较通过，日志无 FATAL/ERROR/FAIL。统一入口为
-> `tools/run_xsim.sh`，本次证据目录为 `hw/build/xsim/20260821T165313Z/`。M2～M4 与 G3 仍未完成。
+> `tools/run_xsim.sh`，本次证据目录为 `hw/build/xsim/20260821T165313Z/`。随后复跑仍为 6/6 PASS。
+
+> **M2 快速串联记录（2026-08-22，提交 `e4a895f`）：** `tools/run_m2_quick.sh` 完成
+> `Stage1 实际输出 → Stage2 实际 AXI 读/写 → 独立 PS 等价 XOR → Stage3 实际 AXI 读/写`，
+> 三个 checkpoint 均逐位比较通过。用例使用前 64 条黄金读段；Stage2 为满足既有固定容量 TB，
+> 将其余记录填为 score=0 的显式无效记录，`SCORE_MIN=67` 下不参与投票。Stage2 期望、XOR
+> 期望和 Stage3 期望均由 `tools/m2_chain.py` 从实际上一级输出/水印独立推导，未将
+> `stage2_expect.hex` 或 `stage3_expect.hex` 注入级间数据。证据目录为
+> `hw/build/xsim/m2_quick/20260821T171854Z/`，日志和 checkpoint SHA-256 已写入其
+> `summary.txt`。M2 完整 2,048 条真实串联、故障注入、M3/M4 与 G3 仍未完成。
 
 > **M0 实施记录（2026-08-22）：** 在同一 checkout 中，Icarus 11.0 的 6 个 RTL/AXI 功能用例、
 > 3 个 PS 侧 C 单测和 4 个生产顶层语法检查通过；上位机 `client_core` 与 LDPC 自检未能执行，
