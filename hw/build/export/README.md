@@ -1,6 +1,7 @@
 # 2026-08-16 可上板交付制品
 
-本目录保存与 `refactor/three-end-audit-20260816` 当前 RTL/PS 固件匹配的最小完整交付集。
+本目录保存与 2026-08-21 主分支当前 RTL/PS 固件匹配的最小完整交付集。该实现最初在
+`refactor/three-end-audit-20260816` 完成审查，核查通过后已快进纳入 `main`。
 Vivado/Vitis 缓存和重复平台目录不纳入 Git；这里的独立启动组件来自同一次构建，且按
 `sw/boot/dna_board_20260816.bif` 重新执行 Bootgen 后可逐字节复现 `BOOT.bin`。
 

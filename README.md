@@ -10,9 +10,11 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 
 ---
 
-## ⚠️ 项目状态（截至 2026-08-16）
+## ⚠️ 项目状态（截至 2026-08-21）
 
-**流程能跑通，结果还不正确。** 请在动手前先读 [`docs/03-status.md`](docs/03-status.md)。
+**离线算法、三级 RTL、主机/固件单测和可上板构建均已通过；真实开发板端到端结果尚未验收。**
+接手开发请先读 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)
+和 [`docs/03-status.md`](docs/03-status.md)。
 
 - ✅ **算法链路已在软件上端到端跑通并验证**：原始 FASTQ → 比对 → 投票 → 反稀疏化 → LDPC
   → 还原出的 JPEG 与 `Milk coronet.jpg` 的 SHA-256 完全相同。
@@ -32,7 +34,9 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   尾批超时位宽；全量 `bash tools/run_sim.sh` 11 项通过，DNA/Voter/Desparsifier
   三个顶层 100 MHz 综合通过（DNA WNS `+0.543 ns`、Voter WNS `+2.480 ns`，
   Desparsifier 0 errors / 0 critical warnings）。
-- ⚠️ 板级构建一键复现（A3）和板上端到端验证未完成（P3 的板端握手联调也待上板）。
+- ✅ A3 可上板构建链已关闭：Vivado/Vitis 2022.2 已生成同源 bitstream、XSA、FSBL、
+  应用 ELF 和 BOOT.bin，完整实现 100 MHz 收敛（WNS `+0.145 ns`）；制品和报告已纳入
+  `hw/build/export/`。⚠️ P3 板端握手联调与 G3 真实回传仍待上板。
 - ✅ LDPC 有纯 Python 参考实现（`tools/ldpc_decode.py`，Linux 可跑）：黄金自检
   88 bit 错误 5 轮收敛、重建 JPEG 与原图逐字节相同（Windows EXE 保留给 GUI）。
 
@@ -49,7 +53,7 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 ├─ tools/golden_model.py 黄金参考模型 / 验收基准
 ├─ hw/                   PL 工程
 │  ├─ ip/                三个自研 IP（RTL + IP-XACT 封装）
-│  ├─ constr/            约束（当前为空）
+│  ├─ constr/            顶层时钟与接口约束
 │  └─ scripts/           Vivado 构建 Tcl
 ├─ sw/                   PS 裸机软件
 │  ├─ app/               lwIP + 三级流水线调度（echo.c/echo.h 是核心）
@@ -95,14 +99,14 @@ LDPC 解码器 `resources/R5_6_LDPC_hard_decoder.exe` 只有 Windows 版本。
 ### 硬件与固件构建
 
 ```bash
-vivado -mode batch -source hw/scripts/build.tcl     # ⚠️ 当前脚本依赖当前工作目录，见 docs/03-status.md A2
+vivado -mode batch -source hw/scripts/build.tcl
 xsct sw/scripts/create_vitis.tcl
 ```
 
-`design_2_wrapper.xsa`（与 `hw/build/export/hardware.xsa` 字节相同）是**历史硬件快照**，
-含可用的 bitstream，但尚未被证明能由当前 Tcl 重新生成。
-R3 后 XSCT 已在无效 DISPLAY 的环境下通过自动 Xvfb 重建，ELF 为 941,888 B
-（text 144,519 / data 3,148 / bss 3,266,624）。
+当前可上板构建对在 `hw/build/export/`，先执行
+`(cd hw/build/export && sha256sum -c SHA256SUMS)`。`design_2_wrapper.xsa` 与
+`hw/build/export/hardware.xsa` 是只读历史快照，不得替代当前 `dna_accel.xsa` 和
+`BOOT.bin`。构建细节、哈希和 Bootgen 复现命令见 `hw/build/export/README.md`。
 
 ## 🔧 环境
 
@@ -112,12 +116,10 @@ R3 后 XSCT 已在无效 DISPLAY 的环境下通过自动 Xvfb 重建，ELF 为 
 
 ## 📚 下一步
 
-详细实施计划见 [`docs/06-implementation-plan.md`](docs/06-implementation-plan.md)，
-方向性说明见 [`docs/04-roadmap.md`](docs/04-roadmap.md)。一句话版本：
-**除上板本身外，全部离线任务已于 2026-08-16 完成**（D1/D2 方案B、C1~C4、
-A2/A6/A8/A9、P5 纯 Python LDPC、P3 任务配置化）。下一步只有一条主路径：
-用修复后的 RTL 重新生成比特流（历史 XSA 里的 Voter 是 B13~B16 修复之前的版本，
-**直接烧旧比特流必错**）→ 烧板 → 2,048 条读段双向发送 → 真实回传 →
+最终交接见 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)，
+详细实施计划见 [`docs/06-implementation-plan.md`](docs/06-implementation-plan.md)。下一步只有一条主路径：
+使用 `hw/build/export/BOOT.bin` 烧板（历史 XSA 里的 Voter 是 B13~B16 修复之前的版本，
+**直接烧旧比特流必错**）→ 2,048 条读段双向发送 → 真实回传 →
 `python3 tools/ldpc_decode.py decode` → 图片 SHA-256 必须等于 `fcd0cf90...b6b1f2c3`。
-之后是 P3 任务配置化与 A7 LICENSE（需选择许可证类型）。
+之后再处理 A7 LICENSE 和 P7 Stage1 架构改造。
 调试期只需要传 2,048 条读段（80 KB），不必传全部 51,781 条。

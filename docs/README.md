@@ -12,9 +12,10 @@
 | [05-interfaces.md](05-interfaces.md) | TCP 协议、寄存器、DDR 地址 | 写 PS 固件或上位机 |
 | [07-performance.md](07-performance.md) | CPU/FPGA 性能实测与加速价值分析 | 讨论选型、立项、答辩 |
 | [08-handoff-2026-08-10.md](08-handoff-2026-08-10.md) | 历史快照：Stage1/Stage3 修复与复核 | 追溯 2026-08-06~10 的工作 |
-| [09-handoff-2026-08-16.md](09-handoff-2026-08-16.md) | **当前可交接基线**：Stage2 黄金 TB + 同日完成的 D1/C1~C4/P5 全部离线任务 | 接续开发前 |
+| [09-handoff-2026-08-16.md](09-handoff-2026-08-16.md) | 历史快照：Stage2 黄金 TB + 同日完成的 D1/C1~C4/P5 全部离线任务 | 追溯离线闭环 |
 | [10-three-end-audit-2026-08-16.md](10-three-end-audit-2026-08-16.md) | 三端审查、R1/R2/R3 提交与回退记录 | 追踪本轮修复与验证 |
 | [11-github-sync-handoff-2026-08-21.md](11-github-sync-handoff-2026-08-21.md) | 两分支 GitHub 同步、可上板制品与排除项 | 获取代码或准备上板前 |
+| [12-main-handoff-2026-08-21.md](12-main-handoff-2026-08-21.md) | **当前主分支最终交接**：接手顺序、验证、构建、上板和风险 | 新开发者首先阅读 |
 
 ## 参考资料（历史审计结果，只读）
 

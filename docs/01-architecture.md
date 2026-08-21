@@ -33,8 +33,8 @@ DNA 信息存储的**读出**（readout）环节：把测序仪产出的大量�
 | Stage 3 | `desparsification_decoder` (PL) | 81,000 bit | 64,800 bit | 5b→4b 反稀疏化，还原 LDPC 码字 |
 | Stage 4 | PC 端 EXE | 64,800 bit | 54,000 bit + JPEG | DVB-S2 R=5/6 LDPC 硬判决译码 |
 
-> **实现边界**：B3 已由 `sw/app/echo.c:1113-1121,1685-1701` 接入 PS 状态机，
-> 不是 PL IP；由于 Stage2 尚未用黄金向量验证，不能把这段 XOR 当作端到端已验收。
+> **实现边界**：B3 已由 `sw/app/echo.c` 接入 PS 状态机，不是 PL IP；Stage2 已有黄金
+> 向量逐位判据，但 Stage2.5 的真实 DDR/cache 输入输出和整链仍待上板验收，不能由此宣称 G3 完成。
 
 ---
 
