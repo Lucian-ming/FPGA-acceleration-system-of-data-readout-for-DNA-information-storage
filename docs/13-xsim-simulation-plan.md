@@ -19,6 +19,10 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 > 每例均完成 xvlog → xelab → xsim，显式 PASS 比较通过，日志无 FATAL/ERROR/FAIL。统一入口为
 > `tools/run_xsim.sh`，本次证据目录为 `hw/build/xsim/20260821T165313Z/`。M2～M4 与 G3 仍未完成。
 
+> **M0 实施记录（2026-08-22）：** 在同一 checkout 中，Icarus 11.0 的 6 个 RTL/AXI 功能用例、
+> 3 个 PS 侧 C 单测和 4 个生产顶层语法检查通过；上位机 `client_core` 与 LDPC 自检未能执行，
+> 原因是按项目约定不入 Git 的 `data/R0.83_data/` 当前未挂载，属于输入环境缺口而非 RTL 失败。
+
 ---
 
 ## 一、可直接交给后续 Agent 的执行提示
