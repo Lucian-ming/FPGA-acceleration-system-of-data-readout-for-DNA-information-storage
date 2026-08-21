@@ -1,6 +1,6 @@
 the_ROM_image:
 {
-  [bootloader] sw/workspace/dna_platform_board_20260816/zynq_fsbl/fsbl.elf
-  hw/build/dna_accel.runs/impl_1/top_bd_wrapper.bit
-  sw/workspace/dna_lwip_app_board_20260816/Debug/dna_lwip_app_board_20260816.elf
+  [bootloader] hw/build/export/fsbl.elf
+  hw/build/export/top_bd_wrapper.bit
+  hw/build/export/dna_lwip_app_board_20260816.elf
 }

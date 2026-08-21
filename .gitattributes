@@ -1,0 +1,2 @@
+# Vivado 原始报告包含工具生成的行尾空格；保留原始字节和 SHA-256。
+hw/build/export/reports/*.rpt -whitespace

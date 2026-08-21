@@ -1,0 +1,5 @@
+design : dna_accel
+tool   : 2022.2
+date   : 2026-08-16 18:01:46
+WNS    : 0.145 ns
+        ✓ 以 100 MHz 目标收敛
