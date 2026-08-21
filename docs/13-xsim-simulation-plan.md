@@ -9,9 +9,15 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 4. 对关键路径做综合后/实现后定向仿真；
 5. 保留可审计证据，并明确哪些结论仍必须上板才能得到。
 
-> **交接状态（2026-08-21）：** 本文是待执行计划。本次交接只完成计划、Git 约束和远端同步，
+> **交接状态（2026-08-21）：** 本文最初是待执行计划。本次交接只完成计划、Git 约束和远端同步，
 > 未实施 M0～M4，未新增 XSim Testbench/运行器，也未产生可据此宣称通过的 XSim 结果。
 > 接手者必须先通过下述 Git 绑定门禁，然后从 M0.1 开始逐项执行；不得把计划文本当验证证据。
+
+> **M1 实施记录（2026-08-22）：** 已在 `main@3515b19c8e83a3fe470d799e4fc5b98ede0b8d42`
+> 通过 Vivado Simulator 2022.2 复跑 6 个既有黄金 Testbench：Stage3 数据通路、Stage3 AXI、
+> DNA ingress、DNA AXI-Lite、Stage1 `srpe_batch`、Stage2 `differential_voter`，结果为 **6/6 PASS**。
+> 每例均完成 xvlog → xelab → xsim，显式 PASS 比较通过，日志无 FATAL/ERROR/FAIL。统一入口为
+> `tools/run_xsim.sh`，本次证据目录为 `hw/build/xsim/20260821T165313Z/`。M2～M4 与 G3 仍未完成。
 
 ---
 
