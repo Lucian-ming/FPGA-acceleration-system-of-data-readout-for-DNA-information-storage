@@ -160,6 +160,13 @@ AXI-Lite 控制口遵循 AW/W 独立握手：DNA、Voter、Desparsifier 三个�
 
 ## 4. DDR 布局（`sw/app/echo.h`，按 108,000 条读段预留）
 
+> **实物 DDR（2026-08-29 更正）**：目标 ZYNQ ECO(R6) 板为**单颗 16 bit
+> `MT41J256M16HA-125`，总容量 512 MiB**（不是此前 PS7 配置里的 32 bit 双颗）。
+> 总容量不变，故**下表地址布局无需改动**，最高用到约 294 MiB，远在容量内。
+> 变化的只有 DDR 峰值带宽（约 4.3 GB/s → 约 2.1 GB/s），对本流水线无实质影响。
+> 详见 `docs/16-board-zynq-eco-7010.md`。
+
+
 > 2026-08-16 起，cache flush/invalidate 与 Voter 配置均按**本次任务实际条数**计算
 > （`sw/app/ddr_layout.h`，主机可测，见 `tools/test_ddr_layout.c`）；下表尺寸是
 > 预留容量上限，不是运行时用量。另注意 `TOTAL_READS=108000` 本身不是 64 的倍数

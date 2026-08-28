@@ -27,8 +27,17 @@ create_bd_design "top_bd"
 set ps_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7 ps_0]
 apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config { make_external "FIXED_IO, DDR" } [get_bd_cells ps_0]
 
-# 板级参数来自只读历史硬件快照 design_2_wrapper.xsa（SHA-256 79c64736...e6eb33）
-# 的 design_1.hwh。历史 XSA 未声明 BOARD，不能套用其他开发板 preset。
+# 板级参数来源（2026-08-29 修正）：
+#   - DDR3 以 **ZYNQ ECO（R6）实物** 为准，资料见 docs/board/zynq-eco-7010/。
+#     该板只有一颗 16 bit 的 MT41J256M16HA-125，硬件规格说明书明确写着
+#     「配置 DDR3 必须是 16 位，默认配置 32 位，如果不更改不能运行」。
+#     Vivado 预设中与之同组织、同速率的型号是 MT41J256M16 RE-125（仅 die revision 不同）。
+#   - 其余 PS 外设（GEM0 MIO16..27、MDIO MIO52..53、UART1 MIO48..49、Bank 电压、
+#     FCLK0 100 MHz、晶振 33.3333 MHz）与只读历史快照 design_2_wrapper.xsa
+#     （SHA-256 79c64736...e6eb33）的 design_1.hwh 一致，且经 ECO 资料逐项复核通过。
+#   - ⚠️ 历史 XSA 自身的 DDR 是 32 bit 双颗 MT41J128M16，属于**另一块板**；
+#     它不再是 DDR 配置的依据，禁止据其回退本节。
+#   - 历史 XSA 未声明 BOARD，不能套用其他开发板 preset。
 set_property -dict [list \
   CONFIG.PCW_USE_M_AXI_GP0 {1} \
   CONFIG.PCW_USE_S_AXI_HP0 {1} \
@@ -46,17 +55,17 @@ set_property -dict [list \
   CONFIG.PCW_UART_PERIPHERAL_FREQMHZ {100} \
   CONFIG.PCW_UIPARAM_DDR_ENABLE {1} \
   CONFIG.PCW_UIPARAM_DDR_MEMORY_TYPE {DDR 3} \
-  CONFIG.PCW_UIPARAM_DDR_BUS_WIDTH {32 Bit} \
-  CONFIG.PCW_UIPARAM_DDR_PARTNO {MT41J128M16 HA-125} \
+  CONFIG.PCW_UIPARAM_DDR_BUS_WIDTH {16 Bit} \
+  CONFIG.PCW_UIPARAM_DDR_PARTNO {MT41J256M16 RE-125} \
   CONFIG.PCW_UIPARAM_DDR_DRAM_WIDTH {16 Bits} \
-  CONFIG.PCW_UIPARAM_DDR_DEVICE_CAPACITY {2048 MBits} \
+  CONFIG.PCW_UIPARAM_DDR_DEVICE_CAPACITY {4096 MBits} \
   CONFIG.PCW_UIPARAM_DDR_SPEED_BIN {DDR3_1066F} \
   CONFIG.PCW_UIPARAM_DDR_FREQ_MHZ {533.333333} \
   CONFIG.PCW_UIPARAM_DDR_CL {7} \
   CONFIG.PCW_UIPARAM_DDR_CWL {6} \
   CONFIG.PCW_UIPARAM_DDR_T_RCD {7} \
   CONFIG.PCW_UIPARAM_DDR_T_RP {7} \
-  CONFIG.PCW_UIPARAM_DDR_T_RC {48.75} \
+  CONFIG.PCW_UIPARAM_DDR_T_RC {48.91} \
   CONFIG.PCW_UIPARAM_DDR_T_RAS_MIN {35.0} \
   CONFIG.PCW_UIPARAM_DDR_T_FAW {40.0} \
   CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY0 {0.25} \

@@ -38,6 +38,7 @@
 | `docs/13-xsim-simulation-plan.md` | XSim 分层仿真计划、判据和留证规则 |
 | `docs/14-next-steps-2026-08-29.md` | **下一步行动计划**：本机已验证基线、M3/G3 排序与待用户决定项 |
 | `docs/15-m3-bd-simulation-2026-08-29.md` | **M3 实际 BD 集成仿真结果**与 BD-3 阻塞证据 |
+| `docs/16-board-zynq-eco-7010.md` | **板级配置唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 修正与上板顺序 |
 | `docs/reference/` | 历史审计结果（数据集校验和、文件索引、缺口清单、提交归档），只读参考 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
@@ -56,6 +57,12 @@
   必须保持这一点。
 - 两份 XSA 字节相同（SHA-256 `79c64736...e6eb33`），是历史硬件快照，
   **不是**当前 Tcl 已被证明可再生的产物。
+- **历史 XSA 是另一块板**：其 DDR 为 32 bit 双颗 `MT41J128M16`，而目标 ZYNQ ECO(R6)
+  实物是单颗 16 bit `MT41J256M16HA-125`。板级配置的唯一权威是
+  `docs/16-board-zynq-eco-7010.md` 与 `docs/board/zynq-eco-7010/`，
+  **禁止**再据历史 XSA 回退 DDR 配置。
+- `hw/build/export/` 中的 XSA/bit/ELF/BOOT.bin 是按旧（错误）DDR 配置生成的，
+  **不能烧到 ECO 板**，必须整套重建后才能上板。
 - `archive/submission_2025-11-07/..._重要代码.rar` 尚未解压（环境缺 RAR5 工具）；
   解压后必须先做来源/哈希差异审计再决定是否导入。
 

@@ -19,6 +19,7 @@
 | [13-xsim-simulation-plan.md](13-xsim-simulation-plan.md) | **XSim 高质量仿真提示与计划**：单 IP、三级流水线、Block Design、网表 | 开始完整仿真前 |
 | [14-next-steps-2026-08-29.md](14-next-steps-2026-08-29.md) | **下一步行动计划**：本机已验证基线、M3/G3 的排序与判据、需要用户决定的事 | 想知道「现在该做什么」 |
 | [15-m3-bd-simulation-2026-08-29.md](15-m3-bd-simulation-2026-08-29.md) | **M3 实际 BD 集成仿真结果**：BD-1/BD-2 通过、BD-3 被 PS7 VIP HP0 阻塞的完整证据链 | 接手 M3 或想知道 BD 级验证到哪一步 |
+| [16-board-zynq-eco-7010.md](16-board-zynq-eco-7010.md) | **板级配置的唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 配置修正与首次上板顺序 | 改 PS7 配置、准备上板之前必读 |
 
 ## 参考资料（历史审计结果，只读）
 

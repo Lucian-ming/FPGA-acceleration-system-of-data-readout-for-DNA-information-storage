@@ -29,6 +29,10 @@ __pycache__/
 data/
 archive/
 
+# 板卡资料包（docs/board/）整体纳入版本管理，只排除体积过大的教学视频；
+# 其 SHA-256 仍记录在 docs/board/zynq-eco-7010/SHA256SUMS.txt 中，可按需另行获取。
+docs/board/**/tutorials/*.mp4
+
 # 编辑器与操作系统本地文件
 .vscode/
 .idea/

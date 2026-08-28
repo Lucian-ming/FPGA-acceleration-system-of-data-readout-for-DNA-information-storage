@@ -39,6 +39,12 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   ELF 已用 xsct 重建。
 - ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
   推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
+- ⛔ **板级 DDR 配置修正（2026-08-29）**：确认目标板为 **ZYNQ ECO R6**（资料已入库
+  `docs/board/zynq-eco-7010/`）。实物只有**一颗 16 bit `MT41J256M16`**，而工程此前固化的是
+  32 bit 双颗——规格书明确「不更改不能运行」。追查发现历史 XSA 本身就是 32 bit 双颗，
+  **属于另一块板**。`bd.tcl` 已修正，但 `hw/build/export/` 全套制品因此**作废，必须重建**。
+  影响面很窄：地址布局与 PL 侧完全不动。详见
+  [`docs/16-board-zynq-eco-7010.md`](docs/16-board-zynq-eco-7010.md)。
 - ⚙️ **M3 实际 Block Design 集成仿真（2026-08-29）**：DUT 为 `bd.tcl` 生成的实际
   `top_bd_wrapper`。**BD-1（地址图/黑盒/elaboration）与 BD-2（控制面 71 项检查）已通过**；
   **BD-3 数据面未通过**，卡在 Vivado 2022.2 PS7 VIP 的 HP0 从机读通路不返回数据
