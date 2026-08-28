@@ -56,6 +56,15 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
   Stage3 64,800 bit / 8,100 B、LDPC 图片哈希命中目标值，Stage2 bit 123 故障注入被检出）。
   注意 `hw/build/xsim/` 不入 Git，各条记录里的证据目录只存在于当初运行的那台机器；
   换 checkout 后必须本机重跑生成自己的证据，不得直接引用他机运行 ID。
+- 2026-08-29 · **M3 实际 Block Design 集成仿真**（提交 `1bd236d`，详见
+  `docs/15-m3-bd-simulation-2026-08-29.md`）：新增 `tools/run_m3_bd.sh` 与
+  `hw/scripts/m3_bd_sim.tcl`，DUT 是 `bd.tcl` 生成的实际 `top_bd_wrapper`。
+  **BD-1 PASS**：地址图与 `sw/app/xparameters.h` 逐项一致，无黑盒，三个自研 IP 均在且未锁定；
+  **BD-2 PASS**：71 项检查 0 失败（寄存器写/读回、从机隔离、未映射地址 DECERR）；
+  **BD-3 未通过**：Voter/Decoder 的合法 INCR 读突发经实际 ic_hp 到达 S_AXI_HP0、AR 握手完成后，
+  Vivado 2022.2 的 `processing_system7_vip` 一拍 RDATA 都不返回；已逐条排除跨 4KB 边界、
+  地址范围、未完成事务上限、三档从机延迟、单 IP 因素与时钟/复位。定位为仿真模型限制，
+  **不为此修改生产 BD**。M3 因此仍未完成，不得据此关闭 G3。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到

@@ -35,9 +35,11 @@ module tb_m3_bd3_dpath;
     localparam [31:0] ADDR_VOTER = 32'h43C2_0000;
     localparam [31:0] ADDR_DEC   = 32'h43C1_0000;
 
-    localparam [31:0] DDR_STAGE1_OUT = 32'h1060_0000;  // Voter 输入
-    localparam [31:0] DDR_STAGE2_OUT = 32'h1100_0000;  // Voter 输出 / Decoder 输入
-    localparam [31:0] DDR_STAGE3_OUT = 32'h1110_0000;  // Decoder 输出
+    // 默认使用 docs/05-interfaces.md §4 的真实地址；可用 plusarg 覆盖，
+    // 用于诊断「地址是否落在仿真内存模型可服务范围内」这类问题。
+    reg [31:0] DDR_STAGE1_OUT = 32'h1060_0000;  // Voter 输入
+    reg [31:0] DDR_STAGE2_OUT = 32'h1100_0000;  // Voter 输出 / Decoder 输入
+    reg [31:0] DDR_STAGE3_OUT = 32'h1110_0000;  // Decoder 输出
 
     localparam VOTER_OUT_BEATS_N = 1266;   // 81,000 bit
     localparam DEC_IN_BEATS_N    = 1266;
@@ -139,6 +141,9 @@ module tb_m3_bd3_dpath;
             $fatal(1, "missing +mem_out");
         end
         if (!$value$plusargs("total_reads=%d", total_reads)) total_reads = 4096;
+        if ($value$plusargs("s1_addr=%h", DDR_STAGE1_OUT)) ;
+        if ($value$plusargs("s2_addr=%h", DDR_STAGE2_OUT)) ;
+        if ($value$plusargs("s3_addr=%h", DDR_STAGE3_OUT)) ;
         if (!$value$plusargs("latency=%d", latency_mode))    latency_mode = 0;
 
         `PS7.set_stop_on_error(0);

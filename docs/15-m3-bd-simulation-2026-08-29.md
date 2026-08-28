@@ -16,6 +16,9 @@
 | BD-2 | 控制面：GP0 → ic_lite → 四个从机 | **PASS**（71 项检查 0 失败） |
 | BD-3 | 数据面：Voter/Decoder 主口 → ic_hp → HP0 → DDR | **未通过（阻塞）** |
 
+本机证据目录：`hw/build/xsim/m3/20260828T171531Z/`（`bash tools/run_m3_bd.sh all`）。
+该目录在 `.gitignore` 中，**不随 Git 分发**，换 checkout 必须本机重跑。
+
 ---
 
 ## 2. 交付物
@@ -115,6 +118,7 @@ HP0 AR 通道探针抓到的实际事务完全合法：
 | --- | --- |
 | 突发跨 4 KB 边界 | 用 `total_reads=80`（数学上不可能跨界）复跑，**仍在同一时刻卡死**；且 Voter 首笔就是 48 B 对齐突发 |
 | 未命中的地址范围 | HP0 段为 `0x00000000+512MB`；VIP 的 AFI 从机默认 `BASEADDR=0x00000000 / HIGHADDR=0xFFFFFFFF`；VIP 的 DDR 数组为 1 GB；同地址的预载由 VIP 自己确认成功 |
+| DDR 容量不足（怀疑 VIP 只建模 256 MB，而项目缓冲区都在 `0x1000_0000` 以上） | 用 `+s2_addr=01000000 +s3_addr=01100000` 把整级搬到 16 MB 处复跑，**同样卡死**，与地址高低无关 |
 | 超出未完成读事务上限 | Voter 的 FSM 一次只发 **1 笔**读突发，同样卡死；不需要触及 VIP 的 `max_rd_outstanding_transactions = 8` |
 | 某一档从机延迟的问题 | `BEST_CASE(0)`、`AVG_CASE(1)`、`WORST_CASE(2)` 三档**全部**卡死 |
 | 某个 IP 自身的问题 | Voter 与 Decoder 两个独立 IP、不同突发长度/ID/CACHE，症状一致 |

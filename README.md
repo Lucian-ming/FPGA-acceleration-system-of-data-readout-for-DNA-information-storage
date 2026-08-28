@@ -39,6 +39,11 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   ELF 已用 xsct 重建。
 - ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
   推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
+- ⚙️ **M3 实际 Block Design 集成仿真（2026-08-29）**：DUT 为 `bd.tcl` 生成的实际
+  `top_bd_wrapper`。**BD-1（地址图/黑盒/elaboration）与 BD-2（控制面 71 项检查）已通过**；
+  **BD-3 数据面未通过**，卡在 Vivado 2022.2 PS7 VIP 的 HP0 从机读通路不返回数据
+  （已排除设计侧因素，不为此改生产 BD）。入口 `bash tools/run_m3_bd.sh`，
+  详见 [`docs/15-m3-bd-simulation-2026-08-29.md`](docs/15-m3-bd-simulation-2026-08-29.md)。
 - ✅ **M2 完整三级 XSim 串联（2026-08-28）**：2,048 条原始读段展开为 4,096 条
   正向/反向记录，Stage1 64/64 batch → Stage2 → PS 等价 XOR → Stage3 全部使用上一级
   实际输出；LDPC 5 轮收敛，重建 JPEG 的 SHA-256 为目标值 `fcd0cf90...b6b1f2c3`。
