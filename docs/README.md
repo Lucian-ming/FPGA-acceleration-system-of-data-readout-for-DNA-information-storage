@@ -18,6 +18,7 @@
 | [12-main-handoff-2026-08-21.md](12-main-handoff-2026-08-21.md) | **当前主分支最终交接**：接手顺序、验证、构建、上板和风险 | 新开发者首先阅读 |
 | [13-xsim-simulation-plan.md](13-xsim-simulation-plan.md) | **XSim 高质量仿真提示与计划**：单 IP、三级流水线、Block Design、网表 | 开始完整仿真前 |
 | [14-next-steps-2026-08-29.md](14-next-steps-2026-08-29.md) | **下一步行动计划**：本机已验证基线、M3/G3 的排序与判据、需要用户决定的事 | 想知道「现在该做什么」 |
+| [15-m3-bd-simulation-2026-08-29.md](15-m3-bd-simulation-2026-08-29.md) | **M3 实际 BD 集成仿真结果**：BD-1/BD-2 通过、BD-3 被 PS7 VIP HP0 阻塞的完整证据链 | 接手 M3 或想知道 BD 级验证到哪一步 |
 
 ## 参考资料（历史审计结果，只读）
 
@@ -40,6 +41,8 @@
 | `tools/run_xsim.sh` | Vivado/XSim 单 IP 黄金回归：6 个功能/AXI 用例，自动 PASS/FAIL 与日志归档 |
 | `tools/run_m2_quick.sh` | 64 条快速三级串联：Stage1 实际输出 → Stage2 → PS XOR → Stage3 |
 | `tools/run_m2_full.sh` | **2,048 条完整三级串联**：4,096 条正反记录、LDPC/JPEG 哈希与单 bit 故障注入 |
+| `tools/run_m3_bd.sh` | **M3 实际 Block Design 集成仿真**：BD-1 静态/elaboration、BD-2 控制面、BD-3 数据面 |
+| `tools/m3_mem.py` | M3 辅助：黄金 64bit 向量 ⇄ PS7 VIP DDR 的 32bit 字镜像格式互转与逐位比较 |
 | `tools/verify_repo_binding.sh` | 开发前 Git 强制门禁：核对唯一目录、main、origin 和私有仓库推送权限 |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
