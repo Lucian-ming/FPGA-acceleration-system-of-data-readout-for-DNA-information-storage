@@ -47,6 +47,15 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
   Stage3 64,800 bit 与受控黄金向量逐字节一致；LDPC 5 轮收敛并得到目标图片哈希。
   翻转 Stage2 bit 123 后 Stage3 精确报告 1 bit mismatch。统一入口为
   `STAGE1_JOBS=3 bash tools/run_m2_full.sh`，实现提交 `e7b4e44`。
+- 2026-08-29 · **异机复跑与运行器可移植性修复**（提交 `b388d2e`）：四个仿真入口原先硬依赖
+  ripgrep，在未装 rg 的 checkout 上 `run_sim.sh` 会把 11 个实际 PASS 的用例统计成
+  「通过 5 项，失败 6 项」（假红），`run_xsim.sh`/`run_m2_quick.sh`/`run_m2_full.sh`
+  则直接 `FATAL: ripgrep is required` 退出。已回退到 POSIX `grep -E`（判据强度不变）。
+  本 checkout 复跑：`run_sim.sh` 11/11 PASS、`run_xsim.sh all` 6/6 PASS、
+  `STAGE1_JOBS=6 bash tools/run_m2_full.sh` 全链 PASS（Stage1 64/64 batch、Stage2 81,000 bit、
+  Stage3 64,800 bit / 8,100 B、LDPC 图片哈希命中目标值，Stage2 bit 123 故障注入被检出）。
+  注意 `hw/build/xsim/` 不入 Git，各条记录里的证据目录只存在于当初运行的那台机器；
+  换 checkout 后必须本机重跑生成自己的证据，不得直接引用他机运行 ID。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到

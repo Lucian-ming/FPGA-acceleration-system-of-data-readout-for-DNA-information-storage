@@ -38,6 +38,27 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 > 将 Stage2 bit 123 主动翻转后，Stage3 scoreboard 精确检出 1 bit mismatch。证据目录为
 > `hw/build/xsim/m2_full/20260828T152219Z/`。至此 M2 完成；M3、M4 与真实上板 G3 仍未完成。
 
+> **异机复跑与运行器可移植性（2026-08-29，修复提交 `b388d2e`）：** 在本 WSL checkout 上复跑
+> 时发现四个仿真入口都硬依赖 ripgrep：`tools/run_sim.sh` 的判据行 `rg -q PASS` 直接
+> `command not found`，11 个用例全部打印 PASS 却被统计成「通过 5 项，失败 6 项」（假红）；
+> `run_xsim.sh`/`run_m2_quick.sh`/`run_m2_full.sh` 则在启动自检处 `FATAL: ripgrep is required`
+> 直接退出，M1/M2 根本无法复跑。已改为优先 ripgrep、缺失时回退 POSIX `grep -E`
+> （既有判据模式本就是 ERE，`-n/-q` 语义一致，判据强度不变，仍可用 `RG=<path>` 覆盖）。
+> 修复后本 checkout 复跑：`bash tools/run_sim.sh` 11/11 PASS，`bash tools/run_xsim.sh all`
+> 6/6 PASS（证据目录 `hw/build/xsim/20260828T160436Z/`），
+> `STAGE1_JOBS=6 bash tools/run_m2_full.sh` 全链 PASS（证据目录
+> `hw/build/xsim/m2_full/20260828T160554Z/`）：Stage1 64/64 batch、Stage2 81,000 bit、
+> PS 等价 XOR、Stage3 64,800 bit / 8,100 B、LDPC 重建 JPEG 命中目标 SHA-256，
+> 且 Stage2 bit 123 故障注入被 Stage3 scoreboard 检出。**M1/M2 的结论因此在本机独立成立，
+> 不再依赖他机运行 ID。** 该次运行的 `summary.txt` 记 `head=1cb7429`（启动早于 `b388d2e`，
+> 工作区含未提交的运行器修复）；`b388d2e` 只改运行器脚本，不触碰 RTL、黄金向量或判据。
+
+> **证据目录的边界（重要）：** `hw/build/xsim/` 在 `.gitignore` 中，**证据不随 Git 分发**。
+> 上文各条记录里的 `20260821T165313Z`、`20260821T171854Z`、`20260828T152219Z` 等目录只存在于
+> 当初运行它们的那个 checkout。新接手者克隆后这些路径必然不存在，这是预期状态，**不是证据丢失，
+> 也不能当成已验证**。任何要在本机宣称的 M0/M1/M2 结论，都必须在本机重新跑出自己的证据目录，
+> 再按本文 §9 归档；不得直接引用他机的运行 ID。
+
 > **M0 自包含更新（2026-08-28）：** 主机水印测试和 LDPC 自检已改为只依赖仓库内受
 > `SHA256SUMS` 保护的向量与版本化目标图片，不再要求未随 Git 分发的 `data/R0.83_data/`。
 > 最终 `bash tools/run_sim.sh` 为 11/11 PASS，`bash tools/run_xsim.sh all` 为 6/6 PASS。

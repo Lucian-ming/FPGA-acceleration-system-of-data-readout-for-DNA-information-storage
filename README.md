@@ -10,11 +10,15 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 
 ---
 
-## ⚠️ 项目状态（截至 2026-08-21）
+## ⚠️ 项目状态（截至 2026-08-29）
 
 **离线算法、三级 RTL、主机/固件单测和可上板构建均已通过；真实开发板端到端结果尚未验收。**
 接手开发请先读 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)
-和 [`docs/03-status.md`](docs/03-status.md)。
+和 [`docs/03-status.md`](docs/03-status.md)；想直接知道「现在该做什么」看
+[`docs/14-next-steps-2026-08-29.md`](docs/14-next-steps-2026-08-29.md)。
+
+⚠️ 仿真证据目录（`hw/build/xsim/`）不入 Git，只存在于跑过它的那台机器。文档里的运行 ID
+在新 clone 上必然不存在，这是预期状态；要宣称同样的结论必须本机重跑。
 
 接手者必须使用 WSL 原生文件系统中的本项目 checkout 并绑定当前 GitHub 私有仓库；禁止 `git init`、
 嵌套项目或在同一任务中同时修改多个 checkout。用户明确授权的新 WSL clone 可以使用。
