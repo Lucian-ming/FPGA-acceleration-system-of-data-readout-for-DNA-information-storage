@@ -10,6 +10,9 @@
 **当前 RTL 的 bitstream/XSA 与相匹配 ELF 已重建；剩余主路径是上板端到端验收。**
 硬件侧：Stage1/2/3 三级 RTL 全部有黄金向量逐位背书（含 D1 方案B 的 SCORE_MIN 阈值过滤），
 完整 `top_bd_wrapper` 已生成 bitstream，在 100 MHz 收敛（WNS +0.145 ns、WHS +0.018 ns）；
+2026-08-28 又完成 2,048 条原始读段（4,096 条正反记录）的 M2 完整 XSim 串联，
+Stage1 实际输出真实进入 Stage2，Stage2 实际输出经 PS 等价 XOR 后真实进入 Stage3，
+最终 LDPC 重建图片哈希为 `fcd0cf90...b6b1f2c3`，并通过单 bit 故障注入反证；
 PS 侧：按实际条数运行（C1~C3）、SCORE_MIN=67 已写入并回读校验，ELF 已基于同一份新 XSA 用 xsct 重建；
 主机侧：纯 Python LDPC 译码器（P5）在 Linux 上完成黄金数据全链自检（重建 JPEG 与原图逐字节相同）。
 
@@ -39,6 +42,11 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
 - 2026-08-16 晚 · **A3 与可上板构建链关闭**：从只读历史 XSA 的 `design_1.hwh`
   固化 DDR、GEM0/MDIO、UART1、FCLK0 和 MIO Bank 电压；完整 Vivado/Vitis 2022.2
   重建 bitstream、XSA、lwIP BSP 与匹配 ELF。全量回归 11/11；产物和哈希见下文。
+- 2026-08-28 · **M2 完整 XSim 串联关闭**：64/64 个 Stage1 batch（4,096 条记录）
+  score/codeword 0 错误，并列峰 85/4,096（2.08%）；Stage2 81,000 bit、PS XOR、
+  Stage3 64,800 bit 与受控黄金向量逐字节一致；LDPC 5 轮收敛并得到目标图片哈希。
+  翻转 Stage2 bit 123 后 Stage3 精确报告 1 bit mismatch。统一入口为
+  `STAGE1_JOBS=3 bash tools/run_m2_full.sh`，实现提交 `e7b4e44`。
 
 同时，**算法本身已经被证明是正确可行的**：`tools/golden_model.py verify-code` 用 R0.83
 黄金数据证明了「编码序列 ⊕ 水印 → 5b4b → 码字」逐位成立。所以要做的是把 RTL 对齐到

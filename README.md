@@ -34,6 +34,10 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
   ELF 已用 xsct 重建。
 - ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
   推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
+- ✅ **M2 完整三级 XSim 串联（2026-08-28）**：2,048 条原始读段展开为 4,096 条
+  正向/反向记录，Stage1 64/64 batch → Stage2 → PS 等价 XOR → Stage3 全部使用上一级
+  实际输出；LDPC 5 轮收敛，重建 JPEG 的 SHA-256 为目标值 `fcd0cf90...b6b1f2c3`。
+  Stage2 注入单 bit 故障后 Stage3 scoreboard 能稳定检出，排除了假绿。
 - ✅ R3 PL 收口：DNA FIFO 满背压、DNA/Voter/Desparsifier AXI-Lite AW/W 独立握手、
   尾批超时位宽；全量 `bash tools/run_sim.sh` 11 项通过，DNA/Voter/Desparsifier
   三个顶层 100 MHz 综合通过（DNA WNS `+0.543 ns`、Voter WNS `+2.480 ns`，
@@ -81,6 +85,16 @@ bash tools/verify_repo_binding.sh --remote
 ```bash
 python3 tools/golden_model.py verify-code
 ```
+
+### Vivado/XSim 仿真（不需要板子）
+
+```bash
+bash tools/run_xsim.sh all              # 三个 IP 的 6 项独立黄金回归
+STAGE1_JOBS=3 bash tools/run_m2_full.sh # 2,048 条完整三级串联 + LDPC/图片哈希
+```
+
+完整串联不会把 `stage2_expect.hex` / `stage3_expect.hex` 注入级间通路；它们只作为
+scoreboard。所有实际 checkpoint、日志和哈希保存在 `hw/build/xsim/m2_full/<UTC时间>/`。
 
 ### 软件复现整条流水线（不需要板子，全量约 4 分钟）
 

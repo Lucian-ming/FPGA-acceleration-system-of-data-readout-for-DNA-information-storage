@@ -28,6 +28,20 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 > `hw/build/xsim/m2_quick/20260821T171854Z/`，日志和 checkpoint SHA-256 已写入其
 > `summary.txt`。M2 完整 2,048 条真实串联、故障注入、M3/M4 与 G3 仍未完成。
 
+> **M2 完整串联记录（2026-08-28，实现提交 `e7b4e44`）：** 新增统一入口
+> `tools/run_m2_full.sh`，从受控 `reads_cw.hex` 独立派生 2,048 条原始读段的正向/反向互补
+> 输入，共 4,096 条记录、64 个 Stage1 batch。每批实际 Stage1 输出合并后真实进入 Stage2，
+> Stage2 实际输出经独立 PS 等价 XOR 后真实进入 Stage3，Stage3 实际 64,800 bit 再进入
+> 纯 Python LDPC。Stage1 score/codeword 错误均为 0，并列峰 85/4,096（2.08%，低于 5%）；
+> Stage2、XOR、Stage3 和 `dec_input` 与受控黄金文件逐字节相同；LDPC 5 轮收敛，重建
+> 6,624 B JPEG 的 SHA-256 为 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
+> 将 Stage2 bit 123 主动翻转后，Stage3 scoreboard 精确检出 1 bit mismatch。证据目录为
+> `hw/build/xsim/m2_full/20260828T152219Z/`。至此 M2 完成；M3、M4 与真实上板 G3 仍未完成。
+
+> **M0 自包含更新（2026-08-28）：** 主机水印测试和 LDPC 自检已改为只依赖仓库内受
+> `SHA256SUMS` 保护的向量与版本化目标图片，不再要求未随 Git 分发的 `data/R0.83_data/`。
+> 最终 `bash tools/run_sim.sh` 为 11/11 PASS，`bash tools/run_xsim.sh all` 为 6/6 PASS。
+
 > **M0 实施记录（2026-08-22）：** 在同一 checkout 中，Icarus 11.0 的 6 个 RTL/AXI 功能用例、
 > 3 个 PS 侧 C 单测和 4 个生产顶层语法检查通过；上位机 `client_core` 与 LDPC 自检未能执行，
 > 原因是按项目约定不入 Git 的 `data/R0.83_data/` 当前未挂载，属于输入环境缺口而非 RTL 失败。
@@ -101,11 +115,12 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 
 ### 2.2 当前缺口
 
-- 没有统一、可回归的 XSim 运行器、结果摘要和日志归档。
+- M1/M2 已有统一 XSim 运行器、自动判据、结果摘要和日志归档；M3/M4 尚无对应入口。
 - Vivado 工程中的 `sim_1` 没有完整 Testbench。
 - `vivado_quick_sim.tcl` 是旧的 Stage1 冒烟脚本，不是黄金回归：源文件不完整、运行时间不足、
   输入不是生产向量、失败不 `$fatal`，不得作为验收入口。
-- 尚无 Stage1 实际输出串入 Stage2、再经水印 XOR 串入 Stage3 的同一仿真闭环。
+- Stage1 → Stage2 → PS XOR → Stage3 的直接闭环已完成快速与 2,048 条完整两档回归；
+  尚未把同一业务链移入实际 Block Design 仿真。
 - 尚无实际 `top_bd` 下 AXI DMA、Interconnect、三个自研 IP 的事务级集成证据。
 - 尚无板端 G3 证据。
 

@@ -36,6 +36,9 @@
 | `tools/extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC EXE 缺失的 3 个 MinGW 运行时 DLL |
 | `tools/make_golden.py` | 生成各级黄金向量到 `tests/golden/`（RTL Testbench 与端到端回归的判据） |
 | `tools/run_sim.sh` | Icarus 仿真回归：用黄金向量逐位判定 RTL（含 DNA ingress/AXI-Lite、stage1/2/3/host/syntax） |
+| `tools/run_xsim.sh` | Vivado/XSim 单 IP 黄金回归：6 个功能/AXI 用例，自动 PASS/FAIL 与日志归档 |
+| `tools/run_m2_quick.sh` | 64 条快速三级串联：Stage1 实际输出 → Stage2 → PS XOR → Stage3 |
+| `tools/run_m2_full.sh` | **2,048 条完整三级串联**：4,096 条正反记录、LDPC/JPEG 哈希与单 bit 故障注入 |
 | `tools/verify_repo_binding.sh` | 开发前 Git 强制门禁：核对唯一目录、main、origin 和私有仓库推送权限 |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
