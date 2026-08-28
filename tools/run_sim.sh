@@ -27,7 +27,7 @@ run_case() {
     timeout 600 vvp "$BUILD/$name" >"$log" 2>&1
     status=$?
     sed 's/^/  /' "$log"
-    if [ "$status" -eq 0 ] && ! rg -q 'FATAL:' "$log" && rg -q 'PASS' "$log"; then
+    if [ "$status" -eq 0 ] && ! grep -q 'FATAL:' "$log" && grep -q 'PASS' "$log"; then
         PASS=$((PASS+1))
     else
         FAIL=$((FAIL+1))

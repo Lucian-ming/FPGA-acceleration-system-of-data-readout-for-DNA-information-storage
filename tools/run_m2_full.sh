@@ -9,7 +9,15 @@ VIVADO_ROOT=${VIVADO_ROOT:-/tools/Xilinx/Vivado/2022.2}
 XVLOG=${XVLOG:-$VIVADO_ROOT/bin/xvlog}
 XELAB=${XELAB:-$VIVADO_ROOT/bin/xelab}
 XSIM=${XSIM:-$VIVADO_ROOT/bin/xsim}
-RG=${RG:-/usr/bin/rg}
+# 日志判据检索器：优先用 ripgrep，缺失时回退到 POSIX grep -E（模式均为 ERE）。
+RG=${RG:-}
+if [[ -n "$RG" ]]; then
+    LOG_GREP=("$RG")
+elif command -v rg >/dev/null 2>&1; then
+    LOG_GREP=(rg)
+else
+    LOG_GREP=(grep -E)
+fi
 TIMEOUT_SEC=${XSIM_TIMEOUT_SEC:-1800}
 STAGE1_JOBS=${STAGE1_JOBS:-3}
 ORIGINAL_READS=2048
@@ -21,8 +29,6 @@ TARGET_IMAGE_SHA256=fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1
 for tool in "$XVLOG" "$XELAB" "$XSIM"; do
     [[ -x "$tool" ]] || { echo "FATAL: missing Vivado tool $tool" >&2; exit 2; }
 done
-[[ -x "$RG" ]] || RG=$(command -v rg || true)
-[[ -x "$RG" ]] || { echo "FATAL: ripgrep is required" >&2; exit 2; }
 [[ "$STAGE1_JOBS" =~ ^[1-9][0-9]*$ ]] || {
     echo "FATAL: STAGE1_JOBS must be a positive integer" >&2; exit 2;
 }
@@ -84,7 +90,7 @@ compile_snapshot() {
         "$XVLOG" -work work "$@" > xvlog.log 2>&1
         "$XELAB" -debug typical "$top" -s "$snapshot" > xelab.log 2>&1
     ) || return 1
-    if "$RG" -n 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
+    if "${LOG_GREP[@]}" -n 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
         "$build_dir/xvlog.log" "$build_dir/xelab.log" >/dev/null 2>&1; then
         return 1
     fi
@@ -114,8 +120,8 @@ run_stage1_batch() {
             -testplusarg "dump_stage1=$BATCH_DIR/actual_$batch_id.hex"
     ) > "$log" 2>&1 || sim_rc=$?
     if [[ "$sim_rc" -ne 0 ]] \
-       || ! "$RG" -q 'PASS' "$log" \
-       || "$RG" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' "$log"; then
+       || ! "${LOG_GREP[@]}" -q 'PASS' "$log" \
+       || "${LOG_GREP[@]}" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' "$log"; then
         echo "Stage1 batch $batch_id FAIL (rc=$sim_rc)"
         return 1
     fi
@@ -167,8 +173,8 @@ compile_snapshot stage2_voter tb_differential_voter stage2_full_sim \
         -testplusarg "runs=1" \
         -testplusarg "dump_stage2=$CHECKPOINT/stage2_actual.hex"
 ) > "$OUT_ROOT/stage2_voter/xsim.log" 2>&1 || fail "Stage2 simulation failed"
-"$RG" -q 'PASS' "$OUT_ROOT/stage2_voter/xsim.log" || fail "Stage2 PASS marker missing"
-! "$RG" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
+"${LOG_GREP[@]}" -q 'PASS' "$OUT_ROOT/stage2_voter/xsim.log" || fail "Stage2 PASS marker missing"
+! "${LOG_GREP[@]}" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
     "$OUT_ROOT/stage2_voter/xsim.log" || fail "Stage2 log contains failure"
 
 python3 "$REPO_ROOT/tools/m2_chain.py" xor \
@@ -187,8 +193,8 @@ compile_snapshot stage3_decoder tb_desparsifier stage3_full_sim \
         -testplusarg "expect=$CHECKPOINT/stage3_expected_from_actual.hex" \
         -testplusarg "dump_stage3=$CHECKPOINT/stage3_actual.hex"
 ) > "$OUT_ROOT/stage3_decoder/xsim.log" 2>&1 || fail "Stage3 simulation failed"
-"$RG" -q 'PASS' "$OUT_ROOT/stage3_decoder/xsim.log" || fail "Stage3 PASS marker missing"
-! "$RG" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
+"${LOG_GREP[@]}" -q 'PASS' "$OUT_ROOT/stage3_decoder/xsim.log" || fail "Stage3 PASS marker missing"
+! "${LOG_GREP[@]}" -q 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
     "$OUT_ROOT/stage3_decoder/xsim.log" || fail "Stage3 log contains failure"
 
 python3 "$REPO_ROOT/tools/m2_chain.py" to-bittext \
@@ -220,8 +226,8 @@ fault_rc=0
         -testplusarg "input=$CHECKPOINT/sparse_fault_bit123.hex" \
         -testplusarg "expect=$CHECKPOINT/stage3_expected_from_actual.hex"
 ) > "$OUT_ROOT/stage3_decoder/fault_xsim.log" 2>&1 || fault_rc=$?
-if "$RG" -q 'PASS' "$OUT_ROOT/stage3_decoder/fault_xsim.log" \
-   || ! "$RG" -q 'FATAL:|FAIL|不符' "$OUT_ROOT/stage3_decoder/fault_xsim.log"; then
+if "${LOG_GREP[@]}" -q 'PASS' "$OUT_ROOT/stage3_decoder/fault_xsim.log" \
+   || ! "${LOG_GREP[@]}" -q 'FATAL:|FAIL|不符' "$OUT_ROOT/stage3_decoder/fault_xsim.log"; then
     fail "fault-injected Stage3 run was not rejected (rc=$fault_rc)"
 fi
 

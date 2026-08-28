@@ -8,19 +8,20 @@ VIVADO_ROOT=${VIVADO_ROOT:-/tools/Xilinx/Vivado/2022.2}
 XVLOG=${XVLOG:-$VIVADO_ROOT/bin/xvlog}
 XELAB=${XELAB:-$VIVADO_ROOT/bin/xelab}
 XSIM=${XSIM:-$VIVADO_ROOT/bin/xsim}
-RG=${RG:-/usr/bin/rg}
+# 日志判据检索器：优先用 ripgrep，缺失时回退到 POSIX grep -E（模式均为 ERE）。
+RG=${RG:-}
+if [[ -n "$RG" ]]; then
+    LOG_GREP=("$RG")
+elif command -v rg >/dev/null 2>&1; then
+    LOG_GREP=(rg)
+else
+    LOG_GREP=(grep -E)
+fi
 TIMEOUT_SEC=${XSIM_TIMEOUT_SEC:-900}
 WHICH=${1:-all}
 
 if [[ ! -x "$XVLOG" || ! -x "$XELAB" || ! -x "$XSIM" ]]; then
     echo "FATAL: Vivado/XSim not found under $VIVADO_ROOT" >&2
-    exit 2
-fi
-if [[ ! -x "$RG" ]]; then
-    RG=$(command -v rg || true)
-fi
-if [[ -z "$RG" || ! -x "$RG" ]]; then
-    echo "FATAL: ripgrep is required for PASS/FAIL log checks" >&2
     exit 2
 fi
 
@@ -62,13 +63,13 @@ run_case() {
         ) > "$case_dir/xsim.log" 2>&1 || sim_rc=$?
     fi
     local log_error=0
-    if "$RG" -n 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
+    if "${LOG_GREP[@]}" -n 'FATAL:|ERROR:|(^|[[:space:]])FAIL([:[:space:]]|$)|FAILED|\[FAIL\]' \
         "$case_dir/xvlog.log" "$case_dir/xelab.log" "$case_dir/xsim.log" >/dev/null 2>&1; then
         log_error=1
     fi
     if [[ "$compile_rc" -eq 0 && "$elab_rc" -eq 0 && "$sim_rc" -eq 0 \
           && -s "$case_dir/xsim.log" && "$log_error" -eq 0 ]] \
-          && "$RG" -n 'PASS' "$case_dir/xsim.log" >/dev/null 2>&1; then
+          && "${LOG_GREP[@]}" -n 'PASS' "$case_dir/xsim.log" >/dev/null 2>&1; then
         golden_rc=0
         PASS=$((PASS + 1))
         echo "  PASS ($case_dir)"
