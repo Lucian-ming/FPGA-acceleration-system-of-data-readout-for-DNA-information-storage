@@ -248,8 +248,12 @@ module tb_desparsifier;
     integer k, b;
     reg [63:0] got, exp, mask;
     integer timeout;
-    reg [8*256-1:0] input_path, expect_path;
+    reg [8*256-1:0] input_path, expect_path, dump_stage3_path;
     integer plusarg_result;
+    integer dump_stage3_en, dump_fd;
+
+    // 导出的文件来自 AXI 写内存模型中的 DUT 实际输出，不复制期望向量。
+    initial dump_stage3_en = $value$plusargs("dump_stage3=%s", dump_stage3_path);
 
     initial begin
         s_awvalid=0; s_wvalid=0; s_bready=0; s_arvalid=0; s_rready=1;
@@ -306,9 +310,20 @@ module tb_desparsifier;
         end
 
         $display("--------------------------------------------------");
-        if (errors == 0)
+        if (errors == 0) begin
             $display("[TB] ✓ PASS  %0d 拍 / %0d bit 与黄金向量逐位相同", OUT_BEATS, OUT_BITS);
-        else
+            if (dump_stage3_en) begin
+                dump_fd = $fopen(dump_stage3_path, "w");
+                if (dump_fd == 0) begin
+                    $display("[TB] ✗ 无法打开 Stage3 checkpoint: %s", dump_stage3_path);
+                    $fatal(1);
+                end
+                for (k = 0; k < OUT_BEATS; k = k + 1)
+                    $fdisplay(dump_fd, "%016h", mem_out[k]);
+                $fclose(dump_fd);
+                $display("[TB] ✓ 已导出实际 Stage3 checkpoint: %s", dump_stage3_path);
+            end
+        end else
             $display("[TB] ✗ FAIL  %0d 拍不符，共 %0d bit 错", errors, bit_errors);
         $display("--------------------------------------------------");
         if (errors != 0) $fatal(1);

@@ -85,11 +85,20 @@ class WatermarkAndBatchTests(unittest.TestCase):
         )
 
     def test_watermark_pack_matches_golden_and_padding(self) -> None:
-        bits = first.load_watermark_bits(
-            REPO / "data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
-        )
-        payload = first.pack_watermark_bits(bits, self.task)
         golden = (REPO / "tests/golden/watermark_packed.bin").read_bytes()
+        # data/R0.83_data 是不入 Git 的只读原始数据。这里从已受
+        # SHA256SUMS 保护的打包黄金向量还原文本输入，既覆盖文本解析，
+        # 又保证干净 clone 的主机回归不依赖本机私有数据目录。
+        text_bits = "".join(
+            "01"[(byte >> bit) & 1]
+            for byte in golden
+            for bit in range(8)
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            watermark = Path(directory) / "watermark.txt"
+            watermark.write_text(text_bits + "\n", encoding="utf-8")
+            bits = first.load_watermark_bits(watermark)
+        payload = first.pack_watermark_bits(bits, self.task)
         self.assertEqual(payload[:len(golden)], golden)
         self.assertEqual(payload[len(golden):], b"\x00" * 3)
 

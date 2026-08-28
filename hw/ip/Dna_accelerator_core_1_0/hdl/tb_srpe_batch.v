@@ -108,10 +108,11 @@ module tb_srpe_batch;
 
     // ---------------- 主流程 ----------------
     integer fd, i, j, lc, row, idx, code, dummy;
-    integer sc_err, pos_err, pos_tie, cw_err;
+    integer sc_err, pos_err, pos_tie, cw_err, max_ties;
     reg [CODEBITS-1:0] exp_cw;
     integer timeout;
-    reg [8*256-1:0] dump_stage1_path;
+    reg [8*256-1:0] reads_path, expect_path, dump_stage1_path;
+    integer plusarg_result;
     integer dump_stage1_en;
     integer dump_fd;
     reg [383:0] dump_rec;
@@ -122,12 +123,18 @@ module tb_srpe_batch;
     initial dump_stage1_en = $value$plusargs("dump_stage1=%s", dump_stage1_path);
 
     initial begin
+        reads_path = "tests/golden/reads_cw.hex";
+        expect_path = "tests/golden/stage1_fwd_expect.txt";
+        max_ties = (BATCH * 5) / 100;
+        plusarg_result = $value$plusargs("reads=%s", reads_path);
+        plusarg_result = $value$plusargs("expect=%s", expect_path);
+        plusarg_result = $value$plusargs("max_ties=%d", max_ties);
         $readmemh("tests/golden/wm_regions.hex", wm_sym);
-        $readmemh("tests/golden/reads_cw.hex",   reads);
+        $readmemh(reads_path, reads);
 
         // 读正向期望：跳过以 '#' 开头的注释行
-        fd = $fopen("tests/golden/stage1_fwd_expect.txt", "r");
-        if (fd == 0) begin $display("[TB] 打不开 stage1_fwd_expect.txt"); $fatal(1); end
+        fd = $fopen(expect_path, "r");
+        if (fd == 0) begin $display("[TB] 打不开 Stage1 期望文件: %s", expect_path); $fatal(1); end
         code = $fgetc(fd);                       // 吃掉注释行
         while (code != "\n" && code != -1) code = $fgetc(fd);
         for (i = 0; i < BATCH; i = i + 1) begin
@@ -209,8 +216,8 @@ module tb_srpe_batch;
         $display("--------------------------------------------------");
         $display("[TB] 分数不符 %0d 条 / 码字不符 %0d 条 / 并列峰 %0d 条（共 %0d 条）",
                  sc_err, cw_err, pos_tie, BATCH);
-        if (sc_err == 0 && cw_err == 0 && pos_tie * 100 <= BATCH * 5)
-            $display("[TB] ✓ PASS  与黄金模型一致（并列峰 %0d 条，在容许范围内）", pos_tie);
+        if (sc_err == 0 && cw_err == 0 && pos_tie <= max_ties)
+            $display("[TB] ✓ PASS  与黄金模型一致（并列峰 %0d 条，门限 %0d）", pos_tie, max_ties);
         else begin
             $display("[TB] ✗ FAIL");
             $display("--------------------------------------------------");

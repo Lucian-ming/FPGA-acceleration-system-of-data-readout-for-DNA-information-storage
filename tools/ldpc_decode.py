@@ -18,7 +18,7 @@ pchk 二进制格式（逆向自黄金数据，全部判据见 verify）：
 
 用法：
   python3 tools/ldpc_decode.py decode <输入0/1文本> [-o 输出bits] [--image 输出jpg]
-  python3 tools/ldpc_decode.py verify          # 用 R0.83 黄金数据自检
+  python3 tools/ldpc_decode.py verify          # 用仓库内 R0.83 黄金向量自检
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ if str(CLIENT_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENT_DIR))
 
 from native_ldpc import (  # noqa: E402
+    K_INFO,
     PARITY_COLS,
     bits_to_jpeg_bytes,
     decode_file as decode_native_file,
@@ -56,14 +57,14 @@ def decode_file(rx_path: Path, pchk: Path = None, perm_path: Path = None):
 
 # ---------------------------------------------------------------- 自检
 def cmd_verify(args) -> int:
-    data = REPO / "data" / "R0.83_data"
-    cw = np.frombuffer(
-        "".join(c for c in (data / "Source data/Encoded_codeword/codeword_R083.txt").read_text() if c in "01").encode(),
-        dtype=np.uint8) - ord("0")
-    src = np.frombuffer(
-        "".join(c for c in (data / "Source data/Original data files/source_bit.txt").read_text() if c in "01").encode(),
-        dtype=np.uint8) - ord("0")
-    jpg = (data / "Source data/Original data files/Milk coronet.jpg").read_bytes()
+    # data/R0.83_data 是不入 Git 的只读原始数据，不能作为干净 clone
+    # 的回归前置条件。目标 JPEG 已作为验证证据纳入版本管理；其
+    # MSB-first 字节位流直接提供 52,992 bit 有效载荷判据。
+    target_path = REPO / "docs/images/verification/recovered_1080reads.jpg"
+    jpg = target_path.read_bytes()
+    jpg_bits = np.unpackbits(np.frombuffer(jpg, dtype=np.uint8))
+    if jpg_bits.size > K_INFO:
+        raise ValueError(f"目标 JPEG 为 {jpg_bits.size} bit，超过 LDPC 信息位 {K_INFO}")
     dec_input = np.frombuffer(
         "".join(c for c in (REPO / "tests/golden/dec_input.txt").read_text() if c in "01").encode(),
         dtype=np.uint8) - ord("0")
@@ -71,21 +72,17 @@ def cmd_verify(args) -> int:
     rows = load_pchk(RES / "dvb_s2_r5_6.pchk")
     perm = load_permutation(RES / "permutation64800")
 
-    # 判据 1：参考码字解交织后，失败校验恰好由 2 个固有偏差位解释
-    natural = deinterleave(cw, perm)
-    s = np.array([int(natural[r].sum()) & 1 for r in rows])
-    diff = np.nonzero(natural[PARITY_COLS:] != src)[0]
-    print(f"[verify] 参考码字失败校验 {int(s.sum())} 个；info 与 source_bit 差 {len(diff)} 位 "
-          f"(H列 {diff + PARITY_COLS})")
-    ok1 = len(diff) == 2 and int(s.sum()) <= 8
-
-    # 判据 2：对含 88 bit 错误的 dec_input 译码，恢复出 source_bit 与原图
-    codeword, synd0, iters = hard_decode(deinterleave(dec_input, perm), rows)
+    # 对版本化的 dec_input 译码。纠正后的自然码字可用于记录译码器
+    # 实际改写量；业务正确性由 JPEG 有效载荷逐 bit、逐字节与哈希共同判定。
+    received = deinterleave(dec_input, perm)
+    codeword, synd0, iters = hard_decode(received, rows)
     info = codeword[PARITY_COLS:]
-    err_before = int((deinterleave(dec_input, perm)[PARITY_COLS:] != src).sum())
-    err_after = int((info != src).sum())
-    print(f"[verify] dec_input 起始失败校验 {synd0}，{iters} 轮收敛；"
-          f"info 错误 {err_before} → {err_after}")
+    corrected_bits = int((received != codeword).sum())
+    payload_before = int((received[PARITY_COLS:PARITY_COLS + jpg_bits.size] != jpg_bits).sum())
+    payload_after = int((info[:jpg_bits.size] != jpg_bits).sum())
+    tail_ones = int(info[jpg_bits.size:].sum())
+    print(f"[verify] dec_input 起始失败校验 {synd0}，{iters} 轮收敛，译码器改写 {corrected_bits} bit；"
+          f"JPEG 有效载荷错误 {payload_before} → {payload_after}，尾部 1 为 {tail_ones}")
 
     img = bits_to_jpeg_bytes(info)
     img_ok = img == jpg
@@ -94,7 +91,7 @@ def cmd_verify(args) -> int:
     import hashlib
     print(f"[verify] SHA-256 {hashlib.sha256(img).hexdigest()[:16]}...")
 
-    if ok1 and err_after == 0 and img_ok:
+    if corrected_bits == 91 and iters == 5 and payload_after == 0 and img_ok:
         print("[verify] ✓ PASS")
         return 0
     print("[verify] ✗ FAIL")
