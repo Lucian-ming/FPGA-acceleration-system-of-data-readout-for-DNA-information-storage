@@ -51,8 +51,8 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 ## 一、可直接交给后续 Agent 的执行提示
 
 ```text
-你正在处理 FPGA DNA 数据读出项目：
-/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
+你正在处理 FPGA DNA 数据读出项目；先用 `git rev-parse --show-toplevel`
+确认当前 WSL checkout 根目录。
 
 目标：在 main 分支建立完整、高质量、自动判定的 Vivado 2022.2 / XSim 仿真体系。
 严格按照 docs/13-xsim-simulation-plan.md 的阶段顺序实施，不要只给建议或停在方案层面。
@@ -62,8 +62,8 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 1. 开始前完整阅读 AGENTS.md、docs/README.md、docs/01-architecture.md、
    docs/02-data-contract.md、docs/03-status.md、docs/05-interfaces.md、
    docs/09-handoff-2026-08-16.md、docs/10-three-end-audit-2026-08-16.md 和本文。
-2. 唯一允许的开发目录是 /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout；禁止
-   git init、另行 clone、另建平行项目或嵌套仓库。开始前必须运行
+2. 开发必须位于用户指定的 WSL 原生文件系统 checkout；禁止 git init、嵌套仓库或在同一任务
+   同时修改多个 checkout。只有用户明确要求新建独立 WSL 文件夹时才允许重新 clone。开始前必须运行
    bash tools/verify_repo_binding.sh --remote；绑定未通过前禁止仿真、开发或处理其他项目。
 3. 只能在 main 分支工作，origin 必须绑定指定的 Lucian-ming 私有仓库。工作区可能已有用户修改，
    必须保留，禁止 reset、checkout 覆盖、clean 或删除构建产物。所有有意义修改必须提交并执行

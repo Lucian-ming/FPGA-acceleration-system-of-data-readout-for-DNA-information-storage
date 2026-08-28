@@ -16,8 +16,9 @@ PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──
 接手开发请先读 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)
 和 [`docs/03-status.md`](docs/03-status.md)。
 
-接手者必须直接使用本项目 checkout 并绑定当前 GitHub 私有仓库，禁止另建仓库、平行 clone 或
-嵌套项目。开始开发前先运行 `bash tools/verify_repo_binding.sh --remote`；所有提交必须推送
+接手者必须使用 WSL 原生文件系统中的本项目 checkout 并绑定当前 GitHub 私有仓库；禁止 `git init`、
+嵌套项目或在同一任务中同时修改多个 checkout。用户明确授权的新 WSL clone 可以使用。
+开始开发前先运行 `bash tools/verify_repo_binding.sh --remote`；所有提交必须推送
 `origin/main`，交接前用 `--require-synced` 确认本地与远端同步。
 
 - ✅ **算法链路已在软件上端到端跑通并验证**：原始 FASTQ → 比对 → 投票 → 反稀疏化 → LDPC

@@ -2,7 +2,10 @@
 # Refuse development in a copy, nested repository, wrong branch, or wrong remote.
 set -euo pipefail
 
-EXPECTED_ROOT="/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout"
+# 绑定到当前脚本所属 checkout，而不是某台机器的绝对路径。这样用户明确
+# 授权的新 WSL clone 可以复用同一门禁，同时仍拒绝从别的/嵌套仓库误调用。
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+EXPECTED_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
 EXPECTED_HTTPS="https://github.com/Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage.git"
 EXPECTED_SSH="git@github.com:Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage.git"
 
@@ -25,6 +28,7 @@ fail() {
 command -v git >/dev/null 2>&1 || fail "git is not installed"
 
 actual_root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git worktree"
+actual_root=$(cd "$actual_root" && pwd -P)
 [ "$actual_root" = "$EXPECTED_ROOT" ] || fail "unexpected Git root: $actual_root"
 
 cd "$EXPECTED_ROOT"
@@ -62,4 +66,3 @@ printf '  root: %s\n' "$actual_root"
 printf '  branch/upstream: %s -> %s\n' "$branch" "$upstream"
 printf '  origin: %s\n' "$origin_url"
 printf '  main...origin/main: %s ahead, %s behind\n' "$ahead" "$behind"
-

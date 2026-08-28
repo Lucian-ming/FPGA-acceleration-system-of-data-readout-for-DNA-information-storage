@@ -8,11 +8,13 @@
 
 ## Git 绑定与远程交付（最高优先级门禁）
 
-- 唯一允许的开发目录是 `/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`，唯一允许的
-  GitHub 仓库是 `Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`。
-- 禁止 `git init` 另建仓库，禁止另行 clone 后建立平行项目，禁止在项目内创建嵌套仓库。其他 Agent
-  拉取或接手时必须继续使用并绑定上述 GitHub 仓库；绑定核验未通过前，禁止进行仿真、开发或其他项目。
-- 开始工作必须在仓库根目录运行 `bash tools/verify_repo_binding.sh --remote`。该命令必须确认绝对路径、
+- 开发必须位于用户指定的 **WSL 原生文件系统 checkout**；路径可随机器或用户授权的新 clone 变化，
+  但唯一允许的 GitHub 仓库是
+  `Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`。
+- 禁止 `git init` 另建仓库，禁止在项目内创建嵌套仓库，禁止在同一任务中同时修改多个 checkout。
+  只有用户明确要求新建独立 WSL 文件夹时才允许重新 clone；拉取或接手后仍必须绑定上述 GitHub
+  仓库。绑定核验未通过前，禁止进行仿真或开发。
+- 开始工作必须在仓库根目录运行 `bash tools/verify_repo_binding.sh --remote`。该命令必须确认脚本所属 checkout、
   `main`、`origin/main`、指定远端以及当前 GitHub 身份的 fetch/push 权限；任一项失败立即停止。
 - 只允许在 `main` 开发。所有有意义的源码、脚本、测试摘要和交接文档必须提交，并在每次提交后执行
   `git push origin main`；禁止留下仅存在本地的提交。交接前运行

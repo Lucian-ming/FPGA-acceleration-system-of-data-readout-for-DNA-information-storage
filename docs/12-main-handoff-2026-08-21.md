@@ -20,16 +20,17 @@
 
 ### 2.0 接手前强制 Git 门禁
 
-本项目只允许直接使用 `/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`，并绑定：
+本项目只允许使用用户指定的 WSL 原生文件系统 checkout，并绑定：
 
 ```text
 https://github.com/Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage.git
 ```
 
-禁止 `git init`、另行 clone 后另建项目或在本目录中创建嵌套仓库。任何 Agent 开始工作前必须运行：
+禁止 `git init`、在项目中创建嵌套仓库或在同一任务中同时修改多个 checkout；只有用户明确要求
+新建独立 WSL 文件夹时才允许重新 clone。任何 Agent 开始工作前必须在当前仓库根目录运行：
 
 ```bash
-cd /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
+cd "$(git rev-parse --show-toplevel)"
 bash tools/verify_repo_binding.sh --remote
 ```
 
