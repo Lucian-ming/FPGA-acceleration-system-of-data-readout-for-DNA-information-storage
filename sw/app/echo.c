@@ -89,7 +89,7 @@ static volatile proc_state_e g_proc_state = PROC_IDLE;
 typedef enum {
     XFER_TX_READS = 0,  /* MM2S:送 reads 数据 → 2560B/BD (TLAST) */
     XFER_TX_WM    = 1,  /* MM2S:送 watermark → 16KB/BD */
-    XFER_RX_OUT   = 2   /* S2MM:收输出 → 16KB/BD */
+    XFER_RX_OUT   = 2   /* S2MM:收输出 → 【B21】48B/BD，DNA 核每条记录一个 TLAST packet */
 } xfer_kind_e;
 
 /*============================================================================
@@ -169,7 +169,25 @@ static void dump_dma_regs(const char *tag)
     u32 rx_tal= XAxiDma_ReadReg(rx, XAXIDMA_TDESC_OFFSET);
 
     xil_printf("\n\r[DMA] %s\n\r", tag);
+    /* 【B21】原实现读完寄存器却一行都没打印，等于哑巴看门狗：
+     * 上一轮板上卡死时即使触发了 dump 也看不到任何证据。 */
+    xil_printf("  MM2S: DMACR=0x%08X DMASR=0x%08X CURDESC=0x%08X TAILDESC=0x%08X\n\r",
+               tx_cr, tx_sr, tx_cur, tx_tal);
+    xil_printf("  S2MM: DMACR=0x%08X DMASR=0x%08X CURDESC=0x%08X TAILDESC=0x%08X\n\r",
+               rx_cr, rx_sr, rx_cur, rx_tal);
+    xil_printf("  MM2S halted=%u idle=%u err=0x%X | S2MM halted=%u idle=%u err=0x%X\n\r",
+               (unsigned)(tx_sr & 1U), (unsigned)((tx_sr >> 1) & 1U),
+               (unsigned)((tx_sr >> 4) & 0x7U),
+               (unsigned)(rx_sr & 1U), (unsigned)((rx_sr >> 1) & 1U),
+               (unsigned)((rx_sr >> 4) & 0x7U));
+}
 
+/* 【B21】DNA 核控制寄存器回读（reg0=start/preload/softrst，reg1=wm_sel） */
+static void dump_dna_regs(const char *tag)
+{
+    xil_printf("[DNA] %s reg0=0x%08X reg1=0x%08X\n\r", tag,
+               read_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL),
+               read_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG1_WMSEL));
 }
 
 /*============================================================================
@@ -260,8 +278,16 @@ static int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
     case XFER_TX_READS:
         per_bd = FRAME_BYTES;
         break;
-    case XFER_TX_WM:
     case XFER_RX_OUT:
+        /* 【B21 根因】DNA 核的 s2mm_pack64 在每条 48 B 结果的第 6 拍就拉 M_AXIS_RESULT_TLAST，
+         * 即每条记录都是一个独立的 AXIS packet。AXI DMA S2MM 在 SG 模式下遇到 TLAST 就
+         * 关闭当前 BD，所以一个 BD 只能收下一条记录（板上取证：BD 状态 0x8c000030 =
+         * Cmplt|RXSOF|RXEOF|len=48）。原实现按 16,376 B/BD 只投了 13 个 BD，
+         * 收满 13 条后 S2MM_CURDESC==S2MM_TAILDESC 进入 Idle，反压把整条链锁死。
+         * 正确做法：一条记录一个 BD，并在 ring 上滚动补投。 */
+        per_bd = DNA_ACC_RESULT_PACKED_BYTES;
+        break;
+    case XFER_TX_WM:
     default: {
         u32 target = min_u32(max_per_bd, 16U*1024U);
         per_bd = align_down(target, DMA_ADDR_ALIGNMENT);
@@ -386,9 +412,50 @@ static u32 tx_frames_total = 0;
 static u32 tx_frames_sent  = 0;
 static u32 tx_frames_done  = 0;
 
+/* 【B21】RX 改为「一条 48 B 记录一个 BD」后的滚动补投计数 */
+static u32 rx_records_total     = 0;   /* 本次任务应收的记录条数 = 实际读段数 */
+static u32 rx_records_submitted = 0;   /* 已交给硬件的 BD（记录）条数 */
+#define RX_OUTSTANDING_MAX  512U       /* ring 有 1024 个 BD，最多留一半在飞 */
+
+/* 【B21】Stage1 无进展看门狗（poll_callback 每 500 ms 步进一次流水线） */
+static int  s1_last_tx_done = -1;
+static int  s1_last_rx_done = -1;
+static u32  s1_no_progress  = 0;
+#define S1_NO_PROGRESS_LIMIT  60U      /* 60 x 500 ms ≈ 30 s 完全无 BD 进展即判定卡死 */
+
 static inline void pipeline_reset_counters(void){
     wm_tx_expected=0; rx_expected=0; tx_expected=0; tx_done=0; rx_done=0;
     tx_frames_total=0; tx_frames_sent=0; tx_frames_done=0; wm_region=0;
+    rx_records_total=0; rx_records_submitted=0;
+    s1_last_tx_done=-1; s1_last_rx_done=-1; s1_no_progress=0;
+}
+
+/* 【B21】按「一条记录一个 BD」滚动补投 RX 描述符。
+ * 返回本次投出的 BD 数（0 表示暂时不需要补），-1 表示失败。 */
+static int submit_rx_records(void)
+{
+    if (rx_records_submitted >= rx_records_total) return 0;
+    u32 remain = rx_records_total - rx_records_submitted;
+
+    u32 done = (rx_done > 0) ? (u32)rx_done : 0U;
+    u32 outstanding = (rx_records_submitted > done) ? (rx_records_submitted - done) : 0U;
+    if (outstanding >= RX_OUTSTANDING_MAX) return 0;
+
+    u32 n = RX_OUTSTANDING_MAX - outstanding;
+    if (n > remain) n = remain;
+
+    u32 free_bd = XAxiDma_BdRingGetFreeCnt(RxRingPtr);
+    if (n > free_bd) n = free_bd;
+    if (n == 0) return 0;
+
+    u32 addr  = DDR_DNA_ACC_OUT_BASE + rx_records_submitted * DNA_ACC_RESULT_PACKED_BYTES;
+    u32 bytes = n * DNA_ACC_RESULT_PACKED_BYTES;
+
+    int bd = submit_bd_transfer(RxRingPtr, addr, bytes, RxMaxTransferLen,
+                                "RX-DNA-RECORDS", XFER_RX_OUT);
+    if (bd < 0) return -1;
+    rx_records_submitted += n;
+    return bd;
 }
 
 static inline void pipeline_set_state(pipe_state_e st){ pipe_state = st; }
@@ -508,10 +575,16 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         xil_printf("  Output: %u bytes (%u × %u B/read)\n\r",
                    out_size, total_reads, DNA_ACC_RESULT_PACKED_BYTES);
 
-        rx_expected = submit_bd_transfer(RxRingPtr, DDR_DNA_ACC_OUT_BASE,
-                                        out_size, RxMaxTransferLen,
-                                        "RX-DNA", XFER_RX_OUT);
-        if (rx_expected < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
+        /* 【B21】DNA 核每条记录一个 AXIS packet（TLAST），所以一个 BD 只收一条记录。
+         * 需要收 total_reads 条 = total_reads 个 BD，而 ring 只有 1024 个，
+         * 因此按 RX_OUTSTANDING_MAX 滚动补投，rx_expected 直接按条数计。 */
+        Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, out_size);
+        rx_records_total     = total_reads;
+        rx_records_submitted = 0;
+        rx_expected          = (int)total_reads;
+        if (submit_rx_records() < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
+        xil_printf("  RX BD: 1 BD/记录(48 B)，预投 %u/%u 条\n\r",
+                   rx_records_submitted, rx_records_total);
         pipeline_set_state(PIPE_TX_PREFILL);
         return PIPE_STEP_PROGRESS;
     }
@@ -551,6 +624,9 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             rx_done += got_rx;
 
         }
+        /* 【B21】立刻补投 RX BD：一条记录一个 BD，ring 不能空，否则 S2MM 进 Idle
+         * → 结果 FIFO 满 → 输入 FIFO 满 → S_AXIS_DATA_TREADY 拉低 → MM2S 永久停摆 */
+        if (submit_rx_records() < 0) { dump_dma_regs("RX resubmit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
 
         int free_rx = XAxiDma_BdRingGetFreeCnt(RxRingPtr);
         if (free_rx < 100 && tx_frames_sent < tx_frames_total) {
@@ -575,26 +651,30 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         if (got_tx < 0) { dump_dma_regs("TX_STREAM reclaim TX failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
         if (got_tx > 0) { tx_done += got_tx; tx_frames_done = tx_done; }
 
-        static u32 last_report_sent = 0;
-
-
-        static u32 last_rx_done = 0, stuck_count = 0;
-        if (rx_done == last_rx_done && tx_frames_sent >= tx_frames_total) {
-            stuck_count++;
-            if (stuck_count > 10000) {
-                xil_printf("\n\r[ERROR] RX stuck at %d/%d after TX complete!\n\r", rx_done, rx_expected);
-                dump_dma_regs("RX stuck");
-                xil_printf("[STAGE1] Final RX recovery attempt...\n\r");
-                for (int i = 0; i < 10; i++) {
-                    got_rx = reclaim_some_bd(RxRingPtr, 512);
-                    if (got_rx > 0) { rx_done += got_rx; xil_printf("  +%d BDs\n\r", got_rx); }
-                    usleep(1000);
-                }
-                if (rx_done == last_rx_done) { xil_printf("[ERROR] RX truly stuck, hardware issue!\n\r"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
-                stuck_count = 0;
-            }
-        } else stuck_count = 0;
-        last_rx_done = rx_done;
+        /* 【B21】可达的无进展看门狗。
+         * 本函数由 lwIP 的 poll_callback 驱动，约 500 ms 才走一次；
+         * 原来的 stuck_count>10000 需要约 83 分钟才会触发，等于永远打不出证据，
+         * 这正是上一轮板上「IP core START 之后再无任何输出」的原因。 */
+        if (rx_done == s1_last_rx_done && tx_done == s1_last_tx_done) {
+            s1_no_progress++;
+        } else {
+            s1_no_progress = 0;
+            s1_last_rx_done = rx_done;
+            s1_last_tx_done = tx_done;
+        }
+        if (s1_no_progress > S1_NO_PROGRESS_LIMIT) {
+            xil_printf("\n\r[ERROR] STAGE1 停滞 ~%u s 无任何 BD 进展\n\r",
+                       (unsigned)(S1_NO_PROGRESS_LIMIT / 2U));
+            xil_printf("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
+                       tx_frames_sent, tx_frames_total, tx_done, tx_expected);
+            xil_printf("  RX records done=%d/%d  submitted=%u  ring free=%d\n\r",
+                       rx_done, rx_expected, rx_records_submitted,
+                       (int)XAxiDma_BdRingGetFreeCnt(RxRingPtr));
+            dump_dma_regs("STAGE1 stall");
+            dump_dna_regs("STAGE1 stall");
+            pipeline_set_state(PIPE_FAIL);
+            return PIPE_STEP_FAIL;
+        }
 
         if (tx_frames_sent >= tx_frames_total && tx_done >= tx_expected && rx_done >= rx_expected) {
             xil_printf("\n\r[STAGE1] COMPLETE!\n\r");
@@ -612,10 +692,14 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 
         int got_rx = reclaim_some_bd(RxRingPtr, 256); if (got_rx < 0){pipeline_set_state(PIPE_FAIL);return PIPE_STEP_FAIL;}
         rx_done += got_rx;
+        /* 【B21】收尾阶段同样要保证 RX ring 里始终有描述符 */
+        if (submit_rx_records() < 0) { dump_dma_regs("PROGRESS RX resubmit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
 
         static u32 wait_count = 0;
-        if (++wait_count >= 50) {
-            xil_printf("[STAGE1] WAIT tx=%u/%u rx=%d/%d\n\r", tx_frames_done, tx_frames_total, rx_done, rx_expected);
+        if (++wait_count >= 10) {
+            xil_printf("[STAGE1] WAIT tx=%u/%u rx=%d/%d (submitted=%u)\n\r",
+                       tx_frames_done, tx_frames_total, rx_done, rx_expected,
+                       rx_records_submitted);
             wait_count = 0;
         }
 

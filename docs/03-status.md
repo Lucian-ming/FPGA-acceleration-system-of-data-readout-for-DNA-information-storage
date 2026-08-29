@@ -114,8 +114,31 @@ FIFO 背压，没有真实 DMA、没有 50 次水印预载的区域切换时序�
 2. DNA ingress FIFO 满背压后的恢复；
 3. `start` 与 `preload` 位的先后与清除时机。
 
-**下一步**：应先补做 BD-3b（实际 BD 下 DMA↔DNA 的 AXIS 事务仿真）以在仿真中复现，
-而不是直接在板上试错。详见 `docs/15-m3-bd-simulation-2026-08-29.md` §6。
+### 根因（2026-08-29 已坐实，三方独立印证）
+
+| 环节 | 事实 |
+| --- | --- |
+| DNA 核 | `s2mm_pack64.v` 的 `S_PACK5` 状态 `m_last <= 1'b1`：每条 48 B 结果（6 拍 × 64 bit）结尾都拉 `M_AXIS_RESULT_TLAST`，即**每条记录是一个独立 AXIS packet** |
+| AXI DMA S2MM | SG 模式遇 `TLAST` 即关闭当前 BD，**一个 BD 只能收下一条记录** |
+| 固件 `echo.c` | RX BD 却按「总字节 / 每 BD 最大长度」切：`ceil(196608 / 16376) = 13` 个 BD |
+| 板上实测 | RX Cmplt = **13**，与上式**精确吻合**；BD 状态 `0x8c000030` = Cmplt+RXSOF+RXEOF+48 B，正是「一条记录一个 packet」 |
+| 自相矛盾佐证 | 同一份固件里 `rx_expected = total_reads = 4096`，说明它本就预期每条读段回一次，与投递逻辑不一致 |
+
+收满 13 条后 `S2MM_CURDESC == S2MM_TAILDESC`，S2MM 进入 Idle，
+AXIS 反压回灌把 DNA 核连同整条链锁死——这解释了「无任何 AXI 错误位却完全静止」。
+
+**正确做法**：RX 每个 BD 按 **48 B**（`DNA_ACC_RESULT_PACKED_BYTES`）投递，
+4,096 条记录需要 4,096 个 BD，而 RX 环只有 `MAX_BD_COUNT_RX = 1024`，
+**因此必须边回收边滚动补投**。
+
+### 状态：修复在途，**尚未验证**
+
+- `sw/app/echo.c` 已改 `XFER_RX_OUT` 的 `per_bd` 为 48 B，并补了
+  `dump_dma_regs()` 的实际打印（原实现读完寄存器一行都不打印，等于哑巴看门狗）
+  与新增 `dump_dna_regs()`。
+- `hw/sim/m3/tb_m3_bd3b_dma.sv` 为 BD-3b 仿真复现的在途文件。
+- **两者都未经完整验证**：未复跑 Icarus/XSim/M2、未重建制品、未再次上板。
+  接手者必须先补完验证再宣称修复。
 
 ---
 
