@@ -205,6 +205,70 @@ CH340 通常是 `1A86:7523`）。
 
 ---
 
+## 6.3 首次上板实测记录（2026-08-29，已完成）
+
+工具链：Windows 侧 **Vivado Lab 2022.2**（`D:\dev_tools\Vivado_Lab\2022.2`）批处理驱动。
+WSL 里的 Vivado **无法**通过 `connect_hw_server` 连到 Windows 的 hw_server
+（TCP 端口探测会误报成功，实际协议握手失败），因此改为在 Windows 侧直接跑
+`vivado_lab.bat -mode batch` 与 `xsdb.bat`，把制品放到 `D:\dna_board_smoke\`。
+
+### 实测结果
+
+| 检查项 | 结果 |
+| --- | --- |
+| JTAG 链 | ✅ 目标 `localhost:3121/xilinx_tcf/Digilent/210251A08870` |
+| 器件 | ✅ `arm_dap_0` + `xc7z010_1`，IDCODE `0x13722093`（XC7Z010） |
+| 官方 LED bit 冒烟 | ✅ 烧录前 `DONE status = 0`，烧录后 `End of startup status: HIGH` |
+| 本项目 bitstream | ✅ 烧录成功（`top_bd_wrapper.bit`，SHA-256 `919551be...`） |
+| `ps7_init` / `ps7_post_config` | ✅ 正常返回（**DDR 训练在此完成**） |
+| **DDR 读写自检** | ✅ **11 个地址 × 4 种图案 + 地址唯一性，全部通过** |
+| 应用 ELF 启动 | ✅ `dna_lwip_app_b20.elf`（SHA-256 `e95c7d95...`）下载并运行 |
+| 三个 IP 复位 | ✅ Voter `IDLE=1,DONE=0`；Decoder `IDLE=1,DONE=0`；DNA 就绪 |
+| PHY 自协商 | ✅ `autonegotiation complete`，**link speed 1000** |
+| 网络接口 | ✅ `Board IP: 192.168.1.10` |
+| AXI DMA | ✅ TX BD Ring 2048、RX BD Ring 1024 初始化完成 |
+
+**DDR 自检覆盖的地址**：`0x00100000 / 0x08000000 / 0x10000000 / 0x10040000 /
+0x10100000 / 0x10600000 / 0x11000000 / 0x11100000 / 0x11800000 / 0x11900000 / 0x1FFF0000`，
+即应用实际使用的全部区间加上下边界。图案为 `A5A55A5A / 5A5AA5A5 / FFFFFFFF / 00000000`，
+另加递增图案回读以排除地址线错接与镜像。
+
+> **这直接验证了 §3 的 DDR 修正在真实硬件上成立。** 修正前按 32 bit 配置，
+> 规格书明确「不更改不能运行」；修正后 DDR 训练通过、全地址读写正确。
+> §5 第 2 条那个「板级走线延迟仍是从错误板卡继承的 0.25」的残留风险，
+> 至此可以认为**在本板上不构成问题**（三项训练自适应成功）。
+
+### 需要更正的两处资料
+
+1. **板载下载器不是 FT232H**：实际枚举为 **Digilent** cable（`210251A08870`）。
+   规格书与资料包 README 都写的是 FT232H，与实物不符。不影响使用。
+2. **串口**：CH340 枚举为 **COM6**，`VID_1A86&PID_7523`（与预期一致）。
+   `Win32_SerialPort` 查不到它，要用 `Win32_PnPEntity` 按 `Name -match 'COM\d+'` 找。
+
+### 已知告警（不阻塞）
+
+- lwIP 打印 `unable to determine type of EMAC with baseaddress 0xE000B000`，
+  但随后 PHY 自协商成功、链路 1000 Mbps、IP 配置完成，功能正常。
+
+### 尚未打通：主机到板子的网络
+
+板子固定 `192.168.1.10`，而 Windows 侧接板子的网卡（**ASIX USB 千兆网卡**，
+设备名「以太网 2」，链路 1 Gbps Up）当前是 APIPA 地址 `169.254.x.x`，
+**与板子不在同一网段**，因此 ping 不通。直连网线无 DHCP 服务器，属正常现象。
+
+需要把该网卡设为 `192.168.1.x/24` 静态地址（例如 `192.168.1.100`）：
+
+```powershell
+# 以管理员身份运行；<IfIndex> 用 Get-NetAdapter 查「以太网 2」
+New-NetIPAddress -InterfaceAlias "以太网 2" -IPAddress 192.168.1.100 -PrefixLength 24
+# 恢复 DHCP：
+# Set-NetIPInterface -InterfaceAlias "以太网 2" -Dhcp Enabled
+```
+
+配好后即可进行 G3：`clients/python/first.py` 发送读段并回收 8,100 B 结果。
+
+---
+
 ## 7. 原始资料索引
 
 | 路径 | 内容 |
