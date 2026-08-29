@@ -82,9 +82,9 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
 
 ---
 
-## B 类新增 · B21（2026-08-29，**首次上板 G3 发现，未修复**）
+## B 类新增 · B21（2026-08-29，首次上板 G3 发现）
 
-### B21 Stage1 在板上产出约 13 条结果后硬卡死
+### ~~B21 Stage1 在板上产出约 13 条结果后硬卡死~~ ✅ 已修复并在板上验证（2026-08-29）
 
 **现象**：首次 G3 上板，协议握手、CONFIG、水印下发、读段下发全部成功，
 板端打印到 `[STAGE1] IP core START` 后再无任何输出，客户端等结果 180 s 超时。
@@ -131,14 +131,148 @@ AXIS 反压回灌把 DNA 核连同整条链锁死——这解释了「无任何 
 4,096 条记录需要 4,096 个 BD，而 RX 环只有 `MAX_BD_COUNT_RX = 1024`，
 **因此必须边回收边滚动补投**。
 
-### 状态：修复在途，**尚未验证**
+### 状态：已修复，**板上实测通过**（2026-08-29 第二次上板）
 
-- `sw/app/echo.c` 已改 `XFER_RX_OUT` 的 `per_bd` 为 48 B，并补了
-  `dump_dma_regs()` 的实际打印（原实现读完寄存器一行都不打印，等于哑巴看门狗）
-  与新增 `dump_dna_regs()`。
-- `hw/sim/m3/tb_m3_bd3b_dma.sv` 为 BD-3b 仿真复现的在途文件。
-- **两者都未经完整验证**：未复跑 Icarus/XSim/M2、未重建制品、未再次上板。
-  接手者必须先补完验证再宣称修复。
+固件改动（`sw/app/echo.c`）：
+
+1. `XFER_RX_OUT` 的 `per_bd` 改为 `DNA_ACC_RESULT_PACKED_BYTES` = 48 B；
+2. 新增 `submit_rx_records()`：按 `RX_OUTSTANDING_MAX = 512` 在 1,024 个 BD 的环上
+   滚动补投，`PIPE_RX_PREP` / `PIPE_TX_STREAM` / `PIPE_PROGRESS` 三处都会补；
+3. `reclaim_some_bd()` 原来用 `&BdPtr[i]` **线性索引**遍历刚回收的一批 BD。
+   `XAxiDma_BdRingFromHw()` 返回的是环上一段逻辑连续的 BD，**可能跨过环尾回绕**；
+   RX 改成 48 B/BD 后一次任务要用掉 4,096 个 BD 而环只有 1,024 个，
+   必然回绕 4 次，线性索引会读到 BD 环之外的内存——既可能把垃圾值误判成 BD 错误
+   而让整条流水线 FAIL，也可能漏掉真正回绕那几个 BD 的错误位。已改为沿
+   `XAxiDma_BdRingNext()` 遍历；`submit_bd_transfer()` 里那次
+   `Xil_DCacheFlushRange(BdPtr, bd_count*64)` 同样是「假设一批 BD 内存连续」，
+   一并改为逐个刷。
+4. `dump_dma_regs()` 补上实际打印（原实现读完寄存器一行都不打印，等于哑巴看门狗），
+   新增 `dump_dna_regs()`；`PIPE_TX_STREAM` 的无进展看门狗从
+   `stuck_count > 10000`（按 500 ms 一次的 poll 折算约 83 分钟，等于永远打不出证据）
+   改为 60 次 poll ≈ 30 s。
+
+**板上判据（第二次上板，UART 实录）**：
+
+```
+[STAGE1] RX_PREP
+  Reads: 4096
+  Output: 196608 bytes (4096 x 48 B/read)
+  RX BD: 1 BD/记录(48 B)，预投 512/4096 条
+[STAGE1] IP core START
+[STAGE1] COMPLETE!
+  TX: sent=64 done=64/64
+  RX: done=4096/4096
+```
+
+`RX: done=4096/4096`（原为 13）即 B21 关闭判据：滚动补投在真实硬件上成立，
+含 4 次环回绕，无一条 BD 报错。Stage1 之后 Stage2 正常 DONE，流水线继续向下走。
+
+> **注意**：B21 关闭**只**代表「4,096 条记录都被 DMA 搬回了 DDR」，
+> **不代表记录内容正确**。内容错误另见 B23。
+
+---
+
+## B 类新增 · B22（2026-08-29，第二次上板发现）
+
+### ~~B22 Stage3 等待循环从不读 STATUS，DONE 永远等不到、超时也永远触发不了~~ ✅ 已修复并验证
+
+**现象**：B21 修好后再次上板，Stage1、Stage2 都正常完成，日志停在
+`[STAGE3] ✓ Started, monitoring progress...` 之后再无输出，客户端 180 s 超时。
+
+**根因**（`sw/app/echo.c` 的 `PIPE_DECODER_WAIT`，三处叠加）：
+
+| # | 缺陷 | 后果 |
+| --- | --- | --- |
+| 1 | 注释声称「用状态寄存器的 DONE 标志(可靠)」，但循环里**从来没有读过 `DECODER_REG_STATUS`** | 完成信号根本没人看 |
+| 2 | 唯一的判定是每 1,000 次轮询做一次的内存启发式；本状态由 lwIP `tcp_poll` 驱动，间隔 500 ms，**最早也要 1000 × 500 ms = 500 s 才做第一次判断** | 上位机 `recv_result` 的静默上限是 180 s，必然先超时 |
+| 3 | 那个启发式把 `0` 和 `0xAAAA…` 当「未写」，可 `PIPE_DECODER_PREP` 填的哨兵是 `DECODER_SENTINEL_U64 = 0x0A55AA55AA55AA55`，**根本不在比较之列**；超时阈值 `poll_count > 500000` ≈ 69 小时 | 既分不出写没写，也等于没有超时 |
+
+**修复**：与 Stage2 的 `PIPE_VOTER_WAIT` 对齐——每次轮询都读 `STATUS` 判 `DONE`；
+内存进度只作旁证且按真正的哨兵比较、每 20 次轮询（约 10 s）打一次；
+超时改为 240 次轮询 ≈ 120 s，仍在上位机 180 s 静默上限之内，超时时打印
+`STATUS / IN_ADDR / IN_BEATS / OUT_ADDR / OUT_BEATS`。
+
+**判据**：修复后同一条命令拿到 `Result: 8100 bytes, 32.23s`，
+Stage3 正常完成，8,100 B 回传成立。
+
+---
+
+## B 类新增 · B23（2026-08-29，第二次上板发现，**未修复，当前 G3 唯一阻塞项**）
+
+### B23 DNA 核 `M_AXIS_RESULT` 的 TDATA 比 TVALID 早一拍，每条记录丢首拍、末拍重复
+
+**现象**：B21 + B22 修好后，G3 全程走通并回传 8,100 B，但
+`tools/ldpc_decode.py` **译码不收敛**（50 轮后仍有 5,265 个失败校验）。
+把回传比特与 `archive/submission_2025-11-07/演示文件/dec_input.txt` 逐位比，
+**误码率 49.70%**（32,206/64,800），即与正确结果完全不相关。
+
+**取证方式**：板子跑完后**不复位、不重烧**，用 XSDB 只读 DDR
+（`mrd -bin -file`，脚本 `D:\dna_board_smoke\dump_ddr.tcl`）导出四级中间结果，
+与仓库内黄金向量逐拍比对。
+
+| 观测项 | 结果 |
+| --- | --- |
+| DDR 里展开后的 50 个水印区域（`0x10040000`，191,400 B）vs `tests/golden/wm_regions.hex` | **47,850/47,850 字逐位相同** ✅ |
+| Stage1 输出（`0x10600000`，4,096 × 48 B）vs `tests/golden/stage2_in.hex` | **内容错位** ❌ |
+| 每条记录的第 5、6 个 64-bit 字 | **4,096/4,096 条完全相同**，且都 ≤ 6 bit |
+| 解析出的 score / position | score 均匀铺满 0..1023、position 最大 64,306（**> L=40,500，不可能**）→ 是随机比特 |
+
+**错位规律（决定性证据）**：设 golden 记录 *i* 的第 *k* 拍为 `G[i][k]`，
+板上记录 *i* 的第 *k* 拍为 `B[i][k]`，则
+
+```
+B[i][k] == G[i+1][k+1]   k = 0..4     实测 20,470 / 20,475 拍吻合（99.98%）
+B[i][5] == B[i][4]                    实测 4,095 / 4,095 条成立
+```
+
+即 **每个 48 B 包实际收到的是 `[b1,b2,b3,b4,b5,b5]`**：首拍被丢掉、末拍被重复采样，
+整条流水还额外整体偏移了一条记录。首拍正是 `score[9:0]` + `position[15:0]` +
+码字低 38 bit 所在的那 64 bit，**所以 Voter 拿到的分数和位置全是码字碎片**，
+投票结果自然与正确答案不相关。
+
+**根因**（`hw/ip/Dna_accelerator_core_1_0/hdl/Dna_accelerator_core_v1_0.v:404-424`）：
+
+```verilog
+end else if (M_AXIS_RESULT_TREADY || ~M_AXIS_RESULT_TVALID) begin
+    M_AXIS_RESULT_TVALID <= pack_vld;      // 寄存，晚一拍
+    M_AXIS_RESULT_TLAST  <= pack_last;     // 寄存，晚一拍
+end
+...
+assign M_AXIS_RESULT_TDATA = pack_dat;     // 组合直连，立刻跟随
+```
+
+`TDATA` 组合直连 `s2mm_pack64` 的寄存输出，而 `TVALID`/`TLAST` 又寄存了一拍，
+**数据比 valid 早一整拍**。于是每次握手采到的都是「下一拍」的数据：
+包首那一拍在 TVALID 还没抬起来时就过去了（丢），包尾那一拍在 TVALID 多拉一拍时被采两次（重）。
+
+**为什么所有仿真都没抓到**：`tools/run_m2_full.sh` 的 Stage1 环节
+（`run_m2_full.sh:99`）只编译 `srpe_batch.v` + `tb_srpe_batch.v`，
+**直接抓引擎的 `res_din` 记录，完全绕开了 `Dna_accelerator_core_v1_0.v` 的 AXIS 输出级和
+`s2mm_pack64`**；`tb_dna_ingress` 只测入口 FIFO 背压。
+`DNA M_AXIS → AXI DMA S2MM` 这条链至今没有任何仿真覆盖——
+正是 `docs/13` §7.2 BD-3 第 2 项、`docs/17` §1「根因缺口」点名的那一条。
+
+**修复方向**：把 `TDATA` 和 `TVALID`/`TLAST` 放进同一个 always 块、用同一个使能条件寄存
+（标准 register-slice 写法），让三者同拍推进：
+
+```verilog
+end else if (M_AXIS_RESULT_TREADY || ~M_AXIS_RESULT_TVALID) begin
+    M_AXIS_RESULT_TVALID  <= pack_vld;
+    M_AXIS_RESULT_TLAST   <= pack_last;
+    m_axis_result_tdata_r <= pack_dat;     // 与 valid 同拍
+end
+assign M_AXIS_RESULT_TDATA = m_axis_result_tdata_r;
+```
+
+**这是 RTL 改动，必须重新综合/实现并重建 bitstream 与整套 `hw/build/export/` 制品，
+然后才能再上板。在图片 SHA-256 等于
+`fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 之前，
+G3 仍未闭环，不得声称端到端正确。**
+
+补一条仿真判据（应与修复同批提交）：在 BD 级把
+`AXI DMA MM2S → DNA S_AXIS` 与 `DNA M_AXIS → AXI DMA S2MM` 串起来，
+判据是「送入 N 条 → 收到 N 条 48 B 记录且逐位等于 `tests/golden/stage2_in.hex`」，
+而不是「跑完没报错」。在途文件 `hw/sim/m3/tb_m3_bd3b_dma.sv`。
 
 ---
 

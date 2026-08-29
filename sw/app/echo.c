@@ -334,7 +334,18 @@ static int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
         BdCurPtr   = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, BdCurPtr);
     }
 
-    Xil_DCacheFlushRange((UINTPTR)BdPtr, bd_count * sizeof(XAxiDma_Bd));
+    /* 【B21】BD ring 是环形的：一批 BD 可能跨过环尾回绕到环首。
+     * 原来的 Xil_DCacheFlushRange(BdPtr, bd_count*64) 假设这批 BD 在内存里连续，
+     * 回绕时会刷到环外地址、而漏掉真正回绕到环首的那几个 BD。
+     * RX 现在按 48 B/BD 投递，一次任务要用掉 4,096 个 BD 而环只有 1,024 个，
+     * 必然回绕 4 次，所以必须逐个沿 BdRingNext 刷。 */
+    {
+        XAxiDma_Bd *FlushPtr = BdPtr;
+        for (u32 i = 0; i < bd_count; i++) {
+            Xil_DCacheFlushRange((UINTPTR)FlushPtr, sizeof(XAxiDma_Bd));
+            FlushPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, FlushPtr);
+        }
+    }
 
     Status = XAxiDma_BdRingToHw(RingPtr, bd_count, BdPtr);
     if (Status != XST_SUCCESS) {
@@ -350,12 +361,20 @@ static int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
     XAxiDma_Bd *BdPtr;
     int n = XAxiDma_BdRingFromHw(RingPtr, max_to_reclaim, &BdPtr);
     if (n > 0) {
+        /* 【B21】BdRingFromHw 返回的是环上一段「逻辑连续」的 BD，它可能跨过环尾回绕。
+         * 原实现用 &BdPtr[i] 线性索引，一旦回绕就会读到 BD 环之外的内存：
+         * 既可能把垃圾值误判成 BD 错误而让整条流水线 FAIL，
+         * 也可能漏掉真正回绕那几个 BD 的错误位。
+         * RX 改成 48 B/BD 后每次任务必然回绕（4,096 条记录 / 1,024 个 BD），
+         * 必须沿 BdRingNext 走。 */
+        XAxiDma_Bd *CurPtr = BdPtr;
         for (int i=0;i<n;i++) {
-            u32 sts = XAxiDma_BdGetSts(&BdPtr[i]);
+            u32 sts = XAxiDma_BdGetSts(CurPtr);
             if (sts & XAXIDMA_BD_STS_ALL_ERR_MASK) {
-                xil_printf("[ERROR] BD status error: 0x%08X\n\r", sts);
+                xil_printf("[ERROR] BD status error: 0x%08X (BD %d/%d)\n\r", sts, i, n);
                 return -1;
             }
+            CurPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, CurPtr);
         }
         if (XAxiDma_BdRingFree(RingPtr, n, BdPtr) != XST_SUCCESS) return -1;
     }
@@ -1406,41 +1425,66 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	     * 2. 实际写入的beat数(区别0和最后写入)
 	     *========================================================================*/
 	    case PIPE_DECODER_WAIT: {
-	        static int poll_count = 0;
+	        /* 【B22】本状态由 poll_callback 驱动，约 500 ms 才走一次。
+	         * 原实现三处错误，合起来等于「永远等不到、也永远超不了时」：
+	         *   1) 注释声称用 STATUS 的 DONE 标志判完成，但循环里**从来没读过 STATUS**，
+	         *      只靠每 1000 次轮询一次的内存启发式 —— 最早也要 1000 x 500 ms = 500 s
+	         *      才做第一次判断，而上位机 recv_result 的静默上限是 180 s；
+	         *   2) 那个启发式拿 0 和 0xAAAA... 当「未写」，可 PREP 填的哨兵是
+	         *      DECODER_SENTINEL_U64 = 0x0A55AA55AA55AA55，压根不在比较之列，
+	         *      所以它其实分不出写没写；
+	         *   3) 超时阈值 500000 次轮询 ≈ 69 小时，等于没有超时。
+	         * 现在与 Stage2 的 PIPE_VOTER_WAIT 对齐：每次轮询都读 STATUS 看 DONE，
+	         * 内存进度只作旁证（且按真正的哨兵比较），并给一个够得着的超时。 */
+	        static u32 poll_count = 0;
 	        poll_count++;
 
-	        if (poll_count % 1000 == 0) {
-	            // 每1000次轮询，刷新一次Decoder输出区缓存
+	        u32 status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
+
+	        /* 条件1（主判据）：DONE 标志置位 */
+	        if (status & DECODER_STATUS_DONE) {
+	            xil_printf("\n\r[STAGE3] ✓ DONE flag set after %u polls\n\r", poll_count);
+	            write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
+	            poll_count = 0;
+	            pipeline_set_state(PIPE_DONE_STAGE3);
+	            return PIPE_STEP_PROGRESS;
+	        }
+
+	        /* 条件2（旁证）：输出区哨兵是否已被全部覆盖。每 20 次轮询（~10 s）看一次 */
+	        if ((poll_count % 20u) == 0u) {
 	            Xil_DCacheInvalidateRange(DDR_DECODER_OUT_BASE, DECODER_OUTPUT_BEATS * 8);
-
-	            u64 *p_out = (u64 *)DDR_DECODER_OUT_BASE;
-	            u32 nonzero_count = 0;
-
+	            volatile const u64 *p_out = (volatile const u64 *)DDR_DECODER_OUT_BASE;
+	            u32 written = 0;
 	            for (u32 i = 0; i < DECODER_OUTPUT_BEATS; i++) {
-	                u64 val = p_out[i];
-	                if (val != 0x0000000000000000ULL && val != 0xAAAAAAAAAAAAAAAAULL) {
-	                    nonzero_count++;
-	                }
+	                if (p_out[i] != DECODER_SENTINEL_U64) written++;
 	            }
+	            xil_printf("[STAGE3][POLL #%u] STATUS=0x%02X (IDLE=%u,DONE=%u) 已写 %u/%u 拍\n\r",
+	                       poll_count, status, (unsigned)(status & 0x1U),
+	                       (unsigned)((status >> 1) & 0x1U),
+	                       written, (u32)DECODER_OUTPUT_BEATS);
 
-	            xil_printf("[POLL #%d] Progress: %u/%u beats (%.1f%%)\n\r",
-	                       poll_count,
-	                       nonzero_count,
-	                       DECODER_OUTPUT_BEATS,
-	                       100.0f * nonzero_count / DECODER_OUTPUT_BEATS);
-
-	            if (nonzero_count >= DECODER_OUTPUT_BEATS) {
-	                xil_printf("[STAGE3] ✓ Output memory written (%u/%u)\n\r",
-	                           nonzero_count, DECODER_OUTPUT_BEATS);
+	            if (written >= DECODER_OUTPUT_BEATS) {
+	                xil_printf("[STAGE3] ⚠️ 输出区 %u/%u 拍已全部写出，但 DONE=0；按完成收尾\n\r",
+	                           written, (u32)DECODER_OUTPUT_BEATS);
+	                write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
+	                poll_count = 0;
 	                pipeline_set_state(PIPE_DONE_STAGE3);
 	                return PIPE_STEP_PROGRESS;
 	            }
+	        }
 
-	            if (poll_count > 500000) {
-	                xil_printf("[STAGE3] ❌ Timeout after %d polls\n\r", poll_count);
-	                pipeline_set_state(PIPE_FAIL);
-	                return PIPE_STEP_FAIL;
-	            }
+	        /* 够得着的超时：240 x 500 ms ≈ 120 s，仍在上位机 180 s 静默上限之内 */
+	        if (poll_count > 240u) {
+	            xil_printf("\n\r[ERROR] STAGE3 等待 ~120 s 仍未完成\n\r");
+	            xil_printf("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
+	                       status,
+	                       read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR),
+	                       read_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS),
+	                       read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR),
+	                       read_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS));
+	            poll_count = 0;
+	            pipeline_set_state(PIPE_FAIL);
+	            return PIPE_STEP_FAIL;
 	        }
 
 	        return PIPE_STEP_PROGRESS;
