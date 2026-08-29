@@ -75,6 +75,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 | `docs/14-next-steps-2026-08-29.md` | **下一步行动计划**：本机已验证基线、M3/G3 排序与待用户决定项 |
 | `docs/15-m3-bd-simulation-2026-08-29.md` | **M3 实际 BD 集成仿真结果**与 BD-3 阻塞证据 |
 | `docs/16-board-zynq-eco-7010.md` | **板级配置唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 修正与上板顺序 |
+| `docs/17-parallel-tasks-2026-08-29.md` | **并行任务简报**：B21 的两条定位路径与会话互斥约定 |
 | `docs/reference/` | 历史审计结果（数据集校验和、文件索引、缺口清单、提交归档），只读参考 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
