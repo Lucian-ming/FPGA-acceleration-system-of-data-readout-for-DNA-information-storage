@@ -227,17 +227,25 @@ module Dna_accelerator_core_v1_0 #(
     // Preload watermark with overflow protection
     // =================================================
     reg        wm_we;
-    reg [9:0]  wm_waddr;
+    reg [9:0]  wm_waddr;     // 递增指针
+    reg [9:0]  wm_waddr_q;   // [B25] 与 wm_wdata / wm_we 同拍的写地址
     reg [1:0]  wm_wdata;
 
+    // [B25] wm_we / wm_wdata 都是寄存输出（下一拍才有效），而 wm_waddr 在同一个
+    // always 块里当拍就自增了。于是第 k 个符号在 wm_we 拉高那一拍看到的地址已经是 k+1，
+    // 整条水印被写偏一个符号，板上表现为每条记录报告的 position 恒比黄金大 1
+    // （4,009/4,095 条精确 +1，其余是因此被打破的并列）。
+    // 修法：另存一个与 wm_wdata 同拍的 wm_waddr_q 作为真正的写地址。
     always @(posedge aclk or negedge aresetn) begin
         wm_we <= 1'b0;
         if (!aresetn || soft_reset_s) begin
-            wm_waddr <= 10'd0;
+            wm_waddr   <= 10'd0;
+            wm_waddr_q <= 10'd0;
         end else if (preload_mode_s && S_AXIS_DATA_TVALID && S_AXIS_DATA_TREADY) begin
             wm_we    <= 1'b1;
             wm_wdata <= S_AXIS_DATA_TDATA[1:0];
             // 【修复3】防溢出：写满 957 个 symbol 后自动归零
+            wm_waddr_q <= wm_waddr;   // [B25] 写地址必须与数据同拍，见下方注释
             wm_waddr <= (wm_waddr == 10'd956) ? 10'd0 : (wm_waddr + 10'd1);
         end
     end
@@ -355,7 +363,7 @@ module Dna_accelerator_core_v1_0 #(
         .cw_data          (in_dout),
         .bram_write_en    (wm_we),
         .bram_sel         (wm_sel_s),
-        .bram_write_addr  (wm_waddr),
+        .bram_write_addr  (wm_waddr_q),
         .bram_write_data  (wm_wdata),
         .res_wr           (eng_res_wr),
         .res_din          (eng_res_din),

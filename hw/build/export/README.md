@@ -1,4 +1,4 @@
-# 2026-08-29 可上板交付制品（ZYNQ ECO R6，16 bit DDR + B20 修复）
+# 2026-08-29 可上板交付制品（ZYNQ ECO R6，16 bit DDR + B20/B23/B24/B25 修复）
 
 本目录是与当前 `main` 的 RTL / PS 固件匹配、且**按目标板 ZYNQ ECO(R6) 实物 DDR 配置**
 重建的最小完整交付集。板级基准见 `docs/16-board-zynq-eco-7010.md`。
@@ -17,7 +17,7 @@
 | `dna_accel.xsa` | 与当前 bitstream 同源的硬件平台（**16 bit DDR**） |
 | `top_bd_wrapper.bit` | 独立 PL bitstream |
 | `fsbl.elf` | 生成 `BOOT.bin` 使用的 FSBL，按新 XSA 重建 |
-| `dna_lwip_app_b20.elf` | 与新 XSA、bitstream 匹配的应用固件 |
+| `dna_lwip_app_b25.elf` | 与新 XSA、bitstream 匹配的应用固件（含 B21/B22 固件修复） |
 | `reports/` | 完整实现及四个关键 RTL 核的时序、资源报告 |
 | `SHA256SUMS` | 上述文件的 SHA-256 清单 |
 
@@ -27,7 +27,7 @@
 > 历史上按旧配置构建的 ELF（`dna_lwip_app_board_20260816.elf` 为 32 bit DDR 版、
 > `dna_lwip_app_ddr16.elf` 为 B20 修复前版）均已从本目录移除（Git 历史中仍可取回），
 > 以免误烧。对应的 `dna_board_20260816.bif` / `dna_board_ddr16.bif` 同样作废，
-> 现用 `sw/boot/dna_board_b20.bif`。
+> 现用 `sw/boot/dna_board_b25.bif`；`dna_lwip_app_b20.elf` 已被 `dna_lwip_app_b25.elf` 取代。
 
 ## 本次重建的验证
 
@@ -61,7 +61,7 @@ sha256sum -c SHA256SUMS
 
 cd ../../..
 /tools/Xilinx/Vitis/2022.2/bin/bootgen \
-  -image sw/boot/dna_board_b20.bif \
+  -image sw/boot/dna_board_b25.bif \
   -arch zynq -o /tmp/BOOT-rebuilt.bin -w on
 cmp /tmp/BOOT-rebuilt.bin hw/build/export/BOOT.bin
 ```
@@ -72,12 +72,45 @@ cmp /tmp/BOOT-rebuilt.bin hw/build/export/BOOT.bin
 vivado -mode batch -source hw/scripts/build.tcl
 xsct sw/scripts/create_vitis.tcl -tclargs \
     xsa=$PWD/hw/build/export/dna_accel.xsa ws=$PWD/sw/workspace \
-    plat=dna_platform_b20 app=dna_lwip_app_b20
+    plat=dna_platform_b25 app=dna_lwip_app_b25
 ```
+
+## 本轮（2026-08-29 晚）在此基础上的修复
+
+这套制品比上一版多了四个已定位缺陷的修复，详见 `docs/03-status.md`：
+
+| 编号 | 位置 | 内容 | 验证状态 |
+| --- | --- | --- | --- |
+| B21 | `sw/app/echo.c` | RX BD 按 48 B/记录滚动补投；`reclaim_some_bd` 的 BD 环回绕 | ✅ 板上 `RX: done=4096/4096` |
+| B22 | `sw/app/echo.c` | Stage3 等待循环从不读 STATUS、超时≈69 小时 | ✅ 板上回传 8,100 B |
+| B23/B24 | `Dna_accelerator_core_v1_0.v`、`s2mm_pack64.v` | AXIS 结果输出级 TDATA 比 TVALID 早一拍；packer 违反 AXI-Stream；结果 FIFO 被反复 pop | ✅ 板上每包 6 拍完整、码字 4,094/4,095 对上 |
+| B25 | `Dna_accelerator_core_v1_0.v` | 水印预载写地址与数据不同拍，整条水印偏一个符号 | ✅ 板上 position 偏移归零，4,009/4,096 条整条逐位正确 |
+
+实现结果：**WNS +0.017 ns**，0 failing endpoint，0 error。
+（上一版 +0.266 ns；输出级重写后时序更紧但仍收敛。）
+
+仿真回归：`run_sim.sh` 11/11、`run_xsim.sh all` **7/7**
+（新增 `result_axis`，即 `hw/sim/dna/tb_dna_result_axis.v`，覆盖此前完全没有判据的
+DNA 核 AXIS 结果输出级）。
 
 ## 边界
 
-**构建成功不代表板端端到端正确。** 本次只保证制品与实物 DDR 配置一致。
+**构建成功不代表板端端到端正确。G3 仍未闭环。**
+
+第四次上板逐级取证的结论（XSDB 只读 DDR 与黄金向量比对）：
+
+| 级 | 与黄金比对 | 判定 |
+| --- | --- | --- |
+| 展开水印 | 47,850/47,850 字相同 | ✅ |
+| Stage1 输出 | 4,009/4,096 条整条逐位相同（其余为 B26 的整体错位一条读段） | ✅（除 B26） |
+| Stage2 输出 ⊕ 水印 | 与 `sparse_expect.hex` 1,265/1,266 字相同，比特误码 0.01% | ✅ |
+| **Stage3 输出** | 与 `stage3_expect.hex` **0/1,013 字相同，比特误码 49.46%** | ❌ **B27** |
+
+**当前主阻塞项是 B27**：Decoder 的输入几乎全对，输出却与正确答案完全不相关，
+且已排除整体位移（±64 bit / ±16 B 全搜索最好仍 49.0%）。
+在图片 SHA-256 等于目标值之前，不得声称端到端正确。
+
+本次只保证制品与实物 DDR 配置一致。
 DDR 板级走线延迟（`PCW_UIPARAM_DDR_BOARD_DELAY*`）仍是从历史板卡继承的 `0.25`，
 ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此处（见 `docs/16` §5）。
 

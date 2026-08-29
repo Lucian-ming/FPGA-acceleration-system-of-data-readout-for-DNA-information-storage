@@ -1,5 +1,6 @@
-design : dna_accel
-tool   : 2022.2
-date   : 2026-08-16 18:01:46
-WNS    : 0.145 ns
-        ✓ 以 100 MHz 目标收敛
+实现摘要（2026-08-29 B23/B24/B25 修复后重建）
+head: 2f0729ed28077910dece24fbd2c38305fa8bfd2c
+    WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
+    -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
+      0.017        0.000                      0                37557        0.016        0.000                      0                37557        3.000        0.000                       0                 13734  
+

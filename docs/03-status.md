@@ -295,6 +295,124 @@ assign M_AXIS_RESULT_TDATA = pack_dat;     // 组合直连，立刻跟随
 
 ---
 
+## B 类新增 · B25 / B26（2026-08-29，第三次上板发现）
+
+第三次上板（RTL 修完 B23/B24、bitstream 重建后）用 XSDB 只读导出 Stage1 输出，
+与 `tests/golden/stage2_in.hex` 逐拍比对，**B23/B24 已确认修复**：
+
+| 指标 | 第二次上板（修复前） | 第三次上板（修复后） |
+| --- | --- | --- |
+| 每条记录 `word4 == word5`（B23 特征） | **4,096 / 4,096** | **1 / 4,096** |
+| 每包拍序 | `[b1,b2,b3,b4,b5,b5]`，丢首拍重末拍 | 6 拍完整、顺序正确 |
+| 码字（记录 bit 26 以上）与黄金一致 | 0 | **4,094 / 4,095** |
+| score 与黄金一致 | 0 | **4,094 / 4,095** |
+
+但回传经 LDPC 仍不收敛（50 轮后 5,215 个失败校验），因为还剩两处**互相独立**的错位。
+
+### ~~B25 水印预载写偏一个符号，导致每条记录的 position 恒 +1~~ ✅ 已修复并在板上验证（第四次上板）
+
+**证据**：board 记录与黄金对齐后，`position` 差值分布高度集中：
+
+```
+position 差值 = +1 : 4,009 / 4,095 条
+其余 86 条为较大差值（并列被 +1 打破后选了另一个位置）
+score 差值 = 0     : 4,094 / 4,095 条
+码字完全相同        : 4,094 / 4,095 条
+```
+
+即**只有 position 偏了，而且恒偏 +1**。
+
+**根因**（`Dna_accelerator_core_v1_0.v` 的 preload always 块）：
+
+```verilog
+end else if (preload_mode_s && S_AXIS_DATA_TVALID && S_AXIS_DATA_TREADY) begin
+    wm_we    <= 1'b1;                       // 寄存，下一拍才有效
+    wm_wdata <= S_AXIS_DATA_TDATA[1:0];     // 寄存，下一拍才有效
+    wm_waddr <= (wm_waddr == 10'd956) ? 10'd0 : (wm_waddr + 10'd1);   // 同拍就自增了
+end
+```
+
+`wm_we` / `wm_wdata` 是寄存输出，下一拍才拉高；而 `wm_waddr` 在同一拍已经自增。
+于是第 *k* 个符号在 `wm_we` 有效那一拍看到的地址是 *k+1*——**整条水印在 BRAM 里
+被写偏一个符号**，所有匹配位置因此恒 +1。
+
+**为什么仿真没抓到**：`tb_srpe_batch` 是直接把水印灌进 `srpe_batch` 的 BRAM 的，
+根本不走 `preload_mode + S_AXIS` 这条 DMA 预载通路。这正是 `docs/17` §1
+列的「1 号怀疑方向：水印预载 50 次区域切换时 `wm_waddr` 是否每次从 0 开始」——
+方向对了，但真正的错不在区域切换，而在**地址与数据不同拍**。
+
+**修复**：新增与 `wm_wdata` 同拍的 `wm_waddr_q` 作为真正的写地址，
+`srpe_batch` 的 `.bram_write_addr` 改接 `wm_waddr_q`。
+
+**第四次上板判据**（重建 bitstream 后，XSDB 只读 DDR 比对）：
+
+| 指标 | 第三次（B25 未修） | 第四次（B25 已修） |
+| --- | --- | --- |
+| `position` 差值 = 0 | 0 / 4,095 | **4,009 / 4,095** |
+| `position` 差值 = +1 | 4,009 / 4,095 | 0 |
+| 整条 48 B 记录与黄金逐位相同 | 0 | **4,009 / 4,096** |
+
+即 position 偏移已彻底消失，Stage1 除了 B26 的整体错位之外已经逐位正确。
+
+### B26 Stage1 结果整体错位一条读段（**未修复，当前 G3 阻塞项**）
+
+**证据**：board 记录 *i* 的码字 == 黄金记录 *i+1* 的码字（4,094/4,095 条），
+且**黄金记录 0 的码字在整份板上 dump 里根本不存在**；
+board 最后一条（slot 4095）是黄金里没有的多余记录。
+
+即：送入 4,096 条读段，核吐出的结果对应读段 **1..4095**，
+**读段 0 的结果丢失**，末尾多出一条。
+
+**推测方向**（尚未坐实，不要当结论用）：
+`Dna_accelerator_core_v1_0.v` 的入口握手注释写着
+「Sync FIFO read delay is 1 cycle => cw_valid = in_rd」，
+但 `fifo_sync_sdpram_b64` 实际是**两级**同步读（`raddr_q <= rptr; dout <= mem[raddr_q]`），
+pop 之后 `dout` 要 3 拍才稳定（B24 里已经为结果 FIFO 补过这道保护）。
+入口 FIFO 这一侧的延迟假设是否同样站不住，需要在仿真里坐实；
+末尾多出的那一条可能来自「partial batch idle timeout」把不足 64 条的批次冲了出去。
+
+**必须先补的判据**：把 `AXI DMA MM2S → DNA S_AXIS` 串起来的 BD 级仿真
+（`docs/13` §7.2 BD-3 第 1 项、`docs/17` 任务 A，在途文件
+`hw/sim/m3/tb_m3_bd3b_dma.sv`），判据是「送入第 k 条读段 → 第 k 条结果的码字等于该读段」。
+`hw/sim/dna/tb_dna_result_axis.v` 只覆盖了出口，进口这一侧仍是空白。
+
+### B27 Stage3（Decoder）输入几乎全对、输出却与黄金完全不相关（**当前 G3 主阻塞项**）
+
+第四次上板后逐级比对（XSDB 只读 DDR，与仓库黄金向量比）：
+
+| 级 | 板上 DDR | 与黄金比对 | 判定 |
+| --- | --- | --- | --- |
+| 展开水印 | `0x10040000` | 47,850 / 47,850 字逐位相同 | ✅ |
+| Stage1 输出 | `0x10600000` | 4,009 / 4,096 条整条逐位相同；码字 4,094/4,095（其余是 B26 的整体错位一条） | ✅（除 B26） |
+| Stage2 输出 ⊕ 水印 | `0x11000000` | 与 `tests/golden/sparse_expect.hex` **1,265 / 1,266 字相同，比特误码 0.01%** | ✅ |
+| Stage3 输出 | `0x11100000` | 与 `tests/golden/stage3_expect.hex` **0 / 1,013 字相同，比特误码 49.46%** | ❌ |
+
+**即 Decoder 拿到的输入是对的（0.01% 误码），吐出来的却是与正确答案完全不相关的数据。**
+已排除「整体位移」：对板上 Stage3 输出做 −64..+64 比特、−16..+16 字节的全部平移搜索，
+最好情况仍是 49.0% 误码，说明不是错位而是**内容本身不对**。
+
+配置回读也是对的（UART 实录）：
+`IN_ADDR=0x11000000 IN_BEATS=1266 OUT_ADDR=0x11100000 OUT_BEATS=1013`。
+
+**这一级在仿真里是「通过」的**：`run_xsim.sh` 的 `desparsify_datapath`、`desparsifier_axi`
+以及 M3 的 BD-3ext 都逐位 PASS——但它们喂的是 VIP 内存里的黄金数据，
+**没有走板上「PS 用 CPU 写 DDR → Decoder 用 AXI 主口读 DDR」这条真实通路**。
+与 B23/B24/B25 同一个模式：出问题的永远是仿真没覆盖到的那条真实接口。
+
+**下一步建议的排查顺序**（不要跳步）：
+
+1. 先确认 Decoder 真的读到了对的数据：在固件里让 Decoder 跑之前，
+   把 `0x11000000` 起的前若干拍打出来，并与 XSDB 读到的值对照
+   （注意 XSDB 经 DAP 访存可能被 cache 影响，两者不一致本身就是线索）；
+2. 复核 `apply_watermark_differential()` 的 cache 次序：
+   它先 Invalidate 再用 CPU 异或再 Flush，看似正确，但 Stage2 收尾处
+   （`echo.c` 的「Preparing output for Stage3 (invalidate only)」）还有一次
+   只 Invalidate 不 Flush 的操作，两者的先后与区间长度要逐字节核对；
+3. 把 `desparsification_decoder` 的 AXI 读通路按 B23 的方式做一次「真实 DMA/真实 DDR」
+   级别的判据，而不是继续用 VIP 内存喂黄金数据。
+
+---
+
 ## B 类新增 · B20（2026-08-29，M3 BD-3ext 发现）
 
 ### ~~B20 Voter 的 AXI 读突发跨越 4 KB 边界，违反 AXI 规范 A3.4.1~~ ✅ 已修复并逐位验证（2026-08-29）
