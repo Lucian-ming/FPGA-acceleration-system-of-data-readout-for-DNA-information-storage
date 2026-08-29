@@ -15,7 +15,7 @@
 | BD-1 | 实际 BD 重建 / 静态检查 / elaboration | **PASS** |
 | BD-2 | 控制面：GP0 → ic_lite → 四个从机 | **PASS**（71 项检查 0 失败） |
 | BD-3 | 数据面（生产 BD，端点为实际 PS7 HP0） | **未通过**：被 PS7 VIP 的 HP0 读通路挡住 |
-| BD-3ext | 数据面（仿真专用端点，HP0 换成 AXI VIP 内存） | **Decoder 逐位通过；Voter 暴露真实 RTL 缺陷 B20** |
+| BD-3ext | 数据面（仿真专用端点，HP0 换成 AXI VIP 内存） | **✅ Voter 与 Decoder 均逐位通过**（修复 B20 后） |
 
 > ### 🔴 M3 的最大产出：发现 Voter 违反 AXI 4KB 边界规则（缺陷 B20）
 >
@@ -28,6 +28,7 @@
 > ```
 >
 > 这是**真实的 RTL 协议违规**，不是仿真模型问题，详见 §6。
+> **B20 已于同日按方案 A（拆分突发）修复并逐位验证通过**，见 §6.6。
 
 本机证据目录：`hw/build/xsim/m3/20260828T171531Z/`（`bash tools/run_m3_bd.sh all`）。
 该目录在 `.gitignore` 中，**不随 Git 分发**，换 checkout 必须本机重跑。
@@ -290,3 +291,65 @@ BD-3ext、以及 Vivado 综合/时序，并**重建 A 阶段的全套上板制�
 | M4 | 未开始 |
 
 **M3 仍未完成**，且现在多了一个必须先修的 RTL 缺陷。不得据此关闭 G3。
+
+---
+
+## 6.6 B20 的修复与验证（2026-08-29 当日完成）
+
+采纳 §6.5 的**方案 A：拆分突发**。
+
+### 实现
+
+`hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v`：
+
+- 新增 `rd_ptr`（本条记录下一笔突发的起始地址）、`rd_burst_beats`（本笔拍数）、
+  `rd_burst_done`（本笔已收拍数）；
+- 组合计算
+  `rd_beats_to_page_end = (4096 - rd_ptr[11:0]) >> 3`，
+  与 `rd_beats_remaining = 6 - read_beat_count` 取较小者作为本笔突发长度；
+- `ARLEN` 由固定 `8'd5` 改为 `{5'd0, rd_burst_beats} - 8'd1`；
+- `S_READ_SETUP` 改用 `rd_ptr` 锁存 `ARADDR`，并**不再清零** `read_beat_count`
+  （它是记录内拍索引，必须跨两笔突发连续；改到记录切换处清零）；
+- `S_READ_DATA` 每收一拍同时推进 `rd_burst_done` 与 `rd_ptr`；
+- 状态转移改为：本笔收满后，若本记录未满 6 拍则回到 `S_READ_SETUP` 再发一笔，
+  否则进入 `S_PARSE_READ`。
+
+页内剩余为 512 / 4 / 2 拍等各种情况均已验算：拆分后两笔合计恒为 6 拍，
+第二笔必从页边界开始，因此不可能再跨页。
+
+### 同时修正黄金 Testbench 的根本缺陷
+
+`tb_differential_voter.v` 的 AXI 内存模型原先 `r_left <= 6` **写死**，完全无视 `ARLEN`
+——**这正是 B20 长期未被发现的直接原因**。现已改为按 `ARLEN` 返回拍数，
+并把原来的「`ARLEN` 必须等于 5」检查替换为真正应当成立的属性：
+
+```verilog
+// AXI A3.4.1：突发不得跨越 4KB 边界
+if ((m_araddr[11:0] + ((m_arlen + 1) << 3)) > 13'd4096)
+    arlen_errors <= arlen_errors + 1;
+```
+
+并新增「每条记录必须恰好累计 6 拍（可跨多笔突发）」的校验，
+使 IP 级黄金 TB 今后能直接拦截同类缺陷。
+
+### 验证结果（全部通过）
+
+| 判据 | 结果 |
+| --- | --- |
+| Stage2 黄金 TB（3 轮，SCORE_MIN=67/67/0） | 1,266 拍 / 81,000 bit 逐位相同；跨 4 KB 违规 **0 次** |
+| `bash tools/run_sim.sh` | **11/11 PASS** |
+| `bash tools/run_xsim.sh all` | **6/6 PASS** |
+| `bash tools/run_m2_full.sh` | 全链 PASS；LDPC 图片哈希仍为 `fcd0cf90...b6b1f2c3`；单 bit 故障注入仍被检出 |
+| **BD-3ext Voter** | PASS，**协议违规 0**，错误标志 0，末次 RRESP=OKAY；输出 **1,266 拍 / 81,024 bit 逐位相同** |
+| **BD-3ext Decoder**（级联自**实际** Stage2 输出经 PS 等价 XOR） | PASS；输出 **1,013 拍 / 64,832 bit 逐位相同** |
+
+修复前，同一 BD-3ext Voter 用例在 1.32 ms、记录 85（`0x10600ff0`）被 AXI 协议检查器
+Fatal 终止；修复后同一位置安全通过，并完整跑完 4,096 条记录（`Voter done @28.85 ms`，
+轮询 13,647 次）。**这是修复生效的直接证据。**
+
+至此 **BD-3ext 数据面全链贯通**：Voter 实际输出 → PS 等价 XOR → Decoder 实际输出，
+两级都逐位命中黄金向量，且全程零 AXI 协议违规。
+
+> 仍未改变的边界：BD-3ext 的内存端点是 AXI VIP，**不是实际 PS7 的 AFI 通路**；
+> 生产 BD 上的 BD-3（端点为真实 HP0）依旧被 PS7 VIP 的读通路缺陷挡住。
+> M3 的 M4 层未开始，G3 未做。**不得据本节结论关闭 G3。**

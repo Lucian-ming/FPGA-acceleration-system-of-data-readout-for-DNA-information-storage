@@ -82,9 +82,9 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
 
 ---
 
-## B 类新增 · B20（2026-08-29，M3 BD-3ext 发现，**未修复**）
+## B 类新增 · B20（2026-08-29，M3 BD-3ext 发现）
 
-### B20 Voter 的 AXI 读突发跨越 4 KB 边界，违反 AXI 规范 A3.4.1
+### ~~B20 Voter 的 AXI 读突发跨越 4 KB 边界，违反 AXI 规范 A3.4.1~~ ✅ 已修复并逐位验证（2026-08-29）
 
 `hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v:675` 固定
 `M00_AXI_ARLEN = 8'd5`（6 拍 × 8 B = 48 B），`:512` 每条记录 `read_addr += 48`，
@@ -102,9 +102,31 @@ Fatal: AXI4_ERRM_ARADDR_BOUNDARY: A burst must not cross a 4kbyte boundary.
 - Decoder 读、Voter 写、Decoder 写均为 128 B 突发且基址 4 KB 对齐，**不受影响**。
 - 既有 Stage2 黄金 TB 用的简易内存模型不检查 4 KB 规则，因此长期未被发现。
 
-**后果**：跨 4 KB 突发在 AXI 下行为未定义，实际 Interconnect/AFI 可能返回错数据或挂死，
-极可能是真实的 G3 阻塞项。修复选项与代价见 `docs/15-m3-bd-simulation-2026-08-29.md` §6.5，
-**待用户决定后实施**。
+**后果**：跨 4 KB 突发在 AXI 下行为未定义，实际 Interconnect/AFI 可能返回错数据或挂死。
+
+**修复（方案 A：拆分突发）**：新增 `rd_ptr` / `rd_burst_beats` / `rd_burst_done`；
+发 AR 前取「页内剩余拍数」与「本记录剩余拍数」的较小者作为本笔突发长度，
+`ARLEN` 由固定 `8'd5` 改为 `本笔拍数-1`；跨页时自动拆成两笔（先到页边界，再读余下），
+`read_beat_count` 作为记录内拍索引跨两笔连续，因此不再在 `S_READ_SETUP` 清零。
+
+**同时修正黄金 Testbench 的根本缺陷**：`tb_differential_voter.v` 的内存模型原先
+`r_left <= 6` 写死、无视 `ARLEN`——这正是 B20 长期未被发现的原因。现改为按 `ARLEN`
+返回拍数，并把原「ARLEN 必须为 5」的检查替换为真正应当成立的
+**AXI A3.4.1 跨 4 KB 检查**，今后同类缺陷会被 IP 级黄金 TB 直接拦截。
+
+**验证判据（全部通过）**：
+
+| 判据 | 结果 |
+| --- | --- |
+| Stage2 黄金 TB（3 轮，含 SCORE_MIN=67/0） | 1,266 拍 / 81,000 bit 逐位相同；跨 4 KB 违规 0 次 |
+| `bash tools/run_sim.sh` | **11/11 PASS** |
+| `bash tools/run_xsim.sh all` | **6/6 PASS** |
+| `bash tools/run_m2_full.sh` | 全链 PASS，LDPC 图片哈希仍为 `fcd0cf90...b6b1f2c3`，单 bit 故障注入仍被检出 |
+| BD-3ext Voter（实际 BD + 实际 Interconnect） | PASS，**协议违规 0**，错误标志 0，末次 RRESP=OKAY；输出 1,266 拍 / 81,024 bit 逐位相同 |
+| BD-3ext Decoder（级联自**实际** Stage2 输出经 PS 等价 XOR） | PASS，输出 1,013 拍 / 64,832 bit 逐位相同 |
+
+修改前同一用例在 1.32 ms 处被 AXI 协议检查器 Fatal 终止（记录 85 / `0x10600ff0`），
+修复后同一位置安全通过并跑完全部 4,096 条记录，这是修复生效的直接证据。
 
 ---
 

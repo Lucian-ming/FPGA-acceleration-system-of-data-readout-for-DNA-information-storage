@@ -14,7 +14,9 @@
 //
 // 判据内容：
 //   1) 每轮 1,266 拍输出与对应黄金向量逐位相同（末拍只比低 40 bit）；
-//   2) AXI 协议：每次读突发恰 6 拍（ARLEN=5）；每次写单拍（WLAST=1）；
+//   2) AXI 协议：每条记录共 6 拍读数据，但**允许拆成多笔突发**（B20 修复后，
+//      跨 4KB 页边界的读必须拆分）；内存模型按 ARLEN 返回拍数，并检查
+//      「突发不得跨越 4KB 边界」（AXI A3.4.1）；每次写单拍（WLAST=1）；
 //      末拍 WSTRB=0x1F（81000 bit = 1265×64 + 40）；
 //   3) done/idle 状态位、调试寄存器（写拍数/首写地址/错误标志）正确；
 //   4) SCORE_MIN 可从 AXI-Lite 0x30 读回。
@@ -96,21 +98,27 @@ module tb_differential_voter #(
     reg        written [0:OUT_BEATS+15];
 
     // ---------------- 读通道从机 ----------------
-    // DUT 每条记录发一个 6 拍突发（ARLEN=5），做完一条才发下一条，
-    // 因此不需要地址队列：一次只接受一个 AR，数据零等待背靠背送出。
+    // DUT 每条记录共取 6 拍，但可能拆成多笔突发（B20：跨 4KB 页边界必须拆分）。
+    // 做完一笔才发下一笔，因此仍不需要地址队列：一次只接受一个 AR。
+    // 内存模型必须**按 ARLEN 返回拍数**，绝不能写死 6——写死正是当初掩盖 B20 的原因。
     integer r_idx, r_left;
     reg     r_busy;
-    integer arlen_errors;
+    integer arlen_errors;    // 现含义：违反 AXI 4KB 边界规则的突发数
+    integer rec_beats;       // 本条记录已收到的拍数，用于校验每条记录恰好 6 拍
+    integer recbeat_errors;  // 每条记录拍数不等于 6 的次数
 
     always @(posedge clk) begin
         if (!rstn) begin
             m_arready <= 1'b1; m_rvalid <= 1'b0; m_rlast <= 1'b0; m_rresp <= 2'b00;
             r_busy <= 1'b0; r_idx <= 0; r_left <= 0; arlen_errors <= 0;
+            rec_beats <= 0; recbeat_errors <= 0;
         end else begin
             if (m_arvalid && m_arready && !r_busy) begin
-                if (m_arlen != 8'd5) arlen_errors <= arlen_errors + 1;
+                // AXI A3.4.1：突发不得跨越 4KB 边界
+                if ((m_araddr[11:0] + ((m_arlen + 1) << 3)) > 13'd4096)
+                    arlen_errors <= arlen_errors + 1;
                 r_idx <= (m_araddr - IN_ADDR) >> 3;
-                r_left <= 6;
+                r_left <= m_arlen + 1;   // 按 ARLEN 返回，不得写死
                 r_busy <= 1'b1;
                 m_arready <= 1'b0;
             end else if (r_busy && (!m_rvalid || m_rready)) begin
@@ -120,6 +128,9 @@ module tb_differential_voter #(
                     m_rlast  <= (r_left == 1);
                     r_idx    <= r_idx + 1;
                     r_left   <= r_left - 1;
+                    // 每条记录必须恰好累计 6 拍（可跨多笔突发）
+                    if (rec_beats == 5) rec_beats <= 0;
+                    else                rec_beats <= rec_beats + 1;
                 end else begin
                     // 最后一个 beat 已被消费：必须撤下 RVALID/RLAST，
                     // 否则残留电平会在下一个突发的 READ_SETUP 期间被 DUT
@@ -354,7 +365,8 @@ module tb_differential_voter #(
             // 协议检查
             proto_errors = (w_count  - w_count0 - OUT_BEATS)
                          + (wlast_errors - wlast0)
-                         + (arlen_errors - arlen0);
+                         + (arlen_errors - arlen0)
+                         + recbeat_errors;
             if (w_count - w_count0 != OUT_BEATS)
                 $display("[TB] ✗ 第 %0d 轮写出 %0d 拍（期望 %0d）",
                          run, w_count - w_count0, OUT_BEATS);
@@ -362,7 +374,8 @@ module tb_differential_voter #(
                 $display("[TB] ✗ 第 %0d 轮出现 %0d 拍 WLAST=0（单拍写必须 WLAST=1）",
                          run, wlast_errors - wlast0);
             if (arlen_errors != arlen0)
-                $display("[TB] ✗ 第 %0d 轮 ARLEN≠5 出现 %0d 次", run, arlen_errors - arlen0);
+                $display("[TB] ✗ 第 %0d 轮出现 %0d 笔跨 4KB 边界的读突发（违反 AXI A3.4.1）",
+                         run, arlen_errors - arlen0);
             errors = errors + (proto_errors > 0 ? 1 : 0);
 
             // 逐位比对：末拍只有低 OUT_BITS-64*(OUT_BEATS-1)=40 位有效

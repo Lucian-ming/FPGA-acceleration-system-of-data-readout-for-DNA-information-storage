@@ -266,6 +266,13 @@ module differential_voter_v1_0 #
 
     reg [31:0] read_addr;
     reg [31:0] read_addr_reg;      // ARADDR 锁存
+    // B20 修复：AXI 规范 A3.4.1 要求突发不得跨越 4KB 边界。每条记录 48B、步长
+    // 也是 48B，而 4096 不是 48 的整数倍，固定 6 拍突发会周期性跨页（4096 条
+    // 记录中 32 次，首次在记录 85 / 0x...0ff0）。这里把跨页的读拆成两笔：
+    // 先读到页边界，再从页边界读完本条记录剩余的拍。
+    reg [31:0] rd_ptr;             // 本条记录下一笔突发的起始地址
+    reg [2:0]  rd_burst_beats;     // 本笔突发的拍数（1..6）
+    reg [2:0]  rd_burst_done;      // 本笔突发已收到的拍数
 
     // 输出打包
     reg [16:0] output_bit_count;
@@ -317,6 +324,13 @@ module differential_voter_v1_0 #
     // beat_count 要到下一拍才等于 6；而合规从机在 RLAST 握手后即撤下 RVALID。
     // 原条件 (beat_count>=6 && RVALID) 依赖残留的 RVALID 电平，真实互连上会死锁。
     wire read_data_complete   = (read_beat_count >= 3'd6);
+    // 页内剩余拍数（rd_ptr 恒为 8B 对齐）与本记录剩余拍数，取较小者为本笔突发长度
+    wire [9:0] rd_beats_to_page_end = (13'd4096 - {1'b0, rd_ptr[11:0]}) >> 3;
+    wire [2:0] rd_beats_remaining   = WORDS_PER_READ[2:0] - read_beat_count;
+    wire [2:0] rd_next_burst_beats  =
+        (rd_beats_to_page_end < {7'd0, rd_beats_remaining}) ? rd_beats_to_page_end[2:0]
+                                                           : rd_beats_remaining;
+    wire rd_burst_complete    = (rd_burst_done >= rd_burst_beats);
     // 【D1/D2】比对分低于阈值的记录不参与投票（含上位机补零的尾批记录）。
     // parse_score 在 S_PARSE_READ 拍从 read_words[0] 组合读出，天然有效。
     wire score_below_min      = ({22'd0, parse_score} < score_min_cfg);
@@ -383,6 +397,9 @@ module differential_voter_v1_0 #
 
             read_addr_reg       <= 32'd0;
             read_addr           <= 32'd0;
+            rd_ptr              <= 32'd0;
+            rd_burst_beats      <= 3'd0;
+            rd_burst_done       <= 3'd0;
             total_reads         <= 32'd0;
 
             // >>> 新增复位
@@ -407,6 +424,8 @@ module differential_voter_v1_0 #
                         read_count        <= 32'd0;
                         total_reads       <= total_reads_cfg;
                         read_addr         <= in_addr;
+                        rd_ptr            <= in_addr;
+                        read_beat_count   <= 3'd0;
 
                         output_bit_count  <= 17'd0;
                         output_word       <= 64'd0;
@@ -441,8 +460,12 @@ module differential_voter_v1_0 #
                 end
 
                 S_READ_SETUP: begin
-                    read_addr_reg   <= read_addr; // 锁存AR地址
-                    read_beat_count <= 3'd0;
+                    // 用 rd_ptr 而非 read_addr：拆分后的第二笔要从页边界开始。
+                    // read_beat_count 是「本条记录」的拍索引，需跨两笔突发连续，
+                    // 因此不能在这里清零，改到记录切换处清。
+                    read_addr_reg   <= rd_ptr;      // 锁存AR地址
+                    rd_burst_beats  <= rd_next_burst_beats;
+                    rd_burst_done   <= 3'd0;
                     debug_state_count <= state;
                 end
 
@@ -450,6 +473,8 @@ module differential_voter_v1_0 #
                     if (M00_AXI_RVALID && M00_AXI_RREADY) begin
                         read_words[read_beat_count] <= M00_AXI_RDATA;
                         read_beat_count <= read_beat_count + 1;
+                        rd_burst_done   <= rd_burst_done + 1;
+                        rd_ptr          <= rd_ptr + 32'd8;
                         // >>> 新增：采样 RRESP（只在握手成功时）
                         last_rresp <= M00_AXI_RRESP;
                     end
@@ -510,7 +535,9 @@ module differential_voter_v1_0 #
                     if (read_count < total_reads - 1) begin
                         read_count <= read_count + 1;
                         read_addr  <= read_addr + (WORDS_PER_READ * 8);
+                        rd_ptr     <= read_addr + (WORDS_PER_READ * 8);
                     end
+                    read_beat_count <= 3'd0;
                     debug_state_count <= state;
                 end
 
@@ -609,7 +636,8 @@ module differential_voter_v1_0 #
                 S_IDLE:            next_state = start_latched_pulse ? S_INIT_BRAM : S_IDLE;
                 S_INIT_BRAM:       next_state = init_complete ? S_READ_SETUP : S_INIT_BRAM;
                 S_READ_SETUP:      next_state = read_setup_complete ? S_READ_DATA  : S_READ_SETUP;
-                S_READ_DATA:       next_state = read_data_complete  ? S_PARSE_READ : S_READ_DATA;
+                S_READ_DATA:       next_state = !rd_burst_complete ? S_READ_DATA
+                                              : (read_data_complete ? S_PARSE_READ : S_READ_SETUP);
                 // 【D1/D2】低分记录直接跳到下一条，不进入投票循环
                 S_PARSE_READ:      next_state = score_below_min ? S_NEXT_READ : S_CALC_ADDR;
                 S_CALC_ADDR:       next_state = S_VOTE_READ;
@@ -672,7 +700,7 @@ module differential_voter_v1_0 #
     end
 
     assign M00_AXI_ARADDR  = read_addr_reg; // 地址已在 S_READ_SETUP 锁存
-    assign M00_AXI_ARLEN   = 8'd5;          // 6 个 64b 拍
+    assign M00_AXI_ARLEN   = {5'd0, rd_burst_beats} - 8'd1; // 本笔突发拍数-1（B20）
     assign M00_AXI_ARSIZE  = 3'b011;        // 8B
     assign M00_AXI_ARBURST = 2'b01;         // INCR
     assign M00_AXI_ARLOCK  = 1'b0;
