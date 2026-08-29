@@ -40,3 +40,8 @@ docs/board/**/tutorials/*.mp4
 *~
 .DS_Store
 Thumbs.db
+
+# 多 agent 实时工作看板（本机可见即可，不进版本管理）；
+# 由 tools/agent_view.sh 生成，结论与判据仍写入 docs/ 并提交。
+view.md
+.agent_view/
