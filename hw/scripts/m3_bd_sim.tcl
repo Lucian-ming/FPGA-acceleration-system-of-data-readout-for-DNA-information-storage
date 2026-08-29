@@ -4,7 +4,7 @@
 #   vivado -mode batch -source hw/scripts/m3_bd_sim.tcl -tclargs \
 #       outdir=<绝对路径> [part=xc7z010clg400-1] [clk_mhz=100] \
 #       [tb_top=<顶层>] [tb_srcs=<以逗号分隔的 TB 源文件>] [stage=bd1|sim] \
-#       [sim_time=<如 2ms>]
+#       [sim_time=<如 2ms>] [bd_script_sel=prod|sim_mem]
 #
 # 设计约束（对应 docs/13-xsim-simulation-plan.md §7.1）：
 #   - 工程建在 outdir 下的一次性目录，**绝不触碰** hw/build/dna_accel.xpr；
@@ -20,6 +20,9 @@ set tb_top    ""
 set tb_srcs   ""
 set stage     "bd1"
 set sim_time  "2ms"
+# 默认用生产 BD；命令行传 bd_script_sel=sim_mem 时改用仿真专用变体
+# （HP0 内存端点换成 AXI VIP 从机，见 hw/scripts/bd_sim_mem.tcl）
+set bd_script_sel "prod"
 
 proc _arg {k def} {
   upvar $k v
@@ -37,18 +40,23 @@ _arg tb_top   $tb_top
 _arg tb_srcs  $tb_srcs
 _arg stage    $stage
 _arg sim_time $sim_time
+_arg bd_script_sel $bd_script_sel
 
 if {$outdir eq ""} { puts "FATAL: outdir= is required"; exit 1 }
 
 set _here     [file normalize [file dirname [info script]]]
 set repo_root [file normalize "$_here/../.."]
-set bd_script [file join $repo_root hw/scripts/bd.tcl]
+if {$bd_script_sel eq "sim_mem"} {
+  set bd_script [file join $repo_root hw/scripts/bd_sim_mem.tcl]
+} else {
+  set bd_script [file join $repo_root hw/scripts/bd.tcl]
+}
 set ip_repo   [file join $repo_root hw/ip]
 set proj_wk   [file join $outdir proj]
 set proj_name "m3_bd"
 
 puts "===> Vivado [version -short]"
-puts "===> M3 stage=$stage part=$part_name clk=${clk_mhz}MHz"
+puts "===> M3 stage=$stage part=$part_name clk=${clk_mhz}MHz bd=$bd_script_sel"
 puts "===> repo=$repo_root"
 puts "===> outdir=$outdir"
 
