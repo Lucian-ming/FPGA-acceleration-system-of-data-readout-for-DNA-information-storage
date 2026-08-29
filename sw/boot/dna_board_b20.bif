@@ -1,0 +1,8 @@
+// ZYNQ ECO(R6) 启动镜像：16 bit DDR + B20（AXI 4KB 拆分突发）修复后
+// 生成：bootgen -image sw/boot/dna_board_b20.bif -arch zynq -o hw/build/export/BOOT.bin -w on
+the_ROM_image:
+{
+  [bootloader] hw/build/export/fsbl.elf
+  hw/build/export/top_bd_wrapper.bit
+  hw/build/export/dna_lwip_app_b20.elf
+}

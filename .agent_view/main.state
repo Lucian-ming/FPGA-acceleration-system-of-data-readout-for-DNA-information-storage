@@ -1,0 +1,7 @@
+AGENT	main
+STATUS	进行中
+DOING	为多 agent 协作建立 view.md 看板机制
+WHY	用户需要单一入口随时了解各 agent 在做什么
+NEXT	把规则写进 AGENTS.md 与 CLAUDE.md
+STARTED	2026-08-29 12:33:23 +08
+UPDATED	2026-08-29 12:33:47 +08

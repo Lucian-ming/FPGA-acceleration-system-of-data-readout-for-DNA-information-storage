@@ -1,8 +1,0 @@
-// ZYNQ ECO(R6) 16 bit DDR 版启动镜像
-// 生成：bootgen -image sw/boot/dna_board_ddr16.bif -arch zynq -o hw/build/export/BOOT.bin -w on
-the_ROM_image:
-{
-  [bootloader] hw/build/export/fsbl.elf
-  hw/build/export/top_bd_wrapper.bit
-  hw/build/export/dna_lwip_app_ddr16.elf
-}

@@ -22,6 +22,42 @@
 - Vivado/XSim 大型生成目录不提交，但不得自动删除；必须提交可复现入口、源文件/黄金数据 manifest、
   结果摘要和结论边界。若 GitHub ruleset 阻止直接推送，立即报告，不得改推其他仓库规避。
 
+## 工作可见性：view.md 看板（强制）
+
+用户只看仓库根目录的 `view.md`，就应当知道**每个 agent 此刻在干什么**。因此所有 agent
+（主会话与任何子 agent、并行 agent）都必须实时登记自己的工作状态。
+
+- **唯一写入方式**是 `tools/agent_view.sh`（内部用 `flock` 串行化，支持多 agent 并发）。
+  **禁止**手工编辑 `view.md`：它是自动生成的，手改会被下一次刷新覆盖。
+- 三个字段必须都填，且写人话、写具体（不要写「处理任务」这种废话）：
+  - `--doing` 在做什么（当前这一步的具体动作，含关键文件/脚本名）
+  - `--why` 为了解决什么问题（哪个缺陷/哪条判据/用户的哪个诉求）
+  - `--next` 下一步可能干什么（做完这步的下一动作，或在等什么）
+
+```bash
+# 开工（每个 agent 拿到任务后、动手前的第一件事）
+tools/agent_view.sh start  --agent "<agent 名>" --doing "..." --why "..." --next "..."
+# 阶段切换 / 有新发现（省略的字段沿用上一次的值）
+tools/agent_view.sh update --agent "<agent 名>" --doing "..." --next "..."
+# 卡住（等用户决策、缺工具、复现失败）
+tools/agent_view.sh block  --agent "<agent 名>" --doing "..." --why "..." --next "..."
+# 收工（交接前的最后一件事）
+tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
+```
+
+- **`--agent` 名字规则**：主会话固定用 `main`；子 agent 用「任务短名」，如 `voter-4kb`、
+  `m3-bd-sim`、`ldpc-golden`。同名会互相覆盖，并行时务必取不同名字。
+- **更新时机**（宁多勿少，但不要每条命令都刷）：
+  1. 开工时 `start`；
+  2. 换到另一个子任务、或结论发生变化时 `update`；
+  3. 长任务（综合、实现、XSim 长跑）**启动前**先 `update` 说明在跑什么、预计等多久；
+  4. 受阻立刻 `block`，把「在等用户回答什么」写进 `--next`；
+  5. 结束时 `done`。
+- **派生子 agent 时**，必须在给子 agent 的 prompt 里明确写上：它要用哪个 `--agent` 名字，
+  并要求它按本节规则 `start` / `update` / `done`。
+- `view.md` 与 `.agent_view/` 是本机实时看板，已在 `.gitignore` 中忽略，**不进 Git**。
+  它不替代交接文档：结论、判据和证据仍然要写进 `docs/` 下对应文档并提交。
+
 ## 文档地图（改代码前先读）
 
 | 文档 | 作用 |
