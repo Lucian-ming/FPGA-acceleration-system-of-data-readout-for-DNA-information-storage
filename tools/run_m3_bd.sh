@@ -83,10 +83,10 @@ fail()  { note "M3 FAIL: $*"; exit 1; }
 #   gen_project <casedir> <tb_top|""> <tb_src|"">
 # ---------------------------------------------------------------------------
 gen_project() {
-    local casedir="$1" tb_top="$2" tb_src="$3"
+    local casedir="$1" tb_top="$2" tb_src="$3" bd_sel="${4:-prod}"
     local log="$casedir/vivado.log"
     mkdir -p "$casedir"
-    local args=(outdir="$casedir" stage=bd1)
+    local args=(outdir="$casedir" stage=bd1 bd_script_sel="$bd_sel")
     [[ -n "$tb_top" ]] && args+=(tb_top="$tb_top")
     [[ -n "$tb_src" ]] && args+=(tb_srcs="$tb_src")
     (
@@ -220,15 +220,20 @@ do_bd2() {
 # ===========================================================================
 # BD-3：数据面（两档内存延迟）
 # ===========================================================================
-do_bd3() {
-    note "=== BD-3 数据面事务（Voter/Decoder 主口 -> ic_hp -> HP0 -> DDR）==="
-    local casedir="$OUT_ROOT/bd3"
-    if ! gen_project "$casedir" "tb_m3_bd3_dpath" "$TB_DIR/tb_m3_bd3_dpath.v"; then
-        note "  FAIL BD-3 (生成/elaborate 失败) -> $casedir/vivado.log"
+# do_bd3_run <tag> <tb_top> <tb_src> <bd_sel> <标题>
+#   tag    用于目录/文件名前缀，避免两条路径互相覆盖
+#   bd_sel prod    = 生产 BD（内存端点是 PS7 的 HP0/AFI）
+#          sim_mem = 仿真专用变体（内存端点换成 AXI VIP，见 hw/scripts/bd_sim_mem.tcl）
+do_bd3_run() {
+    local tag="$1" tb_top="$2" tb_src="$3" bd_sel="$4" title="$5"
+    note "=== $title ==="
+    local casedir="$OUT_ROOT/$tag"
+    if ! gen_project "$casedir" "$tb_top" "$tb_src" "$bd_sel"; then
+        note "  FAIL $tag (生成/elaborate 失败) -> $casedir/vivado.log"
         FAIL=$((FAIL+1)); return 1
     fi
     local simdir="$casedir/proj/m3_bd.sim/sim_1/behav/xsim"
-    local snap="tb_m3_bd3_dpath_behav"
+    local snap="${tb_top}_behav"
 
     # Voter 的激励是受版本管理的 Stage1 输出向量（激励，不是期望值）
     local voter_in="$WORK/voter_in_vip.hex"
@@ -242,11 +247,11 @@ do_bd3() {
             0) name="零延迟(BEST_CASE)" ;;
             2) name="最坏延迟/带背压(WORST_CASE)" ;;
         esac
-        note "--- HP0 内存行为：$name ---"
+        note "--- 内存行为：$name ---"
 
         # ---- Stage2 / Voter ----
-        local v_out_vip="$WORK/stage2_out_vip_lat$lat.hex"
-        local v_out="$WORK/stage2_actual_lat$lat.hex"
+        local v_out_vip="$WORK/${tag}_stage2_out_vip_lat$lat.hex"
+        local v_out="$WORK/${tag}_stage2_actual_lat$lat.hex"
         local v_log="$casedir/xsim_voter_lat$lat.log"
         rc=0
         run_snapshot "$simdir" "$snap" "$v_log" \
@@ -255,32 +260,32 @@ do_bd3() {
             -testplusarg "mem_out=$v_out_vip" \
             -testplusarg "total_reads=4096" \
             -testplusarg "latency=$lat" || rc=$?
-        judge_log "BD-3 Voter ($name)" "$rc" "$v_log" || continue
+        judge_log "$tag Voter ($name)" "$rc" "$v_log" || continue
 
         $PYTHON "$REPO_ROOT/tools/m3_mem.py" from-vip "$v_out_vip" "$v_out" --beats 1266 \
             >> "$SUMMARY" 2>&1 || fail "Stage2 输出格式转换失败"
 
         if $PYTHON "$REPO_ROOT/tools/m3_mem.py" cmp "$v_out" "$GOLDEN/stage2_expect.hex" \
-             --label "BD-3 Stage2 ($name)" | tee -a "$SUMMARY" | "${LOG_GREP[@]}" -q 'PASS'; then
-            note "  PASS BD-3 Stage2 逐位比较 ($name)"; PASS=$((PASS+1))
+             --label "$tag Stage2 ($name)" | tee -a "$SUMMARY" | "${LOG_GREP[@]}" -q 'PASS'; then
+            note "  PASS $tag Stage2 逐位比较 ($name)"; PASS=$((PASS+1))
         else
-            note "  FAIL BD-3 Stage2 逐位比较 ($name)"; FAIL=$((FAIL+1)); continue
+            note "  FAIL $tag Stage2 逐位比较 ($name)"; FAIL=$((FAIL+1)); continue
         fi
 
         # ---- PS 等价 XOR（在两次仿真之间，级间数据仍是实际输出）----
-        local sparse="$WORK/sparse_actual_lat$lat.hex"
+        local sparse="$WORK/${tag}_sparse_actual_lat$lat.hex"
         $PYTHON "$REPO_ROOT/tools/m2_chain.py" xor \
             --stage2 "$v_out" \
             --watermark "$GOLDEN/watermark_sym.hex" \
             --sparse "$sparse" >> "$SUMMARY" 2>&1 || fail "PS 等价 XOR 失败"
 
-        local d_in_vip="$WORK/dec_in_vip_lat$lat.hex"
+        local d_in_vip="$WORK/${tag}_dec_in_vip_lat$lat.hex"
         $PYTHON "$REPO_ROOT/tools/m3_mem.py" to-vip "$sparse" "$d_in_vip" \
             >> "$SUMMARY" 2>&1 || fail "生成 Decoder 输入镜像失败"
 
         # ---- Stage3 / Decoder ----
-        local d_out_vip="$WORK/stage3_out_vip_lat$lat.hex"
-        local d_out="$WORK/stage3_actual_lat$lat.hex"
+        local d_out_vip="$WORK/${tag}_stage3_out_vip_lat$lat.hex"
+        local d_out="$WORK/${tag}_stage3_actual_lat$lat.hex"
         local d_log="$casedir/xsim_decoder_lat$lat.log"
         rc=0
         run_snapshot "$simdir" "$snap" "$d_log" \
@@ -288,27 +293,41 @@ do_bd3() {
             -testplusarg "mem_in=$d_in_vip" \
             -testplusarg "mem_out=$d_out_vip" \
             -testplusarg "latency=$lat" || rc=$?
-        judge_log "BD-3 Decoder ($name)" "$rc" "$d_log" || continue
+        judge_log "$tag Decoder ($name)" "$rc" "$d_log" || continue
 
         $PYTHON "$REPO_ROOT/tools/m3_mem.py" from-vip "$d_out_vip" "$d_out" --beats 1013 \
             >> "$SUMMARY" 2>&1 || fail "Stage3 输出格式转换失败"
 
         if $PYTHON "$REPO_ROOT/tools/m3_mem.py" cmp "$d_out" "$GOLDEN/stage3_expect.hex" \
-             --label "BD-3 Stage3 ($name)" | tee -a "$SUMMARY" | "${LOG_GREP[@]}" -q 'PASS'; then
-            note "  PASS BD-3 Stage3 逐位比较 ($name)"; PASS=$((PASS+1))
+             --label "$tag Stage3 ($name)" | tee -a "$SUMMARY" | "${LOG_GREP[@]}" -q 'PASS'; then
+            note "  PASS $tag Stage3 逐位比较 ($name)"; PASS=$((PASS+1))
         else
-            note "  FAIL BD-3 Stage3 逐位比较 ($name)"; FAIL=$((FAIL+1))
+            note "  FAIL $tag Stage3 逐位比较 ($name)"; FAIL=$((FAIL+1))
         fi
     done
 }
 
+# BD-3：生产 BD（内存端点是实际 PS7 HP0/AFI）
+do_bd3() {
+    do_bd3_run "bd3" "tb_m3_bd3_dpath" "$TB_DIR/tb_m3_bd3_dpath.v" "prod" \
+        "BD-3 数据面事务（Voter/Decoder 主口 -> ic_hp -> 实际 PS7 HP0）"
+}
+
+# BD-3ext：仿真专用内存端点（绕开 PS7 VIP 的 HP0 读通路缺陷）
+# ⚠️ 该路径的内存端点不是实际 PS7 的 AFI 通路，引用结论时必须写明。
+do_bd3ext() {
+    do_bd3_run "bd3ext" "tb_m3_bd3_extmem" "$TB_DIR/tb_m3_bd3_extmem.sv" "sim_mem" \
+        "BD-3ext 数据面事务（Voter/Decoder 主口 -> ic_hp -> AXI VIP 内存模型，仿真专用端点）"
+}
+
 # ===========================================================================
 case "$WHICH" in
-    all) do_bd1; do_bd2; do_bd3 ;;
-    bd1) do_bd1 ;;
-    bd2) do_bd2 ;;
-    bd3) do_bd3 ;;
-    *)   echo "用法: bash tools/run_m3_bd.sh [all|bd1|bd2|bd3]" >&2; exit 2 ;;
+    all)     do_bd1; do_bd2; do_bd3; do_bd3ext ;;
+    bd1)     do_bd1 ;;
+    bd2)     do_bd2 ;;
+    bd3)     do_bd3 ;;
+    bd3ext)  do_bd3ext ;;
+    *)   echo "用法: bash tools/run_m3_bd.sh [all|bd1|bd2|bd3|bd3ext]" >&2; exit 2 ;;
 esac
 
 note ""

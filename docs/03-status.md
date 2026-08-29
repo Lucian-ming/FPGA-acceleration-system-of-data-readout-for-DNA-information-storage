@@ -82,6 +82,32 @@ P3 任务配置化（PKT_CONFIG/PKT_CAPS）已于 2026-08-16 傍晚完成离线�
 
 ---
 
+## B 类新增 · B20（2026-08-29，M3 BD-3ext 发现，**未修复**）
+
+### B20 Voter 的 AXI 读突发跨越 4 KB 边界，违反 AXI 规范 A3.4.1
+
+`hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v:675` 固定
+`M00_AXI_ARLEN = 8'd5`（6 拍 × 8 B = 48 B），`:512` 每条记录 `read_addr += 48`，
+**无 4 KB 边界处理**。因 4096 不是 48 的整数倍，突发会周期性跨页。
+
+判据证据（实际 BD + AXI 协议检查器）：
+
+```
+Warning: ARADDR=0x10600ff0, ARID=0x2, ARLEN=0x05, ARSIZE=0b011
+Fatal: AXI4_ERRM_ARADDR_BOUNDARY: A burst must not cross a 4kbyte boundary.
+```
+
+- 4096 条记录中 **32 次**跨界；首次在记录 **85**（`0x10600ff0`），
+  周期为每 256 条 2 次（`i ≡ 85, 170 mod 256`）。
+- Decoder 读、Voter 写、Decoder 写均为 128 B 突发且基址 4 KB 对齐，**不受影响**。
+- 既有 Stage2 黄金 TB 用的简易内存模型不检查 4 KB 规则，因此长期未被发现。
+
+**后果**：跨 4 KB 突发在 AXI 下行为未定义，实际 Interconnect/AFI 可能返回错数据或挂死，
+极可能是真实的 G3 阻塞项。修复选项与代价见 `docs/15-m3-bd-simulation-2026-08-29.md` §6.5，
+**待用户决定后实施**。
+
+---
+
 ## D 类 · 算法缺口（比所有实现 bug 更靠前）
 
 ### ~~D1 反向互补读段的板端判别与取舍~~ ✅ 已完成离线实现，待 G3 上板验收

@@ -14,7 +14,20 @@
 | --- | --- | --- |
 | BD-1 | 实际 BD 重建 / 静态检查 / elaboration | **PASS** |
 | BD-2 | 控制面：GP0 → ic_lite → 四个从机 | **PASS**（71 项检查 0 失败） |
-| BD-3 | 数据面：Voter/Decoder 主口 → ic_hp → HP0 → DDR | **未通过（阻塞）** |
+| BD-3 | 数据面（生产 BD，端点为实际 PS7 HP0） | **未通过**：被 PS7 VIP 的 HP0 读通路挡住 |
+| BD-3ext | 数据面（仿真专用端点，HP0 换成 AXI VIP 内存） | **Decoder 逐位通过；Voter 暴露真实 RTL 缺陷 B20** |
+
+> ### 🔴 M3 的最大产出：发现 Voter 违反 AXI 4KB 边界规则（缺陷 B20）
+>
+> 换上可用的内存端点后，Xilinx AXI 协议检查器立刻抓到：
+>
+> ```
+> Warning: ARADDR=0x10600ff0, ARID=0x2, ARLEN=0x05, ARSIZE=0b011
+> Fatal: AXI4_ERRM_ARADDR_BOUNDARY: A burst must not cross a 4kbyte boundary.
+>         Spec: section A3.4.1.
+> ```
+>
+> 这是**真实的 RTL 协议违规**，不是仿真模型问题，详见 §6。
 
 本机证据目录：`hw/build/xsim/m3/20260828T171531Z/`（`bash tools/run_m3_bd.sh all`）。
 该目录在 `.gitignore` 中，**不随 Git 分发**，换 checkout 必须本机重跑。
@@ -175,3 +188,105 @@ Testbench 的 SHA-256）、`bd_address.txt`、`bd_unconnected.txt`、`bd_ip_stat
   ARM cache 维护和 SG DMA 描述符管理正确。
 - 最终判据不变：真实板端回传经 LDPC 后重建 JPEG 的 SHA-256 等于
   `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
+
+---
+
+## 6. BD-3ext：换掉仿真内存端点后的结果（含缺陷 B20）
+
+### 6.1 做法
+
+`hw/scripts/bd_sim_mem.tcl` 在生产 `bd.tcl` 的基础上只做**一处**替换：
+断开 `ic_hp/M00_AXI -> ps_0/S_AXI_HP0`，改接 `axi_vip(SLAVE)` 内存模型，
+并把五个主设备（DMA MM2S/S2MM/SG、Voter、Decoder）按**完全相同的真实地址**
+（`0x00000000 + 512 MiB`）重新映射。控制面仍走实际 PS7 VIP 的 GP0 → 实际 `ic_lite`。
+
+生成结果核对：控制面地址与生产 BD 逐行一致
+（DNA `0x43C00000` / Decoder `0x43C10000` / Voter `0x43C20000` / DMA `0x40400000`），
+0 error。Testbench 为 `hw/sim/m3/tb_m3_bd3_extmem.sv`，入口
+`bash tools/run_m3_bd.sh bd3ext`。
+
+> **结论边界**：内存端点是 AXI VIP，**不是实际 PS7 的 AFI/DDR 控制器**。
+> 本路径能证明「三个自研 IP 经实际 Interconnect 在真实地址上正确读写内存」，
+> **不能**证明 PS7 AFI 本身的行为。
+
+### 6.2 Decoder：逐位通过
+
+Decoder 经实际 `ic_hp` 在真实地址读写，`done` 正常，全程 0 条协议违规；
+输出 1013 拍 / 64,832 bit 与 `tests/golden/stage3_expect.hex` **逐位相同**。
+
+（Testbench 在启动前把输出区清零，因此 DUT 用 `WSTRB` 有意不写的末拍填充字节
+读回为 0，与黄金向量一致；若 DUT 漏写也会立刻暴露成 0，而不会被残留数据掩盖。）
+
+### 6.3 Voter：暴露缺陷 B20 —— 读突发跨越 4 KB 边界
+
+**现象**（`hw/build/xsim/m3/` 下 bd3ext 的 Voter 日志）：
+
+```
+Warning: ARADDR=0x10600ff0, ARID=0x2, ARLEN=0x05, ARSIZE=0b011
+Fatal: AXI4_ERRM_ARADDR_BOUNDARY: A burst must not cross a 4kbyte boundary.
+```
+
+**成因**（`hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v`）：
+
+- 第 675 行 `assign M00_AXI_ARLEN = 8'd5;` —— 固定 6 拍；
+- `ARSIZE = 3`（8 B/拍），即每次读突发固定 **48 B**；
+- 第 512 行 `read_addr <= read_addr + (WORDS_PER_READ * 8);` —— 每条记录 **+48 B**；
+- **全程没有 4 KB 边界处理**。
+
+因为 4096 不是 48 的整数倍（4096 / 48 = 85.33），地址每前进一段就会出现
+「突发起点距页尾不足 48 B」的情况，此时该突发跨页，违反 AXI 规范 A3.4.1。
+
+**量化**（`BASE=0x10600000`，步长 48 B，突发 48 B）：
+
+| 项 | 值 |
+| --- | --- |
+| 4096 条记录中跨界的突发数 | **32** |
+| 首次跨界 | 记录 **85**，地址 `0x10600ff0`（与仿真器报告完全一致） |
+| 周期 | 每 256 条记录 2 次（`i ≡ 85, 170 (mod 256)`） |
+
+**未受影响的通路**（均为 128 B 突发、4 KB 对齐基址，跨界数为 0）：
+Decoder 的读、Voter 的写、Decoder 的写。**缺陷只在 Voter 的读路径**。
+
+### 6.4 为什么以前没被发现
+
+Stage2 的既有黄金 Testbench（`tb_differential_voter.v`，Icarus 与 XSim 双通过、
+M2 完整串联也通过）使用的是**自带的简易 AXI 从机内存模型**，它不检查 4 KB 规则，
+给什么地址和长度就返回什么数据。而实际 AXI Interconnect / PS7 AFI 没有义务这样宽容。
+
+这正是 M3「实际 BD 集成仿真」存在的意义：它覆盖的恰好是 IP 级黄金 TB 看不到、
+又最难在板上定位的一类错误。
+
+> ⚠️ 需要澄清一处本轮调查中的弯路：在 BD-3（生产 BD）阶段曾用 `total_reads=80`
+> 试图证伪 4 KB 假设，当时"仍然卡死"于是把该假设排除。**那次排除是无效的**——
+> 因为 PS7 VIP 的 HP0 通路在更早的位置就已经卡死，根本没跑到记录 85，
+> 故障被完全掩盖。教训：在一个已知损坏的平台上做的排除性实验不能作为证据。
+
+### 6.5 B20 的影响与修复选项（**待用户决定，尚未实施**）
+
+**影响**：AXI 规范下，跨 4 KB 的突发行为未定义。实际 Interconnect / AFI 可能返回
+错误数据、错位数据或挂死。这极可能是一个**真实的 G3 阻塞项**，且在板上表现为
+「偶发错数据 / 卡死」，极难定位。
+
+| 方案 | 做法 | 优点 | 代价 |
+| --- | --- | --- | --- |
+| **A. 拆分突发**（推荐） | 在 `S_READ_SETUP` 判断是否跨页；跨页则拆成两笔突发（到页尾 + 余下） | 性能几乎不变，语义最干净 | 需要改读 FSM 并新增状态，改动量中等 |
+| B. 退化为单拍读 | `ARLEN=0`，每条记录发 6 笔单拍读 | 改动最小、绝对安全 | AR 事务数 ×6（约 +2.5~5 ms/任务），相对 Stage1 耗时可忽略 |
+| C. 记录对齐到 64 B | 把每条记录的 DDR 步长由 48 B 改为 64 B | 突发永不跨页 | **改动数据契约**，PS/DMA/`echo.h`/黄金向量都要跟着改，影响面最大 |
+
+无论选哪个，改完都必须重跑：Icarus 11/11、XSim 6/6、M2 完整串联、
+BD-3ext、以及 Vivado 综合/时序，并**重建 A 阶段的全套上板制品**。
+
+---
+
+## 7. 当前 M3 状态汇总
+
+| 步骤 | 状态 |
+| --- | --- |
+| BD-1 | ✅ 通过 |
+| BD-2 | ✅ 通过（71 项检查 0 失败） |
+| BD-3（实际 PS7 HP0 端点） | ⛔ 被 Vivado 2022.2 PS7 VIP 的 HP0 读通路挡住，非设计问题 |
+| BD-3ext Decoder（仿真端点） | ✅ 逐位通过 |
+| BD-3ext Voter（仿真端点） | ❌ 暴露缺陷 **B20**（AXI 4 KB 跨界），待修 |
+| M4 | 未开始 |
+
+**M3 仍未完成**，且现在多了一个必须先修的 RTL 缺陷。不得据此关闭 G3。
