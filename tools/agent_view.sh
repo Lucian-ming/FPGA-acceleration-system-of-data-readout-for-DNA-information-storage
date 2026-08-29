@@ -11,12 +11,16 @@
 #   tools/agent_view.sh block  --agent <名字> --doing "..." --why "..." --next "..."
 #   tools/agent_view.sh done   --agent <名字> --doing "..." --why "..." --next "..."
 #   tools/agent_view.sh show   [--agent <名字>]      # 打印当前状态
-#   tools/agent_view.sh clear  [--agent <名字>|--all-done]  # 清理已完成条目
+#   tools/agent_view.sh clear  [--agent <名字>|--all-done]  # 手工摘除条目（正常情况下用不到）
 #
 # 说明：
 #   * --doing 在做什么 / --why 为了解决什么问题 / --next 下一步可能干什么
 #   * update 时省略的字段沿用上一次的值（只更新变化的部分）。
 #   * --status 可覆盖子命令给出的默认状态文字。
+#   * done 之后条目会自动从「当前状态」摘除（零残留），完成记录留在「最近动态」里，
+#     所以正常收工不需要再手工 clear。
+#   * 「进行中/阻塞」但超过 6 小时没更新的条目会被标注「可能已中断」
+#     （改 AGENT_VIEW_STALE_HOURS 可调）。
 
 set -euo pipefail
 
@@ -46,6 +50,22 @@ get_field() {  # get_field <state_file> <KEY>
 
 now_stamp() { date '+%Y-%m-%d %H:%M:%S %Z'; }
 
+# 另一类残留：会话被杀/额度中断，agent 再也没来 done，条目就永远挂在「进行中」。
+# 删不得（它可能真的还在跑），所以标出来：超过 STALE_HOURS 没更新就提示可能已中断。
+STALE_HOURS=${AGENT_VIEW_STALE_HOURS:-6}
+stale_mark() {  # stale_mark <status> <updated_stamp>
+  local st="$1" up="$2" t now age
+  case "$st" in 进行中|阻塞) ;; *) printf '%s' "$st"; return ;; esac
+  t="$(date -d "$up" +%s 2>/dev/null || true)"
+  [ -n "$t" ] || { printf '%s' "$st"; return; }
+  now="$(date +%s)"; age=$(( (now - t) / 3600 ))
+  if [ "$age" -ge "$STALE_HOURS" ]; then
+    printf '%s ⚠️ 已 %s 小时无更新，可能已中断' "$st" "$age"
+  else
+    printf '%s' "$st"
+  fi
+}
+
 render_view() {
   local tmp="$STATE_DIR/.view.tmp"
   {
@@ -69,7 +89,7 @@ render_view() {
         local a s d u
         a="$(get_field "$f" AGENT)"; s="$(get_field "$f" STATUS)"
         d="$(get_field "$f" DOING)"; u="$(get_field "$f" UPDATED)"
-        printf '| %s | %s | %s | %s |\n' "$a" "$s" "${d//|/\\|}" "$u"
+        printf '| %s | %s | %s | %s |\n' "$a" "$(stale_mark "$s" "$u")" "${d//|/\\|}" "$u"
       done
       echo
       echo "## 详情"
@@ -121,6 +141,15 @@ write_entry() {
     "$agent" "$status" "$(esc "$doing")" "$(esc "$why")" "$(esc "$next")" "$started" "$stamp" > "$file"
 
   printf '%s\t%s\t%s\t%s\n' "$stamp" "$agent" "$status" "$(esc "$doing")" >> "$HISTORY"
+
+  # 【零残留】「完成」即从看板摘除：`当前状态` 只保留还在跑的 agent。
+  # 完成这件事本身仍然留痕——它会出现在下面的「最近动态」里；
+  # 结论、判据和证据以 docs/ 为准（见 AGENTS.md「事实边界」）。
+  # 这样就不会再出现「任务早就做完了，看板上还挂着」的情况。
+  if [ "$status" = "完成" ]; then
+    rm -f "$file"
+  fi
+
   render_view
 }
 
