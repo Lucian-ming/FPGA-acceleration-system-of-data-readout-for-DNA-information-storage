@@ -197,7 +197,7 @@ Stage3 正常完成，8,100 B 回传成立。
 
 ---
 
-## B 类新增 · B23（2026-08-29，第二次上板发现，**未修复，当前 G3 唯一阻塞项**）
+## B 类新增 · B23 / B24（2026-08-29，第二次上板发现；RTL 已修，**待重建 bitstream 上板验证**）
 
 ### B23 DNA 核 `M_AXIS_RESULT` 的 TDATA 比 TVALID 早一拍，每条记录丢首拍、末拍重复
 
@@ -252,27 +252,46 @@ assign M_AXIS_RESULT_TDATA = pack_dat;     // 组合直连，立刻跟随
 `DNA M_AXIS → AXI DMA S2MM` 这条链至今没有任何仿真覆盖——
 正是 `docs/13` §7.2 BD-3 第 2 项、`docs/17` §1「根因缺口」点名的那一条。
 
-**修复方向**：把 `TDATA` 和 `TVALID`/`TLAST` 放进同一个 always 块、用同一个使能条件寄存
-（标准 register-slice 写法），让三者同拍推进：
+### 修复（RTL，已在仿真中逐拍验证；**尚未上板**）
 
-```verilog
-end else if (M_AXIS_RESULT_TREADY || ~M_AXIS_RESULT_TVALID) begin
-    M_AXIS_RESULT_TVALID  <= pack_vld;
-    M_AXIS_RESULT_TLAST   <= pack_last;
-    m_axis_result_tdata_r <= pack_dat;     // 与 valid 同拍
-end
-assign M_AXIS_RESULT_TDATA = m_axis_result_tdata_r;
-```
+补判据的过程中发现同一个输出级还有第二个缺陷，一并修掉，记为 **B24**：
 
-**这是 RTL 改动，必须重新综合/实现并重建 bitstream 与整套 `hw/build/export/` 制品，
-然后才能再上板。在图片 SHA-256 等于
+| 编号 | 缺陷 | 位置 |
+| --- | --- | --- |
+| B23 | `TDATA` 组合直连、`TVALID`/`TLAST` 寄存，数据比 valid 早一拍 | `Dna_accelerator_core_v1_0.v` AXIS 输出级 |
+| B24 | `s2mm_pack64` 的 `m_vld` 依赖 `m_rdy`（VALID 依赖 READY），且状态机按 `m_rdy` 而不是按握手 `m_vld && m_rdy` 推进；下游在包中间撤 TREADY 就丢拍 | `s2mm_pack64.v` |
+| B24 | `res_rd <= ~res_empty & TREADY & pack_vld` 在一条记录的 6 拍打包过程中**反复 pop** 结果 FIFO，FIFO 积压时整条整条丢记录 | `Dna_accelerator_core_v1_0.v` |
+
+改法：把 `s2mm_pack64` 重写成合规的 AXI-Stream master——有数据就拉 VALID（与 READY 无关）、
+只在 `m_vld && m_rdy` 时推进、未握手时 `m_dat`/`m_last` 保持不变；新增 `din_rd` 单拍脉冲
+给 FIFO 当 `rd_en`，保证一条记录只 pop 一次。输出级因此天然同拍，`M_AXIS_RESULT_*` 直接
+从 packer 连出去，不再需要额外寄存级，B23 的偏斜从结构上消失。
+另外补上 FIFO 两级同步读的两道保护：`res_empty_q`（刚写进空 FIFO 时 dout 要下一拍才出来）
+与 `res_settle`（刚 pop 完 `rptr→raddr_q→dout` 共 3 拍才稳定）。
+
+### 新增回归：`tools/run_xsim.sh result_axis`
+
+新 TB `hw/sim/dna/tb_dna_result_axis.v` 用**真实 DUT**（不复制被测逻辑）：
+引擎不启动，改为 `force` 内部的 `eng_res_wr`/`eng_res_din`，把
+`tests/golden/stage2_in.hex` 的已知记录压进结果 FIFO，再在 `M_AXIS_RESULT` 上逐拍核对。
+判据：每包恰好 6 拍、TLAST 只在第 6 拍、每拍逐位等于黄金字、总拍数不多不少，
+且全程在随机 TREADY 背压下成立。
+
+| RTL 版本 | 结果 |
+| --- | --- |
+| 修复前（`git show 363c7f1:`） | **FAIL**：应收 384 拍实收 376 拍，逐拍不符 422 处 |
+| 修复后 | **PASS**：384/384 拍逐位正确，TLAST 位置正确，随机背压下成立 |
+
+### 仍未完成（G3 未闭环）
+
+**RTL 改动必须重新综合/实现、重建 bitstream 与整套 `hw/build/export/` 制品，
+然后再上板复跑 G3。在图片 SHA-256 等于
 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 之前，
-G3 仍未闭环，不得声称端到端正确。**
+不得声称端到端正确。**
 
-补一条仿真判据（应与修复同批提交）：在 BD 级把
-`AXI DMA MM2S → DNA S_AXIS` 与 `DNA M_AXIS → AXI DMA S2MM` 串起来，
-判据是「送入 N 条 → 收到 N 条 48 B 记录且逐位等于 `tests/golden/stage2_in.hex`」，
-而不是「跑完没报错」。在途文件 `hw/sim/m3/tb_m3_bd3b_dma.sv`。
+新 TB 覆盖的是 DNA 核到 AXIS 端口这一段；`AXI DMA MM2S → DNA S_AXIS` 与
+`DNA M_AXIS → AXI DMA S2MM` 的 **BD 级**串联（`docs/13` §7.2 BD-3 第 1、2 项、
+`docs/17` 任务 A）仍未实施，在途文件 `hw/sim/m3/tb_m3_bd3b_dma.sv`。
 
 ---
 

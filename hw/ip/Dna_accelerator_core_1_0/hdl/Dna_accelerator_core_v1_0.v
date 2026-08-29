@@ -63,10 +63,10 @@ module Dna_accelerator_core_v1_0 #(
     // ----------------- AXIS RESULT OUT --------------
     input  wire                                     M_AXIS_RESULT_ACLK,
     input  wire                                     M_AXIS_RESULT_ARESETN,
-    output reg                                      M_AXIS_RESULT_TVALID,
+    output wire                                     M_AXIS_RESULT_TVALID,
     output wire [C_M_AXIS_RESULT_TDATA_WIDTH-1:0]   M_AXIS_RESULT_TDATA,
     output wire [(C_M_AXIS_RESULT_TDATA_WIDTH/8)-1:0] M_AXIS_RESULT_TSTRB,
-    output reg                                      M_AXIS_RESULT_TLAST,
+    output wire                                     M_AXIS_RESULT_TLAST,
     input  wire                                     M_AXIS_RESULT_TREADY
 );
 
@@ -331,7 +331,7 @@ module Dna_accelerator_core_v1_0 #(
     // Engine output -> result FIFO -> 64bit pack -> AXIS OUT
     // =================================================
     wire                 res_full, res_empty;
-    reg                  res_rd;
+    wire                 res_rd;   // [B24] 由 u_pack.din_rd 驱动：一条记录只 pop 一次
     wire [RESULT_W-1:0]  res_out;
 
     wire                  eng_res_wr;
@@ -381,46 +381,55 @@ module Dna_accelerator_core_v1_0 #(
     wire [63:0] pack_dat;
     wire        pack_last;
 
-    // ===== FIX: Add delay register to align with FIFO synchronous read =====
+    // [B24] fifo_sync_sdpram_b64 是两级同步读（raddr_q -> dout），pop 之后 dout 要 2 拍
+    // 才稳定。原来只用了 res_empty 延一拍的 res_empty_q，且 res_rd 在打包过程中会反复
+    // pop（见下），两者叠加会漏记录。现在两道保护都要：res_empty_q 覆盖「刚写进空
+    // FIFO」那一次（dout 要下一拍才出来），res_settle 覆盖「刚 pop 完」（rptr->raddr_q
+    // ->dout 共 3 拍才稳定）。少任何一道，packer 都会锁到 X 或上一条记录。
     reg res_empty_q;
     always @(posedge aclk or negedge aresetn) begin
-        if (!aresetn || soft_reset_s)
-            res_empty_q <= 1'b1;
-        else
-            res_empty_q <= res_empty;
+        if (!aresetn || soft_reset_s) res_empty_q <= 1'b1;
+        else                          res_empty_q <= res_empty;
     end
+
+    reg [1:0] res_settle;
+    always @(posedge aclk or negedge aresetn) begin
+        if (!aresetn || soft_reset_s)      res_settle <= 2'd0;
+        else if (res_rd)                   res_settle <= 2'd3;
+        else if (res_settle != 2'd0)       res_settle <= res_settle - 1'b1;
+    end
+    wire res_ready = ~res_empty_q & (res_settle == 2'd0);
 
     s2mm_pack64 #(.R(RESULT_W)) u_pack (
         .clk   (aclk),
         .rst_n (aresetn & ~soft_reset_s),
-        .din_vld(~res_empty_q),
+        .din_vld(res_ready),
         .din    (res_out),
+        .din_rd (res_rd),
         .m_vld  (pack_vld),
         .m_dat  (pack_dat),
         .m_last (pack_last),
         .m_rdy  (M_AXIS_RESULT_TREADY)
     );
 
-    // Read result FIFO (when downstream ready and pack can output, read next)
-    always @(posedge aclk or negedge aresetn) begin
-        if (!aresetn || soft_reset_s)
-            res_rd <= 1'b0;
-        else
-            res_rd <= ~res_empty & M_AXIS_RESULT_TREADY & pack_vld;
-    end
+    // [B24] 原来这里是：
+    //     res_rd <= ~res_empty & M_AXIS_RESULT_TREADY & pack_vld;
+    // 它在一条记录的 6 拍打包过程中会反复把 FIFO pop 掉，属于「一条记录 pop 多次」，
+    // 结果 FIFO 里积压时会整条整条地丢记录。现在改由 u_pack 在锁存记录那一拍
+    // 输出单拍 din_rd，保证一条记录只 pop 一次。
 
     // AXIS OUT
-    always @(posedge aclk or negedge aresetn) begin
-        if (!aresetn || soft_reset_s) begin
-            M_AXIS_RESULT_TVALID <= 1'b0;
-            M_AXIS_RESULT_TLAST  <= 1'b0;
-        end else if (M_AXIS_RESULT_TREADY || ~M_AXIS_RESULT_TVALID) begin
-            M_AXIS_RESULT_TVALID <= pack_vld;
-            M_AXIS_RESULT_TLAST  <= pack_last;
-        end
-    end
+    // [B23] 原实现 TVALID/TLAST 寄存一拍、TDATA 却组合直连 pack_dat，数据比 valid 早
+    // 一整拍，每次握手采到的都是「下一拍」的数据：每个 48 B 包实收 [b1,b2,b3,b4,b5,b5]，
+    // 首拍（score[9:0] + position[15:0] + 码字低 38 bit）被丢、末拍被采两次。
+    // 板上取证：B[i][k] == G[i+1][k+1]（k=0..4）20,470/20,475 拍吻合，
+    // B[i][5] == B[i][4] 4,095/4,095 条成立，详见 docs/03-status.md B23。
+    // s2mm_pack64 重写后本身就是合规的 AXI-Stream master（输出已寄存、只在
+    // m_vld && m_rdy 时推进），因此这里直接连出去，三者天然同拍，不再需要额外寄存级。
+    assign M_AXIS_RESULT_TVALID = pack_vld;
+    assign M_AXIS_RESULT_TLAST  = pack_last;
+    assign M_AXIS_RESULT_TDATA  = pack_dat;
 
-    assign M_AXIS_RESULT_TDATA = pack_dat;
     assign M_AXIS_RESULT_TSTRB = {(C_M_AXIS_RESULT_TDATA_WIDTH/8){1'b1}};
 
 endmodule

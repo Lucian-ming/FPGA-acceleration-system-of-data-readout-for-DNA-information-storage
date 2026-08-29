@@ -109,6 +109,22 @@ if [[ "$WHICH" == all || "$WHICH" == ingress ]]; then
         "$REPO_ROOT/$DNA/srpe_batch.v" \
         "$REPO_ROOT/$DNA/tb_dna_ingress.v"
 fi
+if [[ "$WHICH" == all || "$WHICH" == result_axis ]]; then
+    # [B23/B24] DNA 核 M_AXIS_RESULT 输出级的逐拍判据。
+    # 这条链（DNA M_AXIS -> AXI DMA S2MM）此前没有任何仿真覆盖：
+    # run_m2_full.sh 的 Stage1 只编译 srpe_batch.v，直接抓引擎的 res_din，
+    # 完全绕开 AXIS 输出级和 s2mm_pack64，所以 B23 只有上板才暴露。
+    run_case dna_result_axis tb_dna_result_axis \
+        "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0.v" \
+        "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$REPO_ROOT/$DNA/fifo_sync_sdpram.v" \
+        "$REPO_ROOT/$DNA/fifo_sync_sdpram_b64.v" \
+        "$REPO_ROOT/$DNA/s2mm_pack64.v" \
+        "$REPO_ROOT/$DNA/srpe_batch.v" \
+        "$REPO_ROOT/$DNA/srpe.v" \
+        "$REPO_ROOT/$DNA/local_correlator.v" \
+        "$REPO_ROOT/hw/sim/dna/tb_dna_result_axis.v"
+fi
 if [[ "$WHICH" == all || "$WHICH" == dna_axil ]]; then
     run_case dna_axil tb_dna_axil \
         "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
