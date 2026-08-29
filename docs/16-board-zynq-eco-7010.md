@@ -150,13 +150,58 @@ PCW_UIPARAM_DDR_DEVICE_CAPACITY  2048 MBits
 
 ## 6. 首次上板顺序（B 阶段，尚未执行）
 
-1. 断电拍摄正反面，确认 PCB 版本与接口布局（本板已确认为 R6：有 OLED）。
-2. SW1 拨到 JTAG `00`，只接标注 DEBUG 的 Type-C 口，不接任何外部扩展模块。
-3. 在 Windows 设备管理器确认 FT232H（JTAG）与 CH340（串口）。
-4. **先烧官方 LED 例程的 PL-only bit 做最小冒烟**——它的 part 与四个 LED 引脚已与原理图核对一致。
-   这一步的目的是把「板子/下载器/供电」与「我们的设计」两个变量分开。
-5. 再下载本项目重建后的 bitstream + ELF，经 JTAG 跑 DDR 自检与串口日志。
-6. 验证以太网 `192.168.1.10:7`，最后才考虑制作 SD/QSPI 启动镜像。
+### 6.0 前置障碍：WSL 连不上开发板（必须先解决）
+
+检查结论（2026-08-29）：WSL 内无 Xilinx/FTDI udev 规则，Windows 未安装 `usbipd-win`，
+也未发现已连接的 FT232H / CH340 设备。**开发板插到 Windows 上，WSL 里的 Vivado 不会自动看到它。**
+
+两条路，二选一：
+
+| 方案 | 做法 | 优点 | 缺点 |
+| --- | --- | --- | --- |
+| **① Windows 跑 hw_server（推荐先试）** | 在 Windows 装 Vivado Lab（桌面已有快捷方式）并启动 `hw_server`，WSL 里的 Vivado 用 `connect_hw_server -url <WindowsIP>:3121` 远程连 | 不动内核/驱动，最省事；串口也直接用 Windows 的 CH340 | 需要 Windows 侧常驻一个进程 |
+| ② `usbipd-win` 透传 | Windows 装 `usbipd-win`，`usbipd attach --wsl --busid <id>`，WSL 内装 Xilinx cable driver 的 udev 规则 | WSL 内完全本地化 | 要装内核态驱动，USB 断连需重新 attach |
+
+**选型前先在 Windows 设备管理器确认实物的 VID/PID**（FT232H 通常是 `0403:6014`，
+CH340 通常是 `1A86:7523`）。
+
+### 6.1 上板步骤
+
+1. **断电**拍摄正反面，确认版本与接口布局（本板已确认 R6：有 OLED）。
+2. `SW1` 拨到 JTAG **`00`**，只接标注 DEBUG 的 Type-C 口，不接任何外部扩展模块。
+3. 在 Windows 设备管理器确认 FT232H（JTAG）与 CH340（串口）已识别。
+4. **最小冒烟：先烧官方 LED 例程的 PL-only bitstream**，不要先烧我们自己的东西。
+
+   ```bash
+   # 资料包内已含官方工程，解压后取 impl_1/LED.bit
+   unzip -o "docs/board/zynq-eco-7010/03_examples/ECO_LED_官方示例工程.zip" -d /tmp/eco_led
+   sha256sum /tmp/eco_led/ECO_LED/ECO_LED.runs/impl_1/LED.bit
+   # 期望：98ae989ebe676aa633d4430440e8c49228128ce3e67f2aab1f127105aed31fe0
+   ```
+
+   该 bit 的头部信息：目标器件 `7z010clg400`、Vivado 2020.1 构建、2,083,839 B；
+   引脚 `T12/U12/V12/W13`（LVCMOS33）与规格书一致。
+   **判据：四个 LED 按流水灯规律点亮。**
+
+   > 这一步的目的是把「板子 / 下载器 / 供电 / 工具链」和「我们的设计」两个变量**分开**。
+   > 如果这一步不通，后面一切排查都没有意义。
+
+5. 冒烟通过后，再下载本项目重建后的 `hw/build/export/top_bd_wrapper.bit` 与应用 ELF，
+   经 JTAG 跑 **DDR 自检**与串口日志（115200，CH340）。
+   DDR 是本板最大的残留风险（§5 第 2 条），务必先确认它。
+6. 验证以太网 `192.168.1.10:7` 能连通、协议握手（CAPS/CONFIG）正常。
+7. 跑一次 2,048 条读段的完整任务，按 `docs/12-main-handoff-2026-08-21.md` §10 逐级采证。
+8. **最后**才考虑制作 SD / QSPI 启动镜像（需要先补 PS7 的 SD0/QSPI 配置，见 §5 第 1 条）。
+
+### 6.2 首次上板必须采集的证据
+
+- CAPS / CONFIG 应答与状态码；
+- 每一级 DDR 中间输出（Stage1 输出、Stage2 输出、PS XOR 后、Stage3 输出）；
+- Stage1 的 TX/RX BD 实际完成数，Stage2/Stage3 的写拍数与末拍有效字节；
+- 完整 UART 日志与 TCP 回传字节数；
+- 最终 8,100 B 回传经 LDPC 后的图片 SHA-256。
+
+**第一处不一致就停下来定位到具体一级**，不要跑完全程再回头猜。
 
 ---
 
