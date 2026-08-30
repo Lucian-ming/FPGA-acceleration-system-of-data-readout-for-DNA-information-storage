@@ -181,9 +181,11 @@ module tb_dna_result_axis;
         if (errors != 0) begin
             $display("[FAIL] M_AXIS_RESULT 逐拍比对不通过（B23 未修复或再次回归）");
             $fatal(1);
+            $finish;   // [XSim 2022.2] $fatal 在这里既不终止仿真也不让 xsim 非零退出，必须显式收尾
         end else if (got_beats != NREC*BEATS) begin
             $display("[FAIL] 拍数不符：实收 %0d，应为 %0d", got_beats, NREC*BEATS);
             $fatal(1);
+            $finish;   // [XSim 2022.2] $fatal 在这里既不终止仿真也不让 xsim 非零退出，必须显式收尾
         end else begin
             $display("PASS: %0d 条记录 x %0d 拍在随机 TREADY 背压下逐位正确，TLAST 位置正确",
                      NREC, BEATS);
@@ -197,6 +199,7 @@ module tb_dna_result_axis;
         $display("[FAIL] 仿真超时，未在限定时间内收齐 %0d 拍（实收 %0d）",
                  NREC*BEATS, got_beats);
         $fatal(1);
+        $finish;   // [XSim 2022.2] $fatal 在这里既不终止仿真也不让 xsim 非零退出，必须显式收尾
     end
 
 endmodule
