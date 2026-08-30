@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 ----------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2022.2 (lin64) Build 3671981 Fri Oct 14 04:59:54 MDT 2022
-| Date         : Sun Aug 16 17:09:35 2026
+| Date         : Sun Aug 30 11:40:37 2026
 | Host         : yoga running 64-bit Ubuntu 20.04.6 LTS
 | Command      : report_utilization -hierarchical -file hw/build/synth_Dna_accelerator_core_v1_0/util.rpt
 | Design       : Dna_accelerator_core_v1_0
@@ -22,12 +22,12 @@ Table of Contents
 +-------------------------------+-------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 |            Instance           |                   Module                  | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +-------------------------------+-------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
-| Dna_accelerator_core_v1_0     |                                     (top) |       4282 |       4282 |       0 |    0 | 4741 |     21 |      1 |          0 |
-|   (Dna_accelerator_core_v1_0) |                                     (top) |         58 |         58 |       0 |    0 |  378 |      0 |      0 |          0 |
+| Dna_accelerator_core_v1_0     |                                     (top) |       4355 |       4355 |       0 |    0 | 5054 |     21 |      1 |          0 |
+|   (Dna_accelerator_core_v1_0) |                                     (top) |         63 |         63 |       0 |    0 |  689 |      0 |      0 |          0 |
 |   u_axil                      | Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL |         75 |         75 |       0 |    0 |  205 |      0 |      0 |          0 |
-|   u_in_fifo                   |                      fifo_sync_sdpram_b64 |        218 |        218 |       0 |    0 |   41 |      8 |      1 |          0 |
-|   u_pack                      |                               s2mm_pack64 |        134 |        134 |       0 |    0 |  395 |      0 |      0 |          0 |
-|   u_res_fifo                  |      fifo_sync_sdpram_b64__parameterized0 |        192 |        192 |       0 |    0 |   36 |      5 |      0 |          0 |
+|   u_in_fifo                   |                      fifo_sync_sdpram_b64 |         68 |         68 |       0 |    0 |   41 |      8 |      1 |          0 |
+|   u_pack                      |                               s2mm_pack64 |        203 |        203 |       0 |    0 |  397 |      0 |      0 |          0 |
+|   u_res_fifo                  |      fifo_sync_sdpram_b64__parameterized0 |        341 |        341 |       0 |    0 |   36 |      5 |      0 |          0 |
 |   u_srpe_batch                |                                srpe_batch |       3605 |       3605 |       0 |    0 | 3686 |      8 |      0 |          0 |
 +-------------------------------+-------------------------------------------+------------+------------+---------+------+------+--------+--------+------------+
 

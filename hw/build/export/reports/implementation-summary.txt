@@ -1,6 +1,10 @@
-实现摘要（2026-08-29 B23/B24/B25 修复后重建）
-head: 2f0729ed28077910dece24fbd2c38305fa8bfd2c
+# 实现摘要（B26+B27 修复后重建，2026-08-30）
+design : dna_accel / top_bd_wrapper
+device : xc7z010clg400-1
+clock  : 100 MHz (clk_out1_top_bd_clk_wiz_0_0)
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-      0.017        0.000                      0                37557        0.016        0.000                      0                37557        3.000        0.000                       0                 13734  
+      0.088        0.000                      0                38462        0.016        0.000                      0                38462        3.000        0.000                       0                 14039  
 
+errors : 0   critical warnings : 0
+含 RTL 修复：B20(voter 4KB) / B23,B24(DNA AXIS 出口) / B25(水印预载) / B26(DNA 入口采样) / B27(decoder START)

@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2022.2 (lin64) Build 3671981 Fri Oct 14 04:59:54 MDT 2022
-| Date         : Sat Aug  8 15:18:50 2026
+| Date         : Sun Aug 30 11:41:15 2026
 | Host         : yoga running 64-bit Ubuntu 20.04.6 LTS
 | Command      : report_utilization -hierarchical -file hw/build/synth_srpe_batch/util.rpt
 | Design       : srpe_batch
@@ -22,7 +22,7 @@ Table of Contents
 +------------+--------+------------+------------+---------+------+------+--------+--------+------------+
 |  Instance  | Module | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs | RAMB36 | RAMB18 | DSP Blocks |
 +------------+--------+------------+------------+---------+------+------+--------+--------+------------+
-| srpe_batch |  (top) |       3304 |       3304 |       0 |    0 | 3665 |      8 |      0 |          0 |
+| srpe_batch |  (top) |       3569 |       3569 |       0 |    0 | 3695 |      8 |      0 |          0 |
 +------------+--------+------------+------------+---------+------+------+--------+--------+------------+
 
 

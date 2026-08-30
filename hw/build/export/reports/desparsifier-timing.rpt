@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2022.2 (lin64) Build 3671981 Fri Oct 14 04:59:54 MDT 2022
-| Date         : Sun Aug 16 17:09:24 2026
+| Date         : Sun Aug 30 11:39:57 2026
 | Host         : yoga running 64-bit Ubuntu 20.04.6 LTS
 | Command      : report_timing_summary -file hw/build/synth_desparsification_decoder_v1_0/timing.rpt -max_paths 5
 | Design       : desparsification_decoder_v1_0
@@ -136,7 +136,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-      1.856        0.000                      0                 1530       -0.091      -10.840                    125                 1530        4.500        0.000                       0                   808  
+      1.856        0.000                      0                 1530       -0.091      -10.835                    125                 1530        4.500        0.000                       0                   808  
 
 
 Timing constraints are not met.
@@ -172,7 +172,7 @@ clk_1               6.252        0.000                      0                  3
 From Clock    To Clock          WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints  
 ----------    --------          -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------  
 clk_1         clk_0               8.600        0.000                      0                  123       -0.091      -10.669                    123                  123  
-clk_0         clk_1               8.593        0.000                      0                    2       -0.087       -0.170                      2                    2  
+clk_0         clk_1               8.583        0.000                      0                    2       -0.087       -0.166                      2                    2  
 
 
 ------------------------------------------------------------------------------------------------
@@ -240,7 +240,7 @@ Slack (MET) :             1.856ns  (required time - arrival time)
                          LUT4 (Prop_lut4_I1_O)        0.124     5.009 f  w_burst[31]_i_10/O
                          net (fo=10, unplaced)        0.492     5.501    w_burst[31]_i_10_n_0
                          LUT2 (Prop_lut2_I1_O)        0.124     5.625 r  w_burst[31]_i_4/O
-                         net (fo=64, unplaced)        0.990     6.615    burst_len_return4
+                         net (fo=64, unplaced)        0.990     6.615    w_burst[31]_i_4_n_0
                          LUT5 (Prop_lut5_I1_O)        0.124     6.739 r  w_burst[31]_i_31/O
                          net (fo=1, unplaced)         0.000     6.739    w_burst[31]_i_31_n_0
                          CARRY4 (Prop_carry4_S[0]_CO[3])
@@ -251,7 +251,7 @@ Slack (MET) :             1.856ns  (required time - arrival time)
                          net (fo=1, unplaced)         0.000     7.385    w_burst_reg[31]_i_11_n_0
                          CARRY4 (Prop_carry4_CI_CO[3])
                                                       0.114     7.499 r  w_burst_reg[31]_i_5/CO[3]
-                         net (fo=50, unplaced)        1.000     8.499    burst_len_return1
+                         net (fo=50, unplaced)        1.000     8.499    w_burst_reg[31]_i_5_n_0
                          LUT5 (Prop_lut5_I3_O)        0.124     8.623 r  aw_len_r[7]_i_9/O
                          net (fo=3, unplaced)         1.129     9.752    aw_len_r[7]_i_9_n_0
                          LUT5 (Prop_lut5_I0_O)        0.124     9.876 r  aw_len_r[6]_i_2/O
@@ -316,7 +316,7 @@ Slack (MET) :             1.856ns  (required time - arrival time)
                          LUT4 (Prop_lut4_I1_O)        0.124     5.009 f  w_burst[31]_i_10/O
                          net (fo=10, unplaced)        0.492     5.501    w_burst[31]_i_10_n_0
                          LUT2 (Prop_lut2_I1_O)        0.124     5.625 r  w_burst[31]_i_4/O
-                         net (fo=64, unplaced)        0.990     6.615    burst_len_return4
+                         net (fo=64, unplaced)        0.990     6.615    w_burst[31]_i_4_n_0
                          LUT5 (Prop_lut5_I1_O)        0.124     6.739 r  w_burst[31]_i_31/O
                          net (fo=1, unplaced)         0.000     6.739    w_burst[31]_i_31_n_0
                          CARRY4 (Prop_carry4_S[0]_CO[3])
@@ -327,7 +327,7 @@ Slack (MET) :             1.856ns  (required time - arrival time)
                          net (fo=1, unplaced)         0.000     7.385    w_burst_reg[31]_i_11_n_0
                          CARRY4 (Prop_carry4_CI_CO[3])
                                                       0.114     7.499 r  w_burst_reg[31]_i_5/CO[3]
-                         net (fo=50, unplaced)        1.000     8.499    burst_len_return1
+                         net (fo=50, unplaced)        1.000     8.499    w_burst_reg[31]_i_5_n_0
                          LUT5 (Prop_lut5_I3_O)        0.124     8.623 r  aw_len_r[7]_i_9/O
                          net (fo=3, unplaced)         1.129     9.752    aw_len_r[7]_i_9_n_0
                          LUT5 (Prop_lut5_I0_O)        0.124     9.876 r  aw_len_r[6]_i_2/O
@@ -392,7 +392,7 @@ Slack (MET) :             1.873ns  (required time - arrival time)
                          LUT4 (Prop_lut4_I1_O)        0.124     5.009 f  w_burst[31]_i_10/O
                          net (fo=10, unplaced)        0.492     5.501    w_burst[31]_i_10_n_0
                          LUT2 (Prop_lut2_I1_O)        0.124     5.625 r  w_burst[31]_i_4/O
-                         net (fo=64, unplaced)        0.990     6.615    burst_len_return4
+                         net (fo=64, unplaced)        0.990     6.615    w_burst[31]_i_4_n_0
                          LUT5 (Prop_lut5_I1_O)        0.124     6.739 r  w_burst[31]_i_31/O
                          net (fo=1, unplaced)         0.000     6.739    w_burst[31]_i_31_n_0
                          CARRY4 (Prop_carry4_S[0]_CO[3])
@@ -403,7 +403,7 @@ Slack (MET) :             1.873ns  (required time - arrival time)
                          net (fo=1, unplaced)         0.000     7.385    w_burst_reg[31]_i_11_n_0
                          CARRY4 (Prop_carry4_CI_CO[3])
                                                       0.114     7.499 r  w_burst_reg[31]_i_5/CO[3]
-                         net (fo=50, unplaced)        1.000     8.499    burst_len_return1
+                         net (fo=50, unplaced)        1.000     8.499    w_burst_reg[31]_i_5_n_0
                          LUT5 (Prop_lut5_I3_O)        0.118     8.617 r  aw_len_r[7]_i_6/O
                          net (fo=3, unplaced)         1.129     9.746    aw_len_r[7]_i_6_n_0
                          LUT6 (Prop_lut6_I1_O)        0.124     9.870 r  aw_len_r[7]_i_4/O
@@ -468,7 +468,7 @@ Slack (MET) :             2.070ns  (required time - arrival time)
                          LUT4 (Prop_lut4_I1_O)        0.124     5.009 f  w_burst[31]_i_10/O
                          net (fo=10, unplaced)        0.492     5.501    w_burst[31]_i_10_n_0
                          LUT2 (Prop_lut2_I1_O)        0.124     5.625 r  w_burst[31]_i_4/O
-                         net (fo=64, unplaced)        0.990     6.615    burst_len_return4
+                         net (fo=64, unplaced)        0.990     6.615    w_burst[31]_i_4_n_0
                          LUT5 (Prop_lut5_I1_O)        0.124     6.739 r  w_burst[31]_i_31/O
                          net (fo=1, unplaced)         0.000     6.739    w_burst[31]_i_31_n_0
                          CARRY4 (Prop_carry4_S[0]_CO[3])
@@ -479,7 +479,7 @@ Slack (MET) :             2.070ns  (required time - arrival time)
                          net (fo=1, unplaced)         0.000     7.385    w_burst_reg[31]_i_11_n_0
                          CARRY4 (Prop_carry4_CI_CO[3])
                                                       0.114     7.499 r  w_burst_reg[31]_i_5/CO[3]
-                         net (fo=50, unplaced)        1.000     8.499    burst_len_return1
+                         net (fo=50, unplaced)        1.000     8.499    w_burst_reg[31]_i_5_n_0
                          LUT5 (Prop_lut5_I3_O)        0.124     8.623 r  aw_len_r[7]_i_7/O
                          net (fo=4, unplaced)         0.926     9.549    aw_len_r[7]_i_7_n_0
                          LUT6 (Prop_lut6_I3_O)        0.124     9.673 r  aw_len_r[4]_i_2/O
@@ -542,7 +542,7 @@ Slack (MET) :             2.137ns  (required time - arrival time)
                          LUT3 (Prop_lut3_I0_O)        0.295     3.987 f  r_burst[31]_i_10/O
                          net (fo=1, unplaced)         1.111     5.098    r_burst[31]_i_10_n_0
                          LUT6 (Prop_lut6_I1_O)        0.124     5.222 r  r_burst[31]_i_4/O
-                         net (fo=70, unplaced)        0.993     6.215    r_burst[31]_i_4_n_0
+                         net (fo=70, unplaced)        0.993     6.215    burst_len_return4
                          LUT5 (Prop_lut5_I1_O)        0.124     6.339 r  r_burst[31]_i_37/O
                          net (fo=1, unplaced)         0.000     6.339    r_burst[31]_i_37_n_0
                          CARRY4 (Prop_carry4_S[1]_CO[3])
@@ -556,7 +556,7 @@ Slack (MET) :             2.137ns  (required time - arrival time)
                          net (fo=1, unplaced)         0.000     7.117    r_burst_reg[31]_i_15_n_0
                          CARRY4 (Prop_carry4_CI_CO[3])
                                                       0.114     7.231 r  r_burst_reg[31]_i_5/CO[3]
-                         net (fo=49, unplaced)        1.000     8.231    r_burst_reg[31]_i_5_n_0
+                         net (fo=49, unplaced)        1.000     8.231    burst_len_return1
                          LUT4 (Prop_lut4_I2_O)        0.118     8.349 r  ar_len_r[7]_i_5/O
                          net (fo=2, unplaced)         1.122     9.471    ar_len_r[7]_i_5_n_0
                          LUT5 (Prop_lut5_I0_O)        0.124     9.595 r  ar_len_r[7]_i_4/O
@@ -2009,14 +2009,14 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
 From Clock:  clk_0
   To Clock:  clk_1
 
-Setup :            0  Failing Endpoints,  Worst Slack        8.593ns,  Total Violation        0.000ns
-Hold  :            2  Failing Endpoints,  Worst Slack       -0.087ns,  Total Violation       -0.170ns
+Setup :            0  Failing Endpoints,  Worst Slack        8.583ns,  Total Violation        0.000ns
+Hold  :            2  Failing Endpoints,  Worst Slack       -0.087ns,  Total Violation       -0.166ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             8.593ns  (required time - arrival time)
+Slack (MET) :             8.583ns  (required time - arrival time)
   Source:                 busy_reg/C
                             (rising edge-triggered cell FDRE clocked by clk_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            b1_reg/D
@@ -2024,7 +2024,7 @@ Slack (MET) :             8.593ns  (required time - arrival time)
   Path Group:             clk_1
   Path Type:              Setup (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_0 rise@0.000ns)
-  Data Path Delay:        0.808ns  (logic 0.456ns (56.436%)  route 0.352ns (43.564%))
+  Data Path Delay:        0.818ns  (logic 0.456ns (55.746%)  route 0.362ns (44.254%))
   Logic Levels:           0  
   Clock Path Skew:        -0.329ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2049,7 +2049,7 @@ Slack (MET) :             8.593ns  (required time - arrival time)
                          FDRE                                         r  busy_reg/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  busy_reg/Q
-                         net (fo=3, unplaced)         0.352     3.275    busy_reg_n_0
+                         net (fo=5, unplaced)         0.362     3.285    busy_reg_n_0
                          FDRE                                         r  b1_reg/D
   -------------------------------------------------------------------    -------------------
 
@@ -2066,9 +2066,9 @@ Slack (MET) :             8.593ns  (required time - arrival time)
                          FDRE (Setup_fdre_C_D)       -0.235    11.868    b1_reg
   -------------------------------------------------------------------
                          required time                         11.868    
-                         arrival time                          -3.275    
+                         arrival time                          -3.285    
   -------------------------------------------------------------------
-                         slack                                  8.593    
+                         slack                                  8.583    
 
 Slack (MET) :             8.600ns  (required time - arrival time)
   Source:                 done_m_reg/C
@@ -2184,7 +2184,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
   -------------------------------------------------------------------
                          slack                                 -0.087    
 
-Slack (VIOLATED) :        -0.084ns  (arrival time - required time)
+Slack (VIOLATED) :        -0.080ns  (arrival time - required time)
   Source:                 busy_reg/C
                             (rising edge-triggered cell FDRE clocked by clk_0  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            b1_reg/D
@@ -2192,7 +2192,7 @@ Slack (VIOLATED) :        -0.084ns  (arrival time - required time)
   Path Group:             clk_1
   Path Type:              Hold (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_0 rise@0.000ns)
-  Data Path Delay:        0.289ns  (logic 0.141ns (48.726%)  route 0.148ns (51.274%))
+  Data Path Delay:        0.294ns  (logic 0.141ns (48.026%)  route 0.153ns (51.974%))
   Logic Levels:           0  
   Clock Path Skew:        0.355ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2217,7 +2217,7 @@ Slack (VIOLATED) :        -0.084ns  (arrival time - required time)
                          FDRE                                         r  busy_reg/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.141     0.829 r  busy_reg/Q
-                         net (fo=3, unplaced)         0.148     0.978    busy_reg_n_0
+                         net (fo=5, unplaced)         0.153     0.982    busy_reg_n_0
                          FDRE                                         r  b1_reg/D
   -------------------------------------------------------------------    -------------------
 
@@ -2234,9 +2234,9 @@ Slack (VIOLATED) :        -0.084ns  (arrival time - required time)
                          FDRE (Hold_fdre_C_D)        -0.017     1.061    b1_reg
   -------------------------------------------------------------------
                          required time                         -1.061    
-                         arrival time                           0.978    
+                         arrival time                           0.982    
   -------------------------------------------------------------------
-                         slack                                 -0.084    
+                         slack                                 -0.080    
 
 
 

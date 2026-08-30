@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2022.2 (lin64) Build 3671981 Fri Oct 14 04:59:54 MDT 2022
-| Date         : Sun Aug 16 17:09:24 2026
+| Date         : Sun Aug 30 11:39:57 2026
 | Host         : yoga running 64-bit Ubuntu 20.04.6 LTS
 | Command      : report_utilization -hierarchical -file hw/build/synth_desparsification_decoder_v1_0/util.rpt
 | Design       : desparsification_decoder_v1_0
@@ -22,10 +22,10 @@ Table of Contents
 +-----------------------------------+---------------------+------------+------------+---------+------+-----+--------+--------+------------+
 |              Instance             |        Module       | Total LUTs | Logic LUTs | LUTRAMs | SRLs | FFs | RAMB36 | RAMB18 | DSP Blocks |
 +-----------------------------------+---------------------+------------+------------+---------+------+-----+--------+--------+------------+
-| desparsification_decoder_v1_0     |               (top) |        962 |        962 |       0 |    0 | 806 |      0 |      0 |          0 |
-|   (desparsification_decoder_v1_0) |               (top) |        445 |        445 |       0 |    0 | 373 |      0 |      0 |          0 |
-|   u_axil                          |   axi_slave_decoder |         83 |         83 |       0 |    0 | 202 |      0 |      0 |          0 |
-|   u_dp                            | desparsify_datapath |        434 |        434 |       0 |    0 | 231 |      0 |      0 |          0 |
+| desparsification_decoder_v1_0     |               (top) |        963 |        963 |       0 |    0 | 806 |      0 |      0 |          0 |
+|   (desparsification_decoder_v1_0) |               (top) |        446 |        446 |       0 |    0 | 373 |      0 |      0 |          0 |
+|   u_axil                          |   axi_slave_decoder |         84 |         84 |       0 |    0 | 202 |      0 |      0 |          0 |
+|   u_dp                            | desparsify_datapath |        433 |        433 |       0 |    0 | 231 |      0 |      0 |          0 |
 +-----------------------------------+---------------------+------------+------------+---------+------+-----+--------+--------+------------+
 
 

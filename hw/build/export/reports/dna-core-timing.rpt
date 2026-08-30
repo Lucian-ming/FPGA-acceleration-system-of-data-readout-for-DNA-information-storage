@@ -1,7 +1,7 @@
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2022.2 (lin64) Build 3671981 Fri Oct 14 04:59:54 MDT 2022
-| Date         : Sun Aug 16 17:09:36 2026
+| Date         : Sun Aug 30 11:40:38 2026
 | Host         : yoga running 64-bit Ubuntu 20.04.6 LTS
 | Command      : report_timing_summary -file hw/build/synth_Dna_accelerator_core_v1_0/timing.rpt -max_paths 5
 | Design       : Dna_accelerator_core_v1_0
@@ -136,7 +136,7 @@ Table of Contents
 
     WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
     -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-      0.543        0.000                      0                13934       -0.087       -0.780                      9                13934        4.500        0.000                       0                  4787  
+      0.543        0.000                      0                14559       -0.087       -0.780                      9                14559        4.500        0.000                       0                  5100  
 
 
 Timing constraints are not met.
@@ -161,7 +161,7 @@ clk_2  {0.000 5.000}      10.000          100.000
 
 Clock             WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints     WPWS(ns)     TPWS(ns)  TPWS Failing Endpoints  TPWS Total Endpoints  
 -----             -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------     --------     --------  ----------------------  --------------------  
-clk_1               0.543        0.000                      0                13088        0.135        0.000                      0                13088        4.500        0.000                       0                  4581  
+clk_1               0.543        0.000                      0                13711        0.135        0.000                      0                13711        4.500        0.000                       0                  4894  
 clk_2               6.466        0.000                      0                  365        0.134        0.000                      0                  365        4.500        0.000                       0                   206  
 
 
@@ -182,7 +182,7 @@ clk_2         clk_1               8.600        0.000                      0     
 
 Path Group         From Clock         To Clock               WNS(ns)      TNS(ns)  TNS Failing Endpoints  TNS Total Endpoints      WHS(ns)      THS(ns)  THS Failing Endpoints  THS Total Endpoints  
 ----------         ----------         --------               -------      -------  ---------------------  -------------------      -------      -------  ---------------------  -------------------  
-**async_default**  clk_1              clk_1                    6.902        0.000                      0                  472        0.929        0.000                      0                  472  
+**async_default**  clk_1              clk_1                    6.868        0.000                      0                  474        0.943        0.000                      0                  474  
 
 
 ------------------------------------------------------------------------------------------------
@@ -231,7 +231,7 @@ Slack (MET) :             0.543ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.584     2.467    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[1]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  u_srpe_batch/pos_base_reg[1]/Q
@@ -277,7 +277,7 @@ Slack (MET) :             0.543ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.439    12.138    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/wm_rd_addr_q_reg[15]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
@@ -316,7 +316,7 @@ Slack (MET) :             0.669ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.584     2.467    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[1]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  u_srpe_batch/pos_base_reg[1]/Q
@@ -359,7 +359,7 @@ Slack (MET) :             0.669ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.439    12.138    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/wm_rd_addr_q_reg[12]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
@@ -398,7 +398,7 @@ Slack (MET) :             0.671ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.584     2.467    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[1]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  u_srpe_batch/pos_base_reg[1]/Q
@@ -441,7 +441,7 @@ Slack (MET) :             0.671ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.439    12.138    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/wm_rd_addr_q_reg[14]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
@@ -480,7 +480,7 @@ Slack (MET) :             0.731ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.584     2.467    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[1]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  u_srpe_batch/pos_base_reg[1]/Q
@@ -523,7 +523,7 @@ Slack (MET) :             0.731ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.439    12.138    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/wm_rd_addr_q_reg[13]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
@@ -562,7 +562,7 @@ Slack (MET) :             0.782ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.584     2.467    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[1]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.456     2.923 r  u_srpe_batch/pos_base_reg[1]/Q
@@ -605,7 +605,7 @@ Slack (MET) :             0.782ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.439    12.138    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/wm_rd_addr_q_reg[11]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
@@ -622,58 +622,6 @@ Slack (MET) :             0.782ns  (required time - arrival time)
 
 Min Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.135ns  (arrival time - required time)
-  Source:                 u_in_fifo/count_reg[8]/C
-                            (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
-  Destination:            u_in_fifo/count_reg[8]/D
-                            (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
-  Path Group:             clk_1
-  Path Type:              Hold (Min at Fast Process Corner)
-  Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.385ns  (logic 0.249ns (64.721%)  route 0.136ns (35.279%))
-  Logic Levels:           2  (CARRY4=1 LUT2=1)
-  Clock Path Skew:        0.145ns (DCD - SCD - CPR)
-    Destination Clock Delay (DCD):    1.043ns
-    Source Clock Delay      (SCD):    0.688ns
-    Clock Pessimism Removal (CPR):    0.210ns
-
-    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
-  -------------------------------------------------------------------    -------------------
-                         (clock clk_1 rise edge)      0.000     0.000 r  
-                                                      0.000     0.000 r  S_AXIS_DATA_ACLK (IN)
-                         net (fo=0)                   0.000     0.000    S_AXIS_DATA_ACLK
-                         IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
-                         net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
-                         BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
-                         FDCE                                         r  u_in_fifo/count_reg[8]/C
-  -------------------------------------------------------------------    -------------------
-                         FDCE (Prop_fdce_C_Q)         0.141     0.829 r  u_in_fifo/count_reg[8]/Q
-                         net (fo=4, unplaced)         0.136     0.965    u_in_fifo/count_reg[8]
-                         LUT2 (Prop_lut2_I1_O)        0.045     1.010 r  u_in_fifo/count0_carry__0_i_1/O
-                         net (fo=1, unplaced)         0.000     1.010    u_in_fifo/count0_carry__0_i_1_n_0
-                         CARRY4 (Prop_carry4_S[3]_O[3])
-                                                      0.063     1.073 r  u_in_fifo/count0_carry__0/O[3]
-                         net (fo=1, unplaced)         0.000     1.073    u_in_fifo/count[8]
-                         FDCE                                         r  u_in_fifo/count_reg[8]/D
-  -------------------------------------------------------------------    -------------------
-
-                         (clock clk_1 rise edge)      0.000     0.000 r  
-                                                      0.000     0.000 r  S_AXIS_DATA_ACLK (IN)
-                         net (fo=0)                   0.000     0.000    S_AXIS_DATA_ACLK
-                         IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
-                         net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
-                         BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
-                         FDCE                                         r  u_in_fifo/count_reg[8]/C
-                         clock pessimism             -0.210     0.833    
-                         FDCE (Hold_fdce_C_D)         0.105     0.938    u_in_fifo/count_reg[8]
-  -------------------------------------------------------------------
-                         required time                         -0.938    
-                         arrival time                           1.073    
-  -------------------------------------------------------------------
-                         slack                                  0.135    
-
 Slack (MET) :             0.135ns  (arrival time - required time)
   Source:                 u_res_fifo/count_reg[4]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
@@ -697,7 +645,7 @@ Slack (MET) :             0.135ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    u_res_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    u_res_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_res_fifo/count_reg[4]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 r  u_res_fifo/count_reg[4]/Q
@@ -716,7 +664,7 @@ Slack (MET) :             0.135ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_res_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_res_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_res_fifo/count_reg[4]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Hold_fdce_C_D)         0.105     0.938    u_res_fifo/count_reg[4]
@@ -725,6 +673,58 @@ Slack (MET) :             0.135ns  (arrival time - required time)
                          arrival time                           1.073    
   -------------------------------------------------------------------
                          slack                                  0.135    
+
+Slack (MET) :             0.136ns  (arrival time - required time)
+  Source:                 u_in_fifo/count_reg[8]/C
+                            (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Destination:            u_in_fifo/count_reg[8]/D
+                            (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
+  Path Group:             clk_1
+  Path Type:              Hold (Min at Fast Process Corner)
+  Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
+  Data Path Delay:        0.386ns  (logic 0.249ns (64.438%)  route 0.137ns (35.562%))
+  Logic Levels:           2  (CARRY4=1 LUT2=1)
+  Clock Path Skew:        0.145ns (DCD - SCD - CPR)
+    Destination Clock Delay (DCD):    1.043ns
+    Source Clock Delay      (SCD):    0.688ns
+    Clock Pessimism Removal (CPR):    0.210ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk_1 rise edge)      0.000     0.000 r  
+                                                      0.000     0.000 r  S_AXIS_DATA_ACLK (IN)
+                         net (fo=0)                   0.000     0.000    S_AXIS_DATA_ACLK
+                         IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
+                         net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
+                         BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
+                         net (fo=4893, unplaced)      0.114     0.688    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         FDCE                                         r  u_in_fifo/count_reg[8]/C
+  -------------------------------------------------------------------    -------------------
+                         FDCE (Prop_fdce_C_Q)         0.141     0.829 r  u_in_fifo/count_reg[8]/Q
+                         net (fo=5, unplaced)         0.137     0.967    u_in_fifo/count_reg[8]
+                         LUT2 (Prop_lut2_I1_O)        0.045     1.012 r  u_in_fifo/count0_carry__0_i_1/O
+                         net (fo=1, unplaced)         0.000     1.012    u_in_fifo/count0_carry__0_i_1_n_0
+                         CARRY4 (Prop_carry4_S[3]_O[3])
+                                                      0.063     1.075 r  u_in_fifo/count0_carry__0/O[3]
+                         net (fo=1, unplaced)         0.000     1.075    u_in_fifo/count[8]
+                         FDCE                                         r  u_in_fifo/count_reg[8]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk_1 rise edge)      0.000     0.000 r  
+                                                      0.000     0.000 r  S_AXIS_DATA_ACLK (IN)
+                         net (fo=0)                   0.000     0.000    S_AXIS_DATA_ACLK
+                         IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
+                         net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
+                         BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         FDCE                                         r  u_in_fifo/count_reg[8]/C
+                         clock pessimism             -0.210     0.833    
+                         FDCE (Hold_fdce_C_D)         0.105     0.938    u_in_fifo/count_reg[8]
+  -------------------------------------------------------------------
+                         required time                         -0.938    
+                         arrival time                           1.075    
+  -------------------------------------------------------------------
+                         slack                                  0.136    
 
 Slack (MET) :             0.139ns  (arrival time - required time)
   Source:                 u_srpe_batch/pos_base_reg[10]/C
@@ -749,7 +749,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.114     0.688    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[10]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.141     0.829 r  u_srpe_batch/pos_base_reg[10]/Q
@@ -765,7 +765,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.259     1.043    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/best_pos_reg[0][10]/C
                          clock pessimism             -0.210     0.833    
                          FDRE (Hold_fdre_C_D)         0.091     0.924    u_srpe_batch/best_pos_reg[0][10]
@@ -798,7 +798,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.114     0.688    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[11]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.141     0.829 r  u_srpe_batch/pos_base_reg[11]/Q
@@ -814,7 +814,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.259     1.043    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/best_pos_reg[0][11]/C
                          clock pessimism             -0.210     0.833    
                          FDRE (Hold_fdre_C_D)         0.091     0.924    u_srpe_batch/best_pos_reg[0][11]
@@ -847,7 +847,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.114     0.688    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/pos_base_reg[12]/C
   -------------------------------------------------------------------    -------------------
                          FDRE (Prop_fdre_C_Q)         0.141     0.829 r  u_srpe_batch/pos_base_reg[12]/Q
@@ -863,7 +863,7 @@ Slack (MET) :             0.139ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_srpe_batch/clk
+                         net (fo=4893, unplaced)      0.259     1.043    u_srpe_batch/clk
                          FDRE                                         r  u_srpe_batch/best_pos_reg[0][12]/C
                          clock pessimism             -0.210     0.833    
                          FDRE (Hold_fdre_C_D)         0.091     0.924    u_srpe_batch/best_pos_reg[0][12]
@@ -890,16 +890,16 @@ Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            3.363         10.00
 Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            3.363         10.000      6.637                u_srpe_batch/wm_bram_reg_1_0/CLKARDCLK
 Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            3.363         10.000      6.637                u_srpe_batch/wm_bram_reg_1_1/CLKARDCLK
 Min Period        n/a     RAMB36E1/CLKARDCLK  n/a            2.944         10.000      7.056                u_in_fifo/mem_reg_0/CLKARDCLK
-Low Pulse Width   Slow    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TLAST_reg/C
-Low Pulse Width   Fast    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TLAST_reg/C
-Low Pulse Width   Slow    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TVALID_reg/C
-Low Pulse Width   Fast    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TVALID_reg/C
 Low Pulse Width   Slow    FDCE/C              n/a            0.500         5.000       4.500                arm_start_reg/C
-High Pulse Width  Slow    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TLAST_reg/C
-High Pulse Width  Fast    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TLAST_reg/C
-High Pulse Width  Slow    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TVALID_reg/C
-High Pulse Width  Fast    FDCE/C              n/a            0.500         5.000       4.500                M_AXIS_RESULT_TVALID_reg/C
+Low Pulse Width   Fast    FDCE/C              n/a            0.500         5.000       4.500                arm_start_reg/C
+Low Pulse Width   Slow    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[0]/C
+Low Pulse Width   Fast    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[0]/C
+Low Pulse Width   Slow    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[100]/C
 High Pulse Width  Slow    FDCE/C              n/a            0.500         5.000       4.500                arm_start_reg/C
+High Pulse Width  Fast    FDCE/C              n/a            0.500         5.000       4.500                arm_start_reg/C
+High Pulse Width  Slow    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[0]/C
+High Pulse Width  Fast    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[0]/C
+High Pulse Width  Slow    FDCE/C              n/a            0.500         5.000       4.500                cw_hold_reg[100]/C
 
 
 
@@ -1535,7 +1535,7 @@ Slack (MET) :             8.600ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_preload_reg[0]/C
                          clock pessimism              0.000    12.138    
                          clock uncertainty           -0.035    12.103    
@@ -1589,7 +1589,7 @@ Slack (MET) :             8.600ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[0]/C
                          clock pessimism              0.000    12.138    
                          clock uncertainty           -0.035    12.103    
@@ -1643,7 +1643,7 @@ Slack (MET) :             8.600ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_start_reg[0]/C
                          clock pessimism              0.000    12.138    
                          clock uncertainty           -0.035    12.103    
@@ -1697,7 +1697,7 @@ Slack (MET) :             8.600ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  wm_sel_s1_reg[0]/C
                          clock pessimism              0.000    12.138    
                          clock uncertainty           -0.035    12.103    
@@ -1751,7 +1751,7 @@ Slack (MET) :             8.600ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  wm_sel_s1_reg[1]/C
                          clock pessimism              0.000    12.138    
                          clock uncertainty           -0.035    12.103    
@@ -1811,7 +1811,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_preload_reg[0]/C
                          clock pessimism              0.000     1.043    
                          clock uncertainty            0.035     1.078    
@@ -1865,7 +1865,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[0]/C
                          clock pessimism              0.000     1.043    
                          clock uncertainty            0.035     1.078    
@@ -1919,7 +1919,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_start_reg[0]/C
                          clock pessimism              0.000     1.043    
                          clock uncertainty            0.035     1.078    
@@ -1973,7 +1973,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  wm_sel_s1_reg[0]/C
                          clock pessimism              0.000     1.043    
                          clock uncertainty            0.035     1.078    
@@ -2027,7 +2027,7 @@ Slack (VIOLATED) :        -0.087ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  wm_sel_s1_reg[1]/C
                          clock pessimism              0.000     1.043    
                          clock uncertainty            0.035     1.078    
@@ -2047,14 +2047,14 @@ Path Group:  **async_default**
 From Clock:  clk_1
   To Clock:  clk_1
 
-Setup :            0  Failing Endpoints,  Worst Slack        6.902ns,  Total Violation        0.000ns
-Hold  :            0  Failing Endpoints,  Worst Slack        0.929ns,  Total Violation        0.000ns
+Setup :            0  Failing Endpoints,  Worst Slack        6.868ns,  Total Violation        0.000ns
+Hold  :            0  Failing Endpoints,  Worst Slack        0.943ns,  Total Violation        0.000ns
 ---------------------------------------------------------------------------------------------------
 
 
 Max Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             6.902ns  (required time - arrival time)
+Slack (MET) :             6.868ns  (required time - arrival time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[0]/CLR
@@ -2062,7 +2062,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        2.509ns  (logic 0.751ns (29.932%)  route 1.758ns (70.068%))
+  Data Path Delay:        2.543ns  (logic 0.751ns (29.532%)  route 1.792ns (70.468%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2082,13 +2082,13 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.456     2.923 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.843     3.766    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.295     4.061 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.915     4.976    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.877     3.800    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.295     4.095 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.915     5.010    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[0]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2098,18 +2098,18 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[0]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
                          FDCE (Recov_fdce_C_CLR)     -0.409    11.878    u_in_fifo/count_reg[0]
   -------------------------------------------------------------------
                          required time                         11.878    
-                         arrival time                          -4.976    
+                         arrival time                          -5.010    
   -------------------------------------------------------------------
-                         slack                                  6.902    
+                         slack                                  6.868    
 
-Slack (MET) :             6.902ns  (required time - arrival time)
+Slack (MET) :             6.868ns  (required time - arrival time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[10]/CLR
@@ -2117,7 +2117,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        2.509ns  (logic 0.751ns (29.932%)  route 1.758ns (70.068%))
+  Data Path Delay:        2.543ns  (logic 0.751ns (29.532%)  route 1.792ns (70.468%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2137,13 +2137,13 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.456     2.923 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.843     3.766    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.295     4.061 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.915     4.976    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.877     3.800    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.295     4.095 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.915     5.010    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[10]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2153,18 +2153,18 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[10]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
                          FDCE (Recov_fdce_C_CLR)     -0.409    11.878    u_in_fifo/count_reg[10]
   -------------------------------------------------------------------
                          required time                         11.878    
-                         arrival time                          -4.976    
+                         arrival time                          -5.010    
   -------------------------------------------------------------------
-                         slack                                  6.902    
+                         slack                                  6.868    
 
-Slack (MET) :             6.902ns  (required time - arrival time)
+Slack (MET) :             6.868ns  (required time - arrival time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[1]/CLR
@@ -2172,7 +2172,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        2.509ns  (logic 0.751ns (29.932%)  route 1.758ns (70.068%))
+  Data Path Delay:        2.543ns  (logic 0.751ns (29.532%)  route 1.792ns (70.468%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2192,13 +2192,13 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.456     2.923 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.843     3.766    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.295     4.061 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.915     4.976    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.877     3.800    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.295     4.095 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.915     5.010    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[1]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2208,18 +2208,18 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[1]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
                          FDCE (Recov_fdce_C_CLR)     -0.409    11.878    u_in_fifo/count_reg[1]
   -------------------------------------------------------------------
                          required time                         11.878    
-                         arrival time                          -4.976    
+                         arrival time                          -5.010    
   -------------------------------------------------------------------
-                         slack                                  6.902    
+                         slack                                  6.868    
 
-Slack (MET) :             6.902ns  (required time - arrival time)
+Slack (MET) :             6.868ns  (required time - arrival time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[2]/CLR
@@ -2227,7 +2227,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        2.509ns  (logic 0.751ns (29.932%)  route 1.758ns (70.068%))
+  Data Path Delay:        2.543ns  (logic 0.751ns (29.532%)  route 1.792ns (70.468%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2247,13 +2247,13 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.456     2.923 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.843     3.766    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.295     4.061 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.915     4.976    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.877     3.800    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.295     4.095 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.915     5.010    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[2]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2263,18 +2263,18 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[2]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
                          FDCE (Recov_fdce_C_CLR)     -0.409    11.878    u_in_fifo/count_reg[2]
   -------------------------------------------------------------------
                          required time                         11.878    
-                         arrival time                          -4.976    
+                         arrival time                          -5.010    
   -------------------------------------------------------------------
-                         slack                                  6.902    
+                         slack                                  6.868    
 
-Slack (MET) :             6.902ns  (required time - arrival time)
+Slack (MET) :             6.868ns  (required time - arrival time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[3]/CLR
@@ -2282,7 +2282,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
   Path Group:             **async_default**
   Path Type:              Recovery (Max at Slow Process Corner)
   Requirement:            10.000ns  (clk_1 rise@10.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        2.509ns  (logic 0.751ns (29.932%)  route 1.758ns (70.068%))
+  Data Path Delay:        2.543ns  (logic 0.751ns (29.532%)  route 1.792ns (70.468%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        -0.145ns (DCD - SCD + CPR)
     Destination Clock Delay (DCD):    2.138ns = ( 12.138 - 10.000 ) 
@@ -2302,13 +2302,13 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.982     0.982 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.800     1.782    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.101     1.883 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.584     2.467    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.456     2.923 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.843     3.766    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.295     4.061 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.915     4.976    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.877     3.800    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.295     4.095 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.915     5.010    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[3]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2318,16 +2318,16 @@ Slack (MET) :             6.902ns  (required time - arrival time)
                          IBUF (Prop_ibuf_I_O)         0.849    10.849 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.760    11.608    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.091    11.699 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.439    12.138    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[3]/C
                          clock pessimism              0.184    12.322    
                          clock uncertainty           -0.035    12.287    
                          FDCE (Recov_fdce_C_CLR)     -0.409    11.878    u_in_fifo/count_reg[3]
   -------------------------------------------------------------------
                          required time                         11.878    
-                         arrival time                          -4.976    
+                         arrival time                          -5.010    
   -------------------------------------------------------------------
-                         slack                                  6.902    
+                         slack                                  6.868    
 
 
 
@@ -2335,7 +2335,7 @@ Slack (MET) :             6.902ns  (required time - arrival time)
 
 Min Delay Paths
 --------------------------------------------------------------------------------------
-Slack (MET) :             0.929ns  (arrival time - required time)
+Slack (MET) :             0.943ns  (arrival time - required time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[0]/CLR
@@ -2343,7 +2343,7 @@ Slack (MET) :             0.929ns  (arrival time - required time)
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.980ns  (logic 0.239ns (24.387%)  route 0.741ns (75.613%))
+  Data Path Delay:        0.994ns  (logic 0.239ns (24.035%)  route 0.755ns (75.965%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        0.145ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2358,13 +2358,13 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.355     1.185    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.098     1.283 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.386     1.668    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.370     1.199    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.098     1.297 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.386     1.683    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[0]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2374,17 +2374,17 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[0]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Remov_fdce_C_CLR)     -0.094     0.739    u_in_fifo/count_reg[0]
   -------------------------------------------------------------------
                          required time                         -0.739    
-                         arrival time                           1.668    
+                         arrival time                           1.683    
   -------------------------------------------------------------------
-                         slack                                  0.929    
+                         slack                                  0.943    
 
-Slack (MET) :             0.929ns  (arrival time - required time)
+Slack (MET) :             0.943ns  (arrival time - required time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[10]/CLR
@@ -2392,7 +2392,7 @@ Slack (MET) :             0.929ns  (arrival time - required time)
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.980ns  (logic 0.239ns (24.387%)  route 0.741ns (75.613%))
+  Data Path Delay:        0.994ns  (logic 0.239ns (24.035%)  route 0.755ns (75.965%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        0.145ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2407,13 +2407,13 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.355     1.185    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.098     1.283 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.386     1.668    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.370     1.199    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.098     1.297 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.386     1.683    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[10]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2423,17 +2423,17 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[10]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Remov_fdce_C_CLR)     -0.094     0.739    u_in_fifo/count_reg[10]
   -------------------------------------------------------------------
                          required time                         -0.739    
-                         arrival time                           1.668    
+                         arrival time                           1.683    
   -------------------------------------------------------------------
-                         slack                                  0.929    
+                         slack                                  0.943    
 
-Slack (MET) :             0.929ns  (arrival time - required time)
+Slack (MET) :             0.943ns  (arrival time - required time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[1]/CLR
@@ -2441,7 +2441,7 @@ Slack (MET) :             0.929ns  (arrival time - required time)
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.980ns  (logic 0.239ns (24.387%)  route 0.741ns (75.613%))
+  Data Path Delay:        0.994ns  (logic 0.239ns (24.035%)  route 0.755ns (75.965%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        0.145ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2456,13 +2456,13 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.355     1.185    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.098     1.283 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.386     1.668    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.370     1.199    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.098     1.297 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.386     1.683    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[1]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2472,17 +2472,17 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[1]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Remov_fdce_C_CLR)     -0.094     0.739    u_in_fifo/count_reg[1]
   -------------------------------------------------------------------
                          required time                         -0.739    
-                         arrival time                           1.668    
+                         arrival time                           1.683    
   -------------------------------------------------------------------
-                         slack                                  0.929    
+                         slack                                  0.943    
 
-Slack (MET) :             0.929ns  (arrival time - required time)
+Slack (MET) :             0.943ns  (arrival time - required time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[2]/CLR
@@ -2490,7 +2490,7 @@ Slack (MET) :             0.929ns  (arrival time - required time)
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.980ns  (logic 0.239ns (24.387%)  route 0.741ns (75.613%))
+  Data Path Delay:        0.994ns  (logic 0.239ns (24.035%)  route 0.755ns (75.965%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        0.145ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2505,13 +2505,13 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.355     1.185    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.098     1.283 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.386     1.668    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.370     1.199    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.098     1.297 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.386     1.683    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[2]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2521,17 +2521,17 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[2]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Remov_fdce_C_CLR)     -0.094     0.739    u_in_fifo/count_reg[2]
   -------------------------------------------------------------------
                          required time                         -0.739    
-                         arrival time                           1.668    
+                         arrival time                           1.683    
   -------------------------------------------------------------------
-                         slack                                  0.929    
+                         slack                                  0.943    
 
-Slack (MET) :             0.929ns  (arrival time - required time)
+Slack (MET) :             0.943ns  (arrival time - required time)
   Source:                 sr_soft_reg[2]/C
                             (rising edge-triggered cell FDCE clocked by clk_1  {rise@0.000ns fall@5.000ns period=10.000ns})
   Destination:            u_in_fifo/count_reg[3]/CLR
@@ -2539,7 +2539,7 @@ Slack (MET) :             0.929ns  (arrival time - required time)
   Path Group:             **async_default**
   Path Type:              Removal (Min at Fast Process Corner)
   Requirement:            0.000ns  (clk_1 rise@0.000ns - clk_1 rise@0.000ns)
-  Data Path Delay:        0.980ns  (logic 0.239ns (24.387%)  route 0.741ns (75.613%))
+  Data Path Delay:        0.994ns  (logic 0.239ns (24.035%)  route 0.755ns (75.965%))
   Logic Levels:           1  (LUT3=1)
   Clock Path Skew:        0.145ns (DCD - SCD - CPR)
     Destination Clock Delay (DCD):    1.043ns
@@ -2554,13 +2554,13 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.211     0.211 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.337     0.548    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.026     0.574 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.114     0.688    S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  sr_soft_reg[2]/C
   -------------------------------------------------------------------    -------------------
                          FDCE (Prop_fdce_C_Q)         0.141     0.829 f  sr_soft_reg[2]/Q
-                         net (fo=110, unplaced)       0.355     1.185    u_pack/Q[0]
-                         LUT3 (Prop_lut3_I0_O)        0.098     1.283 f  u_pack/mem_reg_0_i_1/O
-                         net (fo=486, unplaced)       0.386     1.668    u_in_fifo/mem_reg_8_1
+                         net (fo=421, unplaced)       0.370     1.199    u_pack/Q[0]
+                         LUT3 (Prop_lut3_I0_O)        0.098     1.297 f  u_pack/mem_reg_0_i_1/O
+                         net (fo=488, unplaced)       0.386     1.683    u_in_fifo/mem_reg_8_2
                          FDCE                                         f  u_in_fifo/count_reg[3]/CLR
   -------------------------------------------------------------------    -------------------
 
@@ -2570,15 +2570,15 @@ Slack (MET) :             0.929ns  (arrival time - required time)
                          IBUF (Prop_ibuf_I_O)         0.400     0.400 r  S_AXIS_DATA_ACLK_IBUF_inst/O
                          net (fo=1, unplaced)         0.355     0.755    S_AXIS_DATA_ACLK_IBUF
                          BUFG (Prop_bufg_I_O)         0.029     0.784 r  S_AXIS_DATA_ACLK_IBUF_BUFG_inst/O
-                         net (fo=4580, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
+                         net (fo=4893, unplaced)      0.259     1.043    u_in_fifo/S_AXIS_DATA_ACLK_IBUF_BUFG
                          FDCE                                         r  u_in_fifo/count_reg[3]/C
                          clock pessimism             -0.210     0.833    
                          FDCE (Remov_fdce_C_CLR)     -0.094     0.739    u_in_fifo/count_reg[3]
   -------------------------------------------------------------------
                          required time                         -0.739    
-                         arrival time                           1.668    
+                         arrival time                           1.683    
   -------------------------------------------------------------------
-                         slack                                  0.929    
+                         slack                                  0.943    
 
 
 

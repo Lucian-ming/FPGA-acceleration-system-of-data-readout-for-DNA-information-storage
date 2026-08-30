@@ -1,4 +1,4 @@
-# 2026-08-29 可上板交付制品（ZYNQ ECO R6，16 bit DDR + B20/B23/B24/B25 修复）
+# 2026-08-30 可上板交付制品（ZYNQ ECO R6，16 bit DDR + B20/B23/B24/B25/B26/B27 修复）
 
 本目录是与当前 `main` 的 RTL / PS 固件匹配、且**按目标板 ZYNQ ECO(R6) 实物 DDR 配置**
 重建的最小完整交付集。板级基准见 `docs/16-board-zynq-eco-7010.md`。
@@ -17,7 +17,7 @@
 | `dna_accel.xsa` | 与当前 bitstream 同源的硬件平台（**16 bit DDR**） |
 | `top_bd_wrapper.bit` | 独立 PL bitstream |
 | `fsbl.elf` | 生成 `BOOT.bin` 使用的 FSBL，按新 XSA 重建 |
-| `dna_lwip_app_b25.elf` | 与新 XSA、bitstream 匹配的应用固件（含 B21/B22 固件修复） |
+| `dna_lwip_app_b27.elf` | 与新 XSA、bitstream 匹配的应用固件（含 B21/B22/B27 固件修复） |
 | `reports/` | 完整实现及四个关键 RTL 核的时序、资源报告 |
 | `SHA256SUMS` | 上述文件的 SHA-256 清单 |
 
@@ -25,9 +25,32 @@
 且其 DDR 配置与本板不符，禁止使用。
 
 > 历史上按旧配置构建的 ELF（`dna_lwip_app_board_20260816.elf` 为 32 bit DDR 版、
-> `dna_lwip_app_ddr16.elf` 为 B20 修复前版）均已从本目录移除（Git 历史中仍可取回），
-> 以免误烧。对应的 `dna_board_20260816.bif` / `dna_board_ddr16.bif` 同样作废，
-> 现用 `sw/boot/dna_board_b25.bif`；`dna_lwip_app_b20.elf` 已被 `dna_lwip_app_b25.elf` 取代。
+> `dna_lwip_app_ddr16.elf` 为 B20 修复前版、`dna_lwip_app_b20.elf`、`dna_lwip_app_b25.elf`）
+> 均已从本目录移除（Git 历史中仍可取回），以免误烧。
+> 对应的 `dna_board_20260816.bif` / `dna_board_ddr16.bif` / `dna_board_b25.bif` 同样作废，
+> **现用 `sw/boot/dna_board_b27.bif`**。
+
+## 2026-08-30 重建：B26 + B27 修复，且**已上板闭环**
+
+本次重建把两个 RTL 缺陷一起烤进同一颗 bit：
+
+| 编号 | 缺陷 | IP / 流水级 |
+| --- | --- | --- |
+| B26 | 入口 FIFO 两级同步读、引擎晚一拍采样 → Stage1 结果整体错位一条读段 | `Dna_accelerator_core_v1_0.v` / Stage1 |
+| B27 | AXI-Lite 写 START 寄存器时不看 `wdata[0]`，固件启动后 100 us 又写了一次 START=0，把跑到一半的任务重启；重启不取消已发出的 AXI 读突发，残留 R 拍被当成新任务输入流的开头，整条输入旋转 126 拍 | `desparsification_decoder_v1_0.v` / Stage3 |
+
+两者在不同 IP、不同流水级，而每一级都有黄金向量可以单独归因，所以合并成一次综合。
+
+- 实现收敛：**WNS +0.088 ns / WHS +0.016 ns**，0 failing endpoint，0 error / 0 critical warning。
+- **第五次上板（2026-08-30）G3 闭环**：`first.py --limit 2048 --orient both --score-min 67`
+  回传 8,100 B，经 `tools/ldpc_decode.py` 起始失败校验 332、5 轮收敛，
+  重建 JPEG 的 SHA-256 = `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`，
+  与判据逐位相同。
+- 四级 DDR 只读留证（`tools/board_stage_check.py`）：展开水印 47,850/47,850、
+  Stage1 码字 4,096/4,096（B26 错位消失）、Stage2⊕水印 误码 0/81,000、
+  **Stage3 误码 0/64,800**（上一版是 49.47%）。
+- 闭环范围仅限 SE150 / 2,048 条源读段 / `--orient both` / `SCORE_MIN=67` 这一组参数，
+  SE250、全量 51,781 条、二次任务均未验证。详见 `docs/03-status.md`「第五次上板」一节。
 
 ## 本次重建的验证
 
