@@ -79,18 +79,29 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 | `docs/09-handoff-2026-08-16.md` | **当前可交接基线**、已复跑判据和下一阻塞项 |
 | `docs/12-main-handoff-2026-08-21.md` | **当前主分支交接**、Git 门禁、构建和上板步骤 |
 | `docs/13-xsim-simulation-plan.md` | XSim 分层仿真计划、判据和留证规则 |
-| `docs/14-next-steps-2026-08-29.md` | **下一步行动计划**：本机已验证基线、M3/G3 排序与待用户决定项 |
+| `docs/14-next-steps-2026-08-29.md` | 历史快照：G3 闭环**前**的排序（已被 `docs/18` 取代） |
 | `docs/15-m3-bd-simulation-2026-08-29.md` | **M3 实际 BD 集成仿真结果**与 BD-3 阻塞证据 |
 | `docs/16-board-zynq-eco-7010.md` | **板级配置唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 修正与上板顺序 |
-| `docs/17-parallel-tasks-2026-08-29.md` | **并行任务简报**：B21 的两条定位路径与会话互斥约定 |
+| `docs/17-parallel-tasks-2026-08-29.md` | 并行任务简报：B21 的两条定位路径与会话互斥约定 |
+| `docs/18-next-steps-2026-08-30.md` | **当前行动计划**：G3 闭环后的排队、适用范围与技术债 |
 | `docs/reference/` | 历史审计结果（数据集校验和、文件索引、缺口清单、提交归档），只读参考 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
 
 ## 事实边界
 
-- **当前代码不能产生正确的端到端结果。** 界面成功、图片生成、EXE 正常退出都不能证明流水线正确。
-  唯一判据是：板端实际回传的数据经 LDPC 后与 R0.83 参考逐位/逐哈希相同。
+- **G3 已于 2026-08-30 闭环，但只在一组参数下成立。** 第五次上板端到端跑通：
+  板端回传经 `tools/ldpc_decode.py` 译码后图片 SHA-256 =
+  `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`，与判据逐位相同；
+  回传比特流与 `tests/golden/dec_input.txt` 0/64,800 处差异；板上四级 DDR 快照
+  逐级比对全过（`tools/board_stage_check.py`）。
+  **成立范围仅限**：2,048 条源读段（`--orient both` → 4,096 条记录）、`score_min 67`、SE150。
+  **尚未验证**：SE250、全量 51,781 条、同一次连接内的二次任务、长时间连续运行。
+  不得据此声称「系统已全面正确」。
+- **判据纪律不变**：界面成功、图片生成、EXE 正常退出、仿真全绿都不能证明流水线正确。
+  唯一判据始终是板端实际回传的数据经 LDPC 后与 R0.83 参考逐位/逐哈希相同。
+  这条纪律在 G3 闭环后**更要守住**——2026-08-29 到 30 修掉的 7 个缺陷里，
+  有 5 个（B23/B24/B25/B26/B27）在所有仿真里都是绿的，只有上板才暴露。
 - **算法本身已被证明正确**：`python3 tools/golden_model.py verify-code` 会用黄金数据证明
   「编码序列 ⊕ 水印 → 5b4b → codeword_R083.txt」逐位成立。要做的是让 RTL 对齐这个模型。
 - **历史演示存在「用正确结果直接生成图片」的通道。**
@@ -105,10 +116,20 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   实物是单颗 16 bit `MT41J256M16HA-125`。板级配置的唯一权威是
   `docs/16-board-zynq-eco-7010.md` 与 `docs/board/zynq-eco-7010/`，
   **禁止**再据历史 XSA 回退 DDR 配置。
-- `hw/build/export/` 中的 XSA/bit/ELF/BOOT.bin 是按旧（错误）DDR 配置生成的，
-  **不能烧到 ECO 板**，必须整套重建后才能上板。
+- `hw/build/export/` 中的制品已按 ECO 板的 16 bit DDR 配置、并含 B20/B23/B24/B25/B26/B27
+  修复整套重建（2026-08-30），是 G3 闭环那一轮实际烧录的版本。
+  改动 RTL 或固件后**必须整套重建并刷新 `SHA256SUMS`**，否则制品与源码不同源。
 - `archive/submission_2025-11-07/..._重要代码.rar` 尚未解压（环境缺 RAR5 工具）；
   解压后必须先做来源/哈希差异审计再决定是否导入。
+- **仿真喂黄金数据、板上走真实接口——差异就在这里。** 2026-08-29~30 修掉的 7 个缺陷里，
+  B23/B24/B25/B26/B27 五个全部落在这条缝上：`run_m2_full.sh` 的 Stage1 只编译
+  `srpe_batch.v` + `tb_srpe_batch.v`，直接抓引擎的 `res_din`，**完全绕开**
+  `Dna_accelerator_core_v1_0.v` 的 AXIS 输入/输出级；`tb_srpe_batch` 也是把水印直接灌进 BRAM，
+  不走 `preload_mode + S_AXIS` 的 DMA 预载通路。于是这些缺陷在所有仿真里都是绿的。
+  **新增或修改任何跨 IP 接口（AXIS 握手、DMA、寄存器时序、FIFO 读延迟）时，
+  判据必须建在真实接口上**，不能继续用 VIP 内存喂黄金数据糊过去。
+  现有的接口级判据：`run_xsim.sh result_axis`（DNA 核 AXIS 出口）、
+  `ingress_result`（入口采样）、`dec_restart`（Decoder 寄存器时序）。
 
 ## 开发前检查表
 
@@ -125,6 +146,14 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   它们之间存在约束 `NUM_LC*STRIDE = L - READ_BPS`、`REF_LEN = STRIDE + READ_BPS`。
 - 不要把 `tb_dna_quick.v` 编译通过当成功能正确：它的 AXI-Lite `AWVALID`/`WVALID` 恒为 0，
   控制寄存器从未被真正写入。
+- **控制寄存器的写序列本身就是被测对象。** 只在 TB 里写一次 `START=1` 不构成判据——
+  B27 就是这么漏掉的：`tb_desparsifier` 连**综合后网表**都 PASS，说明既不是 RTL
+  也不是综合的问题，而是真实固件那串「写 0 → 写 1 → 100 us 后再写 0」的时序从未被回放过，
+  而该 IP 对 `START` 写任何值都会启动。TB 必须按固件的原样顺序回放寄存器写，
+  参见 `hw/sim/dec/tb_dec_ddr_restart.v`。
+- **同步 FIFO 的读延迟要按实现数，不要按注释数。** `fifo_sync_sdpram_b64` 是两级同步读
+  （`raddr_q <= rptr; dout <= mem[raddr_q]`），pop 之后 `dout` 要 3 拍才稳定。
+  B24 和 B26 都是照注释里的「1 拍」去采样才出的错，一个丢记录、一个整体错位一条读段。
 - 不要把 `apply_bd_automation` 的默认 PS7 配置或历史 XSA 当作新板配置来源；当前约束必须以
   `hw/constr/top.xdc` 和可复现 Tcl 构建的现场结果为准。
 - 不要把 `five_to_four_decoder.v` 接回生产数据通路：它是未被顶层引用的死文件；查找表已按契约
