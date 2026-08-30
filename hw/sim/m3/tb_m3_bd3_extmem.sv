@@ -167,28 +167,44 @@ module tb_m3_bd3_extmem;
 
     // ---------------- 背压 ----------------
     // latency=2 时对 AW/W/AR 三个通道施加随机 ready，模拟带背压的内存。
+    //
+    // ⚠️ 这里**不能**用 `XIL_AXI_READY_GEN_RANDOM` + `forever send_*ready(g)`。
+    //    RANDOM 策略的 ready 对象是**一次性**的（axi_ready_gen 的 event_count 默认为 1），
+    //    所以必须不断补充；而 `send_*ready()` 是**非阻塞**的，只把对象排进 VIP 队列就返回。
+    //    裸 `forever` 会在同一个 delta 里无限排队，965 ns 就撞上 VIP 的硬上限
+    //    「limited to 500 outstanding READY objects」；Stop-On-Error=0 让它此后每个 delta
+    //    刷一条 Error —— 实测日志涨到 16 GB，xsim 被 OOM 杀掉（exit 137），
+    //    此时 DUT 一拍数据都还没开始传。按时钟限速也治不了：补充速率只要略高于
+    //    VIP 的消费速率（约每 low+high 拍一个），队列迟早还是会涨满，
+    //    实测每 4 拍补一个只是把撞上限的时刻从 965 ns 推迟到 1,200,495 ns。
+    //
+    //    正确做法是用 `XIL_AXI_READY_GEN_OSC`：Vivado 的 axi_vip_pkg.sv 明确写着
+    //    「the policy repeats until the channel is given different policy」——
+    //    它自己无限重复，**只需要 send 一次**，队列深度恒为 1，永远撞不上 500 上限。
+    //    三个通道取不同的 low/high 组合，避免相位一致把背压退化成同拍开合。
+
     task automatic backpressure_aw();
         axi_ready_gen g = mem_agent.wr_driver.create_ready("awready");
-        g.set_ready_policy(XIL_AXI_READY_GEN_RANDOM);
-        g.set_low_time_range(1, 6);
-        g.set_high_time_range(1, 3);
-        forever mem_agent.wr_driver.send_awready(g);
+        g.set_ready_policy(XIL_AXI_READY_GEN_OSC);
+        g.set_low_time(3);          // 低 3 拍
+        g.set_high_time(1);         // 高 1 拍，然后无限重复
+        mem_agent.wr_driver.send_awready(g);
     endtask
 
     task automatic backpressure_w();
         axi_ready_gen g = mem_agent.wr_driver.create_ready("wready");
-        g.set_ready_policy(XIL_AXI_READY_GEN_RANDOM);
-        g.set_low_time_range(1, 6);
-        g.set_high_time_range(1, 3);
-        forever mem_agent.wr_driver.send_wready(g);
+        g.set_ready_policy(XIL_AXI_READY_GEN_OSC);
+        g.set_low_time(2);          // 低 2 拍
+        g.set_high_time(1);         // 高 1 拍，然后无限重复
+        mem_agent.wr_driver.send_wready(g);
     endtask
 
     task automatic backpressure_ar();
         axi_ready_gen g = mem_agent.rd_driver.create_ready("arready");
-        g.set_ready_policy(XIL_AXI_READY_GEN_RANDOM);
-        g.set_low_time_range(1, 6);
-        g.set_high_time_range(1, 3);
-        forever mem_agent.rd_driver.send_arready(g);
+        g.set_ready_policy(XIL_AXI_READY_GEN_OSC);
+        g.set_low_time(5);          // 低 5 拍
+        g.set_high_time(2);         // 高 2 拍，然后无限重复
+        mem_agent.rd_driver.send_arready(g);
     endtask
 
     // ---------------- 主流程 ----------------

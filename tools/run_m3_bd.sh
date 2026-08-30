@@ -101,11 +101,21 @@ gen_project() {
 run_snapshot() {
     local simdir="$1" snap="$2" log="$3"; shift 3
     local rc=0
+    # 日志上限（MiB）。VIP 在 Stop-On-Error=0 下可能每个 delta 刷一条 Error：
+    # 实测 BD-3ext 的 WORST_CASE 曾把日志刷到 16 GB，把 xsim 撑到被 OOM 杀掉，
+    # 顺带差点填满磁盘。超过上限就截断并杀掉仿真，让它以失败收场而不是拖垮机器。
+    local cap_mb="${M3_XSIM_LOG_CAP_MB:-512}"
     (
         cd "$simdir" || exit 1
         timeout --foreground "${M3_XSIM_TIMEOUT:-3600}" \
-            "$XSIM" "$snap" -runall "$@"
+            "$XSIM" "$snap" -runall "$@" \
+            | head -c "$((cap_mb * 1024 * 1024))"
+        exit "${PIPESTATUS[0]}"
     ) > "$log" 2>&1 || rc=$?
+    if [[ "$(stat -c %s "$log" 2>/dev/null || echo 0)" -ge "$((cap_mb * 1024 * 1024))" ]]; then
+        printf '\n[run_m3_bd] FAIL 日志达到 %s MiB 上限被截断，仿真判为失败\n' "$cap_mb" >> "$log"
+        rc=1
+    fi
     return $rc
 }
 
