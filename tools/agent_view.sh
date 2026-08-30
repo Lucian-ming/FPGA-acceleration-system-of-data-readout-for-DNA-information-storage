@@ -10,7 +10,8 @@
 #   tools/agent_view.sh update --agent <名字> --doing "..." --why "..." --next "..."
 #   tools/agent_view.sh block  --agent <名字> --doing "..." --why "..." --next "..."
 #   tools/agent_view.sh done   --agent <名字> --doing "..." --why "..." --next "..."
-#   tools/agent_view.sh show   [--agent <名字>]      # 打印当前状态
+#   tools/agent_view.sh show   [--agent <名字>]      # 打印当前状态（会先重新渲染）
+#   tools/agent_view.sh refresh                      # 只重新渲染 view.md（刷新陈旧标记）
 #   tools/agent_view.sh clear  [--agent <名字>|--all-done]  # 手工摘除条目（正常情况下用不到）
 #
 # 说明：
@@ -187,11 +188,23 @@ case "$cmd" in
     exec 9>&-
     echo "view.md 已更新：[$status] $agent"
     ;;
+  refresh)
+    # 陈旧标记是渲染时算出来的，而渲染只在有人写看板时发生。
+    # 所以「某个 agent 挂了、14 小时没更新」这件事不会自己浮出来——
+    # refresh 用来在没有任何写入的情况下重新渲染，让 ⚠️ 标记和时间差刷新。
+    exec 9>"$LOCK"; flock 9
+    render_view
+    exec 9>&-
+    echo "view.md 已重新渲染"
+    ;;
   show)
     if [ -n "$agent" ]; then
       f="$STATE_DIR/$(slug "$agent").state"
       [ -f "$f" ] && cat "$f" || echo "（无记录）"
     else
+      exec 9>"$LOCK"; flock 9
+      render_view
+      exec 9>&-
       [ -f "$VIEW" ] && cat "$VIEW" || echo "（view.md 尚未生成）"
     fi
     ;;
