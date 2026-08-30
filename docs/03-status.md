@@ -450,41 +450,133 @@ eng_cw_vld <= in_rd_d2;             // valid 与 cw_hold 同拍
 第五次上板 → XSDB 只读比对 Stage1 输出与 `tests/golden/stage2_in.hex`。
 在那之前，B26 只能声称「**仿真已验证、上板未验证**」。
 
-### B27 Stage3（Decoder）输入几乎全对、输出却与黄金完全不相关（**当前 G3 主阻塞项**）
+### ~~B27 Stage3（Decoder）输入全对、输出却与黄金完全不相关~~ ✅ 仿真已坐实根因并修复（**上板未验证**）
 
-第四次上板后逐级比对（XSDB 只读 DDR，与仓库黄金向量比）：
+第四次上板后逐级比对（XSDB 只读 DDR，与仓库黄金向量比；dump 备份在 `D:\dna_board_smoke\run4_dumps\`）：
 
 | 级 | 板上 DDR | 与黄金比对 | 判定 |
 | --- | --- | --- | --- |
 | 展开水印 | `0x10040000` | 47,850 / 47,850 字逐位相同 | ✅ |
 | Stage1 输出 | `0x10600000` | 4,009 / 4,096 条整条逐位相同；码字 4,094/4,095（其余是 B26 的整体错位一条） | ✅（除 B26） |
-| Stage2 输出 ⊕ 水印 | `0x11000000` | 与 `tests/golden/sparse_expect.hex` **1,265 / 1,266 字相同，比特误码 0.01%** | ✅ |
-| Stage3 输出 | `0x11100000` | 与 `tests/golden/stage3_expect.hex` **0 / 1,013 字相同，比特误码 49.46%** | ❌ |
+| Stage2 输出 ⊕ 水印 | `0x11000000` | 与 `tests/golden/sparse_expect.hex` **81,000 / 81,000 bit 逐位相同**（唯一不同的第 1,266 字只差末拍无效的高位） | ✅ |
+| Stage3 输出 | `0x11100000` | 与 `tests/golden/stage3_expect.hex` **0 / 1,013 字相同，比特误码 49.47%** | ❌ |
 
-**即 Decoder 拿到的输入是对的（0.01% 误码），吐出来的却是与正确答案完全不相关的数据。**
-已排除「整体位移」：对板上 Stage3 输出做 −64..+64 比特、−16..+16 字节的全部平移搜索，
-最好情况仍是 49.0% 误码，说明不是错位而是**内容本身不对**。
+即 **Decoder 拿到的输入 100% 正确，吐出来的却与正确答案完全不相关。**
 
-配置回读也是对的（UART 实录）：
-`IN_ADDR=0x11000000 IN_BEATS=1266 OUT_ADDR=0x11100000 OUT_BEATS=1013`。
+#### 第 1 步：把范围一刀切成两半（不用板子）
 
-**这一级在仿真里是「通过」的**：`run_xsim.sh` 的 `desparsify_datapath`、`desparsifier_axi`
-以及 M3 的 BD-3ext 都逐位 PASS——但它们喂的是 VIP 内存里的黄金数据，
-**没有走板上「PS 用 CPU 写 DDR → Decoder 用 AXI 主口读 DDR」这条真实通路**。
-与 B23/B24/B25 同一个模式：出问题的永远是仿真没覆盖到的那条真实接口。
+把 `run4_dumps/dump_stage2.bin`（板上真实 DDR 内容，小端 64 bit 转 hex）直接喂 `tb_desparsifier`：
 
-**下一步建议的排查顺序**（不要跳步）：
+| 被测对象 | 激励 | 结果 |
+| --- | --- | --- |
+| RTL（`desparsification_decoder_v1_0.v` + `desparsify_datapath.v`） | 板上 `dump_stage2` | **PASS**：1,013 拍 / 64,800 bit 与 `stage3_expect.hex` 逐位相同 |
+| 综合后网表（`top_bd_desparsification_dec_0_0_sim_netlist.v`，即比特流里那一份） | 板上 `dump_stage2` | **PASS**，同上 |
 
-1. 先确认 Decoder 真的读到了对的数据：在固件里让 Decoder 跑之前，
-   把 `0x11000000` 起的前若干拍打出来，并与 XSDB 读到的值对照
-   （注意 XSDB 经 DAP 访存可能被 cache 影响，两者不一致本身就是线索）；
-2. 复核 `apply_watermark_differential()` 的 cache 次序：
-   它先 Invalidate 再用 CPU 异或再 Flush，看似正确，但 Stage2 收尾处
-   （`echo.c` 的「Preparing output for Stage3 (invalidate only)」）还有一次
-   只 Invalidate 不 Flush 的操作，两者的先后与区间长度要逐字节核对；
-3. 把 `desparsification_decoder` 的 AXI 读通路按 B23 的方式做一次「真实 DMA/真实 DDR」
-   级别的判据，而不是继续用 VIP 内存喂黄金数据。
+**结论：RTL 和综合结果都没问题。** 也不是 cache：固件在启动 Decoder 之前已经
+`Xil_DCacheInvalidateRange(0x11000000, 10128)` 并把整块重读了一遍（`echo.c` 的
+`[STAGE3] Input Validation`），所以 XSDB 后来 dump 到的就是 DDR 里的内容，输入在 DDR 里是对的。
 
+#### 第 2 步：从板上输出反推 Decoder 实际读进了什么
+
+反稀疏化是每 5 bit 一组、组内第一个 bit 是取反标志：`out[3:0] = grp[4:1] ^ {4{grp[0]}}`。
+因此 `out[j] ^ out[j']` **与标志位无关**，可以拿它当每组 3 bit 的指纹，去输入流里搜对齐位置
+（一次性取证脚本，不进仓库；可复现的判据以下面的 TB 为准）。把板上 Stage3 的 16,200 组
+与板上 Stage2 的输入流逐段匹配，得到一个干净得不像话的结构：
+
+```
+board 输出组     0.. 1599   ← 输入 bit 偏移 +72960 = +1140.00 拍
+board 输出组  1613..15488   ← 输入 bit 偏移  -8064 =  -126.00 拍
+board 输出组 15504..16191   ← 输入 bit 偏移  -8080 =  -126.25 拍
+```
+
+即 **Decoder 先读了输入缓冲区最后的 126 拍（第 1140..1265 拍），然后才从第 0 拍读起** ——
+整条输入被旋转了 126 拍。126 个输入拍 = 8,064 bit ⇒ 输出旋转 8064/5×4 = 6,451.2 bit ≈ 101 拍，
+这正好解释了板上 dump 里唯一两段能对上的数据：
+
+```
+board[   0..  99] == golden[912..1011]      （delta +912）
+board[ 969..1012] == golden[868.. 911]      （delta -101 = +912 - 1013）
+board[100] 的低 4 字节 == golden[1012] 的低 4 字节，高 4 字节仍是哨兵 0x0A55AA55
+   —— 整个任务末拍 WSTRB=0x0F 的特征，证明这确实是 Decoder 自己写下的
+```
+
+#### 根因（两个缺陷叠加，缺一不可）
+
+**① RTL：写 START 寄存器时不看数据位。**
+`hw/ip/desparsification_decoder_1_0/hdl/desparsification_decoder_v1_0.v` 的 `axi_slave_decoder`：
+
+```verilog
+case (waddr)
+    ...
+    4'd4: start_pulse <= 1'b1;      // ← 写 0x10 就产生脉冲，压根不看 write_data[0]
+endcase
+```
+
+同项目的 `differential_voter_v1_0.v:943` 写的是 `start_pulse <= write_data[0];`，
+DNA 核用的是电平寄存器 —— **只有 Decoder 是错的**。
+
+**② 固件：启动之后又写了一次 START。**
+`sw/app/echo.c` 的 `PIPE_DECODER_START`：
+
+```c
+write_reg32(..., DECODER_REG_START, 0x00);
+usleep(10);
+write_reg32(..., DECODER_REG_START, 0x01);
+usleep(100);                                    /* 100 us */
+write_reg32(..., DECODER_REG_START, 0x00);      /* 注释写「脉冲结束」← 致命 */
+```
+
+于是那句「脉冲结束」在任务跑到一半（读到第 1,140 拍）时**把核重启了**。
+
+**③ 为什么一重启就必错：** 重启只复位了本模块的 FSM 和 `desparsify_datapath`，
+**已经发出去的 AXI 读突发不会被取消**。真实 DDR / 真实互连会把那段突发剩下的 R 拍
+继续送回来（当时正在第 5 段突发，还剩 1266 − 1140 = **126 拍**），它们落进刚被清空的
+`in_pool`，被当成新任务输入流的开头 —— 输入旋转 126 拍，输出与黄金完全不相关。
+
+**为什么所有仿真都没抓到**：`desparsifier_axi` / `desparsify_datapath` / M3 的 BD-3ext
+都只写一次 `START=1`（`tb_desparsifier.v` 的 `axil_write(6'h10, 32'd1)`），从机模型也不模拟
+「主机复位后已接受的突发仍要发完」。与 B23/B24/B25 同一个模式：
+出问题的永远是仿真没覆盖到的那条真实接口。
+
+#### 修复
+
+| 编号 | 缺陷 | 位置 | 改法 |
+| --- | --- | --- | --- |
+| B27-① | 写 START 寄存器时 `start_pulse <= 1'b1`，写 0 也启动 | `desparsification_decoder_v1_0.v` 的 `axi_slave_decoder` | 改成 `start_pulse <= write_data[0]` |
+| B27-② | 核忙时也接受 START，而重启不清飞行中的读突发 | 同文件的 M00_AXI 时钟域 | 新增 `core_active_m = busy \| (rd_state==RD_ADDR) \| (rd_state==RD_DATA)` 与 `start_eff_m = start_pulse_m & ~core_active_m`；读引擎、写引擎、数据通路复位、`done_m` 全部改用 `start_eff_m`。`RD_DONE` 时所有读突发已收完、`busy=0` 时最后一个 B 也已回来，此时重启才安全 |
+| B27-③ | 启动后 100 us 又写一次 START=0 | `sw/app/echo.c` 的 `PIPE_DECODER_START` | 只写一次 `START=0x01`，前后都不再碰这个寄存器 |
+
+RTL 与固件两边都改，互不依赖。
+
+#### 新增判据：`tools/run_xsim.sh dec_restart`
+
+新 TB `hw/sim/dec/tb_dec_ddr_restart.v`，做到「真实 DDR / 真实 AXI 主口」级别，
+不再用温柔的 VIP 内存喂黄金数据：
+
+- 真实 DUT（`desparsification_decoder_v1_0` + `desparsify_datapath`），不复制被测逻辑；
+- 板上真实地址（IN `0x1100_0000` / OUT `0x1110_0000`）与板上真实数据
+  （`tests/golden/sparse_expect.hex` 就是第四次上板 DDR 里逐位相同的那一份）；
+- 从机模型像真 DDR：AR→首拍 12~32 拍延迟、突发中间随机空档、AW/W/B 随机背压，
+  **已接受的读突发一定把 `ARLEN+1` 拍发完，不因主机重启而取消**；
+- 输出区先按固件填 `DECODER_SENTINEL_U64`，逐拍逐位比对，末拍按 `WSTRB=0x0F` 只比低 32 bit；
+- 一次仿真跑两个场景，并额外判 AXI 流量必须刚好（读 1,266 拍、写 1,013 拍，不多不少）：
+
+| 场景 | 寄存器时序 | 修复前 | 修复后 |
+| --- | --- | --- | --- |
+| `clean-single-start` | 只写一次 `START=1` | **PASS** | **PASS** |
+| `firmware-sequence` | 原样回放 `echo.c`：写 0 → 10 us → 写 1 → 100 us → 写 0 | **FAIL**：读 839/1266 拍、写 665/1013 拍，759 处不符 | **PASS**：1,013 拍 / 64,800 bit 逐位相同 |
+
+修复前的失败输出用同一套指纹分析，同样呈现「输入被拼成若干段旋转」的结构
+（`+643.5 / −124.5 / 0 / −252` 拍），与板上同型，机理一致。
+
+`tools/run_xsim.sh all` 全量回归 **9/9 通过**（含 `dec_restart`）。
+
+#### 仍未完成（G3 未闭环）
+
+**RTL 改动必须重新综合/实现、重建 bitstream 与整套 `hw/build/export/` 制品，
+再连同 B26 的入口修复一起上板复跑 G3。在回传数据经 `tools/ldpc_decode.py` 译码后
+图片 SHA-256 等于 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 之前，
+不得声称端到端正确 —— 哪怕四级 dump 全对，也以哈希为准。**
 ---
 
 ## B 类新增 · B20（2026-08-29，M3 BD-3ext 发现）
