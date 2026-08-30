@@ -313,6 +313,23 @@ do_bd3() {
         "BD-3 数据面事务（Voter/Decoder 主口 -> ic_hp -> 实际 PS7 HP0）"
 }
 
+# 故障注入自检的专用判据：这一档**期望**用例失败，所以不能用 judge_log
+# （它的日志里本来就有 FAIL 行）。判据是：TB 自己打出「故障注入自检 PASS」，
+# 且没有打出「判据没有鉴别力」。
+judge_inject_log() {
+    local name="$1" rc="$2" log="$3"
+    if [[ "$rc" -ne 0 ]]; then
+        note "  FAIL $name (exit=$rc) -> $log"; FAIL=$((FAIL+1)); return 1
+    fi
+    if "${LOG_GREP[@]}" -q '判据没有鉴别力' "$log"; then
+        note "  FAIL $name (注入故障后判据仍然通过) -> $log"; FAIL=$((FAIL+1)); return 1
+    fi
+    if ! "${LOG_GREP[@]}" -q '故障注入自检 PASS' "$log"; then
+        note "  FAIL $name (未看到故障注入自检结论) -> $log"; FAIL=$((FAIL+1)); return 1
+    fi
+    note "  PASS $name"; PASS=$((PASS+1)); return 0
+}
+
 # ===========================================================================
 # BD-3b：AXI DMA <-> DNA 核（docs/13 §7.2 BD-3 第 1、2 项、docs/17 任务 A）
 #
@@ -359,6 +376,22 @@ do_bd3b() {
         -testplusarg "reads_file=$reads_vip" \
         -testplusarg "mem_out=$WORK/bd3b_stage1_out_vip.hex" || rc=$?
     judge_log "BD-3b 入口逐条判据 (phase=$phase, reads=$reads)" "$rc" "$log"
+
+    # 故障注入自检（docs/13 §十）：把 cw_data 强行接回 in_dout（= B26 修复前的接法），
+    # 判据必须失败。跑一次只多花约 1 分钟，是「这条判据真的能抓住 B26」的唯一证明。
+    if [[ "${M3_BD3B_SKIP_INJECT:-0}" != "1" ]]; then
+        local ilog="$casedir/xsim_bd3b_inject.log"
+        rc=0
+        run_snapshot "$simdir" "tb_m3_bd3b_dma_behav" "$ilog" \
+            -testplusarg "phase=load" \
+            -testplusarg "require=all" \
+            -testplusarg "rx_bd_mode=perrec" \
+            -testplusarg "reads=$reads" \
+            -testplusarg "inject_b26=1" \
+            -testplusarg "wm_file=$GOLDEN/wm_regions.hex" \
+            -testplusarg "reads_file=$reads_vip" || rc=$?
+        judge_inject_log "BD-3b 故障注入自检（注入 B26 后判据必须失败）" "$rc" "$ilog"
+    fi
 }
 
 # BD-3ext：仿真专用内存端点（绕开 PS7 VIP 的 HP0 读通路缺陷）

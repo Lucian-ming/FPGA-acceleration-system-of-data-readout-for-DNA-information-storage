@@ -510,6 +510,23 @@ eng_cw_vld <= in_rd_d2;             // valid 与 cw_hold 同拍
 > 因此 TB 里 `$fatal` 之后一律显式 `$finish`，并用 `if/else` 保证失败路径**绝不打印 PASS**；
 > 真正的判定由 `tools/run_xsim.sh` 做（日志里出现 FAIL 关键字即判失败，且必须有 PASS 标记）。
 
+#### BD 级判据：`tools/run_m3_bd.sh bd3b`（2026-08-30 补齐）
+
+上面的 `ingress_result` 是 IP 级的。`AXI DMA MM2S → DNA S_AXIS` 这条链的 **BD 级**判据
+（`docs/13` §7.2 BD-3 第 1 项、`docs/17` 任务 A）也已补上：
+`hw/sim/m3/tb_m3_bd3b_dma.sv` 用**实际 BD**（真实 PS7 GP0、真实 `ic_lite`/`ic_hp`、
+真实 AXI DMA SG 模式、真实 DNA 核；只把 HP0 内存端点换成 AXI VIP，理由见 `docs/15` §5），
+完全按 `echo.c` 的顺序搭 BD 环、预载水印、下发读段。
+
+| 判据 | 结果 |
+| --- | --- |
+| 水印预载 50 区域 × 957 符号（真实 SG DMA + 真实 preload 通路） | PASS，47,850 个符号逐个相同 |
+| **DMA 送入的第 k 条读段必须原样进入引擎的第 k 个槽位** | PASS，64/64 槽位逐位相同 |
+| **故障注入自检**：`force` 把 `cw_data` 接回 `in_dout`（= 修复前的接法） | 判据**如期失败**：64 个槽位 63 个不符，其中 62 个整体错位 +1、1 个含 X（装到从未写入的 FIFO 槽位）、1 个因黄金第 53/54 条读段内容相同而不可分辨 |
+
+**同一条判据、同一个工程，FAIL ↔ PASS 只取决于 `cw_data` 接哪根线** ——
+这既复现了 B26，也证明这条判据确实有鉴别力。细节见 `docs/15` §8。
+
 #### 交付边界（**重要**）
 
 ~~**RTL 已改，但 bitstream 未重建、板子未验证。**~~

@@ -134,6 +134,7 @@ module tb_m3_bd3b_dma;
     string phase_arg   = "full";
     string rx_mode_arg = "fw";
     string require_arg = "all";
+    bit    inject_b26  = 1'b0;   // 故障注入自检：把 cw_data 接回 in_dout（= B26 修复前的接法）
     string wm_file     = "";
     string reads_file  = "";
     string mem_out     = "";
@@ -206,6 +207,7 @@ module tb_m3_bd3b_dma;
         if (fd == 0) begin
             $display("[TB] FATAL: 打不开 %0s（%0s）", fname, label);
             $fatal(1, "input file open failed");
+            $finish;
         end
         for (i = 0; i < nwords; i++) begin
             code = $fscanf(fd, "%h", w);
@@ -213,10 +215,12 @@ module tb_m3_bd3b_dma;
             mem_wr32(base + 4*i, w);
         end
         $fclose(fd);
-        $display("[TB] 已装载 %0s：%0d 个 32bit 字（%0d B）-> 0x%08x", label, i, 4*i, base);
+        // 注意：XSim 2022.2 打印 SystemVerilog string 里的非 ASCII 会变乱码，
+        // 所以所有 label 一律传 ASCII（内容在下面的中文字面量里说清楚）。
+        $display("[TB] 已装载 %s：%0d 个 32bit 字（%0d B）-> 0x%08x", label, i, 4*i, base);
         if (i < nwords) begin
             errors++;
-            $display("[TB] FAIL: %0s 只有 %0d 字，少于需要的 %0d 字", label, i, nwords);
+            $display("[TB] FAIL: %s 只有 %0d 字，少于需要的 %0d 字", label, i, nwords);
         end
     endtask
 
@@ -232,6 +236,7 @@ module tb_m3_bd3b_dma;
         if (fd == 0) begin
             $display("[TB] FATAL: 打不开输出文件 %0s", fname);
             $fatal(1, "mem_out open failed");
+            $finish;
         end
         for (i = 0; i < nwords; i++) $fdisplay(fd, "%08x", mem_rd32(base + 4*i));
         $fclose(fd);
@@ -470,8 +475,8 @@ module tb_m3_bd3b_dma;
     // (a) 引擎第 k 个槽位装的必须是第 (batch_base+k) 条读段
     task automatic check_planes(input int batch_base);
         logic [CODEBITS-1:0] got, exp;
-        int k, r, j, bad, shift_hit;
-        bad = 0;
+        int k, r, j, bad, shift_hit, off_by_one, has_x, other;
+        bad = 0; off_by_one = 0; has_x = 0; other = 0;
         for (k = 0; k < BATCH; k++) begin
             for (r = 0; r < READ_BPS; r++) begin
                 got[r]            = `ENG.plane_hi[r][k];
@@ -480,6 +485,10 @@ module tb_m3_bd3b_dma;
             exp = read_cw_of(batch_base + k);
             if (got !== exp) begin
                 bad++;
+                // 错位统计：+1 条 / 含 X（装到了从未写入的 FIFO 槽位）/ 其它
+                if (^got === 1'bx)                              has_x++;
+                else if (got === read_cw_of(batch_base + k + 1)) off_by_one++;
+                else                                            other++;
                 if (bad <= 4) begin
                     $display("[TB] FAIL: 引擎槽位 %0d 装的不是第 %0d 条读段", k, batch_base + k);
                     $display("[TB]        got = %075h", got);
@@ -501,6 +510,8 @@ module tb_m3_bd3b_dma;
             errors++;
             $display("[TB] FAIL: 引擎装载的 %0d 个槽位里有 %0d 个不是对应的读段（B26 特征）",
                      BATCH, bad);
+            $display("[TB]        其中：整体错位 +1 条 %0d 个，含 X（装到从未写入的 FIFO 槽位）%0d 个，其它 %0d 个",
+                     off_by_one, has_x, other);
         end else begin
             $display("[TB]   ok  引擎 %0d 个槽位逐位等于送入的第 %0d..%0d 条读段",
                      BATCH, batch_base, batch_base + BATCH - 1);
@@ -583,7 +594,7 @@ module tb_m3_bd3b_dma;
         int waddr_before, waddr_after;
 
         $display("[TB] ==== 水印预载：%0d 区域 x %0d 符号 ====", WM_NUM_LC, WM_REF_LEN);
-        load_words(wm_file, DDR_WM_REGIONS, WM_NUM_LC * WM_REF_LEN, "水印区域");
+        load_words(wm_file, DDR_WM_REGIONS, WM_NUM_LC * WM_REF_LEN, "wm_regions");
 
         for (r = 0; r < WM_NUM_LC; r++) begin
             waddr_before = `DNA.wm_waddr;
@@ -602,7 +613,7 @@ module tb_m3_bd3b_dma;
                       WM_REGION_BYTES, FW_RX_PER_BD, 1'b1, first_idx, last_idx, n_bd);
             dma_kick_tx(last_idx);
             wait_tx_group(first_idx, n_bd, WM_REGION_BYTES, 1000000,
-                          $sformatf("水印区域 %0d", r));
+                          $sformatf("wm_region %0d", r));
             if (errors != 0) return;
 
             step(50);
@@ -675,7 +686,7 @@ module tb_m3_bd3b_dma;
         recs_expect = n_reads;
 
         $display("[TB] ==== 读段：%0d 条 = %0d 帧 x %0d 条 ====", n_reads, frames, FRAME_READS);
-        load_words(reads_file, DDR_READS, n_reads * READ_WORDS, "读段");
+        load_words(reads_file, DDR_READS, n_reads * READ_WORDS, "reads");
         zero_mem(DDR_STAGE1_OUT, n_reads * REC_BYTES / 4);
 
         // ---- echo.c PIPE_RX_PREP：提交 RX BD 环 ----
@@ -684,6 +695,7 @@ module tb_m3_bd3b_dma;
         else begin
             $display("[TB] FATAL: 未知 rx_bd_mode=%0s", rx_mode_arg);
             $fatal(1, "bad rx_bd_mode");
+            $finish;
         end
         bd_submit(BD_BASE_RX, RX_BD_CNT, rx_head, DDR_STAGE1_OUT, rx_total,
                   rx_per_bd, 1'b0, rx_first, rx_lastidx, rx_n);
@@ -767,7 +779,7 @@ module tb_m3_bd3b_dma;
             end else begin
                 $display("[TB]   ok  送入 %0d 条 -> 收到 %0d 条 48 B 记录", recs_expect, recs_got);
             end
-            wait_tx_group(tx_first_all, tx_n_all, FRAME_BYTES, 1000000, "读段帧");
+            wait_tx_group(tx_first_all, tx_n_all, FRAME_BYTES, 1000000, "read_frames");
             // [B26] 入口逐条判据（b）：第 k 条结果的码字必须等于第 k 条读段的码字
             if (recs_got > 0) check_records((recs_got < recs_expect) ? recs_got : recs_expect);
         end else if (require_arg == "repro") begin
@@ -793,14 +805,30 @@ module tb_m3_bd3b_dma;
 
     task automatic finish_report();
         $display("[TB] --------------------------------------------------");
+        if (inject_b26) begin
+            // 注入模式：判据**必须**失败才算这条判据有效
+            if (errors == 0) begin
+                $display("[TB] 故障注入自检不通过：注入 B26 后判据却仍然通过，说明判据没有鉴别力");
+                $fatal(1, "BD-3b 判据没有鉴别力");
+                $finish;
+            end
+            $display("[TB] 故障注入自检 PASS：注入 B26 后判据如期失败（%0d 项，槽位不符 %0d）",
+                     errors, plane_bad);
+            $finish;
+        end
+        // 【XSim 2022.2 的坑】$fatal 既不终止仿真也不让 xsim 非零退出（实测会继续往下跑，
+        // 一路跑到看门狗）。所以这里用 if/else 保证失败路径**绝不打印 PASS**，
+        // 并在 $fatal 之后显式 $finish；真正的判定由 tools/run_m3_bd.sh 的日志判据做。
         if (errors != 0) begin
             $display("[TB] BD-3b FAIL（%0d 项）", errors);
             $fatal(1, "BD-3b 用例失败");
+            $finish;
+        end else begin
+            $display("[TB] PASS  BD-3b phase=%s rx_bd_mode=%s require=%s（槽位不符 %0d，记录码字不符 %0d）",
+                     phase_arg, rx_mode_arg, require_arg, plane_bad, rec_cw_bad);
+            $display("[TB] --------------------------------------------------");
+            $finish;
         end
-        $display("[TB] PASS  BD-3b phase=%0s rx_bd_mode=%0s require=%0s（槽位不符 %0d，记录码字不符 %0d）",
-                 phase_arg, rx_mode_arg, require_arg, plane_bad, rec_cw_bad);
-        $display("[TB] --------------------------------------------------");
-        $finish;
     endtask
 
     // ================================================================
@@ -814,15 +842,24 @@ module tb_m3_bd3b_dma;
         void'($value$plusargs("rx_bd_mode=%s", rx_mode_arg));
         void'($value$plusargs("require=%s",    require_arg));
         void'($value$plusargs("reads=%d",      n_reads));
+        void'($value$plusargs("inject_b26=%d", inject_b26));
         void'($value$plusargs("mem_out=%s",    mem_out));
-        if (!$value$plusargs("wm_file=%s", wm_file))
+        if (!$value$plusargs("wm_file=%s", wm_file)) begin
             $fatal(1, "必须指定 +wm_file=<tests/golden/wm_regions.hex>");
-        if (phase_arg != "wm" && phase_arg != "load" && phase_arg != "full")
+            $finish;
+        end
+        if (phase_arg != "wm" && phase_arg != "load" && phase_arg != "full") begin
             $fatal(1, "未知 phase（只接受 wm / load / full）");
-        if (phase_arg != "wm" && !$value$plusargs("reads_file=%s", reads_file))
+            $finish;
+        end
+        if (phase_arg != "wm" && !$value$plusargs("reads_file=%s", reads_file)) begin
             $fatal(1, "load/full 阶段必须指定 +reads_file=<32bit 字镜像>");
-        if (n_reads % FRAME_READS != 0)
+            $finish;
+        end
+        if (n_reads % FRAME_READS != 0) begin
             $fatal(1, "reads 不是 64 的整数倍");
+            $finish;
+        end
 
         $display("[TB] phase=%0s rx_bd_mode=%0s require=%0s reads=%0d",
                  phase_arg, rx_mode_arg, require_arg, n_reads);
@@ -839,6 +876,15 @@ module tb_m3_bd3b_dma;
         wait (dut.top_bd_i.rst_ps_peripheral_aresetn === 1'b1);
         step(50);
         $display("[TB] PL 复位已释放 @%0t ps", $time);
+
+        // [B26 故障注入自检 / docs/13 §十]
+        // 把引擎的 cw_data 强行接回 in_fifo 的 dout —— 这正是修复前的接法。
+        // 用它证明本用例的判据真的能抓住 B26，而不是「编译过、跑完、没报错」。
+        // 注入后本用例**必须失败**；如果仍然通过，说明判据没有鉴别力，同样判 FAIL。
+        if (inject_b26) begin
+            force `ENG.cw_data = `DNA.in_dout;
+            $display("[TB] 【故障注入】cw_data 强制接回 in_dout（复现 B26 修复前的接法）");
+        end
 
         bd_ring_init(BD_BASE_TX, TX_BD_CNT);
         bd_ring_init(BD_BASE_RX, RX_BD_CNT);
@@ -870,6 +916,7 @@ module tb_m3_bd3b_dma;
         repeat (400) #1_000_000_000;   // 400 x 1 ms = 400 ms
         $display("[TB] FATAL: BD-3b 全局超时");
         $fatal(1, "BD-3b 超时");
+        $finish;
     end
 
 endmodule

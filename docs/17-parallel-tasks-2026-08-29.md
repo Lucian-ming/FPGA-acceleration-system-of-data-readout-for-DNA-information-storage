@@ -123,7 +123,20 @@ BD-3ext 只覆盖了 Voter 与 Decoder。IP 级 `tb_dna_ingress` 只测了 FIFO 
 沿用 `docs/13` §十：编译通过、跑完、有波形都不算 PASS；每个用例要有显式 PASS/FAIL、
 非零失败退出码、超时保护、逐位比较。**不得为了变绿放宽判据或屏蔽 X/Z。**
 
-### 交付
+### 交付状态：✅ 已完成（2026-08-30，`--agent b26-ingress`）
+
+任务 A 的目标是「复现 B21」，但 B21 早已在 363c7f1 修好。这条链最终复现并坐实的是
+**B26**（入口 FIFO 两级同步读 + 引擎晚采样 → 结果整体错位一条读段）：
+
+| 交付物 | 状态 |
+| --- | --- |
+| `tools/run_m3_bd.sh bd3b` 一键复跑 | ✅ 已加分支（默认 `phase=load`，含故障注入自检） |
+| BD 级判据「送入第 k 条读段 → 引擎第 k 个槽位 / 第 k 条结果的码字」 | ✅ `hw/sim/m3/tb_m3_bd3b_dma.sv` |
+| IP 级同一判据（秒级回归） | ✅ `tools/run_xsim.sh ingress_result` |
+| 结论写进 `docs/15` | ✅ 新增 §8 |
+| RTL 缺陷立条目 | ✅ `docs/03-status.md` B26 |
+
+### 交付（原始要求）
 
 - `tools/run_m3_bd.sh bd3b` 可一键复跑；
 - 结论写进 `docs/15-m3-bd-simulation-2026-08-29.md` 新增一节；

@@ -353,3 +353,95 @@ Fatal 终止；修复后同一位置安全通过，并完整跑完 4,096 条记�
 > 仍未改变的边界：BD-3ext 的内存端点是 AXI VIP，**不是实际 PS7 的 AFI 通路**；
 > 生产 BD 上的 BD-3（端点为真实 HP0）依旧被 PS7 VIP 的读通路缺陷挡住。
 > M3 的 M4 层未开始，G3 未做。**不得据本节结论关闭 G3。**
+
+---
+
+## 8. BD-3b：`AXI DMA ↔ DNA 加速核` 数据面（2026-08-30，补上最后一段未覆盖的链路）
+
+`docs/13` §7.2 BD-3 的第 1、2 项（`AXI DMA MM2S → DNA S_AXIS` 与
+`DNA M_AXIS_RESULT → AXI DMA S2MM`）此前**从未在 BD 级仿真过**，
+`docs/17` 任务 A 点名的就是它。B23/B24/B25/B26/B27 五个缺陷全部出在
+「仿真喂黄金数据、板上走真实接口」的差异上，这段空白是最后一处。
+
+### 8.1 做法
+
+- DUT 仍是 `hw/scripts/bd_sim_mem.tcl` 生成的**实际 BD**：真实 PS7 VIP 的 GP0 控制面、
+  真实 `ic_lite` / `ic_hp`、真实 **AXI DMA（SG 模式）**、真实 DNA 核；
+  只把 `ps_0/S_AXI_HP0` 这一个内存端点换成 AXI VIP 内存模型（理由见 §5）。
+- TB `hw/sim/m3/tb_m3_bd3b_dma.sv` **完全按 `sw/app/echo.c` 的顺序、地址和参数**驱动硬件：
+  在 VIP 内存里按 `XAxiDma_BdRing*` 的语义搭出 TX/RX BD 环
+  （TX @ `0x11800000`、RX @ `0x11900000`，每个 64 B），写 `CURDESC`/`RS`/`TAILDESC` 启动；
+  再走「逐区域预载水印 → 提交 RX BD 环 → 预填第一帧 → 写 `start` → 继续下发」。
+- 入口 32 bit 字镜像由 `tools/m3_mem.py reads-to-vip` 从**只读**的 `tests/golden/reads_cw.hex`
+  生成（每条读段 10 个 32 bit 字，末字只有低 12 bit 有效），与 MM2S 实际读走的字节一致。
+
+### 8.2 判据（不是「跑完没报错」）
+
+| 判据 | 内容 |
+| --- | --- |
+| 水印预载 | 50 个区域 × 957 符号，逐符号比 `u_srpe_batch.wm_bram`；每个区域传完 `wm_waddr` 必须回 0 |
+| TX BD | 每个 BD 必须 Cmplt、无 DecErr/SlvErr/IntErr、传输长度等于提交长度 |
+| RX BD | 每个已完成 BD 必须是 `Cmplt + RXSOF + RXEOF + 48 B`（= 一条完整记录） |
+| **入口逐条（a）** | **DMA 送入的第 k 条读段，必须原样进入引擎的第 k 个槽位**（逐位比 `plane_hi/plane_lo`） |
+| **入口逐条（b）** | **回写 DDR 的第 k 条 48 B 记录，其码字字段（bit 325:26）必须等于第 k 条读段** |
+
+判据 (a) 只需等引擎装完一个 batch（实测 **29,956 拍**）；
+判据 (b) 要等引擎扫完 50×808 个位置（≈ 6.3 M 拍，约 1 小时），因此拆成两档：
+
+```bash
+bash tools/run_m3_bd.sh bd3b                    # 默认 phase=load，跑判据 (a) + 故障注入自检
+M3_BD3B_PHASE=full bash tools/run_m3_bd.sh bd3b # 追加判据 (b)，很慢
+M3_BD3B_READS=128 bash tools/run_m3_bd.sh bd3b  # 送入的读段条数（64 的整数倍）
+```
+
+期望值全部从**VIP 内存里实际被 DMA 读走的那份读段数据**反推（`read_cw_of()`），
+不引入第二份「理想」数据源。
+
+### 8.3 结果
+
+| 用例 | 结果 |
+| --- | --- |
+| 水印预载（50 区域 × 957 符号，真实 SG DMA + 真实 preload 通路） | **PASS**：47,850 个符号逐个相同，每区域 `wm_waddr` 均回 0 |
+| 入口逐条判据 (a)，64 条读段 | **PASS**：引擎 64 个槽位逐位等于送入的第 0..63 条读段 |
+| **故障注入自检**（`+inject_b26=1`） | **如期失败** —— 见下 |
+
+### 8.4 故障注入自检：证明这条判据真的能抓住 B26
+
+`docs/13` §十要求「先验证 Testbench mutation 能抓住错误，再修改 DUT」。
+本 TB 用 `force` 把引擎的 `cw_data` 强行接回 `in_fifo` 的 `dout` ——
+**这正是 B26 修复前的接法**，不需要回退 RTL、也不需要重建工程：
+
+```verilog
+if (inject_b26) force `ENG.cw_data = `DNA.in_dout;
+```
+
+注入后同一用例的输出：
+
+```
+[TB] FAIL: 引擎槽位 0 装的不是第 0 条读段
+[TB]        >>> 它其实是读段 1（错位 1 条）
+[TB] FAIL: 引擎装载的 64 个槽位里有 63 个不是对应的读段（B26 特征）
+[TB]        其中：整体错位 +1 条 62 个，含 X（装到从未写入的 FIFO 槽位）1 个，其它 0 个
+[TB] 故障注入自检 PASS：注入 B26 后判据如期失败（1 项，槽位不符 63）
+```
+
+64 个槽位的去向全部可解释：
+
+- **62 个**整体错位 +1（装成了下一条读段）——与板上「board 记录 *i* 的码字 == 黄金记录 *i+1*」同一特征；
+- **1 个**含 X：最后一个槽位装到了「下一条」尚未写入的 FIFO 位置 ——
+  对应板上末尾那条多余记录；
+- **1 个**碰巧相同：黄金读段里 `reads_cw.hex` 的第 53、54 条内容完全一样
+  （`python3 -c` 可复核），错位在这一条上不可分辨。
+
+注入档的判定不能用通用的 `judge_log`（它的日志里本来就有 FAIL 行），
+`tools/run_m3_bd.sh` 为它单列了 `judge_inject_log`：
+要求日志出现「故障注入自检 PASS」，且**不得**出现「判据没有鉴别力」。
+不注入时同一用例 PASS —— **同一条判据、同一个工程，FAIL ↔ PASS 只取决于 `cw_data` 接哪根线。**
+
+### 8.5 边界声明
+
+- 内存端点是 AXI VIP，**不是实际 PS7 的 AFI 通路**（同 §5、§6 的限制）。
+- 判据 (a) 是白盒的（读引擎内部的 `plane_hi`/`plane_lo`），
+  但它读的是**真实 DUT 在真实 DMA 驱动下**的内部状态，不替换、不注入任何被测逻辑。
+- 默认档不覆盖判据 (b)；`M3_BD3B_PHASE=full` 才跑，约 1 小时。
+- 普通 XSim 仍不能证明 lwIP、真实 PHY、真实 DDR 电气行为与 ARM cache 维护。
