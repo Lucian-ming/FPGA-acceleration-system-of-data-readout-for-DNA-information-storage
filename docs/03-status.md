@@ -134,6 +134,23 @@ Stage1 剩下 85 条与黄金不同的记录，经拆解是 **score 相同、码
 UART 实录也印证 B27 修好了：`[STAGE3] ✓ DONE flag set after 1 polls`
 （第四次要靠「输出区哨兵被覆盖」的旁证收尾）。
 
+### 闭环那一版 RTL 的完整回归（2026-08-30 复跑）
+
+| 回归 | 结果 |
+| --- | --- |
+| `tools/run_xsim.sh all` | **9/9 PASS**（含 B26 的 `ingress_result`、B27 的 `dec_restart`） |
+| `tools/run_m2_full.sh` | 全链 PASS：Stage1 64/64 批、Stage2 81,000 bit、Stage3 64,800 bit；LDPC 图片哈希 `fcd0cf90…f2c3`；单 bit 故障注入被 Stage3 scoreboard 检出 |
+| `tools/run_m3_bd.sh bd2` | PASS |
+| `tools/run_m3_bd.sh bd3ext` | **8/8 PASS**：BEST_CASE 与 WORST_CASE 两档下 Voter / Stage2 逐位 / Decoder / Stage3 逐位全通过 |
+| `tools/run_m3_bd.sh bd3b` | PASS（AXI DMA → DNA 入口逐条判据 + 故障注入，见 `b866c49`） |
+
+复跑过程中另外揪出并修掉一个**与 B26/B27 无关的既有 TB 缺陷**（提交 `aec5ce7`）：
+`tb_m3_bd3_extmem.sv` 的背压用 `XIL_AXI_READY_GEN_RANDOM` + `forever send_*ready(g)`，
+而该策略的 ready 对象是一次性的（`event_count` 默认 1）、`send_*ready()` 又非阻塞，
+于是无限排队撞上 VIP 的 500 上限，配合 `Stop-On-Error=0` 把日志刷到 16 GB、
+xsim 被 OOM 杀掉 —— 此时 DUT 一拍数据都还没传。改用自持的
+`XIL_AXI_READY_GEN_OSC` 只 send 一次即可。详见 `docs/15` §9.1。
+
 ### 闭环的适用范围（不要外推）
 
 本次闭环成立于**这一次运行、这一组参数**：

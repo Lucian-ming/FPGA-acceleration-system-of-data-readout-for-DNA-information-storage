@@ -445,3 +445,67 @@ if (inject_b26) force `ENG.cw_data = `DNA.in_dout;
   但它读的是**真实 DUT 在真实 DMA 驱动下**的内部状态，不替换、不注入任何被测逻辑。
 - 默认档不覆盖判据 (b)；`M3_BD3B_PHASE=full` 才跑，约 1 小时。
 - 普通 XSim 仍不能证明 lwIP、真实 PHY、真实 DDR 电气行为与 ARM cache 维护。
+
+---
+
+## 9. B27 上板闭环后的完整 M3 复跑（2026-08-30）
+
+B26 + B27 修复重建 bitstream、第五次上板闭环之后，把 M3 全套重跑了一遍，
+用的是与上板同一份 RTL（`hw/ip/` 工作区）。
+
+| 用例 | 结果 |
+| --- | --- |
+| `run_m3_bd.sh bd2`（控制面：GP0 → `ic_lite` → 四个从机） | **PASS** |
+| `bd3ext` BEST_CASE（零延迟）Voter / Stage2 逐位 / Decoder / Stage3 逐位 | **4/4 PASS**：Stage2 1,266 拍 81,024 bit、Stage3 1,013 拍 64,832 bit 与黄金逐位相同 |
+| `bd3ext` WORST_CASE（最坏延迟/带背压）同上四项 | **4/4 PASS**（Voter 用时 54 min） |
+| `bd3b`（AXI DMA ↔ DNA 入口逐条判据 + 故障注入） | PASS，见 §8 与提交 `b866c49` |
+
+BD-3ext 合计 **8/8**，两个 summary 的 FAIL 计数均为 0，留证在
+`hw/build/xsim/m3/20260830T053741Z/`：`summary.txt`（BEST_CASE）与
+`summary_worstcase.txt`（WORST_CASE）。
+
+### 9.1 顺带修掉的 TB 缺陷：背压把 VIP 的 ready 队列撑爆（提交 `aec5ce7`）
+
+**这条与 B26/B27 无关**，是 `tb_m3_bd3_extmem.sv` 里既有的问题
+（`17fccaf` 没动过这条路径），但它会让整个 WORST_CASE 档永远红，
+而且代价极高，所以单独记一笔。
+
+**现象**：WORST_CASE 在 **965 ns** 就开始刷 Error，日志涨到 **16 GB**，
+`xsim` 被 OOM 杀掉（exit 137）——**此时 DUT 一拍数据都还没传**，
+所以它既不是 DUT 缺陷，也不是"最坏延迟下 DUT 挂了"。
+
+**根因**（两条叠加）：
+
+1. `XIL_AXI_READY_GEN_RANDOM` 的 ready 对象是**一次性**的 ——
+   Vivado 的 `axi_vip_pkg.sv` 里 `axi_ready_gen` 的 `event_count` 默认就是 1，
+   所以必须不断补充；
+2. `send_*ready()` 是**非阻塞**的，只把对象排进 VIP 队列就返回。
+
+于是 `forever mem_agent.wr_driver.send_awready(g);` 在同一个 delta 里无限排队，
+撞上 VIP 的硬上限 `limited to 500 outstanding READY objects`；
+而 TB 设了 `Stop-On-Error=0`，此后每个 delta 刷一条 Error，日志无限增长。
+
+**走过的弯路（记下来，别再走一遍）**：先试的「按时钟给排队限速」是错的。
+补充速率只要略高于 VIP 的消费速率（约每 `low+high` 拍一个），队列迟早还是涨满 ——
+实测每 4 拍补一个只是把撞上限的时刻从 965 ns 推迟到 **1,200,495 ns**。
+
+**正解**：改用 `XIL_AXI_READY_GEN_OSC`。`axi_vip_pkg.sv` 的注释明写
+「the policy repeats until the channel is given different policy」——
+它自己无限重复，**只需要 `send` 一次**，队列深度恒为 1，永远撞不上 500 上限。
+三个通道取不同的 low/high 组合（AW 3/1、W 2/1、AR 5/2），
+避免相位一致把背压退化成同拍开合。
+
+| | 修复前 | 修复后 |
+| --- | --- | --- |
+| 撞 500 上限 | 965 ns | **0 次** |
+| 日志 | **16 GB**，OOM 杀掉 | 942 KB，正常跑完 |
+| DUT 实际传输 | 零拍 | Voter/Decoder 四项逐位 PASS |
+
+同时给 `run_snapshot` 加了日志上限 `M3_XSIM_LOG_CAP_MB`（默认 512 MiB）：
+VIP 在 `Stop-On-Error=0` 下的任何刷屏都不该再有机会填满磁盘，
+超限就截断并把该条判为失败。
+
+**教训**：VIP 的 ready 生成策略分「一次性」与「自持」两类，
+用错类别的后果不是「背压不对」，而是**仿真在 DUT 还没开始工作时就被资源问题打死**，
+表现却是一条看起来像 DUT 挂掉的 FAIL。判据脚本必须能区分这两种失败 ——
+日志上限就是为此加的。
