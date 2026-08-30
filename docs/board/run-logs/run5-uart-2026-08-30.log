@@ -1,0 +1,203 @@
+====================================
+DNA Accelerator Complete Pipeline
+====================================
+
+========================================
+[INIT] Enhanced IP Core Reset Sequence
+========================================
+[INIT] Resetting DNA Accelerator...
+[INIT] Resetting Voter...
+[INIT] Resetting Decoder (enhanced)...
+
+[RESET] Forcing Decoder to IDLE state...
+[RESET] Method 1: Clear config and wait...
+[RESET] After Method 1: STATUS=0x01 (IDLE=1)
+[RESET] ??? Method 1 succeeded
+[INIT] ??? Decoder reset successful
+
+[INIT] Final Status:
+  Voter   IDLE=1, DONE=0
+  Decoder IDLE=1, DONE=0
+
+[INIT] ??? All IP cores ready
+========================================
+Start PHY autonegotiation 
+Waiting for PHY to complete autonegotiation.
+autonegotiation complete 
+link speed for phy address 1: 1000
+unable to determine type of EMAC with baseaddress 0xE000B000
+[INIT] Enabling interrupts...
+[INIT] Bringing up network interface...
+
+Board IP: 192.168.1.10
+
+[INIT] Initializing DNA Accelerator...
+
+[DMA] After init
+  MM2S: DMACR=0x00010003 DMASR=0x00010008 CURDESC=0x11800000 TAILDESC=0x00000000
+  S2MM: DMACR=0x00010003 DMASR=0x00010008 CURDESC=0x11900000 TAILDESC=0x00000000
+  MM2S halted=0 idle=0 err=0x0 | S2MM halted=0 idle=0 err=0x0
+[INIT] DNA Accelerator ready
+[INFO] TX BD Ring: 2048 BDs, RX BD Ring: 1024 BDs
+[INIT] DNA Accelerator ready
+
+[TCP] Starting server on port 7...
+[TCP] Server ready
+
+*** Waiting for connections ***
+[INIT] System initialization complete
+[INIT] Ready to accept connections
+
+
+========================================
+[TCP] Client connected
+========================================
+
+========================================
+[TCP] Client connected
+========================================
+[CAPS] version=1 read_bps=150 num_lc=50 stride=807 max_symbols=40500 max_reads=107968 features=1
+[CONFIG] accepted: v1 150bp L=40500 (50x807) reads=4096 score_min=67
+[WM] Stored 10128 bytes (81000 bits, 40500 symbols)
+
+========================================
+Starting Processing Pipeline
+Total Reads: 4096 (actual)
+Watermark:   10128 bytes
+========================================
+
+[STAGE1] WM_PREP: expanding watermark into 50 regions
+[WM] Expanded to 50 regions x 957 symbols (191400 bytes) @ 0x10040000
+[STAGE1] WM preload done: 50 regions x 957 symbols
+[STAGE1] RX_PREP
+  Reads: 4096
+  Output: 196608 bytes (4096 ?? 48 B/read)
+  RX BD: 1 BD/??????(48 B)????????? 512/4096 ???
+[STAGE1] Total: 4096 reads = 64 frames (64 reads/frame)
+[STAGE1] IP core START
+
+[STAGE1] COMPLETE!
+  TX: sent=64 done=64/64
+  RX: done=4096/4096
+
+[STAGE1] ========================================
+[STAGE1] ??? DNA Accelerator stage COMPLETE
+[STAGE1] ========================================
+[STAGE1???STAGE2] Using Stage1 output directly
+  Output address: 0x10600000
+  Data format: 48 bytes/read ?? 4096 reads (actual)
+  Total size: 196608 bytes
+
+[DEBUG] Output Statistics (first 10 reads):
+  Non-zero bytes: 408 / 480 (%)
+
+[DEBUG] First read (48 bytes):
+[READ #0] 48 bytes @ 0x10600000
+  [00-15]: 3D 18 05 18 15 2A 8A 6E 22 C4 70 37 F4 46 88 31 
+  [16-31]: 3B 03 58 51 20 CF B7 7B 64 79 59 E9 2A 09 4C A1 
+  [32-47]: 68 8B 70 E4 8D B4 61 9E 1B 00 00 00 00 00 00 00 
+
+[STAGE1] Flushing all output to DDR...
+[STAGE1] ??? Flush complete
+
+[PIPELINE] Proceeding to Stage2 (Voter).
+
+========================================
+[STAGE2] Voter Preparation
+========================================
+[STAGE2] Invalidating input cache (196608 bytes)...
+[STAGE2] ??? Cache invalidated (196608 bytes)
+
+========================================
+[STAGE2] Starting Voter IP Core
+========================================
+
+[STAGE2] Pre-start Input Validation:
+  Non-zero bytes: 408 / 480
+
+[DEBUG] First read (48 bytes):
+[READ #0] 48 bytes @ 0x10600000
+  [00-15]: 3D 18 05 18 15 2A 8A 6E 22 C4 70 37 F4 46 88 31 
+  [16-31]: 3B 03 58 51 20 CF B7 7B 64 79 59 E9 2A 09 4C A1 
+  [32-47]: 68 8B 70 E4 8D B4 61 9E 1B 00 00 00 00 00 00 00 
+  Parsed Score: 61
+  Parsed Position: 326
+
+[STAGE2] ??? Input validation passed
+[STAGE2] Configuration:
+  Input format: 48 bytes/read (6 beats/read)
+  TOTAL_READS : 4096 (HW will auto-read 6 beats per read)
+
+[STAGE2] Initial status: 0x01 (IDLE=1, DONE=0)
+[STAGE2] Configuration:
+  IN_ADDR:     0x10600000
+  IN_BEATS:    24576 (6 beats/read)
+  OUT_ADDR:    0x11000000
+  OUT_BEATS:   1266
+  TOTAL_READS: 4096
+  SCORE_MIN:   67
+[STAGE2] Configuration readback verified
+
+[START] Sending START pulse to Voter IP core...
+[START] Status before START: 0x01 (IDLE=1, DONE=0)
+[START] Status after START: 0x00 (IDLE=0, DONE=0)
+[START] ??? IP core started (IDLE: 1???0)
+[START] ??? START pulse issued
+[STAGE2] Waiting for completion...
+[STAGE2] ==========================================
+
+
+[STAGE2] ========================================
+[STAGE2] ??? DONE flag set after 0 polls
+[STAGE2] ========================================
+
+[STAGE2] ========================================
+[STAGE2] ??? Voter stage COMPLETE
+[STAGE2] ========================================
+[STAGE2] Making HW-written output visible to CPU (invalidate only)...
+[STAGE2] Verifying output...
+[STAGE2] Verifying output data...
+[STAGE2] Data statistics (first 1000 u64s):
+  Zero count    : 0 (%)
+  Non-zero count: 1000 (%)
+
+[STAGE2] ??? Output contains valid data
+[STAGE2] Non-zero ratio: %
+[STAGE2] Preparing output for Stage3 (invalidate only)...
+[STAGE2] ??? Flush complete
+[DIFF] Consensus XOR watermark done (10125 bytes)
+
+[PIPELINE] Proceeding to Stage3 (Decoder)...
+
+========================================
+[STAGE3] Decoder Preparation
+========================================
+[STAGE3] Step 0: Ensuring START is cleared...
+[STAGE3] Status before config: 0x01 (IDLE=1)
+[STAGE3] Invalidating input cache...
+[STAGE3] ??? Cache invalidated
+[STAGE3] Input Validation:
+  Non-zero u64s: 1266/1266 (%)
+  Bit ones:      23627 (%)
+  Bit zeros:     57397 (%)
+[STAGE3] Clearing output area...
+[STAGE3] Output area filled with sentinel values
+[STAGE3] Writing configuration (with safety checks)...
+[STAGE3] Configuration verification:
+  IN_ADDR:  0x11000000 ???
+  IN_BEATS: 1266 ???
+  OUT_ADDR: 0x11100000 ???
+  OUT_BEATS:1013 ???
+[STAGE3] Status after config: 0x01 (IDLE=1, DONE=0)
+========================================
+
+========================================
+[STAGE3] Starting Decoder...
+[STAGE3] Status before START: 0x01 (IDLE=1, DONE=0)
+[STAGE3] ??? IP core started (IDLE: 1???0)
+[STAGE3] ??? Started, monitoring progress...
+
+[STAGE3] ??? DONE flag set after 1 polls
+
+[RESULT] Sending 8100 bytes
+[RESULT] Complete 8100 bytes

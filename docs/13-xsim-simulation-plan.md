@@ -554,6 +554,29 @@ hw/build/xsim/<HEAD>/<timestamp>/<case>/
 - Stage2 大 BRAM 不默认全量入波形，使用文件 dump + Python diff；
 - 波形是定位证据，不是 PASS 判据。
 
+### 9.4 长仿真必须落盘、可续跑（2026-08-30 补）
+
+超过十几分钟的仿真**不要假设进程能活到结束**。实测教训：
+`run_m3_bd.sh bd3ext` 的 WORST_CASE 单条就要 54 分钟，而这类长任务被
+会话结束、机器重启、OOM 打断过三次，其中 `setsid` 也没能保住。
+
+因此：
+
+- **每完成一个子判据就往 summary 追加一行**，不要只在全部跑完时才写结论。
+  `run_m3_bd.sh` 的 `summary.txt` 就是这么用的 —— 被打断后靠它确认
+  BEST_CASE 四项已 PASS，于是只续跑 WORST_CASE，省掉重建 BD（10 min）
+  与 BEST_CASE（33 min）共 43 分钟。
+- **BD 工程与 snapshot 是可复用的**：TB 源码没改时，直接用
+  `<case>/proj/m3_bd.sim/sim_1/behav/xsim` 下现成的 snapshot 跑 `xsim`，
+  比重跑整条 `run_m3_bd.sh` 快得多；改了 TB 也只需 `compile.sh` + `elaborate.sh`，
+  不必重新生成 BD。
+- **续跑的步骤必须与脚本逐条对齐**（同样的 plusargs、同样的 `m3_mem.py` 转换与比较），
+  否则拿到的不是同一条判据。
+- **给日志设上限**。`run_snapshot` 的 `M3_XSIM_LOG_CAP_MB`（默认 512 MiB）是被
+  一次 16 GB 的 VIP 刷屏逼出来的：那次 xsim 被 OOM 杀掉，表现却像一条
+  DUT 失败的 FAIL（详见 `docs/15` §9.1）。判据脚本要能把
+  「DUT 判据不过」和「仿真被资源问题打死」区分开。
+
 ---
 
 ## 十、防止假绿的强制检查

@@ -16,6 +16,8 @@ hw/build/xsim/
 sw/workspace/
 *.jou
 *.log
+# 例外：板端 UART 实录是上板判据的证据，必须入库（作用域仅此目录）
+!docs/board/run-logs/*.log
 *.str
 *.pb
 *.wdb
