@@ -1,0 +1,21 @@
+# G3 逐级取证：只读导出四级 DDR 快照（由 tools/run_g3.sh 渲染）
+#
+# 纪律：**不复位、不重烧**。跑完任务后直接连上去读 DDR，
+# 否则中间结果会被清掉，就只剩「最后不对」而不知道错在第几级。
+# mrd 的长度单位是 32 bit 字，不是字节；各区间长度由 run_g3.sh 按本次条数算好填入。
+# XSDB 默认禁止访问 PL 地址（0x4000_0000+），所以这里只读 DDR 里的中间结果。
+connect
+targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
+puts "DUMP> target selected (no reset)"
+# 展开后的 50 个水印区域：50 x 957 x 4 B = 191400 B
+mrd -bin -file @@OUTDIR@@/dump_wm_regions.bin 0x10040000 @@WM_WORDS@@
+puts "DUMP> wm_regions done"
+# Stage1 输出：@@STAGE1_RECORDS@@ x 48 B
+mrd -bin -file @@OUTDIR@@/dump_stage1.bin 0x10600000 @@STAGE1_WORDS@@
+puts "DUMP> stage1 done"
+# Stage2 输出（已就地异或水印）：1266 x 8 B = 10128 B
+mrd -bin -file @@OUTDIR@@/dump_stage2.bin 0x11000000 @@STAGE2_WORDS@@
+puts "DUMP> stage2 done"
+# Stage3 输出：1013 x 8 B = 8104 B
+mrd -bin -file @@OUTDIR@@/dump_stage3.bin 0x11100000 @@STAGE3_WORDS@@
+puts "DUMP> stage3 done"

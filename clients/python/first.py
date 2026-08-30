@@ -126,6 +126,12 @@ class ClientConfig:
     format: str = DEFAULT_FORMAT
     score_min: int = 67         # 【P3】经 PKT_CONFIG 下发；67=int(0.45×150)，与黄金向量一致
     dry_run: bool = False       # 【P3】只打印将下发的配置，不连接板端
+    # 板端从收到 PKT_POST 到 send_result() 之间一个字节都不发（echo.c 的 poll_callback
+    # 只在 PROC_DONE 才发结果），而 recv_exact 用的是 sock.settimeout()，
+    # 所以这个值是**整条流水线处理时长的上限**，不是「两次进度打印的间隔」。
+    # 4,096 条记录实测 32.4 s，其中约 97% 是随条数线性增长的 Stage1；
+    # 换规模时必须一起调大，否则超时会把「还在算」误报成「挂了」。
+    result_timeout: float = 180.0
 
     def resolve_total(self, detected: int) -> int:
         """Return number of source reads to send.
@@ -626,7 +632,7 @@ def run_client(
         progress.set_status("接收结果...")
         progress.set_stage("RESULT")
         t0 = perf_counter()
-        result_size = recv_result(sock, stats, output_path, timeout=180.0)
+        result_size = recv_result(sock, stats, output_path, timeout=config.result_timeout)
         stats.t_result = perf_counter() - t0
         log_info(
             log,
@@ -692,6 +698,9 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true",
                         help="只打印将下发的 PKT_CONFIG 内容，不连接板端")
     parser.add_argument("--no-post", action="store_true", help="不发送POST触发命令")
+    parser.add_argument("--result-timeout", type=float, default=180.0,
+                        help="等待板端结果的超时（秒）。板端处理期间静默，"
+                             "所以这是整条流水线的时长上限；条数越多必须调得越大（默认 180）")
     return parser.parse_args(argv)
 
 
@@ -713,6 +722,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         format=args.format,
         score_min=args.score_min,
         dry_run=args.dry_run,
+        result_timeout=args.result_timeout,
     )
 
     stats = run_client(config, log=lambda msg: print(msg))

@@ -1,0 +1,23 @@
+# G3 上板启动脚本（由 tools/run_g3.sh 渲染，勿手工编辑渲染产物）
+#
+# 与历史的 boot2.tcl / boot_b27.tcl 同流程：
+#   rst -system -> fpga -> ps7_init + post_config -> dow ELF -> con
+# 区别只在于 bit/elf 路径由 run_g3.sh 从 hw/build/export/ 校验后填入，
+# 保证「烧进板子的制品」与「仓库 SHA256SUMS 记录的制品」同源。
+connect
+targets -set -nocase -filter {name =~ "APU*"}
+rst -system
+after 2000
+puts "BOOT> system reset done"
+targets -set -nocase -filter {name =~ "@@DEVICE@@*"}
+fpga -file @@BITFILE@@
+puts "BOOT> PL programmed"
+targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
+source @@PS7INIT@@
+ps7_init
+ps7_post_config
+puts "BOOT> ps7_init + post_config done"
+dow @@ELFFILE@@
+puts "BOOT> ELF downloaded"
+con
+puts "BOOT> running"
