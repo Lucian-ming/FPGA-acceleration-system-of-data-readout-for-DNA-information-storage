@@ -84,6 +84,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 | `docs/16-board-zynq-eco-7010.md` | **板级配置唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 修正与上板顺序 |
 | `docs/17-parallel-tasks-2026-08-29.md` | 并行任务简报：B21 的两条定位路径与会话互斥约定 |
 | `docs/18-next-steps-2026-08-30.md` | **当前行动计划**：G3 闭环后的排队、适用范围与技术债 |
+| `docs/19-parallel-sessions-2026-08-30.md` | **并行会话简报**：剩余环节与估时、三个会话的分工/互斥与提示词 |
 | `docs/reference/` | 历史审计结果（数据集校验和、文件索引、缺口清单、提交归档），只读参考 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
