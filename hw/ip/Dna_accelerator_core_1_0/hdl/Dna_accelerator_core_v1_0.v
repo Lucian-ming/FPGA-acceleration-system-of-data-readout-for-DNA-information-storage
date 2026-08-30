@@ -258,16 +258,30 @@ module Dna_accelerator_core_v1_0 #(
     wire eng_cw_req;
     reg  eng_cw_vld;
     reg  rd_issued;
+    reg  in_rd_d1, in_rd_d2;
+    reg  [CODEBITS-1:0] cw_hold;
 
     always @(posedge aclk or negedge aresetn) begin
         if (!aresetn || soft_reset_s) begin
             in_rd      <= 1'b0;
+            in_rd_d1   <= 1'b0;
+            in_rd_d2   <= 1'b0;
             eng_cw_vld <= 1'b0;
             rd_issued  <= 1'b0;
+            cw_hold    <= {CODEBITS{1'b0}};
         end else begin
             // Default pull low
             in_rd      <= 1'b0;
-            eng_cw_vld <= in_rd;   // <--- KEY: valid = previous cycle's read (aligned with dout)
+            // [B26] 原来是 eng_cw_vld <= in_rd，注释还写着「FIFO 读延迟 1 拍」。
+            // 但 fifo_sync_sdpram_b64 是两级同步读（raddr_q <= rptr; dout <= mem[raddr_q]），
+            // pop 之后 dout 要 3 拍才稳定，早采样会把上一条记录当成本条，
+            // 板上表现为结果整体错位一条读段（读段 0 的结果丢失、末尾多一条）。
+            // 改为延到 in_rd_d2 才置 valid，并用 cw_hold 锁存住那一拍的数据。
+            in_rd_d1   <= in_rd;
+            in_rd_d2   <= in_rd_d1;
+            if (in_rd_d2)
+                cw_hold <= in_dout;
+            eng_cw_vld <= in_rd_d2;
 
             // req released, allow next trigger
             if (!eng_cw_req)
@@ -360,7 +374,7 @@ module Dna_accelerator_core_v1_0 #(
         .start_batch      (arm_start),
         .cw_req           (eng_cw_req),
         .cw_valid         (eng_cw_vld),
-        .cw_data          (in_dout),
+        .cw_data          (cw_hold),
         .bram_write_en    (wm_we),
         .bram_sel         (wm_sel_s),
         .bram_write_addr  (wm_waddr_q),

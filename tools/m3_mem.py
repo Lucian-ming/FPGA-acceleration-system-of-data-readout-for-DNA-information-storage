@@ -68,6 +68,39 @@ def cmd_from_vip(args):
     print(f"[m3_mem] from-vip: {args.src} -> {args.dst} ({len(src) // 2} × 64bit)")
 
 
+def cmd_reads_to_vip(args):
+    """reads_cw.hex（每行一条读段的 300 bit 码字）-> VIP 32 bit 字镜像。
+
+    板端 MM2S 每条读段发 40 B = 10 个 32 bit 字，与 DNA 核 AXIS 入口的装配顺序
+    （in_cnt 0..9，第 9 个字只用低 12 bit）完全一致：
+        word w = cw[32w .. 32w+31]，w = 0..8；word 9 = {20'b0, cw[299:288]}
+    这是 BD-3b 入口判据的**激励**，同时也是它的**期望值**（引擎把装载进来的码字
+    原样搬进结果记录的 bit 325:26）。黄金文件只读，本函数不修改它。
+    """
+    words = []
+    n = 0
+    with open(args.src, "r", encoding="ascii") as fh:
+        for raw in fh:
+            tok = raw.strip()
+            if not tok or tok.startswith("//"):
+                continue
+            cw = int(tok, 16)
+            if cw >> 300:
+                raise SystemExit(f"{args.src}: 码字超过 300 bit: {tok!r}")
+            for w in range(10):
+                words.append((cw >> (32 * w)) & 0xFFFFFFFF)
+            n += 1
+            if args.reads is not None and n >= args.reads:
+                break
+    if args.reads is not None and n < args.reads:
+        raise SystemExit(f"[m3_mem] FAIL: {args.src} 只有 {n} 条读段，不足 {args.reads} 条")
+    with open(args.dst, "w", encoding="ascii") as fh:
+        for w in words:
+            fh.write("%08x\n" % w)
+    print(f"[m3_mem] reads-to-vip: {args.src} ({n} 条读段) -> "
+          f"{args.dst} ({len(words)} × 32bit, {4 * len(words)} B)")
+
+
 def cmd_cmp(args):
     """逐拍/逐位比较两个 64 bit 文件，报告第一处不一致。"""
     act = read_words(args.actual, 64)
@@ -116,6 +149,13 @@ def main():
     p.add_argument("dst")
     p.add_argument("--beats", type=int, default=None, help="只取前 N 拍")
     p.set_defaults(func=cmd_from_vip)
+
+    p = sub.add_parser("reads-to-vip",
+                       help="reads_cw.hex（300bit/行）-> VIP 32bit 字镜像（10 字/读段）")
+    p.add_argument("src")
+    p.add_argument("dst")
+    p.add_argument("--reads", type=int, default=None, help="只取前 N 条读段")
+    p.set_defaults(func=cmd_reads_to_vip)
 
     p = sub.add_parser("cmp", help="逐位比较两个 64bit 文件")
     p.add_argument("actual")

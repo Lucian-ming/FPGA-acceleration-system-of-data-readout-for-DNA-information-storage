@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Vivado/XSim 黄金回归入口。
-# 用法：bash tools/run_xsim.sh [all|datapath|axi|stage1|stage2|ingress|dna_axil]
+# 用法：bash tools/run_xsim.sh [all|result_axis|ingress_result|datapath|axi|stage1|stage2|ingress|dna_axil]
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -100,6 +100,16 @@ if [[ "$WHICH" == all || "$WHICH" == axi ]]; then
         "$REPO_ROOT/$DEC/desparsify_datapath.v" \
         "$REPO_ROOT/$DEC/tb_desparsifier.v"
 fi
+if [[ "$WHICH" == all || "$WHICH" == dec_restart ]]; then
+    # [B27] Stage3 Decoder 的「真实 DDR / 真实 AXI 主口 + 固件寄存器时序」判据。
+    # desparsifier_axi / desparsify_datapath / M3 BD-3ext 都 PASS，板上却 49.46% 误码：
+    # 它们只写一次 START=1、从机也很温柔，抓不到「跑到一半被 START 重启、
+    # 飞行中的读突发残留拍污染输入流」这条真实路径。
+    run_case dec_ddr_restart tb_dec_ddr_restart \
+        "$REPO_ROOT/$DEC/desparsification_decoder_v1_0.v" \
+        "$REPO_ROOT/$DEC/desparsify_datapath.v" \
+        "$REPO_ROOT/hw/sim/dec/tb_dec_ddr_restart.v"
+fi
 if [[ "$WHICH" == all || "$WHICH" == ingress ]]; then
     run_case dna_ingress tb_dna_ingress \
         "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0.v" \
@@ -124,6 +134,21 @@ if [[ "$WHICH" == all || "$WHICH" == result_axis ]]; then
         "$REPO_ROOT/$DNA/srpe.v" \
         "$REPO_ROOT/$DNA/local_correlator.v" \
         "$REPO_ROOT/hw/sim/dna/tb_dna_result_axis.v"
+fi
+if [[ "$WHICH" == all || "$WHICH" == ingress_result ]]; then
+    # [B26] DNA 核入口的「逐条」判据：送入第 k 条读段 -> 第 k 条结果的码字必须等于它。
+    # tb_srpe_batch 直接把 cw_data 摆在引擎端口上（不经过 in_fifo 与 in_rd/eng_cw_vld
+    # 握手），tb_dna_ingress 只测 TREADY 背压，所以入口错位一条在仿真里从来是绿的。
+    run_case dna_ingress_result tb_dna_ingress_result \
+        "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0.v" \
+        "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$REPO_ROOT/$DNA/fifo_sync_sdpram.v" \
+        "$REPO_ROOT/$DNA/fifo_sync_sdpram_b64.v" \
+        "$REPO_ROOT/$DNA/s2mm_pack64.v" \
+        "$REPO_ROOT/$DNA/srpe_batch.v" \
+        "$REPO_ROOT/$DNA/srpe.v" \
+        "$REPO_ROOT/$DNA/local_correlator.v" \
+        "$REPO_ROOT/hw/sim/dna/tb_dna_ingress_result.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == dna_axil ]]; then
     run_case dna_axil tb_dna_axil \

@@ -21,8 +21,19 @@
 //   2) 提交 RX BD 环 -> 提交第一帧读段 -> 写 reg0[0]=start -> 继续下发剩余帧
 // 因此它复现的是板上真实发生的时序，而不是理想化的激励。
 //
+// [B26] 2026-08-29 补上本项目至今完全没有的**入口逐条判据**：
+//   「送入第 k 条读段 -> 引擎第 k 个槽位装的就是第 k 条读段
+//     -> 第 k 条结果记录的码字就是第 k 条读段的码字」。
+//   这正是 docs/13 §7.2 BD-3 第 1 项、docs/17 任务 A 点名的那一段，
+//   也是 B26（板上 result[k] == read[k+1]、read[0] 的结果丢失、末尾多一条）
+//   唯一能在 BD 级坐实的判据。
+//
 // plusargs：
-//   +phase=wm|full          wm=只做水印预载；full=预载 + 读段全流程
+//   +phase=wm|load|full     wm  =只做水印预载
+//                           load=预载 + 送读段 + 校验引擎装载进来的 64 个槽位
+//                                （~3 万拍即可判定，用于 B26 的快速复现/回归）
+//                           full=在 load 之上再等结果经 S2MM 回写 DDR 并逐条比码字
+//                                （引擎一个 batch 要扫 50x808x156 ≈ 6.3M 拍，很慢）
 //   +rx_bd_mode=fw|perrec   RX BD 环的配额方式
 //                             fw     = 照抄 echo.c：per_bd=align_down(min(MaxLen,16K),8)=16376 B
 //                             perrec = 每条 48 B 记录一个 BD
@@ -90,6 +101,15 @@ module tb_m3_bd3b_dma;
     localparam int FRAME_BYTES     = FRAME_READS * READ_BYTES; // 2560
     localparam int REC_BYTES       = 48;                      // DNA_ACC_RESULT_PACKED_BYTES
 
+    // [B26] 结果记录的字段布局（与 srpe_batch 的 res_din = {cw_acc, global_pos, best_sc} 一致）
+    localparam int READ_BPS = 150;
+    localparam int CODEBITS = READ_BPS * 2;                   // 300
+    localparam int SCORE_W  = 10;
+    localparam int POS_W    = 16;
+    localparam int RESULT_W = CODEBITS + POS_W + SCORE_W;     // 326
+    localparam int BATCH    = 64;                             // srpe_batch 的 BATCH
+    localparam [3:0] ENG_S_INITC = 4'd5;                      // srpe_batch 的 S_INITC
+
     // C_SG_LENGTH_WIDTH = 14（已在生成的 BD 中核实）-> MaxTransferLen = 16383
     localparam int SG_LEN_WIDTH = 14;
     localparam int SG_MAX_LEN   = (1 << SG_LEN_WIDTH) - 1;    // 16383
@@ -128,6 +148,10 @@ module tb_m3_bd3b_dma;
 
     int tx_head = 0;
     int rx_head = 0;
+
+    int plane_bad   = 0;
+    int rec_cw_bad  = 0;
+    bit load_seen   = 0;
 
     int rx_bd_used  = 0;
     int recs_expect = 0;
@@ -396,6 +420,133 @@ module tb_m3_bd3b_dma;
     endtask
 
     // ================================================================
+    // [B26] 入口逐条判据
+    //
+    // 「送入第 k 条读段 -> 第 k 条结果的码字等于该读段的码字」拆成两段来判：
+    //   (a) check_planes()  ：DMA 送进来的第 k 条读段，是否真的进了引擎的第 k 个槽位。
+    //       这一段只需要等引擎装完一个 batch（约 3 万拍），是 B26 的**快速**判据。
+    //   (b) check_records() ：回写 DDR 的第 k 条 48 B 记录，其码字字段（bit 325:26）
+    //       是否等于第 k 条读段。这一段要等引擎扫完 50x808 个位置（约 6.3M 拍），很慢。
+    // 两段的期望值都直接从 **VIP 内存里实际被 DMA 读走的那份读段数据** 反推，
+    // 不引入第二份「理想」数据源。
+    // ================================================================
+
+    // 从 VIP 内存里取回第 k 条读段的 300 bit 码字（与 MM2S 实际读走的字节完全一致）
+    function automatic logic [CODEBITS-1:0] read_cw_of(input int k);
+        logic [CODEBITS-1:0] cw;
+        logic [31:0] w;
+        int i;
+        cw = '0;
+        for (i = 0; i < READ_WORDS-1; i++)
+            cw[32*i +: 32] = mem_rd32(DDR_READS + k*READ_BYTES + 4*i);
+        w = mem_rd32(DDR_READS + k*READ_BYTES + 4*(READ_WORDS-1));
+        cw[CODEBITS-1:288] = w[CODEBITS-288-1:0];   // 末字只有低 12 bit 有效
+        return cw;
+    endfunction
+
+    // 等引擎把一个 batch 装完（st 进入 S_INITC），再多等几拍让最后一行的写生效
+    task automatic wait_batch_loaded(input int max_cycles, output bit ok);
+        int c;
+        c  = 0;
+        ok = 1'b0;
+        while (c < max_cycles) begin
+            step(1);
+            c++;
+            if (`ENG.st === ENG_S_INITC) begin
+                ok = 1'b1;
+                break;
+            end
+        end
+        step(8);   // S_LOAD_R 最后一行的 b_we 要下一拍才写进 plane BRAM
+        if (ok)
+            $display("[TB] 引擎第一个 batch 装载完成 @%0t ps（等待 %0d 拍）", $time, c);
+        else begin
+            errors++;
+            $display("[TB] FAIL: 等了 %0d 拍引擎仍未装完一个 batch（st=%0d busy=%b in_count=%0d）",
+                     max_cycles, `ENG.st, `DNA.eng_busy, `DNA.in_count);
+        end
+    endtask
+
+    // (a) 引擎第 k 个槽位装的必须是第 (batch_base+k) 条读段
+    task automatic check_planes(input int batch_base);
+        logic [CODEBITS-1:0] got, exp;
+        int k, r, j, bad, shift_hit;
+        bad = 0;
+        for (k = 0; k < BATCH; k++) begin
+            for (r = 0; r < READ_BPS; r++) begin
+                got[r]            = `ENG.plane_hi[r][k];
+                got[READ_BPS + r] = `ENG.plane_lo[r][k];
+            end
+            exp = read_cw_of(batch_base + k);
+            if (got !== exp) begin
+                bad++;
+                if (bad <= 4) begin
+                    $display("[TB] FAIL: 引擎槽位 %0d 装的不是第 %0d 条读段", k, batch_base + k);
+                    $display("[TB]        got = %075h", got);
+                    $display("[TB]        exp = %075h", exp);
+                    shift_hit = 0;
+                    for (j = 0; j < n_reads && shift_hit < 2; j++)
+                        if (got === read_cw_of(j)) begin
+                            $display("[TB]        >>> 它其实是读段 %0d（错位 %0d 条）",
+                                     j, j - (batch_base + k));
+                            shift_hit++;
+                        end
+                    if (shift_hit == 0 && (^got === 1'bx))
+                        $display("[TB]        >>> 槽位内容含 X/Z：装到了从未写入的 in_fifo 槽位");
+                end
+            end
+        end
+        plane_bad = bad;
+        if (bad != 0) begin
+            errors++;
+            $display("[TB] FAIL: 引擎装载的 %0d 个槽位里有 %0d 个不是对应的读段（B26 特征）",
+                     BATCH, bad);
+        end else begin
+            $display("[TB]   ok  引擎 %0d 个槽位逐位等于送入的第 %0d..%0d 条读段",
+                     BATCH, batch_base, batch_base + BATCH - 1);
+        end
+    endtask
+
+    // (b) 回写 DDR 的第 k 条记录，其码字字段必须等于第 k 条读段
+    task automatic check_records(input int n);
+        logic [383:0] rec;
+        logic [CODEBITS-1:0] got, exp;
+        int k, i, j, bad, shift_hit;
+        bad = 0;
+        for (k = 0; k < n; k++) begin
+            for (i = 0; i < REC_BYTES/4; i++)
+                rec[32*i +: 32] = mem_rd32(DDR_STAGE1_OUT + k*REC_BYTES + 4*i);
+            if (rec[383:RESULT_W] !== 58'd0) begin
+                errors++;
+                $display("[TB] FAIL: 记录 %0d 的末拍高 58 bit 非零（0x%0h）", k, rec[383:RESULT_W]);
+            end
+            got = rec[RESULT_W-1 : SCORE_W+POS_W];
+            exp = read_cw_of(k);
+            if (got !== exp) begin
+                bad++;
+                if (bad <= 4) begin
+                    $display("[TB] FAIL: 记录 %0d 的码字 != 第 %0d 条读段的码字", k, k);
+                    $display("[TB]        got = %075h", got);
+                    $display("[TB]        exp = %075h", exp);
+                    shift_hit = 0;
+                    for (j = 0; j < n_reads && shift_hit < 2; j++)
+                        if (got === read_cw_of(j)) begin
+                            $display("[TB]        >>> 它其实是读段 %0d（错位 %0d 条）", j, j - k);
+                            shift_hit++;
+                        end
+                end
+            end
+        end
+        rec_cw_bad = bad;
+        if (bad != 0) begin
+            errors++;
+            $display("[TB] FAIL: %0d / %0d 条记录的码字与送入的读段不符（B26 特征）", bad, n);
+        end else begin
+            $display("[TB]   ok  %0d 条记录的码字逐位等于送入的第 k 条读段", n);
+        end
+    endtask
+
+    // ================================================================
     // 现场诊断
     // ================================================================
     task automatic dump_diag(input string tag);
@@ -556,6 +707,15 @@ module tb_m3_bd3b_dma;
         step(50);
         $display("[TB] [STAGE1] IP core START @%0t ps", $time);
 
+        // ---- [B26] 入口逐条判据（a）：引擎装完第一个 batch 就能判定 ----
+        // 装载一条读段要 150x3 拍，一个 batch 约 3 万拍；比等结果（6.3M 拍）快两个量级。
+        wait_batch_loaded(200000, load_seen);
+        if (load_seen) check_planes(0);
+        if (phase_arg == "load") begin
+            $display("[TB] phase=load：入口装载判据已完成，不再等待引擎扫完 50x808 个位置");
+            return;
+        end
+
         // ---- echo.c PIPE_TX_STREAM：继续下发剩余帧 ----
         for (f = 1; f < frames; f++) begin
             bd_submit(BD_BASE_TX, TX_BD_CNT, tx_head, DDR_READS + f*FRAME_BYTES,
@@ -608,6 +768,8 @@ module tb_m3_bd3b_dma;
                 $display("[TB]   ok  送入 %0d 条 -> 收到 %0d 条 48 B 记录", recs_expect, recs_got);
             end
             wait_tx_group(tx_first_all, tx_n_all, FRAME_BYTES, 1000000, "读段帧");
+            // [B26] 入口逐条判据（b）：第 k 条结果的码字必须等于第 k 条读段的码字
+            if (recs_got > 0) check_records((recs_got < recs_expect) ? recs_got : recs_expect);
         end else if (require_arg == "repro") begin
             if (recs_got >= recs_expect) begin
                 errors++;
@@ -635,8 +797,8 @@ module tb_m3_bd3b_dma;
             $display("[TB] BD-3b FAIL（%0d 项）", errors);
             $fatal(1, "BD-3b 用例失败");
         end
-        $display("[TB] PASS  BD-3b phase=%0s rx_bd_mode=%0s require=%0s",
-                 phase_arg, rx_mode_arg, require_arg);
+        $display("[TB] PASS  BD-3b phase=%0s rx_bd_mode=%0s require=%0s（槽位不符 %0d，记录码字不符 %0d）",
+                 phase_arg, rx_mode_arg, require_arg, plane_bad, rec_cw_bad);
         $display("[TB] --------------------------------------------------");
         $finish;
     endtask
@@ -655,8 +817,10 @@ module tb_m3_bd3b_dma;
         void'($value$plusargs("mem_out=%s",    mem_out));
         if (!$value$plusargs("wm_file=%s", wm_file))
             $fatal(1, "必须指定 +wm_file=<tests/golden/wm_regions.hex>");
-        if (phase_arg == "full" && !$value$plusargs("reads_file=%s", reads_file))
-            $fatal(1, "full 阶段必须指定 +reads_file=<32bit 字镜像>");
+        if (phase_arg != "wm" && phase_arg != "load" && phase_arg != "full")
+            $fatal(1, "未知 phase（只接受 wm / load / full）");
+        if (phase_arg != "wm" && !$value$plusargs("reads_file=%s", reads_file))
+            $fatal(1, "load/full 阶段必须指定 +reads_file=<32bit 字镜像>");
         if (n_reads % FRAME_READS != 0)
             $fatal(1, "reads 不是 64 的整数倍");
 
@@ -696,7 +860,7 @@ module tb_m3_bd3b_dma;
 
         run_watermark();
 
-        if (phase_arg == "full" && errors == 0) run_reads();
+        if (phase_arg != "wm" && errors == 0) run_reads();
 
         finish_report();
     end

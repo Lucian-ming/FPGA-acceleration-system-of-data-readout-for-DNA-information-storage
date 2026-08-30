@@ -354,27 +354,101 @@ end
 
 即 position 偏移已彻底消失，Stage1 除了 B26 的整体错位之外已经逐位正确。
 
-### B26 Stage1 结果整体错位一条读段（**未修复，当前 G3 阻塞项**）
+### B26 入口 FIFO 两级同步读 + 引擎晚采样 → Stage1 结果整体错位一条读段 ✅ **仿真已复现并修复；上板未验证**
 
-**证据**：board 记录 *i* 的码字 == 黄金记录 *i+1* 的码字（4,094/4,095 条），
-且**黄金记录 0 的码字在整份板上 dump 里根本不存在**；
-board 最后一条（slot 4095）是黄金里没有的多余记录。
+**板上证据**（第四次上板，XSDB 只读 DDR）：board 记录 *i* 的码字 == 黄金记录 *i+1* 的码字
+（4,094/4,095 条），且**黄金记录 0 的码字在整份板上 dump 里根本不存在**；
+board 最后一条（slot 4095）是多出来的一条。
+即：送入 4,096 条读段，核吐出的结果对应读段 **1..4095**，读段 0 的结果丢失，末尾多一条。
 
-即：送入 4,096 条读段，核吐出的结果对应读段 **1..4095**，
-**读段 0 的结果丢失**，末尾多出一条。
+#### 根因（已在仿真里逐条坐实，不再是推测）
 
-**推测方向**（尚未坐实，不要当结论用）：
-`Dna_accelerator_core_v1_0.v` 的入口握手注释写着
-「Sync FIFO read delay is 1 cycle => cw_valid = in_rd」，
-但 `fifo_sync_sdpram_b64` 实际是**两级**同步读（`raddr_q <= rptr; dout <= mem[raddr_q]`），
-pop 之后 `dout` 要 3 拍才稳定（B24 里已经为结果 FIFO 补过这道保护）。
-入口 FIFO 这一侧的延迟假设是否同样站不住，需要在仿真里坐实；
-末尾多出的那一条可能来自「partial batch idle timeout」把不足 64 条的批次冲了出去。
+`fifo_sync_sdpram_b64` 是**两级**同步读：
 
-**必须先补的判据**：把 `AXI DMA MM2S → DNA S_AXIS` 串起来的 BD 级仿真
-（`docs/13` §7.2 BD-3 第 1 项、`docs/17` 任务 A，在途文件
-`hw/sim/m3/tb_m3_bd3b_dma.sv`），判据是「送入第 k 条读段 → 第 k 条结果的码字等于该读段」。
-`hw/sim/dna/tb_dna_result_axis.v` 只覆盖了出口，进口这一侧仍是空白。
+```verilog
+raddr_q <= rptr;
+dout    <= mem[raddr_q];
+```
+
+设 `in_rd` 有效（pop `mem[rptr(m)]`）的那一拍为 *m*，则
+
+| 周期 | `dout` 的内容 |
+| --- | --- |
+| m+1 | `mem[rptr(m-1)]` —— 上一条（FIFO 空闲时恰好等于本条） |
+| **m+2** | **`mem[rptr(m)]` —— 这一拍才是刚被 pop 的那一条** |
+| m+3 起 | `mem[rptr(m)+1]` —— **已经跳到下一条**，并一直保持 |
+
+而原来的握手写着 `eng_cw_vld <= in_rd`（注释：「Sync FIFO read delay is 1 cycle」），
+即在 *m+1* 就拉 `cw_valid`；`srpe_batch` 收到 `cw_valid` 后要到 `S_LOAD_R` 的
+`phase==2`（*m+4*）才**第一次**采样 `cw_data`，并在随后 450 拍里持续采样
+（一条读段 150 行 × 3 相）。**那时 `dout` 早已跳到下一条**。
+
+于是每一次装载拿到的都是**下一条读段**：结果 *k* 是读段 *k+1*，读段 0 的结果凭空消失；
+最后一次 pop 时「下一条」还没写进来，装出来的是从未写入的 FIFO 槽位 —— 就是末尾那条多余记录。
+pop 次数仍然等于读段条数，所以条数不多不少，板上看不出任何异常，只有内容整体错位。
+
+这与 B24 给**结果** FIFO 补的 `res_empty_q` / `res_settle` 是同一类缺陷：
+两处都把 `fifo_sync_sdpram_b64` 当成一级同步读用了。
+
+#### 为什么之前所有仿真都是绿的
+
+| 既有 TB | 为什么抓不到 |
+| --- | --- |
+| `tb_srpe_batch.v` | 直接把 `cw_data` 摆在**引擎端口**上，完全不经过 `in_fifo`、也不经过 `in_rd`/`eng_cw_vld` 握手 |
+| `tb_dna_ingress.v` | 只看 `S_AXIS_DATA_TREADY` 的背压行为，从不检查「送进去的第 k 条读段是不是成了第 k 条结果」 |
+| `tb_dna_result_axis.v` | 只覆盖**出口**（force `eng_res_wr`/`eng_res_din` 注入），引擎根本不启动 |
+| `run_m2_full.sh` Stage1 | 只编译 `srpe_batch.v`，抓引擎的 `res_din` |
+
+**入口这一侧至今没有任何逐条判据** —— 与 B23/B24/B25 同一个模式：
+出问题的永远是仿真没覆盖到的那条真实接口。
+
+#### 修复
+
+`Dna_accelerator_core_v1_0.v`：pop 之后等两拍，把 `dout` 锁进新增的 `cw_hold`，
+再拉 `cw_valid`；引擎全程读 `cw_hold`（下一次 pop 之前恒定不变），不再直接读 FIFO 的 `dout`。
+
+```verilog
+in_rd_d1 <= in_rd;
+in_rd_d2 <= in_rd_d1;
+if (in_rd_d2) cw_hold <= in_dout;   // 此拍 dout 正好是刚被 pop 的那一条
+eng_cw_vld <= in_rd_d2;             // valid 与 cw_hold 同拍
+...
+.cw_data (cw_hold),                 // 原来接的是 in_dout
+```
+
+代价是每条读段多 2 拍（一条读段本来就要 450+ 拍装载），可忽略。
+
+#### 新增回归：`tools/run_xsim.sh ingress_result`
+
+新 TB `hw/sim/dna/tb_dna_ingress_result.v`，**真实 DUT**（`Dna_accelerator_core_v1_0`），
+真实 AXI-Lite 写 `reg0`/`reg1`、真实 `S_AXIS` 送水印与读段、真实 `M_AXIS` 收结果，
+全程随机上游空档 + 随机 `TREADY` 背压。
+`READ_BPS`/`CODEBITS`/`REF_LEN`/两个 FIFO 与生产完全一致；只把**扫描几何**改小
+（`NUM_LC=1`、`STRIDE=8`、`BATCH=8`）好让一个 batch 在秒级跑完 ——
+入口装载通路逐比特与生产相同，`NUM_LC`/`STRIDE` 只决定比对要跑多少拍，不参与装载。
+
+判据：送入 N 条 → 收到恰好 N 条 48 B 记录；**第 k 条记录的码字（bit 325:26）逐位等于
+送入的第 k 条读段**；每条 6 拍、`TLAST` 只在第 6 拍、末拍高 58 bit 为 0；码字不含 X/Z。
+
+| RTL 版本 | 结果 |
+| --- | --- |
+| 修复前（`git show 65a4ade:`） | **FAIL**：32/32 条「记录 k 的码字 == 读段 k+1 的码字」，错位恒 +1，与板上特征逐条吻合 |
+| 修复后 | **PASS**：32 条记录的码字逐位等于送入的第 k 条读段 |
+
+故障注入自检（docs/13 §十）：把送出的第 3 条读段翻 1 bit（只动激励、不动期望）→ 用例 FAIL；
+把判据的配对改成 k+1（即「接受错位一条」）→ 修好的 RTL 下 FAIL。判据确实有鉴别力。
+
+> **XSim 2022.2 的坑**：`$fatal` 在这里既不终止仿真也不让 `xsim` 非零退出（实测会继续往下跑）。
+> 因此 TB 里 `$fatal` 之后一律显式 `$finish`，并用 `if/else` 保证失败路径**绝不打印 PASS**；
+> 真正的判定由 `tools/run_xsim.sh` 做（日志里出现 FAIL 关键字即判失败，且必须有 PASS 标记）。
+
+#### 交付边界（**重要**）
+
+**RTL 已改，但 bitstream 未重建、板子未验证。**
+本轮定位与修复全部在仿真里完成（改动方无开发板访问权，板子由另一会话独占）。
+上板复验必须由拿板子的一方统一做：重新综合/实现 → 重建 `hw/build/export/` 全套制品 →
+第五次上板 → XSDB 只读比对 Stage1 输出与 `tests/golden/stage2_in.hex`。
+在那之前，B26 只能声称「**仿真已验证、上板未验证**」。
 
 ### B27 Stage3（Decoder）输入几乎全对、输出却与黄金完全不相关（**当前 G3 主阻塞项**）
 

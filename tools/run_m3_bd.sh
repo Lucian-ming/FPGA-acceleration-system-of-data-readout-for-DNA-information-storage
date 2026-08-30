@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # M3：实际 Vivado Block Design 集成仿真的统一入口。
 #
-#   bash tools/run_m3_bd.sh [all|bd1|bd2|bd3]
+#   bash tools/run_m3_bd.sh [all|bd1|bd2|bd3|bd3ext|bd3b]
 #
 # BD-1  由 hw/scripts/bd.tcl 从干净目录重建实际 BD，validate/生成 simulation target，
 #       编译并 elaborate top_bd_wrapper；核对地址图、未连接接口、IP 状态和黑盒。
@@ -73,7 +73,7 @@ fail()  { note "M3 FAIL: $*"; exit 1; }
         [[ -f "$GOLDEN/$f" ]] && sha256sum "$GOLDEN/$f"
     done
     echo "---- testbench manifest ----"
-    for f in "$TB_DIR"/*.v; do [[ -f "$f" ]] && sha256sum "$f"; done
+    for f in "$TB_DIR"/*.v "$TB_DIR"/*.sv; do [[ -f "$f" ]] && sha256sum "$f"; done
     sha256sum "$REPO_ROOT/hw/scripts/bd.tcl" "$GEN_TCL" "$REPO_ROOT/tools/m3_mem.py"
     echo
 } >> "$SUMMARY"
@@ -313,6 +313,54 @@ do_bd3() {
         "BD-3 数据面事务（Voter/Decoder 主口 -> ic_hp -> 实际 PS7 HP0）"
 }
 
+# ===========================================================================
+# BD-3b：AXI DMA <-> DNA 核（docs/13 §7.2 BD-3 第 1、2 项、docs/17 任务 A）
+#
+# 这是本项目至今唯一没有 BD 级覆盖的一段链路，也是缺陷 B26 的判据所在：
+#   判据 = 「送入第 k 条读段 -> 引擎第 k 个槽位装的就是第 k 条读段
+#            -> 第 k 条结果记录的码字就是第 k 条读段的码字」，
+#   不是「跑完没报错」。
+#
+# 两档：
+#   wm   50 个区域的水印预载（真实 SG DMA + 真实 preload 通路），逐符号比 wm BRAM
+#   load 在 wm 之上再送 64 条读段，等引擎装完一个 batch（约 3 万拍）后校验 64 个槽位
+#        —— B26 的快速判据
+# ⚠️ 内存端点是 AXI VIP，不是实际 PS7 的 AFI 通路（docs/15 §5），引用结论时必须写明。
+#
+# 环境变量：
+#   M3_BD3B_READS   送入的读段条数（64 的整数倍，默认 64）
+#   M3_BD3B_PHASE   wm|load|full（默认 load；full 要等引擎扫完 50x808 个位置，极慢）
+# ===========================================================================
+do_bd3b() {
+    local phase="${M3_BD3B_PHASE:-load}"
+    local reads="${M3_BD3B_READS:-64}"
+    note "=== BD-3b 数据面（AXI DMA MM2S -> DNA S_AXIS -> M_AXIS -> S2MM，phase=$phase）==="
+    local casedir="$OUT_ROOT/bd3b"
+    if ! gen_project "$casedir" "tb_m3_bd3b_dma" "$TB_DIR/tb_m3_bd3b_dma.sv" "sim_mem"; then
+        note "  FAIL BD-3b (生成/elaborate 失败) -> $casedir/vivado.log"
+        FAIL=$((FAIL+1)); return 1
+    fi
+    local simdir="$casedir/proj/m3_bd.sim/sim_1/behav/xsim"
+
+    # 读段镜像：黄金 reads_cw.hex -> 每条 10 个 32 bit 字（与 MM2S 实际发的字节一致）
+    local reads_vip="$WORK/bd3b_reads_vip.hex"
+    $PYTHON "$REPO_ROOT/tools/m3_mem.py" reads-to-vip \
+        "$GOLDEN/reads_cw.hex" "$reads_vip" --reads "$reads" >> "$SUMMARY" 2>&1 \
+        || fail "生成读段镜像失败"
+
+    local log="$casedir/xsim_bd3b_${phase}.log"
+    local rc=0
+    run_snapshot "$simdir" "tb_m3_bd3b_dma_behav" "$log" \
+        -testplusarg "phase=$phase" \
+        -testplusarg "require=all" \
+        -testplusarg "rx_bd_mode=perrec" \
+        -testplusarg "reads=$reads" \
+        -testplusarg "wm_file=$GOLDEN/wm_regions.hex" \
+        -testplusarg "reads_file=$reads_vip" \
+        -testplusarg "mem_out=$WORK/bd3b_stage1_out_vip.hex" || rc=$?
+    judge_log "BD-3b 入口逐条判据 (phase=$phase, reads=$reads)" "$rc" "$log"
+}
+
 # BD-3ext：仿真专用内存端点（绕开 PS7 VIP 的 HP0 读通路缺陷）
 # ⚠️ 该路径的内存端点不是实际 PS7 的 AFI 通路，引用结论时必须写明。
 do_bd3ext() {
@@ -322,12 +370,13 @@ do_bd3ext() {
 
 # ===========================================================================
 case "$WHICH" in
-    all)     do_bd1; do_bd2; do_bd3; do_bd3ext ;;
+    all)     do_bd1; do_bd2; do_bd3; do_bd3ext; do_bd3b ;;
     bd1)     do_bd1 ;;
     bd2)     do_bd2 ;;
     bd3)     do_bd3 ;;
     bd3ext)  do_bd3ext ;;
-    *)   echo "用法: bash tools/run_m3_bd.sh [all|bd1|bd2|bd3|bd3ext]" >&2; exit 2 ;;
+    bd3b)    do_bd3b ;;
+    *)   echo "用法: bash tools/run_m3_bd.sh [all|bd1|bd2|bd3|bd3ext|bd3b]" >&2; exit 2 ;;
 esac
 
 note ""

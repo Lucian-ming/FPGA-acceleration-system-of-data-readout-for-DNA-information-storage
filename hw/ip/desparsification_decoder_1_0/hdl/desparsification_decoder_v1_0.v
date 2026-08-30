@@ -146,6 +146,18 @@ module desparsification_decoder_v1_0 #
     always @(posedge M00_AXI_ACLK) {s1_m, s2_m, s3_m} <= {start_pulse_s, s1_m, s2_m};
     wire start_pulse_m = s2_m & ~s3_m;
 
+    // ---- [B27] 只有核完全静止时 START 才生效 ----
+    // 跑到一半被重启是致命的：复位只清掉本模块的 FSM 和数据通路，
+    // **已经发出去的 AXI 读突发不会被取消** —— 真实 DDR/互连会把剩下的
+    // R 拍继续送回来，落进刚被清空的 in_pool，被当成新任务输入流的开头。
+    // 于是整条输入被旋转了「残留拍数」，输出与黄金完全不相关：
+    // 第四次上板 Stage3 与 stage3_expect.hex 49.46% 误码就是这么来的
+    // （固件 echo.c 在 START=1 之后 100 us 又写了一次 START=0，
+    //   而上面那个寄存器当时对任何写都产生脉冲）。
+    // 判据见 hw/sim/dec/tb_dec_ddr_restart.v。
+    wire core_active_m;
+    wire start_eff_m = start_pulse_m & ~core_active_m;
+
     // =============================================================
     // 4K 边界：从 addr 到下一个 4K 边界还能放几拍
     // =============================================================
@@ -180,7 +192,7 @@ module desparsification_decoder_v1_0 #
     wire [63:0] dp_out_data;
 
     desparsify_datapath u_dp (
-        .clk(M00_AXI_ACLK), .rstn(M00_AXI_ARESETN & ~start_pulse_m),
+        .clk(M00_AXI_ACLK), .rstn(M00_AXI_ARESETN & ~start_eff_m),
         .in_valid(dp_in_valid), .in_ready(dp_in_ready),
         .in_data(dp_in_data),   .in_done(dp_in_done),
         .out_valid(dp_out_valid), .out_ready(dp_out_ready), .out_data(dp_out_data)
@@ -214,7 +226,7 @@ module desparsification_decoder_v1_0 #
             rd_state <= RD_IDLE; ar_valid_r <= 1'b0; ar_len_r <= 8'd0;
             r_left <= 32'd0; r_recv <= 32'd0; r_burst <= 32'd0;
             ar_addr <= {C_M00_AXI_ADDR_WIDTH{1'b0}};
-        end else if (start_pulse_m) begin
+        end else if (start_eff_m) begin
             rd_state <= (in_beats != 0) ? RD_ADDR : RD_IDLE;
             ar_addr  <= {in_addr[C_M00_AXI_ADDR_WIDTH-1:3], 3'b000};
             r_left   <= in_beats;
@@ -264,6 +276,11 @@ module desparsification_decoder_v1_0 #
     reg        aw_valid_r;
     reg        busy;
 
+    // [B27] 核是否还在动：写引擎 busy，或读引擎还在发地址/收数据。
+    // 只要它为 1，外面写 START 就不生效（见上）。RD_DONE 时所有读突发都已收完，
+    // busy=0 时最后一个 B 也已回来，此时重启才是安全的。
+    assign core_active_m = busy | (rd_state == RD_ADDR) | (rd_state == RD_DATA);
+
     wire [31:0] wr_this = burst_len(w_left, aw_addr);
     // 整个任务的最后一拍：64,800 = 1012*64 + 32，故末拍只有低 4 字节有效
     wire        last_beat_overall = (w_sent == out_beats - 1);
@@ -283,7 +300,7 @@ module desparsification_decoder_v1_0 #
             wr_state <= WR_IDLE; aw_valid_r <= 1'b0; aw_len_r <= 8'd0;
             w_left <= 32'd0; w_sent <= 32'd0; w_burst <= 32'd0; busy <= 1'b0;
             aw_addr <= {C_M00_AXI_ADDR_WIDTH{1'b0}};
-        end else if (start_pulse_m) begin
+        end else if (start_eff_m) begin
             wr_state <= (out_beats != 0) ? WR_ADDR : WR_IDLE;
             aw_addr  <= {out_addr[C_M00_AXI_ADDR_WIDTH-1:3], 3'b000};
             w_left   <= out_beats;
@@ -337,7 +354,7 @@ module desparsification_decoder_v1_0 #
     reg done_m;
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN)      done_m <= 1'b0;
-        else if (start_pulse_m)    done_m <= 1'b0;
+        else if (start_eff_m)      done_m <= 1'b0;
         else if (busy && (wr_state == WR_RESP) && M00_AXI_BVALID && (w_left == 0))
                                    done_m <= 1'b1;
     end
@@ -456,7 +473,7 @@ module axi_slave_decoder #
                     4'd1: in_beats  <= write_data;
                     4'd2: out_addr  <= write_data;
                     4'd3: out_beats <= write_data;
-                    4'd4: start_pulse <= 1'b1;
+                    4'd4: start_pulse <= write_data[0];   // [B27] 只有写 1 才启动
                     default: ;
                 endcase
                 S_AXI_BVALID <= 1'b1;

@@ -1402,14 +1402,17 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        xil_printf("[STAGE3] Status before START: 0x%02X (IDLE=%d, DONE=%d)\n\r",
 	                   status, (status & 0x01) ? 1 : 0, (status & 0x02) ? 1 : 0);
 
-	        // 改为强制写入 START=0 再 START=1，确保脉冲对齐
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-	        usleep(10);
+	        /* 【B27】START 只能写一次 1，前后都不许再写这个寄存器。
+	         * 原来的「写 0 → 写 1 → 100 us 后再写 0（脉冲结束）」是致命的：
+	         * decoder 的 AXI-Lite 把**对 0x10 的任何一次写**都当成 START 脉冲
+	         * （见 desparsification_decoder_v1_0.v 的 axi_slave_decoder），
+	         * 所以那句「脉冲结束」在任务跑到一半时把核重启了；而重启不会取消
+	         * 已经发出去的 AXI 读突发，残留的 R 拍被当成新任务输入流的开头，
+	         * 整条输入被旋转，Stage3 输出与黄金 49.46% 误码（第四次上板）。
+	         * RTL 已同时修好（只认 wdata[0]=1，且忙时不接受 START），
+	         * 这里也一并改成单次脉冲，两边都不再依赖对方。 */
 	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x01);
-
-	        usleep(100);  // 确保 START=1 被采样
-
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00); // 脉冲结束
+	        usleep(100);  /* 只是让 START 在 M 域被采样，期间不再碰这个寄存器 */
 
 	        xil_printf("[STAGE3] ✓ IP core started (IDLE: 1→0)\n\r");
 	        xil_printf("[STAGE3] ✓ Started, monitoring progress...\n\r");
