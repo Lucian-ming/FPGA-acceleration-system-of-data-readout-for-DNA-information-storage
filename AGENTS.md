@@ -178,5 +178,13 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   `hw/constr/top.xdc` 和可复现 Tcl 构建的现场结果为准。
 - 不要把 `five_to_four_decoder.v` 接回生产数据通路：它是未被顶层引用的死文件；查找表已按契约
   校正，但权威实现与 RTL 判据仍是 `desparsification_decoder_v1_0.v` / `desparsify_datapath.v`。
+- **GBK 编码的 RTL 文件不只是「写会写坏」，`grep` 读也会静默骗你。**
+  `hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v` 等文件是 GBK，
+  `grep` 把它判成二进制后**直接跳过、退出码 1、一个字都不打印**，
+  看起来和「确实没有这个标识符」一模一样。实测：`grep -n safe_vote_value` 零命中，
+  `grep -a` 同一文件 6 处命中。搜 RTL 一律带 `-a`（或用 `python3` 按 latin-1 读）。
+  这个坑已经让人差点得出「peer 说的标识符根本不存在」的结论。
+  改写这类文件仍按老规矩：先 encode 成 bytes → 写临时文件 → `os.replace`，
+  绝不能 `open(p,'wb').write(s.encode(...))`（编码抛异常时文件已被截断为 0 字节）。
 - SE150（51,781 × 150 bp）与 SE250（64,800 × 250 bp）不可混用；
   现有比特流只支持 150 bp。
