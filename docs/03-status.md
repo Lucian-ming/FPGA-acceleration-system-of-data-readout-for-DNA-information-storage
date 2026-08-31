@@ -276,8 +276,24 @@ LDPC 起始失败校验 **33**（4,096 条那档是 332）—— 读段越多投
 
 结论：**Voter 累加器在两次任务之间确实被清零了**，而且是在 `echo.c:861` 的
 `clear_voter_out_region()` 仍被注释掉的前提下 —— 说明清零不依赖那段固件代码。
-**但没有据此删它**：它为什么不需要（是 RTL 在 START 时自清，还是别的路径）还没查清楚，
-在查清楚之前删掉等于把一个没理解的依赖去掉。
+
+**「为什么不需要」已查清（2026-08-31）：是 RTL 在每次 START 时自清。**
+
+- `differential_voter_v1_0.v` 的修订 **C4**：原实现靠 `bram_initialized` 只在**首次**
+  START 清零，第二次任务会在上一轮旧票上叠加；改为 `S_IDLE --start_latched_pulse-->
+  S_INIT_BRAM`，**每次 START 都走清零路径**，把 `bram[0..TOTAL_BITS-1]` 全写 `10'sd0`
+  （81,000 拍 ≈ 0.81 ms @100 MHz）。
+- 清零范围受 `FAST_INIT` 控制：为 1 时只清前 64 格。**实测本设计恒为 0**——
+  RTL 默认 `parameter integer FAST_INIT = 0`、`component.xml` 的
+  `MODELPARAM_VALUE`/`PARAM_VALUE` 均为 0、BD 实例化
+  （`top_bd_differential_voter_0_0.xml`）也是 0。三处一致，全 81,000 格都清。
+- 另外 `clear_voter_out_region()` 清的是 **DDR 输出区**，与累加器 BRAM 不是一回事；
+  而且该函数**在 `sw/` 下已无任何定义**，`echo.c:875` 只剩一行注释掉的调用。
+  也就是说它不是「被停用的保险」，而是一段死文本——**没有可恢复的东西**。
+  建议连同注释一起删掉，免得下一个人再花时间判断它是不是被误关的安全网。
+- 六个配置寄存器（`IN_ADDR`/`IN_BEATS`/`OUT_ADDR`/`OUT_BEATS`/`TOTAL_READS`/`SCORE_MIN`）
+  每次任务都按本次实际条数重写并逐个回读校验（`echo.c:829-834`），
+  所以第二次任务的读写长度不会沿用上一次的。
 
 留证：`docs/board/run-logs/run12-uart-reset-dirty-2026-08-31.log`、
 `20260831T022122Z-reset-dirty-v2-summary.txt`。
