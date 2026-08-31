@@ -329,6 +329,7 @@ fi
 # 5. 逐轮任务：first.py → ldpc_decode.py → 比哈希
 # ---------------------------------------------------------------------------
 declare -a RUN_SHAS=()
+RUNS_COMPLETED=0
 if (( ! FAILED )); then
 say "6/7 下发任务并比对判据哈希（共 $RUNS 轮）"
 for (( r = 1; r <= RUNS; r++ )); do
@@ -372,6 +373,7 @@ for (( r = 1; r <= RUNS; r++ )); do
             # 弄脏轮的板端输出本来就可能是噪声，译不出来很正常，不是判据。
             info "弄脏轮 LDPC 未能译出（预期之内，不作判据）"
             step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+            RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
             continue
         fi
         step_bad "第 $r 轮 LDPC 译码" "非零退出，见 $RUN_DIR/ldpc_run$r.log"
@@ -385,6 +387,7 @@ for (( r = 1; r <= RUNS; r++ )); do
     if (( DIRTY_RUN )); then
         info "弄脏轮图片 SHA-256 = $GOT_SHA（不作判据）"
         step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+        RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
         continue
     fi
     if [[ "$GOT_SHA" == "$EXPECT_SHA" ]]; then
@@ -395,6 +398,7 @@ for (( r = 1; r <= RUNS; r++ )); do
         info "实得 : $GOT_SHA"
         info "判据 : $EXPECT_SHA"
     fi
+    RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
 done
 fi
 
@@ -430,7 +434,7 @@ fi
 # 6. 逐级取证：只读导出四级 DDR 快照（不复位、不重烧）
 # ---------------------------------------------------------------------------
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
-if (( DO_DUMP )) && (( ${#RUN_SHAS[@]} > 0 )); then
+if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
     if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/dump.tcl" | tr '/' '\\')" ) \
             > "$RUN_DIR/dump.out" 2>&1 && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
         info "四级快照已导出到 $RUN_DIR"
@@ -484,10 +488,17 @@ if (( FAILED )); then
     printf '唯一判据是图片 SHA-256；上面第一个 FAIL 就是要定位的那一级。\n'
     exit 1
 fi
-# 没跑出任何一轮结果就谈不上 PASS —— 别让「一步都没做」被当成通过。
-if (( ${#RUN_SHAS[@]} < RUNS )); then
+# 没跑完所有轮次就谈不上 PASS —— 别让「一步都没做」被当成通过。
+# 注意用 RUNS_COMPLETED 而不是 ${#RUN_SHAS[@]}：弄脏轮跑完了但不产出判据哈希。
+if (( RUNS_COMPLETED < RUNS )); then
     printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
-    printf '预期 %d 轮，实际只完成 %d 轮。\n' "$RUNS" "${#RUN_SHAS[@]}"
+    printf '预期 %d 轮，实际只完成 %d 轮。\n' "$RUNS" "$RUNS_COMPLETED"
+    exit 1
+fi
+# 判据轮一个都没有也不能算通过。
+if (( ${#RUN_SHAS[@]} == 0 )); then
+    printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
+    printf '没有任何一轮产出判据哈希。\n'
     exit 1
 fi
 printf '\n\033[32m######## G3 PASS ########\033[0m\n'
