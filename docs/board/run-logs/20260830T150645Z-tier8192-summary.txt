@@ -1,0 +1,18 @@
+G3 一键复现  run=20260830T150645Z-tier8192
+时间(UTC)   : 20260830T150645Z
+命令        : tools/run_g3.sh 
+源读段/记录 : 4096 / 8192 （--orient both，对齐 64）
+score_min   : 67
+任务次数    : 1
+结果超时    : 202s
+bitstream   : 7d12552a0df87bdeee75ebe6c4d58fa0ebadfa87001a5639db8b3d138b21f9d1
+ELF         : 9006d0ca7bf7b196e011bfe509c34403f1d02c4d0d1f5218a0acefbe0fead0bd
+判据哈希    : fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+
+结果  步骤
+PASS    制品同源性（hw/build/export/ vs SHA256SUMS）
+PASS    烧录
+PASS    板端 TCP:7 可达
+PASS    第 1 轮 first.py  —       Result: 8100 bytes, 37.06s, 0.00 Mbps
+PASS    第 1 轮 唯一判据（图片 SHA-256）  — fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+PASS    四级逐级取证（board_stage_check.py）

@@ -436,11 +436,24 @@ static u32 rx_records_total     = 0;   /* 本次任务应收的记录条数 = �
 static u32 rx_records_submitted = 0;   /* 已交给硬件的 BD（记录）条数 */
 #define RX_OUTSTANDING_MAX  512U       /* ring 有 1024 个 BD，最多留一半在飞 */
 
-/* 【B21】Stage1 无进展看门狗（poll_callback 每 500 ms 步进一次流水线） */
+/* 【B21】Stage1 无进展看门狗。
+ * poll 间隔实测 ~280 ms，不是 500 ms：
+ * `tcp_slowtmr()` 有两个各自独立、互不清零的驱动源同时在跑 ——
+ *   1) ISR：SCU timer 250 ms（platform_zynq.c:174 载入 CPU_CLK/8，而 SCU 时钟是 CPU_CLK/2），
+ *      timer_callback 用 odd 隔一次才置 TcpSlowTmrFlag（platform_zynq.c:104-113）→ 500 ms；
+ *   2) 软件兜底：main.c:290 的 slow_acc >= 500 直接调 tcp_slowtmr()，
+ *      既不看 ISR 脸色也不被它清零 → 另一个 >=500 ms 源。
+ * 两个不同步的 ~500 ms 源叠加，有效间隔落在 250~500 ms。
+ */
 static int  s1_last_tx_done = -1;
 static int  s1_last_rx_done = -1;
 static u32  s1_no_progress  = 0;
-#define S1_NO_PROGRESS_LIMIT  60U      /* 60 x 500 ms ≈ 30 s 完全无 BD 进展即判定卡死 */
+/* 60 步完全无 BD 进展即判定卡死。按实测 ~280 ms/步折算 **≈ 17 s**，
+ * 不是原注释写的「60 x 500 ms ≈ 30 s」—— 那是照错的 500 ms 算的，乐观了约 2 倍。
+ * 触发得比宣称的更早，方向上是安全的（宁可早报也不要 83 分钟才报，那正是 B21 当年的坑），
+ * 所以本轮**只改注释、不动数值**：改数值要重建 ELF 并刷新 SHA256SUMS，
+ * 而 2026-08-30 全量 103,616 条实跑（132.67 s）下它一次都没误触发。 */
+#define S1_NO_PROGRESS_LIMIT  60U
 
 static inline void pipeline_reset_counters(void){
     wm_tx_expected=0; rx_expected=0; tx_expected=0; tx_done=0; rx_done=0;
@@ -671,7 +684,8 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         if (got_tx > 0) { tx_done += got_tx; tx_frames_done = tx_done; }
 
         /* 【B21】可达的无进展看门狗。
-         * 本函数由 lwIP 的 poll_callback 驱动，约 500 ms 才走一次；
+         * 本函数由 lwIP 的 poll_callback 驱动，实测约 280 ms 走一次（见 S1_NO_PROGRESS_LIMIT
+         * 处的说明：两个独立的 tcp_slowtmr 驱动源叠加，有效间隔 250~500 ms，不是 500 ms）；
          * 原来的 stuck_count>10000 需要约 83 分钟才会触发，等于永远打不出证据，
          * 这正是上一轮板上「IP core START 之后再无任何输出」的原因。 */
         if (rx_done == s1_last_rx_done && tx_done == s1_last_tx_done) {
@@ -1428,7 +1442,8 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	     * 2. 实际写入的beat数(区别0和最后写入)
 	     *========================================================================*/
 	    case PIPE_DECODER_WAIT: {
-	        /* 【B22】本状态由 poll_callback 驱动，约 500 ms 才走一次。
+	        /* 【B22】本状态由 poll_callback 驱动，实测约 280 ms 走一次
+	         * （有效间隔 250~500 ms，机理见 S1_NO_PROGRESS_LIMIT 处的说明）。
 	         * 原实现三处错误，合起来等于「永远等不到、也永远超不了时」：
 	         *   1) 注释声称用 STATUS 的 DONE 标志判完成，但循环里**从来没读过 STATUS**，
 	         *      只靠每 1000 次轮询一次的内存启发式 —— 最早也要 1000 x 500 ms = 500 s
@@ -1476,8 +1491,17 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	            }
 	        }
 
-	        /* 够得着的超时：240 x 500 ms ≈ 120 s，仍在上位机 180 s 静默上限之内 */
+	        /* 够得着的超时。原注释写「240 x 500 ms ≈ 120 s，仍在上位机 180 s 之内」，
+	         * 但每步实测 ~280 ms，**实际预算只有 ≈ 67 s**，乐观了约 2 倍。
+	         * 不是紧迫故障：Stage3 实测 < 500 ms 就 DONE（全量 103,616 条那轮也一样），
+	         * 离 67 s 差着两个数量级。同样只改注释不动数值（改了要重建 ELF）。
+	         * 记在这里是因为：下一个照「500 ms/步」去调这个常数的人一定会算错，
+	         * 而「拿注释当实现」正是 B22 当年翻车的同一类错误。 */
 	        if (poll_count > 240u) {
+	            /* 注意：这句打印的「~120 s」是照错的 500 ms/步算出来的，实际约 67 s。
+	             * 本轮**刻意不改这个字符串** —— 改了会让编译产物与
+	             * hw/build/export/ 里已验证的 ELF 不同源，就得整套重建 + 重新上板复验，
+	             * 而它只在一条从未触发过的失败路径上打印。下次因真实需求重建 ELF 时一并改掉。 */
 	            xil_printf("\n\r[ERROR] STAGE3 等待 ~120 s 仍未完成\n\r");
 	            xil_printf("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
 	                       status,

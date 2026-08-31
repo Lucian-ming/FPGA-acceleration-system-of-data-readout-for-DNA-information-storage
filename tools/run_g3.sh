@@ -42,6 +42,10 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
+# 原样存下本次调用参数：下面的解析循环会 shift 掉 "$@"，
+# 而 summary.txt 是留证，必须记准「这一轮是怎么跑的」。
+INVOCATION="$*"
+
 # ---------------------------------------------------------------------------
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/18 §2。
 # ---------------------------------------------------------------------------
@@ -406,7 +410,7 @@ SUMMARY="$RUN_DIR/summary.txt"
 {
     echo "G3 一键复现  run=$RUN_NAME"
     echo "时间(UTC)   : $STAMP"
-    echo "命令        : tools/run_g3.sh $*"
+    echo "命令        : tools/run_g3.sh $INVOCATION"
     echo "源读段/记录 : $SOURCE_READS / $RECORDS （--orient $ORIENT，对齐 64）"
     echo "score_min   : $SCORE_MIN"
     echo "任务次数    : $RUNS"
