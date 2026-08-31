@@ -178,22 +178,22 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   `hw/constr/top.xdc` 和可复现 Tcl 构建的现场结果为准。
 - 不要把 `five_to_four_decoder.v` 接回生产数据通路：它是未被顶层引用的死文件；查找表已按契约
   校正，但权威实现与 RTL 判据仍是 `desparsification_decoder_v1_0.v` / `desparsify_datapath.v`。
-- **GBK 编码的 RTL 文件不只是「写会写坏」，`grep` 读也会静默骗你。**
-  `hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v` 等文件是 GBK，
-  `grep` 把它判成二进制后**直接跳过、退出码 1、一个字都不打印**，
-  看起来和「确实没有这个标识符」一模一样。这个坑已经让人差点得出
-  「peer 说的标识符根本不存在」的结论。**分两种情况，别只记住一半**：
-
-  | 要搜的东西 | 办法 | 同一文件实测 |
-  | --- | --- | --- |
-  | ASCII 标识符 | `grep -a` 够用 | `grep -n safe_vote_value` **0** → `grep -a` **6** |
-  | **中文**（注释、说明） | **`-a` 没用**，必须先转码：`iconv -f GBK -t UTF-8 <f> \| grep …` | `grep -a 累加器` **0** → 转码后 **3** |
-
-  中文那行是关键：GBK 的中文字节与 UTF-8 不同，`-a` 只是让 grep 别把文件当二进制跳过，
-  并不会帮你转码，所以**用 `-a` 搜中文照样是零命中**——一个只记住 `-a` 的人会以为自己
-  已经绕开了这个坑。跨全库搜中文时（例如复查一处被判定为错误的解释还有几份副本），
-  必须按文件判编码、GBK 的先 `iconv` 再搜，否则 `grep` 的空结果不能当「没有」。
-  改写这类文件仍按老规矩：先 encode 成 bytes → 写临时文件 → `os.replace`，
+- **GBK 编码的 RTL 文件：搜中文必须先转码，`grep` 的空结果不能当「没有」。**
+  `hw/ip/` 下 `differential_voter_v1_0.v`、`Dna_accelerator_core_v1_0.v` 等是 GBK。
+  你的模式是 UTF-8 字节、文件里是 GBK 字节，两串字节根本不同，所以**中文模式恒为零命中**
+  （GNU grep 3.4 实测：`grep 累加器` → 0，`iconv -f GBK -t UTF-8 | grep` → 3；
+  `rg` 同样无匹配）。跨全库复查中文（例如「这处解释还有几份副本」）必须逐文件判编码、
+  GBK 的先 `iconv` 再搜。**搜 ASCII 标识符不受影响**，无需任何特殊开关
+  （实测 `grep -c safe_vote_value` → 6，exit 0）。
+- **⚠️ 但先确认你手里的 `grep` 是什么**：Claude Code 会注入一个同名 shell 函数
+  （内部走 `ugrep -I`，`-I` = 跳过二进制）。这些 GBK 文件第 3 行就有非法 UTF-8 字节，
+  于是**整个文件被判成二进制并静默跳过**——连 GNU grep 那句 `Binary file … matches`
+  都不打，exit=1、stdout 空，看起来和「确实没有这个标识符」一模一样，
+  **连 ASCII 标识符都搜不到**。`type grep` 看是不是函数，`/bin/grep` 可绕开。
+  本条曾让人差点得出「peer 说的标识符根本不存在」，也曾让本文档写错一版
+  （错写成「一律加 `-a`」——`-a` 只改二进制判定、不转码，对中文加不加都是 0）。
+  教训与「范围划错了没人提醒你」同类：**工具被换掉了也没有任何东西会提醒你**。
+- 改写这类 GBK 文件仍按老规矩：先 encode 成 bytes → 写临时文件 → `os.replace`，
   绝不能 `open(p,'wb').write(s.encode(...))`（编码抛异常时文件已被截断为 0 字节）。
 - SE150（51,781 × 150 bp）与 SE250（64,800 × 250 bp）不可混用；
   现有比特流只支持 150 bp。
