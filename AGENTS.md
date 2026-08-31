@@ -131,7 +131,8 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   **新增或修改任何跨 IP 接口（AXIS 握手、DMA、寄存器时序、FIFO 读延迟）时，
   判据必须建在真实接口上**，不能继续用 VIP 内存喂黄金数据糊过去。
   现有的接口级判据：`run_xsim.sh result_axis`（DNA 核 AXIS 出口）、
-  `ingress_result`（入口采样）、`dec_restart`（Decoder 寄存器时序）。
+  `ingress_result`（入口采样）、`dec_restart`（Decoder 寄存器时序）、
+  `vot_ddr`（Voter 的 AXI 读/写通路走类 DDR 从机 + 固件寄存器时序，含 3 档故障注入自检）。
 
 ## 开发前检查表
 

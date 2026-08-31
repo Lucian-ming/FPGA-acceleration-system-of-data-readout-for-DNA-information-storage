@@ -736,6 +736,131 @@ Fatal: AXI4_ERRM_ARADDR_BOUNDARY: A burst must not cross a 4kbyte boundary.
 修复后同一位置安全通过并跑完全部 4,096 条记录，这是修复生效的直接证据。
 
 ---
+## 接口判据补齐 · Voter 的 AXI 读通路走真实 DDR（2026-08-30，`voter-ddr` 会话）
+
+`docs/18` §5「仍未覆盖」的第一条已补齐：**`tools/run_xsim.sh vot_ddr`**，
+新 TB `hw/sim/vot/tb_vot_ddr_bitexact.v`。
+
+### 为什么必须补这一条
+
+Voter 的 AXI 主口此前**从来没有走过带时序的从机**：
+
+| 既有判据 | 从机是什么 | 缺口 |
+| --- | --- | --- |
+| `tb_differential_voter.v`（`run_xsim.sh stage2`） | 自写的温柔内存：`ARREADY` 恒 1、AR→首拍零延迟、突发无空档、`WREADY` 恒 1、B 固定 1 拍 | 没有任何真实 DDR 时序；只写一次 `START=1`，不回放固件写序列 |
+| `run_m3_bd.sh bd3ext` | **AXI VIP 内存模型**（`docs/15` §5 已注明不是实际 PS7 AFI 通路） | 不是「PS 用 CPU 写 DDR → Voter 用 AXI 主口读 DDR」 |
+
+B27 的教训正是：Decoder 喂 VIP 内存连**综合后网表**都 PASS，板上照样 49.47% 误码。
+
+### 这条 TB 做了什么
+
+- **真实 DUT**（`differential_voter_v1_0`，含 `axi_slave_voter`），不复制被测逻辑；
+- **一片共享 DDR**：输入区 `0x1060_0000`（`DDR_DNA_ACC_OUT_BASE`）与输出区
+  `0x1100_0000`（`DDR_VOTER_OUT_BASE`）用板上真实地址落在同一个数组里，
+  PS 侧先把 `tests/golden/stage2_in.hex` 写进输入区、把输出区填成
+  `DECODER_SENTINEL_U64`，然后 Voter 用自己的 AXI 主口去读同一片内存。
+  Voter 若把结果写回输入区、或读写越界，会被直接抓住，而不是像分离数组那样被下标掩盖；
+  两区之间的 10 MB 空洞保持 X，读到那里会把 X 带进码字（不屏蔽 X）；
+- **类 DDR 从机**：AR 队列深 8、`ARREADY`/`AWREADY`/`WREADY` 随机撤下，
+  AR→首拍 12~31 拍延迟并有 1/32 概率叠加 200 拍长停顿（模拟刷新），
+  突发中间随机空档，B 响应 3~14 拍时延，
+  **已接受的读突发一定把 `ARLEN+1` 拍发完**，不因主机被写 `START` 而取消；
+- **逐字节 `WSTRB`**（不是 32 bit 粒度近似——末拍 `WSTRB=0x1F` 只写低 5 字节，
+  32 bit 粒度的模型会漏掉字节 4）；
+- **原样回放 `sw/app/echo.c` 的寄存器时序**：DONE 清除通路、6 个配置寄存器写 +
+  `usleep(10)` + 逐个回读校验、`写 0 → usleep(100) → 写 1 → usleep(100) → 写 0`，
+  以及 `PIPE_VOTER_WAIT` 那样用 AXI-Lite 轮询 `STATUS`；
+- **AXI 协议判据**：4 KB 页边界（A3.4.1）、地址区间与 8 B 对齐、`ARSIZE/ARBURST`、
+  `AWSIZE/AWBURST`、`WLAST` 位置、无 AW 就来 W、
+  `AxVALID` 期间地址/长度必须保持不变，以及
+  **R 拍只能在 `S_READ_DATA` 被握手**（DUT 的 `RREADY` 在 `S_READ_SETUP` 也是 1，
+  但只有 `S_READ_DATA` 才把数据存进 `read_words`，真实 DDR 有延迟时落在别的状态
+  就是静默丢数据）；
+- 读写拍数必须刚好（读 24,576 拍、写 1,266 拍，不多不少），
+  `DBG_WRITE` / `DBG_FIRST_AWADDR` / `ERR_FLAGS` / `LAST_RRESP` 全部核对；
+- 逐拍逐位比对 DDR 输出区，末拍只比低 40 bit（81,000 = 1,265×64 + 40）。
+
+### 结果：5 个场景全部逐位通过
+
+`bash tools/run_xsim.sh vot_ddr`（实测约 3 min，含 3 档故障注入）：
+
+| 场景 | 内容 | 期望向量 | 结果 |
+| --- | --- | --- | --- |
+| `fw-board-cfg` | 固件时序 + `SCORE_MIN=67`（= 第五次上板那组参数） | `stage2_expect.hex` | **PASS** 1,266 拍 / 81,000 bit 逐位相同 |
+| `fw-second-task` | 不复位，紧接第二次任务，走固件 DONE 清除通路，换 `SCORE_MIN=0` | `stage2_rtl_expect.hex` | **PASS** |
+| `fw-raw-score0` | 复位后单独跑 `SCORE_MIN=0`（给上一档做对照） | `stage2_rtl_expect.hex` | **PASS** |
+| `late-start0` | `START=1` 之后 **5 ms**（投票途中）才写 `START=0` | `stage2_expect.hex` | **PASS** |
+| `spurious-start` | 投票途中再写一次 `START=1` | `stage2_expect.hex` | **PASS** |
+
+后两档是针对 B27 的定向探测：`axi_slave_voter` 是 `start_pulse <= wdata[0]`
+（写 0 不启动），且 FSM 只在 `S_IDLE` 响应 `start_latched_pulse`，
+所以固件那笔「脉冲结束」的 `START=0` 和途中多余的 `START=1` 都是无害的——
+**这件事此前只是读代码的推断，现在在真实 DDR 时序下被逐位证明**。
+
+背压随机种子换过三组（默认 / `rseed=12345 wseed=98765` / `rseed=777 wseed=31337`），
+5 个场景均逐位通过，结论不依赖某一组种子。
+
+### 故障注入自检（`docs/13` §十，判据必须能失败）
+
+三档注入都必须让判据变红，否则它没有鉴别力。判据用 `sim_case ... inject`
+（注入档不能用通用判据，因为日志里本来就有 `FAIL` 行）：
+
+| 注入 | 复现的缺陷 | 手段 | 结果 |
+| --- | --- | --- | --- |
+| `inject=b20` | B20：读突发跨 4 KB | `force dut.rd_burst_beats = 6`，退回「每条记录固定 6 拍、从不按页拆分」 | **判据报错**：`page(4KB)=32` —— 与 B20 记录的「4096 条中 32 次」完全吻合 |
+| `inject=rot` | B27 那类「输入流被旋转」的读通路损坏 | 从机把读回的数据流整体旋转一个 64 bit 字 | **判据报错**：1,266 拍全错，误码 **50.06%** |
+| `inject=c4` | C4：二次任务复用旧累加器 | 第二次任务的 `S_INIT_BRAM` 期间 `force dut.bram_we = 0`，清零被完全压制 | **判据报错**：第二轮 720 拍不符，误码 **4.49%** |
+
+### ⚠️ 由此测出来的一件事：二次任务用同一组参数**测不出**累加器没清零
+
+`inject=c4` 加上 `+second_score_min=67`（即第二次任务与第一次用**同一份输入、
+同一个阈值**）时，累加器清零被完全压制，两轮输出**仍然逐位相同**，
+判据打出「判据没有鉴别力」。
+
+机理：输出位是 `票数 > 0` 的符号判决。第二轮在旧票上再加一遍同样的增量，
+票数整体翻倍而符号不变，符号判决因此完全一样。
+
+**对 `docs/18` P1 第 4 项（二次任务 / 状态复位）的直接影响**：
+「同一次连接内连续跑两次任务、判据是两次都拿到同一张图片哈希」这条判据
+**抓不到 Voter 累加器没清零**。要覆盖它，第二次任务必须换参数
+（换 `score_min`、或换读段子集），让两轮的票集不同。
+上面的 `fw-second-task` 场景就是这么设计的（第二轮换成 `SCORE_MIN=0`）。
+
+### 顺带钉住的两件事实
+
+1. **两份 Stage2 黄金向量的语义**（此前只在 TB 注释里，现已由本轮实测确认）：
+   `stage2_expect.hex` = `SCORE_MIN=67`，`stage2_rtl_expect.hex` = `SCORE_MIN=0`，
+   两者相差 **4,894 bit**。
+   进入 G3 链路的是前者：`sparse_expect.hex = stage2_expect.hex ⊕ watermark_packed.bin`
+   **逐位相等（0 bit 差）**，而 `stage2_rtl_expect.hex ⊕ watermark` 与它差 4,894 bit。
+   所以**只比 `stage2_rtl_expect.hex` 等于在验一组板上不跑的参数**；
+   板上那组必须比 `stage2_expect.hex`。本 TB 两者都比。
+2. 修好了 `run_xsim.sh` 的一个结构性限制：原 `run_case` 把编译/elaborate/复跑
+   绑成一次，无法「一次 build、多次带不同 plusarg 复跑」。已拆成
+   `build_case` / `sim_case`（判据可选 `default` 或 `inject`），
+   既有用例行为不变——`bash tools/run_xsim.sh all` **13/13 通过**。
+
+### 证据
+
+- TB：`hw/sim/vot/tb_vot_ddr_bitexact.v`
+  SHA-256 `e1fc8515fc73bafee36e92466faab016ff34e01c65c84b921042d8efe0900232`
+- 输入 `tests/golden/stage2_in.hex` SHA-256 `9e5cd0adebc1a2806a739b8d87a44d3cbefe5275b11fb97ddc234dd12e92175d`
+- 期望 `tests/golden/stage2_expect.hex` SHA-256 `74182edfcaf55fef7b414ed4f77e6205c8b1b29ca1710ca366e79d7cd977f9fc`
+- 期望 `tests/golden/stage2_rtl_expect.hex` SHA-256 `6ffd7560bfcf95b7b9719c015a111b2afc30e3e89e1aa474317e4bdc3350df44`
+- 复跑：`bash tools/run_xsim.sh vot_ddr`（4/4）、`bash tools/run_xsim.sh all`（13/13）
+
+### 结论边界
+
+**可以确认**：Voter 的 AXI 读/写通路在带延迟、带背压、带长停顿的类 DDR 从机上，
+以板上真实地址、按固件原样的寄存器时序，对 4,096 条记录输出 81,000 bit 逐位正确；
+固件那笔 `START=0`、途中多余的 `START=1` 都无害；换阈值的二次任务累加器确实清零。
+
+**仍不能确认**：这仍然是**仿真**，从机是行为模型而不是实际 PS7 的 AFI/DDR 控制器；
+`docs/16` 那颗 16 bit `MT41J256M16HA-125` 的实际时序、刷新与 AFI 深度都没有建模。
+唯一判据仍然是板端实际回传经 LDPC 后的图片 SHA-256。
+
+---
+
 
 ## D 类 · 算法缺口（比所有实现 bug 更靠前）
 
