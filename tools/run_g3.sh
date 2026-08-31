@@ -62,6 +62,14 @@ DO_BOOT=1
 DO_DUMP=1
 DO_UART=1
 STAGE1_DUMP_RECORDS=""       # 空 = min(本次记录数, 4096)，黄金向量只覆盖 4096 条
+# 【二次任务判据的关键】第一轮用一个**不同的** score_min 把 Voter 累加器「弄脏」。
+# 为什么必须不同：Voter 的票是有符号累加（±1，饱和到 [-512,+511]），
+# 输出按符号判决（differential_voter_v1_0.v:569 `~bram_dout[9] && (bram_dout != 0)`）。
+# 两轮用**同一组参数**时，第二轮只是在第一轮的票上再加一遍同样的增量 → 票数翻倍、
+# 符号不变 → 输出逐位相同，**无论累加器有没有清零**。
+# 也就是说「两轮同哈希」根本证明不了累加器被复位，这条判据没有鉴别力。
+# 换个 score_min，第一轮留下的残差与第二轮的增量不同向，没清零就会翻符号、露馅。
+SCORE_MIN_RUN1=""            # 空 = 各轮都用 --score-min
 READS_FILE="data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM_FILE="data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 
@@ -80,6 +88,7 @@ while [[ $# -gt 0 ]]; do
         --limit)            LIMIT="$2"; shift 2 ;;
         --full)             LIMIT=""; shift ;;          # 不传 --limit 给 first.py = 全量
         --score-min)        SCORE_MIN="$2"; shift 2 ;;
+        --first-run-score-min) SCORE_MIN_RUN1="$2"; shift 2 ;;
         --orient)           ORIENT="$2"; shift 2 ;;
         --result-timeout)   RESULT_TIMEOUT="$2"; shift 2 ;;
         --runs)             RUNS="$2"; shift 2 ;;
@@ -331,8 +340,18 @@ for (( r = 1; r <= RUNS; r++ )); do
     FIRST_ARGS=(--ip "$BOARD_IP" --port "$BOARD_PORT"
                 --reads "$READS_FILE" --watermark "$WM_FILE"
                 --output "$BITS_OUT" --orient "$ORIENT"
-                --score-min "$SCORE_MIN" --result-timeout "$RESULT_TIMEOUT")
+                --result-timeout "$RESULT_TIMEOUT")
     [[ -n "$LIMIT" ]] && FIRST_ARGS+=(--limit "$LIMIT")
+
+    # 「弄脏轮」：只为在 Voter 累加器里留下与判据轮不同向的残差，它自己的输出不作判据。
+    RUN_SCORE_MIN="$SCORE_MIN"
+    DIRTY_RUN=0
+    if [[ -n "$SCORE_MIN_RUN1" && $r -eq 1 && $RUNS -gt 1 ]]; then
+        RUN_SCORE_MIN="$SCORE_MIN_RUN1"
+        DIRTY_RUN=1
+        info "本轮是「弄脏轮」：score_min=$RUN_SCORE_MIN（与判据轮的 $SCORE_MIN 不同），其输出不作判据"
+    fi
+    FIRST_ARGS+=(--score-min "$RUN_SCORE_MIN")
 
     T0=$SECONDS
     if ! python3 clients/python/first.py "${FIRST_ARGS[@]}" > "$CLI_LOG" 2>&1; then
@@ -349,6 +368,12 @@ for (( r = 1; r <= RUNS; r++ )); do
     if ! python3 tools/ldpc_decode.py decode "$BITS_OUT" \
             -o "$RUN_DIR/decoded_bits_run$r.txt" --image "$IMG_OUT" \
             > "$RUN_DIR/ldpc_run$r.log" 2>&1; then
+        if (( DIRTY_RUN )); then
+            # 弄脏轮的板端输出本来就可能是噪声，译不出来很正常，不是判据。
+            info "弄脏轮 LDPC 未能译出（预期之内，不作判据）"
+            step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+            continue
+        fi
         step_bad "第 $r 轮 LDPC 译码" "非零退出，见 $RUN_DIR/ldpc_run$r.log"
         tail -20 "$RUN_DIR/ldpc_run$r.log"
         break
@@ -357,6 +382,11 @@ for (( r = 1; r <= RUNS; r++ )); do
 
     GOT_SHA="$(sha256sum "$IMG_OUT" | awk '{print $1}')"
     RUN_SHAS+=("$GOT_SHA")
+    if (( DIRTY_RUN )); then
+        info "弄脏轮图片 SHA-256 = $GOT_SHA（不作判据）"
+        step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+        continue
+    fi
     if [[ "$GOT_SHA" == "$EXPECT_SHA" ]]; then
         step_ok "第 $r 轮 唯一判据（图片 SHA-256）" "$GOT_SHA"
         info "图片 SHA-256 = $GOT_SHA  ← 与判据逐位相同"
@@ -370,7 +400,25 @@ fi
 
 # 二次任务的附加判据：两轮必须拿到同一张图片。哈希都对时这条自然成立，
 # 但若判据哈希本身换过（--expect-sha），这条仍然能独立抓出「第二轮状态没复位」。
-if (( RUNS > 1 && ${#RUN_SHAS[@]} == RUNS )); then
+# 弄脏模式的「判据自证」：弄脏轮与判据轮的**板端原始回传比特流**必须不同。
+# 若相同，说明这一轮压根没在 Voter 累加器里留下不同向的残差，
+# 那么下一轮通过也证明不了累加器被复位 —— 判据没有鉴别力，必须报失败而不是报通过。
+# 用 pre-LDPC 的原始回传来比，不依赖弄脏轮能不能译出图片。
+if [[ -n "$SCORE_MIN_RUN1" ]] && (( RUNS > 1 )); then
+    if [[ -f "$RUN_DIR/dec_input_run1.txt" && -f "$RUN_DIR/dec_input_run2.txt" ]]; then
+        if cmp -s "$RUN_DIR/dec_input_run1.txt" "$RUN_DIR/dec_input_run2.txt"; then
+            step_bad "弄脏轮鉴别力自证" \
+                "两轮回传比特流逐位相同 → 弄脏轮没起作用，本判据对累加器复位没有鉴别力"
+        else
+            DIFF_BITS="$(cmp -l "$RUN_DIR/dec_input_run1.txt" "$RUN_DIR/dec_input_run2.txt" | wc -l)"
+            step_ok "弄脏轮鉴别力自证" "两轮回传相差 $DIFF_BITS/64800 bit，累加器确实被写入了不同向的票"
+        fi
+    else
+        step_bad "弄脏轮鉴别力自证" "缺少两轮的 dec_input，无法自证"
+    fi
+fi
+
+if (( RUNS > 1 && ${#RUN_SHAS[@]} == RUNS )) && [[ -z "$SCORE_MIN_RUN1" ]]; then
     if [[ "$(printf '%s\n' "${RUN_SHAS[@]}" | sort -u | wc -l)" == "1" ]]; then
         step_ok "多轮一致性（$RUNS 轮同一张图片）"
     else
