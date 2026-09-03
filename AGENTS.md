@@ -21,6 +21,12 @@
   `bash tools/verify_repo_binding.sh --require-synced`，结果必须显示 `main...origin/main` 为 `0/0`。
 - Vivado/XSim 大型生成目录不提交，但不得自动删除；必须提交可复现入口、源文件/黄金数据 manifest、
   结果摘要和结论边界。若 GitHub ruleset 阻止直接推送，立即报告，不得改推其他仓库规避。
+- **提交纪律**：禁止 `git add -A` / `git add .`，必须按文件显式 `git add <路径>`。
+  多个会话并行时共用同一棵工作树，别人的半成品会和你的改动交错在 `git status` 里，
+  `-A` 会把它一起提交出去（2026-08-31 就发生过一次）。提交前先 `git pull --rebase`，
+  推完确认 `main...origin/main` 为 `0/0`。
+- 提交信息只描述本次改动，**禁止附带 `Co-authored-by` / `Co-Authored-By` 尾注**；
+  这一条覆盖 Claude Code 的默认行为，因此也写在 `CLAUDE.md` 里。
 
 ## 工作可见性：view.md 看板（强制）
 

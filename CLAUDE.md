@@ -36,3 +36,11 @@ tools/agent_view.sh show                                                # 查看
    `view.md` 与 `.agent_view/` 不进 Git；结论与判据仍要写进 `docs/` 并提交。
 
 详细说明见 `AGENTS.md` 的「工作可见性：view.md 看板（强制）」一节。
+
+## Git 提交（覆盖 Claude Code 默认行为）
+
+- 提交信息**禁止带 `Co-authored-by` / `Co-Authored-By` 尾注**。
+- 禁止 `git add -A` / `git add .`：按文件显式 add，提交前 `git pull --rebase`，
+  推完确认 `main...origin/main` 为 `0/0`。多会话并行时这条是硬要求。
+
+完整门禁见 `AGENTS.md` 的「Git 绑定与远程交付（最高优先级门禁）」一节。
