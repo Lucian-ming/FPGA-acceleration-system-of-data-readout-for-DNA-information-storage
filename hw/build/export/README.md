@@ -142,3 +142,45 @@ ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此�
 
 首次上板顺序见 `docs/16-board-zynq-eco-7010.md` §6：**先用官方 LED 例程冒烟，
 再下载本目录制品**；首次一律用 JTAG 模式（SW1 = `00`），不写 QSPI、不动 SD 卡。
+
+## 只改 PS 固件时怎么重建 ELF（2026-09-03 实测可复现）
+
+上面「完整重建」那一节的参数已经过期（`plat=dna_platform_b25`、`dna_board_b25.bif`
+都是上一版的名字），且改一行 C 代码没必要重跑 `platform generate`。
+现有 Vitis workspace 就能增量重建，**并且逐字节可复现**：
+
+```bash
+export PATH=/tools/Xilinx/Vitis/2022.2/gnu/aarch32/lin/gcc-arm-none-eabi/bin:$PATH
+cp sw/app/echo.c sw/workspace/dna_lwip_app_b27/src/echo.c      # 按需同步改动的源文件
+cd sw/workspace/dna_lwip_app_b27/Debug && make all
+sha256sum dna_lwip_app_b27.elf
+```
+
+**先做这个自证再信重建结果**：把 `sw/workspace/dna_lwip_app_b27/src/` 恢复到未改动状态
+（`git stash` 或从 Git 取回）后重建，ELF 必须逐字节等于本目录里那份。
+2026-09-03 实测：`touch ../src/echo.c && make all` 得到的 ELF =
+`9006d0ca7bf7b196e011bfe509c34403f1d02c4d0d1f5218a0acefbe0fead0bd`，
+与 `SHA256SUMS` 里的 `dna_lwip_app_b27.elf` 相同 —— 说明工具链、BSP、链接脚本
+都还是当初出这套制品时那一套。**没做这一步就换制品，等于拿一个没校准的秤称东西。**
+
+`BOOT.bin` 里嵌着应用 ELF，所以换了 ELF 必须一起重生成（`.bif` 用 b27 那份，不是 b25）：
+
+```bash
+/tools/Xilinx/Vitis/2022.2/bin/bootgen \
+  -image sw/boot/dna_board_b27.bif -arch zynq -o hw/build/export/BOOT.bin -w on
+```
+
+同样先自证：不改 ELF 直接跑上面这条，输出必须等于
+`cabaf453015315ef2bab3b1947db43f6ecc62c1d51f46a8ed93691dff3fb7a92`（2026-09-03 实测成立）。
+
+最后刷新清单，否则 `tools/run_g3.sh` 的「制品同源性校验」会挡住你——**那是故意的**：
+
+```bash
+cd hw/build/export && sha256sum -c SHA256SUMS      # 先看哪几行变了
+# 用新哈希替换 BOOT.bin / dna_lwip_app_b27.elf 两行，再复验
+```
+
+⚠️ **换制品的时机**：工作树是多个会话共享的，`run_g3.sh` 每次烧录前都按 `SHA256SUMS`
+校验同源性。在自己的板上判据跑通之前就覆盖本目录，别的会话要么烧到一份没过判据的固件、
+要么直接因哈希不符停机。所以顺序是：**先在 scratchpad 里备好新制品 → 拿到板子令牌 →
+覆盖 + 刷新 `SHA256SUMS` → 跑 `run_g3.sh` → 通过后立刻提交**。
