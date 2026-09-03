@@ -12,6 +12,7 @@
 #include "xil_cache.h"
 #include "sleep.h"
 #include "xaxidma.h"
+#include "xtime_l.h"
 #include "netif/xadapter.h"
 
 #define BIT_SET(val, bit)    ((val) |= (1ULL << (bit)))
@@ -387,8 +388,11 @@ static int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
 typedef enum {
     PIPE_IDLE = 0,
     PIPE_WM_PREP,
+    /* 【B28】原来这里还有一个 PIPE_WM_WAIT：PIPE_WM_TX 提交 DMA、下一个 poll 才由
+     * PIPE_WM_WAIT 回收 BD，于是 50 个区域各占 2 个 poll 周期 ≈ 100 步。
+     * 现在 PIPE_WM_TX 一次 poll 批量走 WM_REGIONS_PER_POLL 个区域、区域内有界忙等，
+     * WM_WAIT 变成死状态，直接删掉，见 pipeline_step_stage1() 的 PIPE_WM_TX 分支。 */
     PIPE_WM_TX,
-    PIPE_WM_WAIT,
     PIPE_RX_PREP,
     PIPE_TX_PREFILL,
     PIPE_START_IP,
@@ -427,6 +431,37 @@ static int tx_done        = 0;
 static int rx_done        = 0;
 
 static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
+
+/* 【B28 水印预载批量化】—— 为什么是 16，以及为什么不会饿死 lwIP
+ *
+ * 改之前：PIPE_WM_TX 提交一个区域的 DMA 就 return，PIPE_WM_WAIT 在**下一个** poll
+ * 里回收 BD。一个区域两个 poll 周期，50 个区域 ≈ 100 步；而 poll 有效间隔实测
+ * 250~500 ms（见 S1_NO_PROGRESS_LIMIT 处的机理说明），于是白等出 ~29 s 的固定开销
+ * ——与读段条数无关，任何规模都白等（docs/18 P1 第 3 项五档拟合的常数项）。
+ *
+ * 改之后：一次 poll 连续走 WM_REGIONS_PER_POLL 个区域，每个区域在**同一次调用内**
+ * 有界忙等 BD 回收。50 个区域 = ceil(50/16) = 4 个 poll 步，加上 PIPE_WM_PREP 共 5 步。
+ *
+ * 为什么 16 是安全的（poll_callback 是 lwIP 回调，久不返回会饿死 TCP 处理）：
+ *   - 单区域是 957 个符号 × 4 B = 3,828 B 一个 BD。DNA 核预载时 TREADY 恒 1、
+ *     一拍一个符号，957 拍 @100 MHz ≈ 9.6 us；加上三次 usleep(10) 的寄存器时序，
+ *     **典型单区域 ≈ 50 us**，16 个区域 ≈ 0.8 ms —— 比 250 ms 的 poll 间隔小两个半数量级。
+ *   - 硬件真挂住时也有上界：单区域忙等封顶 WM_BD_WAIT_US = 5 ms，
+ *     一次 poll 最坏 16 × 5 ms = 80 ms，仍小于一个 poll 间隔，且结局是 PIPE_FAIL
+ *     而不是原来那种「停在 WM_WAIT 里无限等」。
+ * 为什么不干脆一次 poll 走完 50 个：最坏情况会涨到 250 ms（整整一个 poll 间隔），
+ *   而且把唯一的让出点也丢了；换来的只是再省 ~0.8 s，不划算。
+ * 为什么不是 8：8 要 7 步（≈2 s）而 16 只要 4 步（≈1.1 s），
+ *   而 16 的**典型**在 poll 时间仍是亚毫秒级，等于白拿。
+ */
+#define WM_REGIONS_PER_POLL   16U
+#define WM_BD_WAIT_US       5000U   /* 单区域 BD 回收忙等上限（正常 ~10 us） */
+#define WM_BD_WAIT_STEP_US     5U   /* 忙等的轮询步长 */
+
+static u32   wm_poll_steps = 0;  /* 水印预载实际占用了几个 poll 步（留证用） */
+static XTime wm_t_start    = 0;  /* 预载区域循环的起点（XTime 直接测量，不是推断） */
+static u32   pipe_poll_steps = 0;/* 整条流水线一共占了几个 poll 步（留证用） */
+static XTime pipe_t_start    = 0;
 static u32 tx_frames_total = 0;
 static u32 tx_frames_sent  = 0;
 static u32 tx_frames_done  = 0;
@@ -460,6 +495,7 @@ static inline void pipeline_reset_counters(void){
     tx_frames_total=0; tx_frames_sent=0; tx_frames_done=0; wm_region=0;
     rx_records_total=0; rx_records_submitted=0;
     s1_last_tx_done=-1; s1_last_rx_done=-1; s1_no_progress=0;
+    wm_poll_steps=0; wm_t_start=0;
 }
 
 /* 【B21】按「一条记录一个 BD」滚动补投 RX 描述符。
@@ -537,6 +573,37 @@ static int submit_reads_chunk(void)
 
     return bd;
 }
+/* 【B28】单个水印区域的 BD 有界忙等。
+ * 返回 0 成功，-1 失败（BD 报错或超时）。
+ * 有界是关键：这段忙等发生在 lwIP 的 poll_callback 里，绝不能变成无限等。
+ * 正常情况下 957 拍 ≈ 10 us 就完成，第一次 reclaim 往往就拿到了；
+ * 超时上限 WM_BD_WAIT_US 只在硬件真的挂住时才走到，走到就 FAIL 出去。 */
+static int wm_wait_region_bd(int expected)
+{
+    int got = 0;
+    u32 waited_us = 0;
+
+    while (got < expected) {
+        int n = reclaim_some_bd(TxRingPtr, expected - got);
+        if (n < 0) {
+            xil_printf("[ERROR] WM region %u: TX BD error\n\r", wm_region);
+            return -1;
+        }
+        got += n;
+        if (got >= expected) break;
+
+        if (waited_us >= WM_BD_WAIT_US) {
+            xil_printf("[ERROR] WM region %u: TX BD timeout (%d/%d after %u us)\n\r",
+                       wm_region, got, expected, waited_us);
+            dump_dma_regs("WM region BD timeout");
+            return -1;
+        }
+        usleep(WM_BD_WAIT_STEP_US);
+        waited_us += WM_BD_WAIT_STEP_US;
+    }
+    return 0;
+}
+
 /* 第一级流水线步骤 */
 static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 {
@@ -560,41 +627,85 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
+        /* 【B28】开始批量预载前先把 TX ring 排空。
+         * 批量化之后，「本区域的 BD 完成了没有」是靠 reclaim 的**计数**判断的，
+         * 而 XAxiDma_BdRingFromHw 是按提交顺序返回的：如果环上还压着上一次任务
+         * 失败时残留的已完成 BD，region 0 的等待会被那个残留 BD 顶掉计数，
+         * 于是在自己的 957 拍还没走完时就撤掉 preload —— 残余拍会被当成 read 数据
+         * 推进 in_fifo。原实现整整等一个 poll 周期（250 ms），自己的 BD 早就完成了，
+         * 所以这个隐患一直被时间余量盖住；批量化把余量压到几十微秒，必须显式排空。
+         * 正常路径下 Stage1 要 tx_done >= tx_expected 才退出，这里应当一个都收不到。 */
+        {
+            int stale = reclaim_some_bd(TxRingPtr, MAX_BD_COUNT);
+            if (stale < 0) {
+                xil_printf("[WM] ERROR: TX ring 残留 BD 带错误状态\n\r");
+                pipeline_set_state(PIPE_FAIL);
+                return PIPE_STEP_FAIL;
+            }
+            if (stale > 0)
+                xil_printf("[WM] WARN: 排空了 %d 个残留 TX BD（上一次任务未收尾？）\n\r",
+                           stale);
+        }
+
         wm_region = 0;
+        wm_poll_steps = 0;
+        XTime_GetTime(&wm_t_start);
         pipeline_set_state(PIPE_WM_TX);
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_WM_TX: {
-        /* 先选区域，再进预载模式；顺序不能反 */
-        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG1_WMSEL, wm_region);
-        usleep(10);
-        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL,
-                    DNA_ACC_CTRL_BIT_PRELOAD);
-        usleep(10);
+        /* 【B28】一次 poll 批量走 WM_REGIONS_PER_POLL 个区域。
+         * 每个区域的寄存器写序列与原来**逐字节一致**（选区域 → usleep(10) →
+         * 置 preload → usleep(10) → DMA → 等完成 → 清 preload → usleep(10)）：
+         * 寄存器写序列本身就是被测对象（B27 的教训），这里只收掉 poll 周期的白等，
+         * 不「整理」时序。 */
+        u32 done_this_poll = 0;
 
-        wm_tx_expected = submit_bd_transfer(TxRingPtr,
-                                            DDR_WM_REGIONS_BASE + wm_region * WM_REGION_BYTES,
-                                            WM_REGION_BYTES, TxMaxTransferLen,
-                                            "TX-WM-REGION", XFER_TX_WM);
-        if (wm_tx_expected < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
-        pipeline_set_state(PIPE_WM_WAIT);
-        return PIPE_STEP_PROGRESS;
-    }
-    case PIPE_WM_WAIT: {
-        int got = reclaim_some_bd(TxRingPtr, wm_tx_expected);
-        if (got < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
-        if (got == wm_tx_expected) {
+        wm_poll_steps++;
+
+        while (wm_region < WM_NUM_LC && done_this_poll < WM_REGIONS_PER_POLL) {
+            /* 先选区域，再进预载模式；顺序不能反 */
+            write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG1_WMSEL, wm_region);
+            usleep(10);
+            write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL,
+                        DNA_ACC_CTRL_BIT_PRELOAD);
+            usleep(10);
+
+            wm_tx_expected = submit_bd_transfer(TxRingPtr,
+                                                DDR_WM_REGIONS_BASE + wm_region * WM_REGION_BYTES,
+                                                WM_REGION_BYTES, TxMaxTransferLen,
+                                                "TX-WM-REGION", XFER_TX_WM);
+            if (wm_tx_expected < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
+
+            if (wm_wait_region_bd(wm_tx_expected) < 0) {
+                pipeline_set_state(PIPE_FAIL);
+                return PIPE_STEP_FAIL;
+            }
+
+            /* MM2S 的 BD 完成意味着这 957 拍已经在 AXIS 上握手完毕
+             * （预载模式下 DNA 核 TREADY 恒 1，见 Dna_accelerator_core_v1_0.v:173），
+             * 所以 wm_waddr 已经从 956 回绕到 0。原实现靠「下一个 poll 才回收」
+             * 天然有 250 ms 余量，现在只隔几十微秒，这里再留 10 us（≈1,000 个 aclk）
+             * 的余量后才撤 preload —— 撤早了残余拍会被当成 read 数据推进 in_fifo。 */
+            usleep(10);
+
             /* 每个区域传完都退出预载模式，确保 wm_waddr 与区域边界对齐 */
             write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x00);
             usleep(10);
+
             wm_region++;
-            if (wm_region < WM_NUM_LC) {
-                pipeline_set_state(PIPE_WM_TX);
-            } else {
-                xil_printf("[STAGE1] WM preload done: %u regions x %u symbols\n\r",
-                           (u32)WM_NUM_LC, (u32)WM_REF_LEN);
-                pipeline_set_state(PIPE_RX_PREP);
-            }
+            done_this_poll++;
+        }
+
+        if (wm_region >= WM_NUM_LC) {
+            XTime t_end;
+            XTime_GetTime(&t_end);
+            u32 elapsed_ms = (u32)((t_end - wm_t_start) /
+                                   (XTime)(COUNTS_PER_SECOND / 1000U));
+            xil_printf("[STAGE1] WM preload done: %u regions x %u symbols, "
+                       "%u poll steps, %u ms\n\r",
+                       (u32)WM_NUM_LC, (u32)WM_REF_LEN, wm_poll_steps, elapsed_ms);
+            pipeline_set_state(PIPE_RX_PREP);
         }
         return PIPE_STEP_PROGRESS;
     }
@@ -1861,11 +1972,29 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
 
     switch (g_proc_state) {
     case PROC_REQUESTED:
-        pipeline_reset_counters(); pipeline_set_state(PIPE_WM_PREP); g_proc_state = PROC_RUNNING; break;
+        pipeline_reset_counters(); pipeline_set_state(PIPE_WM_PREP);
+        /* 【B28 留证】整条流水线一共占了几个 poll 步、走了多少墙钟时间。
+         * 固定开销的量纲就是「poll 步数 × 250~500 ms」，把步数直接打出来，
+         * 下一个人就不必再靠分档拟合去反推常数项（docs/18 P1 第 3 项的教训：
+         * 扣除法推断一旦进了表格就会被当成实测引用）。 */
+        pipe_poll_steps = 0;
+        XTime_GetTime(&pipe_t_start);
+        g_proc_state = PROC_RUNNING; break;
     case PROC_RUNNING: {
         int st = run_processing_pipeline(conn);
+        pipe_poll_steps++;
         if (pipe_state == PIPE_FAIL) g_proc_state = PROC_FAILED;
-        else if (pipe_state == PIPE_DONE_STAGE3 && st == XST_SUCCESS) g_proc_state = PROC_DONE;
+        else if (pipe_state == PIPE_DONE_STAGE3 && st == XST_SUCCESS) {
+            XTime t_end;
+            XTime_GetTime(&t_end);
+            xil_printf("[PIPE] total %u poll steps, %u ms "
+                       "(WM preload: %u steps)\n\r",
+                       pipe_poll_steps,
+                       (u32)((t_end - pipe_t_start) /
+                             (XTime)(COUNTS_PER_SECOND / 1000U)),
+                       wm_poll_steps);
+            g_proc_state = PROC_DONE;
+        }
         break;
     }
     case PROC_DONE:   send_result(conn); g_proc_state = PROC_IDLE; break;
