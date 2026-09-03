@@ -10,11 +10,38 @@ from dataclasses import dataclass
 
 TASK_PROTO_VERSION = 1
 TASK_NUM_LC = 50
-READ_BASES = 150
+READ_BASES = 150            # SE150 默认；SE250 显式传 read_bps=250
+SE250_READ_BASES = 250
+# 一套比特流只服务一种几何（几何是综合期常量），客户端这层先挡一道，
+# 与板端 PKT_CONFIG 拒绝码 2 同义（task_config.h:113-114）。
+SUPPORTED_READ_BASES = (150, 250)
 FRAME_READS = 64
-MAX_TOTAL_READS = 107_968
+MAX_TOTAL_READS = 107_968   # = (TOTAL_READS/64)*64，echo.h:27,52；SE250 全量需 129_600
 CONFIG_PAYLOAD_LEN = 44
 CAPS_PAYLOAD_LEN = 24
+
+
+def read_size_bytes(read_bps: int = READ_BASES) -> int:
+    """一条读段在线上占多少字节。
+
+    位平面编码是 2 bit/碱基 = 2*read_bps bit，但 DNA 核的 AXIS 是 32 bit
+    （`Dna_accelerator_core_v1_0.v:16`），所以必须向上对齐到 4 B：
+        SE150  ceil(300/8) = 38 → **40**
+        SE250  ceil(500/8) = 63 → **64**
+    对齐这一步不能省成 63 —— 入口是按整拍收的，少一拍整条记录就错位
+    （docs/20 §1.4 与 §3.5 的 S2）。
+    """
+    return ((2 * read_bps + 31) // 32) * 4
+
+
+def default_score_min(read_bps: int = READ_BASES) -> int:
+    """比对分阈值 int(0.45*read_bps)：SE150 → 67，SE250 → 112。
+
+    这个 0.45 必须和黄金向量同源（`make_golden.py --min-score 0.45`）。
+    docs/20 §2.2 的阈值扫描表明 0.45 对两个数据集都落在
+    「真方向过阈 ~98 %、假方向 0 %」的平台区里。
+    """
+    return int(0.45 * read_bps)
 
 CONFIG_REJECT_REASONS = {
     1: "协议版本不支持",
@@ -101,9 +128,19 @@ class TaskSpec:
         spec.validate()
         return spec
 
+    @property
+    def read_size_bytes(self) -> int:
+        """本任务每条读段的线上字节数（SE150 40 B / SE250 64 B）。"""
+        return read_size_bytes(self.read_bps)
+
     def validate(self) -> None:
         if self.version != TASK_PROTO_VERSION:
             raise ValueError(f"任务协议版本必须为 {TASK_PROTO_VERSION}")
+        if self.read_bps not in SUPPORTED_READ_BASES:
+            raise ValueError(
+                f"read_bps={self.read_bps} 不在客户端支持的 {SUPPORTED_READ_BASES}；"
+                "一套比特流只服务一种几何，混用会被板端 PKT_CONFIG 拒绝码 2 拒掉"
+            )
         if self.symbols != self.num_lc * self.stride + self.read_bps:
             raise ValueError("任务几何不满足 symbols=num_lc*stride+read_bps")
         if self.total_reads <= 0 or self.total_reads % FRAME_READS:

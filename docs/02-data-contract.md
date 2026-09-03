@@ -30,7 +30,8 @@ bit[L     .. 2L-1 ] = 每个碱基的低位   （plane 1 / lower layer）
 
 L=40,500 时即 81,000 bit。`differential_voter_v1_0.v` 的 `calc_layer_position()`
 （`bit_idx<150` → `position+bit_idx`，否则 `LAYER_SIZE+position+bit_idx-150`）就是这个布局；
-`first.py` 的 `seq_to_40B()`（`out_bits[idx]` / `out_bits[150+idx]`）也是这个布局。
+`first.py` 的 `seq_to_read_bytes()`（`out_bits[idx]` / `out_bits[READ_BPS+idx]`；
+2026-09-03 由 `seq_to_40B()` 改名并按 `read_bps` 参数化）也是这个布局。
 
 `srpe_batch.v` 已在 B2/B4 修复中统一为同一布局：`cw_data[i]` 进入高位平面，
 `cw_data[READ_BPS+i]` 进入低位平面；输出也按相同顺序回传。该约定已由
@@ -109,11 +110,14 @@ desparsify( plane_bits(DNA-40.5Kb-MC (R=0.83).txt)  XOR  r0.83_watermark.txt )
 | --- | --- | --- |
 | 水印/参考长度 L | 40,500 nt = 81,000 bit | 决定 Voter `TOTAL_BITS`/`LAYER_SIZE`、BRAM 深度 |
 | 读段长度 READ_BPS | 150 bp | 决定 `CODEBITS=2*READ_BPS`、每条字节数 |
-| 每条字节数 | 40 B | `ceil(2*READ_BPS/8)`，需与 AXIS 拍数一致 |
+| 每条字节数（线上） | 40 B | `ceil(2*READ_BPS/8)` **再向上对齐到 4 B**（AXIS 是 32 bit，`Dna_accelerator_core_v1_0.v:16`）：38 → **40**。只按 `ceil(2*READ_BPS/8)` 算会少一拍 |
 | Stage1 结果宽度 | 326 bit → 48 B | `2*READ_BPS + 16 + 10` |
 | NUM_LC / STRIDE / REF_LEN | 50 / 807 / 957 | `NUM_LC*STRIDE = L - READ_BPS`，`REF_LEN = STRIDE + READ_BPS` |
 | 读段条数 | 51,781 | 决定 DDR 预算、DMA 长度、Voter `total_reads` |
 | 码字长度 | 64,800 bit | `L*2*4/5`，必须等于 LDPC 码长 |
 
 SE250（64,800 条 × 250 bp）需要 `NUM_LC=50, STRIDE=805, REF_LEN=1055, CODEBITS=500`，
-每条 63 B，Stage1 结果 526 bit → 72 B。**现有比特流不支持 SE250。**
+每条**线上 64 B**（有效 63 B + 1 B 对齐补零，同上一行的对齐规则），
+Stage1 结果 526 bit → 72 B。**现有比特流不支持 SE250。**
+主机侧与黄金向量已按这套几何落地（`tests/golden/se250/`，见 `docs/20` 阶段 S2）；
+RTL / 固件仍是 SE150。

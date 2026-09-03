@@ -42,10 +42,13 @@ from task_protocol import (
     FRAME_READS,
     MAX_TOTAL_READS,
     READ_BASES,
+    SUPPORTED_READ_BASES,
     TASK_NUM_LC,
     TASK_PROTO_VERSION,
     TaskSpec,
     build_config_payload,
+    default_score_min,
+    read_size_bytes,
 )
 
 # ============================================================================
@@ -61,7 +64,9 @@ DEFAULT_OUTPUT_FILE = "dec_input.txt"
 
 DEFAULT_FORMAT = "auto"
 
-READ_SIZE_BYTES = 40
+# SE150 的线上字节数。编码路径本身已按 read_bps 参数化（见 seq_to_read_bytes），
+# 这个模块级常量只是 SE150 的便捷别名；SE250 请用 read_size_bytes(250) = 64。
+READ_SIZE_BYTES = read_size_bytes(READ_BASES)
 DEFAULT_TOTAL_READS = 2_048  # 实测约 1,080 条即可完整还原，2,048 留足余量
 DEFAULT_BATCH_SIZE = 1_000
 RESULT_BYTES = 8_100
@@ -124,7 +129,10 @@ class ClientConfig:
     orient: str = "both"        # both = 每条读段发正向+反向互补（必需，见 D1）
     post: bool = True
     format: str = DEFAULT_FORMAT
-    score_min: int = 67         # 【P3】经 PKT_CONFIG 下发；67=int(0.45×150)，与黄金向量一致
+    read_bps: int = READ_BASES  # 150=SE150 / 250=SE250；决定线上字节数与默认阈值
+    # 【P3】经 PKT_CONFIG 下发。None = 按 read_bps 取 int(0.45×read_bps)
+    # （SE150 67 / SE250 112），与黄金向量的 --min-score 0.45 同源。
+    score_min: Optional[int] = None
     dry_run: bool = False       # 【P3】只打印将下发的配置，不连接板端
     # 板端从收到 PKT_POST 到 send_result() 之间一个字节都不发（echo.c 的 poll_callback
     # 只在 PROC_DONE 才发结果），而 recv_exact 用的是 sock.settimeout()，
@@ -132,6 +140,15 @@ class ClientConfig:
     # 4,096 条记录实测 32.4 s，其中约 97% 是随条数线性增长的 Stage1；
     # 换规模时必须一起调大，否则超时会把「还在算」误报成「挂了」。
     result_timeout: float = 180.0
+
+    @property
+    def resolved_score_min(self) -> int:
+        """未显式指定时按 read_bps 推出阈值，避免拿 SE150 的 67 去跑 SE250。"""
+        return default_score_min(self.read_bps) if self.score_min is None else self.score_min
+
+    @property
+    def read_size_bytes(self) -> int:
+        return read_size_bytes(self.read_bps)
 
     def resolve_total(self, detected: int) -> int:
         """Return number of source reads to send.
@@ -241,29 +258,34 @@ def analyze_reads_file(path: Path, format_hint: str = "auto") -> ReadFileInfo:
     return ReadFileInfo(path=path, format=fmt, total_reads=count)
 
 
-def seq_to_40B(seq: str) -> bytes:
-    """把一条 150 bp 序列编码成 40 字节。
+def seq_to_read_bytes(seq: str, read_bps: int = READ_BASES) -> bytes:
+    """把一条 read_bps bp 序列编码成 read_size_bytes(read_bps) 字节。
+
+    SE150：150 bp → 40 B；SE250：250 bp → 64 B（63 B 有效 + 1 B 补零对齐）。
 
     格式见 docs/02-data-contract.md：
-      * 位平面布局：码流前 150 位是每个碱基的高位，后 150 位是低位；
+      * 位平面布局：码流前 read_bps 位是每个碱基的高位，后 read_bps 位是低位；
       * 字节内 **LSB-first** 打包：码流第 k 位 → 第 k/8 个字节的第 k%8 位。
 
     LSB-first 是刻意选的：这样 AXIS 上组装出来的 `in_buf[k]` 正好等于码流第 k 位，
     RTL 端不需要任何位反转。原实现用的是 MSB-first，与 RTL 对不上（缺陷 B4）。
+
+    截断/补 N 一律按传入的 read_bps 做：这个参数写死成 150 的话，SE250 的
+    250 bp 读段会被静默砍成 150 bp（docs/reference/dataset.md 记过这个风险）。
     """
     s = seq.strip().upper()
-    if len(s) < READ_BASES:
-        s += "N" * (READ_BASES - len(s))
-    elif len(s) > READ_BASES:
-        s = s[:READ_BASES]
+    if len(s) < read_bps:
+        s += "N" * (read_bps - len(s))
+    elif len(s) > read_bps:
+        s = s[:read_bps]
 
-    data = bytearray(READ_SIZE_BYTES)
+    data = bytearray(read_size_bytes(read_bps))
     for idx, base in enumerate(s):
         pair = BASE2BITS.get(base, "00")
         if pair[0] == "1":                       # 高位平面
             data[idx >> 3] |= 1 << (idx & 7)
         if pair[1] == "1":                       # 低位平面
-            k = READ_BASES + idx
+            k = read_bps + idx
             data[k >> 3] |= 1 << (k & 7)
     return bytes(data)
 
@@ -302,6 +324,7 @@ def iter_reads(
     limit: int,
     format_type: str = "auto",
     orient: str = "both",
+    read_bps: int = READ_BASES,
 ) -> Iterable[bytes]:
     """产出编码后的读段字节。
 
@@ -313,9 +336,9 @@ def iter_reads(
     if orient not in {"both", "forward"}:
         raise ValueError(f"未知 orient={orient!r}")
     for seq in iter_source_seqs(path, limit, format_type):
-        yield seq_to_40B(seq)
+        yield seq_to_read_bytes(seq, read_bps)
         if orient == "both":
-            yield seq_to_40B(reverse_complement(seq))
+            yield seq_to_read_bytes(reverse_complement(seq), read_bps)
 
 
 def round_up_frames(n: int) -> int:
@@ -330,6 +353,7 @@ def iter_read_batches(
     batch_size: int = DEFAULT_BATCH_SIZE,
     format_type: str = "auto",
     orient: str = "both",
+    read_bps: int = READ_BASES,
 ) -> Iterable[bytes]:
     """产出 PKT_BATCH 的负载块；不足 send_total 的部分补零读段。"""
     if source_reads <= 0 or send_total <= 0:
@@ -347,7 +371,7 @@ def iter_read_batches(
         header = struct.pack(">I", len(batch))
         return header + b"".join(batch)
 
-    for read in iter_reads(reads_file, source_reads, format_type, orient):
+    for read in iter_reads(reads_file, source_reads, format_type, orient, read_bps):
         if count >= send_total:
             break
         batch.append(read)
@@ -363,7 +387,7 @@ def iter_read_batches(
 
     # 补零到 64 的整数倍（这些补零读段的比对分接近 0，会被板端阈值丢掉）
     while count < send_total:
-        batch.append(b"\x00" * READ_SIZE_BYTES)
+        batch.append(b"\x00" * read_size_bytes(read_bps))
         count += 1
         if len(batch) >= batch_size:
             yield flush()
@@ -440,6 +464,7 @@ def send_batches(
     batch_size: int = DEFAULT_BATCH_SIZE,
     format_type: str = "auto",
     orient: str = "both",
+    read_bps: int = READ_BASES,
     stop_check: Optional[Callable[[], bool]] = None,
     progress: Optional[ProgressCallbacks] = None,
 ) -> int:
@@ -448,7 +473,7 @@ def send_batches(
     batch_index = 0
 
     for payload in iter_read_batches(reads_file, source_reads, send_total,
-                                     batch_size, format_type, orient):
+                                     batch_size, format_type, orient, read_bps):
         if stop_check and stop_check():
             raise OperationCancelled("Operation cancelled")
 
@@ -458,7 +483,7 @@ def send_batches(
         expect_ack(sock, stats, PKT_BATCH_OK,
                    operation=f"读段批次 #{batch_index}")
 
-        batch_reads = (len(payload) - 4) // READ_SIZE_BYTES
+        batch_reads = (len(payload) - 4) // read_size_bytes(read_bps)
         total_sent += batch_reads
         batch_index += 1
 
@@ -519,6 +544,9 @@ def run_client(
         raise FileNotFoundError(f"Watermark file does not exist: {watermark_path}")
     if config.skip_wm and config.post:
         raise ValueError("--skip-watermark 只能与 --no-post 一起用于协议调试")
+    if config.read_bps not in SUPPORTED_READ_BASES:
+        raise ValueError(
+            f"--read-bps {config.read_bps} 不在支持列表 {SUPPORTED_READ_BASES}")
 
     info = analyze_reads_file(reads_path, config.format)
     source_reads = config.resolve_total(info.total_reads)
@@ -536,12 +564,14 @@ def run_client(
     task = TaskSpec.from_watermark_bits(
         len(watermark_bits),
         total_reads=send_total,
-        score_min=config.score_min,
+        score_min=config.resolved_score_min,
+        read_bps=config.read_bps,
     )
 
     if config.dry_run:
         payload = task.config_payload()
         print("[dry-run] 将下发 PKT_CONFIG(0x05) 44B：")
+        print(f"  每条读段线上 {task.read_size_bytes} B")
         print(f"  version={task.version} read_bps={task.read_bps} "
               f"num_lc={task.num_lc} stride={task.stride} symbols={task.symbols}")
         print(f"  total_reads={task.total_reads} score_min={task.score_min}")
@@ -555,6 +585,9 @@ def run_client(
         log,
         f"[INFO] Reads file: {reads_path} ({info.total_reads} reads detected, format {info.format.upper()})",
     )
+    log_info(log, f"[INFO] 几何 read_bps={task.read_bps} num_lc={task.num_lc} "
+                  f"stride={task.stride} 每条读段 {task.read_size_bytes} B "
+                  f"score_min={task.score_min}")
     log_info(log, f"[INFO] 取用源读段 {source_reads} 条，方向 {config.orient}（每条 {per_read} 份）")
     padding = send_total - source_reads * per_read
     log_info(log, f"[INFO] 实际发送 {send_total} 条（{FRAME_READS} 的整数倍"
@@ -601,11 +634,12 @@ def run_client(
             batch_size=config.batch,
             format_type=info.format,
             orient=config.orient,
+            read_bps=config.read_bps,
             stop_check=stop_requested,
             progress=progress,
         )
         stats.t_batches = perf_counter() - t0
-        reads_bytes = send_total * READ_SIZE_BYTES
+        reads_bytes = send_total * task.read_size_bytes
         log_info(
             log,
             (
@@ -693,8 +727,14 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--orient", choices=["both", "forward"], default="both",
                         help="both=每条读段发正向+反向互补（默认，必需）；forward=只发正向（仅作对照实验）")
     parser.add_argument("--skip-watermark", action="store_true", help="跳过水印发送")
-    parser.add_argument("--score-min", type=int, default=67,
-                        help="PKT_CONFIG 下发的比对分阈值（默认 67=int(0.45×150)，与黄金向量一致）")
+    parser.add_argument("--read-bps", type=int, default=READ_BASES,
+                        choices=list(SUPPORTED_READ_BASES),
+                        help="读段长度：150=SE150（默认）/ 250=SE250。"
+                             "决定线上字节数（40/64 B）与默认阈值（67/112）；"
+                             "板端只支持它综合时的那一种，混用会被 PKT_CONFIG 拒绝码 2 拒掉")
+    parser.add_argument("--score-min", type=int, default=None,
+                        help="PKT_CONFIG 下发的比对分阈值"
+                             "（默认 int(0.45×read_bps)：SE150 67 / SE250 112，与黄金向量一致）")
     parser.add_argument("--dry-run", action="store_true",
                         help="只打印将下发的 PKT_CONFIG 内容，不连接板端")
     parser.add_argument("--no-post", action="store_true", help="不发送POST触发命令")
@@ -720,6 +760,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         orient=args.orient,
         post=not args.no_post,
         format=args.format,
+        read_bps=args.read_bps,
         score_min=args.score_min,
         dry_run=args.dry_run,
         result_timeout=args.result_timeout,
