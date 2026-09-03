@@ -109,6 +109,15 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
         FAIL=$((FAIL+1))
     fi
 
+    printf '\n=== echo.c（PS 固件：主机侧编译真实源码 + 行为轨迹判据）===\n'
+    # 默认编译 **HEAD 里的** sw/app/echo.c，不受其它会话工作树改动影响；
+    # 做拆分时用 `bash tests/host/run_host_tests.sh --worktree`。
+    if bash tests/host/run_host_tests.sh | sed 's/^/  /'; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+
     printf '\n=== client_core（上位机任务模型/协议/批处理单元测试）===\n'
     if python3 -m unittest discover -s clients/python/tests -p 'test_*.py' \
        | sed 's/^/  /'; then

@@ -1,0 +1,6 @@
+# 行为轨迹黄金文件的出处（本文件不参与比对，只记来源）
+source     = git HEAD (e25dab1)
+echo.c     = 2206 行, sha256 前 16 位 f5a036486673fba7
+recorded   = 2026-09-03T15:45:01+08:00
+scenario   = SE150 / 128 条 / score_min=67 / 50 个水印区域
+lines      = 812

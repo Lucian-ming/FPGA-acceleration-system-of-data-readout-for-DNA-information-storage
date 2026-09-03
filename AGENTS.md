@@ -203,4 +203,10 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 - 改写这类 GBK 文件仍按老规矩：先 encode 成 bytes → 写临时文件 → `os.replace`，
   绝不能 `open(p,'wb').write(s.encode(...))`（编码抛异常时文件已被截断为 0 字节）。
 - SE150（51,781 × 150 bp）与 SE250（64,800 × 250 bp）不可混用；
-  现有比特流只支持 150 bp。
+  现有比特流只支持 150 bp。**但这条守不住在图片哈希上**：把「几何写死成 SE150 的
+  807/957」这个缺陷注回去，15 个产物里 14 个逐字节不变，`dec_input` 照样译出
+  `fcd0cf90…f2c3`、与 `codeword_R083.txt` 的误码照样 36/64,800——因为几何只喂
+  水印区域展开，而 Stage1 是直接在整条 ref 上滑窗。**唯一有鉴别力的是
+  `wm_regions.hex`**：SE250 应为 52,750 行 / `bf8795dd…`，一旦等于 SE150 的
+  `f352853912338cd0…` 就是该缺陷的特征签名。故障注入实测见 docs/20 §6
+  「鉴别力实测」；`tools/make_golden.py` 已内置哨兵会红。
