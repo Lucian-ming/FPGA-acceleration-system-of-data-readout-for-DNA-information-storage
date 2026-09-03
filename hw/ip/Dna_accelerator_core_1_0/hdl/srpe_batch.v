@@ -139,6 +139,17 @@ module srpe_batch #(
     reg [1:0]  phase;      // 0=给地址 1=等BRAM读出 2=读改写（修订 B11）
     reg [5:0]  bit_sel;
 
+    // 【S1 时序改造 2026-09-03】原实现在 S_LOAD_R 里按 row_i 随机索引 cw_data，
+    // 综合成两个 READ_BPS 选 1 的多路选择器（150 选 1，SE250 下 250 选 1）。
+    // 那是 implementation-timing.rpt 第 5 名关键路径
+    // （row_i_reg[1] -> b_lo_d_reg[34]，slack +0.158 ns）。
+    // row_i 在 S_LOAD_R 里严格 0→READ_BPS-1 顺序递增，不需要随机访问：
+    // 在 S_LOAD 收下码字那一拍把两个位平面各锁进一个移位寄存器，之后每行只看最低位。
+    // 顺带把「cw_data 必须在整个 S_LOAD_R 期间保持不变」这条隐式要求也解掉了
+    // （tb_srpe_batch.v:87-95 的 fed 标志正是为它而加）。
+    reg [READ_BPS-1:0] cw_hi_sr;   // cw_data[0 .. READ_BPS-1]        每个碱基的高位
+    reg [READ_BPS-1:0] cw_lo_sr;   // cw_data[READ_BPS .. CODEBITS-1] 每个碱基的低位
+
     // 位置比对阶段
     reg [5:0]   lc_idx;
     reg [15:0]  pos_cnt;
@@ -241,6 +252,7 @@ module srpe_batch #(
                 score[t]       <= {SCORE_W{1'b0}};
             end
             emit_i <= 0; emit_idx <= 0; cw_acc <= {CODEBITS{1'b0}};
+            cw_hi_sr <= {READ_BPS{1'b0}}; cw_lo_sr <= {READ_BPS{1'b0}};
         end else begin
             // ---- 全局默认值 ----
             done   <= 1'b0;
@@ -280,6 +292,11 @@ module srpe_batch #(
                     if (cw_valid) begin
                         row_i <= 0;
                         phase <= 2'd0;
+                        // 【S1】cw_valid 这一拍 cw_data 有效（顶层 cw_hold 与
+                        // eng_cw_vld 同拍更新，见 Dna_accelerator_core_v1_0.v:280-286），
+                        // 在这里整条锁下来，后续 READ_BPS 行只做移位。
+                        cw_hi_sr <= cw_data[READ_BPS-1:0];
+                        cw_lo_sr <= cw_data[CODEBITS-1:READ_BPS];
                         st    <= S_LOAD_R;
                     end
                 end
@@ -302,12 +319,17 @@ module srpe_batch #(
                         // 因此第一位平面进 hi、第二位平面进 lo。
                         // 原实现按 cw_data[2i]/cw_data[2i+1] 取（交织布局），
                         // 与 Voter 的 calc_layer_position() 和上位机都对不上。
-                        b_hi_d <= (cw_data[row_i]) ?
+                        // 【S1】cw_hi_sr[0] / cw_lo_sr[0] 等价于原来的
+                        // cw_data[row_i] / cw_data[READ_BPS+row_i]：本相每个 row_i
+                        // 只进一次（phase 0→1→2 后 row_i 才 +1），移位次数与 row_i 同步。
+                        b_hi_d <= (cw_hi_sr[0]) ?
                                   (b_hi_q | (64'h1 << bit_sel)) :
                                   (b_hi_q & ~(64'h1 << bit_sel));
-                        b_lo_d <= (cw_data[READ_BPS + row_i]) ?
+                        b_lo_d <= (cw_lo_sr[0]) ?
                                   (b_lo_q | (64'h1 << bit_sel)) :
                                   (b_lo_q & ~(64'h1 << bit_sel));
+                        cw_hi_sr <= {1'b0, cw_hi_sr[READ_BPS-1:1]};
+                        cw_lo_sr <= {1'b0, cw_lo_sr[READ_BPS-1:1]};
                         b_we_lo<= 1'b1; b_we_hi<= 1'b1;
 
                         phase  <= 2'd0;

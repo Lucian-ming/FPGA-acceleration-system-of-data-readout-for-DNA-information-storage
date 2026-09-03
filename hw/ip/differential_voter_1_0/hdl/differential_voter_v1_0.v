@@ -237,7 +237,15 @@ module differential_voter_v1_0 #
     reg [63:0] read_words [0:5];
     reg [2:0]  read_beat_count;
 
-    reg [299:0] current_codeword;
+    // 【S1 时序改造 2026-09-03】原为 reg [299:0] current_codeword，判决处按
+    // bit_in_codeword 随机索引，综合成 300 选 1 多路选择器（SE250 下是 500 选 1）。
+    // 那是 implementation-timing.rpt 第 1~4 名关键路径的共同源头
+    // （LUT6→MUXF7→MUXF8→LUT6→MUXF7→LUT6→CARRY4×2→LUT2，9 级逻辑，
+    //  9.666 ns 数据路径、走线占 66.5%），整机 WNS 只剩 +0.088 ns。
+    // bit_in_codeword 在投票循环里严格 0→CODEWORD_BITS-1 顺序递增，
+    // 根本不需要随机访问：改成移位寄存器，每拍只看最低位。
+    // 位宽同时改为跟随 CODEWORD_BITS（原字面量 300 不随 parameter 变，是 SE250 的坑）。
+    reg [CODEWORD_BITS-1:0] codeword_sr;
     reg [15:0]  current_position;
 
     reg [8:0]   bit_in_codeword;
@@ -384,7 +392,7 @@ module differential_voter_v1_0 #
             output_addr_wait    <= 2'd0;
             first_write_captured<= 1'b0;
 
-            current_codeword    <= 300'd0;
+            codeword_sr         <= {CODEWORD_BITS{1'b0}};
             current_position    <= 16'd0;
 
             pre_calc_addr       <= 17'd0;
@@ -484,12 +492,12 @@ module differential_voter_v1_0 #
                 S_PARSE_READ: begin
                     current_position            <= parse_position;
 
-                    current_codeword[37:0]     <= read_words[0][63:26];
-                    current_codeword[101:38]   <= read_words[1][63:0];
-                    current_codeword[165:102]  <= read_words[2][63:0];
-                    current_codeword[229:166]  <= read_words[3][63:0];
-                    current_codeword[293:230]  <= read_words[4][63:0];
-                    current_codeword[299:294]  <= read_words[5][5:0];
+                    codeword_sr[37:0]     <= read_words[0][63:26];
+                    codeword_sr[101:38]   <= read_words[1][63:0];
+                    codeword_sr[165:102]  <= read_words[2][63:0];
+                    codeword_sr[229:166]  <= read_words[3][63:0];
+                    codeword_sr[293:230]  <= read_words[4][63:0];
+                    codeword_sr[299:294]  <= read_words[5][5:0];
 
                     bit_in_codeword <= 9'd0;
 
@@ -518,7 +526,7 @@ module differential_voter_v1_0 #
                 S_VOTE_UPDATE: begin
                     // 【修订 B13】改用 bram_dout（两级：bram_addr→bram_raddr_q→bram_dout），
                     // 本拍恰好对齐本位的累加器；原先的 bram_dout_r 晚一拍，读到上一位。
-                    if (current_codeword[bit_in_codeword]) begin
+                    if (codeword_sr[0]) begin
                         bram_din         <= safe_vote_value(bram_dout + 10'sd1);
                     end else begin
                         bram_din         <= safe_vote_value(bram_dout - 10'sd1);
@@ -527,6 +535,13 @@ module differential_voter_v1_0 #
 
                     if (bit_in_codeword < CODEWORD_BITS - 1)
                         bit_in_codeword <= bit_in_codeword + 1;
+
+                    // 【S1】本拍消费了最低位，右移一位对准下一位。
+                    // S_VOTE_UPDATE 每条记录恰好进 CODEWORD_BITS 次
+                    // （vote_update_complete 之后转 S_NEXT_READ，见 next_state），
+                    // 所以最后一次多移的那一位不会被读到，且下一条记录的
+                    // S_PARSE_READ 会整体重载，因此不需要条件保护。
+                    codeword_sr <= {1'b0, codeword_sr[CODEWORD_BITS-1:1]};
 
                     debug_state_count <= state;
                 end

@@ -24,6 +24,7 @@
 | [18-next-steps-2026-08-30.md](18-next-steps-2026-08-30.md) | **当前行动计划**：G3 闭环后的排队、闭环适用范围、技术债与接口判据现状 | 想知道「接下来做什么」时先读这份 |
 | [19-parallel-sessions-2026-08-30.md](19-parallel-sessions-2026-08-30.md) | 并行会话简报（**历史，三个会话已于 08-31 全部收工**）：分工与互斥约定、提示词；§3 留了一个被实测推翻的结论及成因 | 想参考并行分工的做法时 |
 | [21-parallel-plan-2026-08-31.md](21-parallel-plan-2026-08-31.md) | **当前并行推进计划**：风险验证／水印预载／SE250／PS 拆分四条线的冲突矩阵、板子令牌协议、五段可粘贴提示词 | 要开并行会话时先读这份 |
+| [22-ps-refactor-plan.md](22-ps-refactor-plan.md) | **PS 固件拆分任务书**：模块边界与对外接口、6 步拆分顺序，以及每一步「行为没变」的判据（`tests/host/`）；含必须尊重的既有约束（poll 节奏、寄存器写序列、缓存维护）与两处死状态 | 要拆 `sw/app/echo.c` 之前必读 |
 | [20-se250-study-2026-08-30.md](20-se250-study-2026-08-30.md) | **SE250 扩展评估**（只调研不改 RTL）：几何推导、硬编码清单（RTL 11/固件 8/上位机 3/黄金 3 处）、资源与时序判据、分阶段方案 | 要把流水线从 150 bp 扩到 250 bp 时 |
 
 ## 参考资料（历史审计结果，只读）
@@ -54,6 +55,7 @@
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
 | `tools/test_ddr_layout.c` | C2/C3 的主机单元测试：按实际条数校验 DDR 区间（与固件共用 `sw/app/ddr_layout.h`） |
 | `tools/test_task_config.c` | P3 的主机单元测试：PKT_CONFIG 解析/校验/CRC32（与固件共用 `sw/app/task_config.h`） |
+| `tests/host/run_host_tests.sh` | **PS 固件 `echo.c` 的主机侧判据**：在主机上编译**真实的** `echo.c`（假 DDR + 设备模型）跑纯逻辑单测与 812 行行为轨迹；`--worktree` 是拆分的行为等价判据，`--selftest` 做故障注入自证。说明见 `tests/host/README.md` |
 | `tools/readout.py` | **干净的纯软件读出实现**：只吃 FASTQ + 水印，产出 dec_input.txt，可 `--prove-inputs` 自证不碰参考答案 |
 | `tools/bench_align.py` + `tools/align.c` | Stage1 比对的 CPU 性能基准，以及「种子法为何失效」的实证 |
 

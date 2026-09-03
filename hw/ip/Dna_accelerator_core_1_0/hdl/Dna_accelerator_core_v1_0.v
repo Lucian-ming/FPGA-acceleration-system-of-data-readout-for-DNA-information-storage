@@ -211,8 +211,13 @@ module Dna_accelerator_core_v1_0 #(
         end
     end
 
-    // 【深度优化】输入 FIFO: 2048 → 1024
-    fifo_sync_sdpram_b64 #(.WIDTH(CODEBITS), .DEPTH(1024)) u_in_fifo (
+    // 【深度优化】输入 FIFO: 2048 → 1024 → 256（2026-09-03 阶段 S1）
+    // 引擎的启动条件是 in_count >= BATCH（=64，见下方 trigger_full_batch），
+    // 而 S_AXIS_DATA_TREADY = ~in_full 本来就在做背压，深度只影响缓冲余量、
+    // 不影响正确性。1024 深属于严重过量：SE150 下它吃掉 8×RAMB36 + 1×RAMB18，
+    // 而 SE250 把宽度从 300 推到 500 后需要 14 块，整机 BRAM 会从 90% 直接爆表
+    // （docs/20 §4.2）。256 深仍是 BATCH 的 4 倍余量。
+    fifo_sync_sdpram_b64 #(.WIDTH(CODEBITS), .DEPTH(256)) u_in_fifo (
         .clk   (aclk),
         .rst_n (aresetn & ~soft_reset_s),
         .wr_en (in_wr),
