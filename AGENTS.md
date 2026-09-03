@@ -25,6 +25,21 @@
   多个会话并行时共用同一棵工作树，别人的半成品会和你的改动交错在 `git status` 里，
   `-A` 会把它一起提交出去（2026-08-31 就发生过一次）。提交前先 `git pull --rebase`，
   推完确认 `main...origin/main` 为 `0/0`。
+- **但「显式 add」挡不住并行会话，必须用带路径的 commit**：
+  `git commit` 提交的是**索引的全部内容**，不是「你 add 的那些」。你 `git add` 之后、
+  `git commit` 之前，别的会话往同一个索引里 add 了东西，就会被你一并提交走——
+  2026-09-03 的 `7747e9e` 正是这样把 `docs/22` 和 `docs/README.md` 卷进了一个 RTL 提交，
+  当事会话确实只 add 了三个 RTL 文件、也复核过 `git status`。「add 后再复核一次索引」
+  仍然有竞态窗口，堵不住。**正确写法是把路径写进 commit**：
+
+  ```bash
+  git add sw/app/echo.c
+  git commit -m "..." -- sw/app/echo.c      # 只提交这些路径，索引里别人的东西原封不动
+  ```
+
+  实测（GNU git，2026-09-04）：索引里同时有 `mine.txt`/`theirs.txt` 时，
+  `git commit -m .. -- mine.txt` 只产生 1 file changed 且 `theirs.txt` 仍留在索引里；
+  不带路径的 `git commit` 则是 2 files changed。多路径就并列写在 `--` 后面。
 - 提交信息只描述本次改动，**禁止附带 `Co-authored-by` / `Co-Authored-By` 尾注**；
   这一条覆盖 Claude Code 的默认行为，因此也写在 `CLAUDE.md` 里。
 

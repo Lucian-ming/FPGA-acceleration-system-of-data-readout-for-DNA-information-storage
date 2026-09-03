@@ -42,5 +42,9 @@ tools/agent_view.sh show                                                # 查看
 - 提交信息**禁止带 `Co-authored-by` / `Co-Authored-By` 尾注**。
 - 禁止 `git add -A` / `git add .`：按文件显式 add，提交前 `git pull --rebase`，
   推完确认 `main...origin/main` 为 `0/0`。多会话并行时这条是硬要求。
+- **提交时把路径写进 commit**：`git commit -m "..." -- <你的文件>`。
+  `git commit` 提交的是索引全部内容，多会话共用一棵工作树时，别人在你 add 与 commit
+  之间 add 的东西会被你一并带走（`7747e9e` 就这么把别人的两个文档卷进了 RTL 提交）。
+  只有带路径的 commit 能挡住这个竞态，「add 后复核索引」不能。
 
 完整门禁见 `AGENTS.md` 的「Git 绑定与远程交付（最高优先级门禁）」一节。
