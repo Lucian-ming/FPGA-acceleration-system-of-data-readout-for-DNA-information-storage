@@ -43,8 +43,10 @@ tools/agent_view.sh show                                                # 查看
 - 禁止 `git add -A` / `git add .`：按文件显式 add，提交前 `git pull --rebase`，
   推完确认 `main...origin/main` 为 `0/0`。多会话并行时这条是硬要求。
 - **提交时把路径写进 commit**：`git commit -m "..." -- <你的文件>`。
-  `git commit` 提交的是索引全部内容，多会话共用一棵工作树时，别人在你 add 与 commit
-  之间 add 的东西会被你一并带走（`7747e9e` 就这么把别人的两个文档卷进了 RTL 提交）。
-  只有带路径的 commit 能挡住这个竞态，「add 后复核索引」不能。
+  `git commit` 提交的是索引全部内容，而**索引是整棵工作树共享的**：别人在你 add 与
+  commit 之间 add 东西、或者跑 `git pull --rebase`（autostash 会重置索引），都会改掉它。
+  两个方向都出过事——别人的文件混进你的提交（`7747e9e`），你的文件被踢出索引。
+  带路径的 commit 不看索引、直接取这些路径的工作树内容，两边都堵住；
+  「add 后复核索引」堵不住，复核与 commit 之间照样会被插入。
 
 完整门禁见 `AGENTS.md` 的「Git 绑定与远程交付（最高优先级门禁）」一节。

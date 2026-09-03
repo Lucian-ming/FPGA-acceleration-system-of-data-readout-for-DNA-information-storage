@@ -26,20 +26,27 @@
   `-A` 会把它一起提交出去（2026-08-31 就发生过一次）。提交前先 `git pull --rebase`，
   推完确认 `main...origin/main` 为 `0/0`。
 - **但「显式 add」挡不住并行会话，必须用带路径的 commit**：
-  `git commit` 提交的是**索引的全部内容**，不是「你 add 的那些」。你 `git add` 之后、
-  `git commit` 之前，别的会话往同一个索引里 add 了东西，就会被你一并提交走——
-  2026-09-03 的 `7747e9e` 正是这样把 `docs/22` 和 `docs/README.md` 卷进了一个 RTL 提交，
-  当事会话确实只 add 了三个 RTL 文件、也复核过 `git status`。「add 后再复核一次索引」
-  仍然有竞态窗口，堵不住。**正确写法是把路径写进 commit**：
+  **暂存区（索引）是整棵工作树共享的一份**，而 `git commit` 提交的是**索引的全部内容**，
+  不是「你 add 的那些」。你 `git add` 之后、`git commit` 之前，索引会被别的会话改掉，
+  两个方向都出过事（均为 2026-09-03/04 实况）：
+  - **别人的文件混进你的提交**：`7747e9e` 把 `docs/22` 和 `docs/README.md` 卷进了一个
+    纯 RTL 提交。当事会话确实只 add 了三个 RTL 文件、提交前也复核过 `git status`。
+  - **你自己的文件被踢出索引**：另一会话 add 完之后，`git diff --cached` 里多出了两个
+    从没 add 过的 `tests/host/golden/*`，而自己的 `tools/run_g3.sh` 反而掉了出去。
+    元凶多半不是别人的 `add`，而是别人跑了 **`git pull --rebase`——autostash 会重置索引**。
+  所以「add 之后再复核一次索引」堵不住：复核与 commit 之间同样会被 rebase 插入。
+  **正确写法是把路径写进 commit**：
 
   ```bash
-  git add sw/app/echo.c
-  git commit -m "..." -- sw/app/echo.c      # 只提交这些路径，索引里别人的东西原封不动
+  git commit -m "..." -- sw/app/echo.c      # 只提交这些路径
   ```
 
-  实测（GNU git，2026-09-04）：索引里同时有 `mine.txt`/`theirs.txt` 时，
-  `git commit -m .. -- mine.txt` 只产生 1 file changed 且 `theirs.txt` 仍留在索引里；
-  不带路径的 `git commit` 则是 2 files changed。多路径就并列写在 `--` 后面。
+  实测（GNU git，2026-09-04）两个方向都成立：索引里有别人的 `theirs.txt`、自己的
+  `mine.txt` **完全没 add** 时，`git commit -m .. -- mine.txt` 仍然只产生
+  1 file changed 且内容是工作树里的新版，`theirs.txt` 原封不动留在索引里；
+  换成不带路径的 `git commit` 则是 2 files changed。也就是说带路径的 commit
+  **不看索引、直接取这些路径的工作树内容**，`git add` 那一步甚至可以省掉。
+  多路径并列写在 `--` 后面。
 - 提交信息只描述本次改动，**禁止附带 `Co-authored-by` / `Co-Authored-By` 尾注**；
   这一条覆盖 Claude Code 的默认行为，因此也写在 `CLAUDE.md` 里。
 
