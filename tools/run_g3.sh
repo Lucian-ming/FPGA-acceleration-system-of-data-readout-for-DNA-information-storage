@@ -38,6 +38,7 @@
 #                                                     # 逐轮指定条数与阈值（'-' = 用全局默认，'full' = 全量）
 #   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67 --plan-only
 #                                                     # 只打印逐轮计划，不碰板子（自查参数）
+#   tools/run_g3.sh --ready-deadline 150              # 板端就绪探针（CAPS 握手）多等一会儿
 #
 # 环境（docs/16、docs/19 已验证，勿重摸）
 # --------------------------------------
@@ -65,6 +66,7 @@ ORIENT="both"
 BOARD_IP="192.168.1.10"
 BOARD_PORT=7
 RESULT_TIMEOUT=""            # 空 = 按条数自动估
+READY_DEADLINE=90            # 板端「应用层就绪」探针最多等多少秒（见第 5 步）
 RUNS=1
 TAG=""
 DO_BOOT=1
@@ -102,7 +104,9 @@ XSDB_BAT="D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat"
 JTAG_DEVICE="xc7z010"
 
 usage() {
-    sed -n '2,53p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    # 头部注释块就是帮助正文。结束位置用 `set -uo pipefail` 那行现找，不再写死行号——
+    # 旧写法固定到第 53 行，头部改过之后已经把 4 行代码当帮助打了出来。
+    sed -n '2,/^set -uo pipefail$/p' "${BASH_SOURCE[0]}" | sed '$d' | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -119,6 +123,7 @@ while [[ $# -gt 0 ]]; do
         --plan-only)        PLAN_ONLY=1; shift ;;
         --orient)           ORIENT="$2"; shift 2 ;;
         --result-timeout)   RESULT_TIMEOUT="$2"; shift 2 ;;
+        --ready-deadline)   READY_DEADLINE="$2"; shift 2 ;;
         --runs)             RUNS="$2"; shift 2 ;;
         --tag)              TAG="$2"; shift 2 ;;
         --ip)               BOARD_IP="$2"; shift 2 ;;
@@ -291,7 +296,8 @@ fi
 say "1/7 前置检查"
 
 for f in "$READS_FILE" "$WM_FILE" tools/ldpc_decode.py tools/board_stage_check.py \
-         clients/python/first.py hw/build/export/SHA256SUMS; do
+         clients/python/first.py tools/board/g3_wait_ready.py \
+         hw/build/export/SHA256SUMS; do
     [[ -e "$f" ]] || die "缺少 $f"
 done
 info "仓库内数据与脚本齐备"
@@ -401,17 +407,6 @@ fi
 # 4. 烧录
 # ---------------------------------------------------------------------------
 say "4/7 烧录（rst -system → fpga → ps7_init → dow → con）"
-wait_board() {
-    local deadline=$(( SECONDS + ${1:-60} ))
-    while (( SECONDS < deadline )); do
-        if timeout 2 bash -c "echo > /dev/tcp/$BOARD_IP/$BOARD_PORT" 2>/dev/null; then
-            return 0
-        fi
-        sleep 2
-    done
-    return 1
-}
-
 if (( DO_BOOT )); then
     if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/boot.tcl" | tr '/' '\\')" ) \
             > "$RUN_DIR/boot.out" 2>&1; then
@@ -430,12 +425,35 @@ else
     step_skip "烧录" "--skip-boot"
 fi
 
-say "5/7 等待板端网络就绪"
-if wait_board 90; then
-    step_ok "板端 TCP:$BOARD_PORT 可达"
-    info "$BOARD_IP:$BOARD_PORT 已就绪"
+# ---------------------------------------------------------------------------
+# 5. 等板端**应用层**就绪（B28）
+# ---------------------------------------------------------------------------
+# 这一步以前只探裸 TCP 连通性（`echo > /dev/tcp/IP/PORT`），那是 B28 的直接成因：
+# 烧录完成后裸连通性立刻就「成功」，此时下发任务却必然失败（2026-09-03 实测 2/2），
+# 固定死在 clients/python/protocol.py:76 recv_exact ← query_caps ——
+# connect() 通、请求发得出去，读应答时对端已经把连接关掉，first.py 非零退出，
+# 于是**每个实验的第一轮都被打红**，而红的是一个不存在的缺陷。
+# 传输层有人应答 ≠ 应用层能回包，所以判据抬到应用层：必须收到合法的
+# PKT_CAPS_INFO(0x16) 才算就绪。探针实测烧录后约 7 s 才通过，那 7 s 就是假失败的产地。
+# 探针自己也做了 --settle 让位（板端 g_conn 是单例，关连接要占一个 tcp 回调周期）。
+say "5/7 等待板端应用层就绪（CAPS 握手，探针 tools/board/g3_wait_ready.py）"
+if (( FAILED )); then
+    # 烧录已经红了还去等 90 s，等出来的失败信息会指向 CAPS，把真因（烧录）盖掉。
+    step_skip "板端应用层就绪（CAPS）" "前置步骤已失败，不再探测"
 else
-    step_bad "板端 TCP:$BOARD_PORT 可达" "90 s 内连不上 $BOARD_IP:$BOARD_PORT"
+    READY_LOG="$RUN_DIR/wait_ready.out"
+    if python3 tools/board/g3_wait_ready.py --ip "$BOARD_IP" --port "$BOARD_PORT" \
+            --deadline "$READY_DEADLINE" > "$READY_LOG" 2>&1; then
+        READY_LINE="$(grep '^READY ' "$READY_LOG" | tail -1)"
+        step_ok "板端应用层就绪（CAPS）" "$READY_LINE"
+        info "$BOARD_IP:$BOARD_PORT $READY_LINE（READY <秒数> <尝试次数>；留证 $READY_LOG）"
+    else
+        step_bad "板端应用层就绪（CAPS）" \
+                 "$READY_DEADLINE s 内 $BOARD_IP:$BOARD_PORT 没有正常应答 CAPS，见 $READY_LOG"
+        # 逐次尝试的异常类型都在日志里：ConnectionRefusedError 之类是板子/网络没起来，
+        # 连接期正常但 recv 失败则是应用层还没起来 —— 两者的处置完全不同，别只看结论行。
+        tail -5 "$READY_LOG"
+    fi
 fi
 
 # 网络都不通就没必要往下跑了，后面每一步都会以另一种面目失败，反而掩盖真因。
@@ -445,7 +463,7 @@ if (( FAILED )); then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. 逐轮任务：first.py → ldpc_decode.py → 比哈希
+# 6. 逐轮任务：first.py → ldpc_decode.py → 比哈希
 # ---------------------------------------------------------------------------
 declare -a RUN_SHAS=()      # 只装**判据轮**的图片哈希
 declare -a RUN_ELAPSED=()   # 逐轮 first.py 墙钟耗时，用来看长时间连续运行有没有退化
@@ -592,7 +610,7 @@ if (( RUNS_COMPLETED > 2 )); then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. 逐级取证：只读导出四级 DDR 快照（不复位、不重烧）
+# 7. 逐级取证：只读导出四级 DDR 快照（不复位、不重烧）
 # ---------------------------------------------------------------------------
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
 if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
@@ -617,7 +635,7 @@ fi
 stop_uart
 
 # ---------------------------------------------------------------------------
-# 7. 裁决
+# 8. 裁决
 # ---------------------------------------------------------------------------
 SUMMARY="$RUN_DIR/summary.txt"
 {
