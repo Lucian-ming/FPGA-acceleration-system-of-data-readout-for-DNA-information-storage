@@ -29,6 +29,15 @@
 #   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
 #   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
 #   tools/run_g3.sh --runs 2                          # 同一次上电内连续跑两次任务（状态复位判据）
+#   tools/run_g3.sh --runs 2 --first-run-score-min 0  # 第一轮弄脏 Voter 累加器，第二轮才是判据
+#   tools/run_g3.sh --runs 2 --first-run-limit full --first-run-score-min 0
+#                                                     # 跨规模：先全量（弄脏），再回到默认小规模判据
+#   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67
+#                                                     # 多轮：奇数轮弄脏、偶数轮判据（每轮换 score_min）
+#   tools/run_g3.sh --runs 3 --run-limits full,2048,full --run-score-mins 0,67,67
+#                                                     # 逐轮指定条数与阈值（'-' = 用全局默认，'full' = 全量）
+#   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67 --plan-only
+#                                                     # 只打印逐轮计划，不碰板子（自查参数）
 #
 # 环境（docs/16、docs/19 已验证，勿重摸）
 # --------------------------------------
@@ -76,6 +85,14 @@ STAGE1_DUMP_RECORDS=""       # 空 = min(本次记录数, 4096)，黄金向量�
 # （720/1266 拍不符），足以让逐位判据变红，但别指望「差一位也必然被抓到」。
 # 正因如此，本脚本把「弄脏轮鉴别力自证」做成硬判据：两轮原始回传若相同即 FAIL。
 SCORE_MIN_RUN1=""            # 空 = 各轮都用 --score-min
+# 逐轮参数（比 --first-run-* 更一般，供三轮以上与跨规模连续任务使用）。
+# 逗号分隔，第 r 项对应第 r 轮；'-' 或空 = 沿用全局默认；'full' = 全量数据集。
+RUN_LIMITS=""
+RUN_SCORE_MINS=""
+LIMIT_RUN1=""
+# 「弄脏强度」硬校验：弄脏轮的 score_min 必须**低于**判据轮的，理由见下面的 dirty_strength 检查。
+ALLOW_WEAK_DIRTY=0
+PLAN_ONLY=0                  # 只打印逐轮计划就退出，不碰板子（用来自查参数表）
 READS_FILE="data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM_FILE="data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 
@@ -85,7 +102,7 @@ XSDB_BAT="D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat"
 JTAG_DEVICE="xc7z010"
 
 usage() {
-    sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    sed -n '2,53p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -95,6 +112,11 @@ while [[ $# -gt 0 ]]; do
         --full)             LIMIT=""; shift ;;          # 不传 --limit 给 first.py = 全量
         --score-min)        SCORE_MIN="$2"; shift 2 ;;
         --first-run-score-min) SCORE_MIN_RUN1="$2"; shift 2 ;;
+        --first-run-limit)  LIMIT_RUN1="$2"; shift 2 ;;
+        --run-limits)       RUN_LIMITS="$2"; shift 2 ;;
+        --run-score-mins)   RUN_SCORE_MINS="$2"; shift 2 ;;
+        --allow-weak-dirty) ALLOW_WEAK_DIRTY=1; shift ;;
+        --plan-only)        PLAN_ONLY=1; shift ;;
         --orient)           ORIENT="$2"; shift 2 ;;
         --result-timeout)   RESULT_TIMEOUT="$2"; shift 2 ;;
         --runs)             RUNS="$2"; shift 2 ;;
@@ -135,42 +157,133 @@ RUN_NAME="$STAMP${TAG:+-$TAG}"
 RUN_DIR="$WIN_ROOT_UNIX/g3_runs/$RUN_NAME"
 RUN_DIR_WIN="$WIN_ROOT_WIN/g3_runs/$RUN_NAME"
 
+FULL_READS=""
 detect_reads() {
-    # FASTQ 每条记录 4 行；只在需要推导记录数时才数，全量文件数一次约 1 s。
-    awk 'END{print int(NR/4)}' "$READS_FILE"
+    # FASTQ 每条记录 4 行；只在需要推导记录数时才数，全量文件数一次约 1 s（数完就缓存）。
+    [[ -n "$FULL_READS" ]] || FULL_READS="$(awk 'END{print int(NR/4)}' "$READS_FILE")"
+    printf '%s' "$FULL_READS"
 }
 
-if [[ -z "$LIMIT" ]]; then
-    SOURCE_READS="$(detect_reads)"
-else
-    SOURCE_READS="$LIMIT"
-fi
-MULT=1; [[ "$ORIENT" == "both" ]] && MULT=2
-RECORDS=$(( SOURCE_READS * MULT ))
-# 板端按 64 的倍数对齐（first.py 补零到整批），dump 与判据都按对齐后的条数算。
-RECORDS=$(( (RECORDS + 63) / 64 * 64 ))
+records_of() {
+    # 源读段数 → 板端记录数：--orient both 每条读段发正/反两条记录，再按 64 对齐
+    # （first.py 补零到整批），dump 与判据都按对齐后的条数算。
+    local mult=1 rec
+    [[ "$ORIENT" == "both" ]] && mult=2
+    rec=$(( $1 * mult ))
+    printf '%s' $(( (rec + 63) / 64 * 64 ))
+}
 
-if [[ -z "$RESULT_TIMEOUT" ]]; then
-    # 第五次上板实测：4,096 条记录的 result 阶段 32.4 s，其中约 97% 是 Stage1（随条数线性）。
-    # 这里按 (常数 20 s + 每条 10 ms) 再乘 2 倍余量取整，宁可等也不要被超时掩盖真故障。
-    RESULT_TIMEOUT=$(( (20 + RECORDS / 100) * 2 ))
-    (( RESULT_TIMEOUT < 180 )) && RESULT_TIMEOUT=180
-fi
+timeout_of() {
+    # 显式给了 --result-timeout 就一律用它；否则按本轮条数估。
+    # 第五次上板实测：4,096 条记录的 result 阶段 32.4 s；按 (常数 20 s + 每条 10 ms)
+    # 再乘 2 倍余量取整，宁可等也不要被超时掩盖真故障。
+    local t
+    if [[ -n "$RESULT_TIMEOUT" ]]; then printf '%s' "$RESULT_TIMEOUT"; return; fi
+    t=$(( (20 + $1 / 100) * 2 ))
+    (( t < 180 )) && t=180
+    printf '%s' "$t"
+}
+
+# ---------------------------------------------------------------------------
+# 逐轮参数表：连续任务的每一轮可以有**不同的条数和不同的 score_min**。
+# 为什么要逐轮：
+#   - 换条数 → 覆盖「跨不同规模的连续任务」（DDR 里还留着上一轮更长的中间结果）；
+#   - 换 score_min → 让「Voter 累加器没清零」这条缺陷可观测（同参数下它结构性不可观测，
+#     推导见 docs/03-status.md 盲区小节）。
+# 优先级：--first-run-* > --run-limits/--run-score-mins 的第 r 项 > 全局默认。
+# ---------------------------------------------------------------------------
+IFS=',' read -r -a LIM_SEQ  <<< "$RUN_LIMITS"
+IFS=',' read -r -a SM_SEQ   <<< "$RUN_SCORE_MINS"
+declare -a RUN_LIMIT=() RUN_SM=() RUN_SR=() RUN_REC=() RUN_TO=()
+
+for (( r = 1; r <= RUNS; r++ )); do
+    lim="$LIMIT"
+    if (( ${#LIM_SEQ[@]} >= r )) && [[ -n "${LIM_SEQ[r-1]}" && "${LIM_SEQ[r-1]}" != "-" ]]; then
+        lim="${LIM_SEQ[r-1]}"
+    fi
+    [[ $r -eq 1 && -n "$LIMIT_RUN1" ]] && lim="$LIMIT_RUN1"
+    [[ "$lim" == "full" || "$lim" == "all" ]] && lim=""      # 空 = 不传 --limit = 全量
+
+    sm="$SCORE_MIN"
+    if (( ${#SM_SEQ[@]} >= r )) && [[ -n "${SM_SEQ[r-1]}" && "${SM_SEQ[r-1]}" != "-" ]]; then
+        sm="${SM_SEQ[r-1]}"
+    fi
+    [[ $r -eq 1 && -n "$SCORE_MIN_RUN1" && $RUNS -gt 1 ]] && sm="$SCORE_MIN_RUN1"
+
+    if [[ -z "$lim" ]]; then sr="$(detect_reads)"; else sr="$lim"; fi
+    rec="$(records_of "$sr")"
+    RUN_LIMIT+=("$lim"); RUN_SM+=("$sm"); RUN_SR+=("$sr")
+    RUN_REC+=("$rec");  RUN_TO+=("$(timeout_of "$rec")")
+done
+
+# 全局展示量与四级取证都按**最后一轮**算 —— DDR 里留下的就是最后一轮的结果。
+SOURCE_READS="${RUN_SR[RUNS-1]}"
+RECORDS="${RUN_REC[RUNS-1]}"
+RESULT_TIMEOUT_LAST="${RUN_TO[RUNS-1]}"
 
 if [[ -z "$STAGE1_DUMP_RECORDS" ]]; then
     STAGE1_DUMP_RECORDS=$(( RECORDS < 4096 ? RECORDS : 4096 ))
 fi
 
-# UART 抓取窗口：烧录 + RUNS 轮任务 + 余量。有 StopFile 收尾，这里只是兜底上限。
-UART_SECONDS=$(( 90 + RUNS * (RESULT_TIMEOUT + 60) ))
+# UART 抓取窗口：烧录 + 各轮超时之和 + 余量。有 StopFile 收尾，这里只是兜底上限。
+UART_SECONDS=90
+for (( r = 0; r < RUNS; r++ )); do
+    UART_SECONDS=$(( UART_SECONDS + RUN_TO[r] + 60 ))
+done
 
 say "G3 一键复现  run=$RUN_NAME"
-info "源读段    : $SOURCE_READS 条（--orient $ORIENT）→ 对齐后 $RECORDS 条记录"
-info "score_min : $SCORE_MIN"
-info "任务次数  : $RUNS（同一次上电内连续下发）"
-info "结果超时  : ${RESULT_TIMEOUT}s（板端处理期间一个字节都不发，这是整条流水线的时长上限）"
+info "任务次数  : $RUNS（同一次上电内连续下发，中间不复位、不重烧）"
+for (( r = 1; r <= RUNS; r++ )); do
+    tag=""
+    [[ "${RUN_SM[r-1]}" != "$SCORE_MIN" ]] && tag="  ← 弄脏轮（输出不作判据）"
+    info "  第 $r 轮 : 源读段 $(printf '%8s' "${RUN_SR[r-1]}") 条 → $(printf '%7s' "${RUN_REC[r-1]}") 条记录，score_min=${RUN_SM[r-1]}，超时 ${RUN_TO[r-1]}s$tag"
+done
+info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次才比图片哈希）"
 info "判据哈希  : $EXPECT_SHA"
 info "留证目录  : $RUN_DIR"
+
+# ---------------------------------------------------------------------------
+# 0.5 弄脏强度：结构性校验，跑之前就挡住「不会失败的判据」
+#
+# 「弄脏轮 → 判据轮」这套判据要成立，弄脏轮必须在累加器里留下**与判据轮反向**的票。
+# 只有**降低**阈值才做得到：score_min 越低放进来的错配读段越多，它们的票方向是错的。
+# 提高阈值只是把判据轮那批高分记录取了个子集，残差与判据轮同向 —— 缺陷若存在，
+# 单调性保证符号判决不变（推导见 docs/03-status.md 盲区小节），判据照样全绿。
+#
+# 离线量化（tools/readout.py 语义，2,048 条读段，模拟「未清零」缺陷后判据轮的码字差异）：
+#     弄脏 score_min :    0      40      60      75      90
+#     码字差异 bit   : 1654    1654    1240       3       0
+# 75 那一档特别值得看：它自身输出与判据轮差 5,415 bit（现有的「两轮回传不同」自证
+# 会通过），但缺陷真的存在时只差 3 bit —— LDPC 顺手就纠回去了，判据仍然全绿。
+# 也就是说「两轮回传不同」是**必要非充分**条件，必须再加这条结构性校验。
+# ---------------------------------------------------------------------------
+for (( r = 2; r <= RUNS; r++ )); do
+    [[ "${RUN_SM[r-1]}" == "$SCORE_MIN" && "${RUN_SM[r-2]}" != "$SCORE_MIN" ]] || continue
+    # 规模稀释：弄脏轮条数少于判据轮时，残差会被判据轮自己的票淹没 —— 这一对
+    # 对「累加器没清零」同样没有鉴别力，但它对**跨规模**（DDR 里的长度/缓冲复用）
+    # 仍然有效，所以只提示、不拦。离线实测：2,048 条 score_min=0 弄脏后跑全量判据轮，
+    # 缺陷若存在码字差异 0/64,800 bit（票数 ~190/位，把 ±15 的残差整个盖掉）；
+    # 反过来（全量弄脏 → 2,048 条判据）是 1,155/64,800 bit，红得很清楚。
+    if (( RUN_REC[r-2] < RUN_REC[r-1] )); then
+        info "⚠️ 第 $(( r - 1 )) 轮只有 ${RUN_REC[r-2]} 条记录，少于第 $r 轮的 ${RUN_REC[r-1]} 条："
+        info "   残差会被判据轮自己的票淹没，这一对只覆盖跨规模，不覆盖累加器复位"
+    fi
+    if (( RUN_SM[r-2] >= SCORE_MIN )); then
+        if (( ALLOW_WEAK_DIRTY )); then
+            info "⚠️ 第 $(( r - 1 )) 轮 score_min=${RUN_SM[r-2]} ≥ 判据轮 $SCORE_MIN：残差与判据轮同向，"
+            info "   这一对「弄脏→判据」对累加器复位没有鉴别力（--allow-weak-dirty 已放行）"
+        else
+            die "第 $(( r - 1 )) 轮 score_min=${RUN_SM[r-2]} ≥ 判据轮的 $SCORE_MIN：提高阈值只会留下同向的票，
+     第 $r 轮即使不清零也照样全绿 —— 这条判据不会失败，跑了也没有信息量。
+     要弄脏就用**更低**的 score_min（如 0 或 60）。确要跑请显式加 --allow-weak-dirty。"
+        fi
+    fi
+done
+
+if (( PLAN_ONLY )); then
+    info "--plan-only：只打印逐轮计划，不碰板子"
+    exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # 1. 前置检查：环境、数据、制品同源性
@@ -334,7 +447,9 @@ fi
 # ---------------------------------------------------------------------------
 # 5. 逐轮任务：first.py → ldpc_decode.py → 比哈希
 # ---------------------------------------------------------------------------
-declare -a RUN_SHAS=()
+declare -a RUN_SHAS=()      # 只装**判据轮**的图片哈希
+declare -a RUN_ELAPSED=()   # 逐轮 first.py 墙钟耗时，用来看长时间连续运行有没有退化
+declare -a RUN_KIND=()      # judge / dirty
 RUNS_COMPLETED=0
 if (( ! FAILED )); then
 say "6/7 下发任务并比对判据哈希（共 $RUNS 轮）"
@@ -343,21 +458,21 @@ for (( r = 1; r <= RUNS; r++ )); do
     IMG_OUT="$RUN_DIR/decoded_run$r.jpg"
     CLI_LOG="$RUN_DIR/first_run$r.log"
 
-    info "--- 第 $r/$RUNS 轮：first.py ---"
+    RUN_SCORE_MIN="${RUN_SM[r-1]}"
+    RUN_THIS_LIMIT="${RUN_LIMIT[r-1]}"
+    # 「弄脏轮」= score_min 与判据轮不同的轮次：它只为在 Voter 累加器里留下
+    # 与判据轮不同向的残差，其自身输出不作判据（低阈值必然放进大量错配读段）。
+    DIRTY_RUN=0
+    [[ "$RUN_SCORE_MIN" != "$SCORE_MIN" ]] && DIRTY_RUN=1
+    RUN_KIND+=("$( (( DIRTY_RUN )) && echo dirty || echo judge )")
+
+    info "--- 第 $r/$RUNS 轮：first.py（源读段 ${RUN_SR[r-1]} → ${RUN_REC[r-1]} 条记录，score_min=$RUN_SCORE_MIN）---"
+    (( DIRTY_RUN )) && info "本轮是「弄脏轮」：score_min=$RUN_SCORE_MIN（与判据轮的 $SCORE_MIN 不同），其输出不作判据"
     FIRST_ARGS=(--ip "$BOARD_IP" --port "$BOARD_PORT"
                 --reads "$READS_FILE" --watermark "$WM_FILE"
                 --output "$BITS_OUT" --orient "$ORIENT"
-                --result-timeout "$RESULT_TIMEOUT")
-    [[ -n "$LIMIT" ]] && FIRST_ARGS+=(--limit "$LIMIT")
-
-    # 「弄脏轮」：只为在 Voter 累加器里留下与判据轮不同向的残差，它自己的输出不作判据。
-    RUN_SCORE_MIN="$SCORE_MIN"
-    DIRTY_RUN=0
-    if [[ -n "$SCORE_MIN_RUN1" && $r -eq 1 && $RUNS -gt 1 ]]; then
-        RUN_SCORE_MIN="$SCORE_MIN_RUN1"
-        DIRTY_RUN=1
-        info "本轮是「弄脏轮」：score_min=$RUN_SCORE_MIN（与判据轮的 $SCORE_MIN 不同），其输出不作判据"
-    fi
+                --result-timeout "${RUN_TO[r-1]}")
+    [[ -n "$RUN_THIS_LIMIT" ]] && FIRST_ARGS+=(--limit "$RUN_THIS_LIMIT")
     FIRST_ARGS+=(--score-min "$RUN_SCORE_MIN")
 
     T0=$SECONDS
@@ -367,8 +482,9 @@ for (( r = 1; r <= RUNS; r++ )); do
         break
     fi
     T_RUN=$(( SECONDS - T0 ))
+    RUN_ELAPSED+=("$T_RUN")
     RESULT_LINE="$(grep -E '^\s+Result:' "$CLI_LOG" | tail -1)"
-    step_ok "第 $r 轮 first.py" "$RESULT_LINE"
+    step_ok "第 $r 轮 first.py" "${RUN_REC[r-1]} 条记录 / score_min=$RUN_SCORE_MIN / ${T_RUN}s；$RESULT_LINE"
     info "耗时 ${T_RUN}s；$RESULT_LINE"
 
     info "--- 第 $r/$RUNS 轮：ldpc_decode.py ---"
@@ -378,7 +494,7 @@ for (( r = 1; r <= RUNS; r++ )); do
         if (( DIRTY_RUN )); then
             # 弄脏轮的板端输出本来就可能是噪声，译不出来很正常，不是判据。
             info "弄脏轮 LDPC 未能译出（预期之内，不作判据）"
-            step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+            step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录"
             RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
             continue
         fi
@@ -389,15 +505,15 @@ for (( r = 1; r <= RUNS; r++ )); do
     grep -E "失败校验|收敛|iter" "$RUN_DIR/ldpc_run$r.log" | head -4 | sed 's/^/    /'
 
     GOT_SHA="$(sha256sum "$IMG_OUT" | awk '{print $1}')"
-    RUN_SHAS+=("$GOT_SHA")
     if (( DIRTY_RUN )); then
         info "弄脏轮图片 SHA-256 = $GOT_SHA（不作判据）"
-        step_ok "弄脏轮已执行" "score_min=$RUN_SCORE_MIN"
+        step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录，图片 $GOT_SHA（不作判据）"
         RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
         continue
     fi
+    RUN_SHAS+=("$GOT_SHA")
     if [[ "$GOT_SHA" == "$EXPECT_SHA" ]]; then
-        step_ok "第 $r 轮 唯一判据（图片 SHA-256）" "$GOT_SHA"
+        step_ok "第 $r 轮 唯一判据（图片 SHA-256）" "${RUN_REC[r-1]} 条记录：$GOT_SHA"
         info "图片 SHA-256 = $GOT_SHA  ← 与判据逐位相同"
     else
         step_bad "第 $r 轮 唯一判据（图片 SHA-256）" "实得 $GOT_SHA"
@@ -408,31 +524,70 @@ for (( r = 1; r <= RUNS; r++ )); do
 done
 fi
 
-# 二次任务的附加判据：两轮必须拿到同一张图片。哈希都对时这条自然成立，
-# 但若判据哈希本身换过（--expect-sha），这条仍然能独立抓出「第二轮状态没复位」。
-# 弄脏模式的「判据自证」：弄脏轮与判据轮的**板端原始回传比特流**必须不同。
-# 若相同，说明这一轮压根没在 Voter 累加器里留下不同向的残差，
-# 那么下一轮通过也证明不了累加器被复位 —— 判据没有鉴别力，必须报失败而不是报通过。
-# 用 pre-LDPC 的原始回传来比，不依赖弄脏轮能不能译出图片。
-if [[ -n "$SCORE_MIN_RUN1" ]] && (( RUNS > 1 )); then
-    if [[ -f "$RUN_DIR/dec_input_run1.txt" && -f "$RUN_DIR/dec_input_run2.txt" ]]; then
-        if cmp -s "$RUN_DIR/dec_input_run1.txt" "$RUN_DIR/dec_input_run2.txt"; then
-            step_bad "弄脏轮鉴别力自证" \
+# 「弄脏轮鉴别力自证」（每一对「弄脏轮 → 判据轮」都要各自过一遍）：
+# 两轮的**板端原始回传比特流**必须不同。若相同，说明这一轮压根没在 Voter 累加器里
+# 留下不同向的残差，那么下一轮通过也证明不了累加器被复位 —— 判据没有鉴别力，
+# 必须报失败而不是报通过。用 pre-LDPC 的原始回传来比，不依赖弄脏轮能不能译出图片。
+# 注意这是**必要非充分**条件，充分性由上面「弄脏强度」那条结构性校验补上。
+for (( r = 2; r <= RUNS_COMPLETED; r++ )); do
+    [[ "${RUN_KIND[r-1]:-}" == "judge" && "${RUN_KIND[r-2]:-}" == "dirty" ]] || continue
+    A="$RUN_DIR/dec_input_run$(( r - 1 )).txt"
+    B="$RUN_DIR/dec_input_run$r.txt"
+    if [[ -f "$A" && -f "$B" ]]; then
+        if cmp -s "$A" "$B"; then
+            step_bad "第 $(( r - 1 ))→$r 轮 弄脏轮鉴别力自证" \
                 "两轮回传比特流逐位相同 → 弄脏轮没起作用，本判据对累加器复位没有鉴别力"
         else
-            DIFF_BITS="$(cmp -l "$RUN_DIR/dec_input_run1.txt" "$RUN_DIR/dec_input_run2.txt" | wc -l)"
-            step_ok "弄脏轮鉴别力自证" "两轮回传相差 $DIFF_BITS/64800 bit，累加器确实被写入了不同向的票"
+            DIFF_BITS="$(cmp -l "$A" "$B" | wc -l)"
+            step_ok "第 $(( r - 1 ))→$r 轮 弄脏轮鉴别力自证" \
+                "两轮回传相差 $DIFF_BITS/64800 bit，累加器确实被写入了不同向的票"
         fi
     else
-        step_bad "弄脏轮鉴别力自证" "缺少两轮的 dec_input，无法自证"
+        step_bad "第 $(( r - 1 ))→$r 轮 弄脏轮鉴别力自证" "缺少两轮的 dec_input，无法自证"
+    fi
+done
+
+# 多轮一致性：所有**判据轮**必须拿到同一张图片。各轮哈希都对时这条自然成立，
+# 但若判据哈希本身换过（--expect-sha），这条仍然能独立抓出「后面某轮状态没复位」。
+if (( ${#RUN_SHAS[@]} > 1 )); then
+    if [[ "$(printf '%s\n' "${RUN_SHAS[@]}" | sort -u | wc -l)" == "1" ]]; then
+        step_ok "多轮一致性（${#RUN_SHAS[@]} 个判据轮同一张图片）"
+    else
+        step_bad "多轮一致性（${#RUN_SHAS[@]} 个判据轮同一张图片）" "$(printf '%s ' "${RUN_SHAS[@]}")"
     fi
 fi
 
-if (( RUNS > 1 && ${#RUN_SHAS[@]} == RUNS )) && [[ -z "$SCORE_MIN_RUN1" ]]; then
-    if [[ "$(printf '%s\n' "${RUN_SHAS[@]}" | sort -u | wc -l)" == "1" ]]; then
-        step_ok "多轮一致性（$RUNS 轮同一张图片）"
+# 长时间连续运行的退化判据：同参数（同条数、同 score_min）的轮次之间，
+# 板端耗时不应随轮次增长。lwIP 的连接资源泄漏、BD 环退化、DDR 状态污染
+# 最先表现出来的就是「越跑越慢」或「干脆连不上」（连不上会在 first.py 那步先红）。
+# 阈值 1.5x：板端时长是确定性的（t = 28.90 s + 1.0012 ms/条，R² = 1.00000），
+# 同参数轮次之间的正常抖动远小于 50%，所以这条**会**因真退化而变红。
+if (( RUNS_COMPLETED > 2 )); then
+    DEGRADED=0; DEG_NOTE=""; SEEN_KEYS=" "
+    for (( i = 0; i < RUNS_COMPLETED; i++ )); do
+        [[ -n "${RUN_ELAPSED[i]:-}" ]] || continue
+        KEY="${RUN_REC[i]}/${RUN_SM[i]}"
+        # 每个「条数/阈值」组合只在它首次出现时比一次，避免同一组被重复登记。
+        [[ "$SEEN_KEYS" == *" $KEY "* ]] && continue
+        SEEN_KEYS="$SEEN_KEYS$KEY "
+        FIRST_T=""; LAST_T=""; CNT=0
+        for (( j = i; j < RUNS_COMPLETED; j++ )); do
+            [[ "${RUN_REC[j]}/${RUN_SM[j]}" == "$KEY" ]] || continue
+            [[ -n "${RUN_ELAPSED[j]:-}" ]] || continue
+            [[ -z "$FIRST_T" ]] && FIRST_T="${RUN_ELAPSED[j]}"
+            LAST_T="${RUN_ELAPSED[j]}"; CNT=$(( CNT + 1 ))
+        done
+        (( CNT >= 2 && FIRST_T > 0 )) || continue
+        if (( LAST_T * 100 > FIRST_T * 150 )); then
+            DEGRADED=1
+            DEG_NOTE="$DEG_NOTE ${KEY}: 首轮 ${FIRST_T}s → 末轮 ${LAST_T}s;"
+        fi
+    done
+    ALL_T="$(printf '%s ' "${RUN_ELAPSED[@]}")"
+    if (( DEGRADED )); then
+        step_bad "连续运行无退化（同参数轮次耗时 < 1.5x）" "$DEG_NOTE 逐轮耗时：$ALL_T"
     else
-        step_bad "多轮一致性（$RUNS 轮同一张图片）" "$(printf '%s ' "${RUN_SHAS[@]}")"
+        step_ok "连续运行无退化（同参数轮次耗时 < 1.5x）" "逐轮耗时：$ALL_T"
     fi
 fi
 
@@ -469,10 +624,20 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "G3 一键复现  run=$RUN_NAME"
     echo "时间(UTC)   : $STAMP"
     echo "命令        : tools/run_g3.sh $INVOCATION"
-    echo "源读段/记录 : $SOURCE_READS / $RECORDS （--orient $ORIENT，对齐 64）"
-    echo "score_min   : $SCORE_MIN"
-    echo "任务次数    : $RUNS"
-    echo "结果超时    : ${RESULT_TIMEOUT}s"
+    echo "任务次数    : $RUNS（同一次上电内连续下发，中间不复位、不重烧）"
+    echo "判据阈值    : score_min=$SCORE_MIN（只有这个阈值的轮次才比图片哈希）"
+    echo "orient      : $ORIENT（both = 每条读段发正/反两条记录），记录数按 64 对齐"
+    echo
+    printf '%-4s %-10s %-9s %-9s %-7s %-8s %s\n' \
+        "轮次" "类型" "源读段" "记录数" "阈值" "超时(s)" "实测耗时(s)"
+    for (( r = 1; r <= RUNS; r++ )); do
+        printf '%-4s %-10s %-9s %-9s %-7s %-8s %s\n' \
+            "$r" "$( [[ "${RUN_SM[r-1]}" == "$SCORE_MIN" ]] && echo "判据轮" || echo "弄脏轮" )" \
+            "${RUN_SR[r-1]}" "${RUN_REC[r-1]}" "${RUN_SM[r-1]}" "${RUN_TO[r-1]}" \
+            "${RUN_ELAPSED[r-1]:-未跑}"
+    done
+    echo
+    echo "四级取证按最后一轮算：Stage1 dump $STAGE1_DUMP_RECORDS 条记录"
     echo "bitstream   : $(sha256sum "$RUN_DIR/top_bd_wrapper.bit" | awk '{print $1}')"
     echo "ELF         : $(sha256sum "$RUN_DIR/dna_lwip_app.elf" | awk '{print $1}')"
     echo "判据哈希    : $EXPECT_SHA"
