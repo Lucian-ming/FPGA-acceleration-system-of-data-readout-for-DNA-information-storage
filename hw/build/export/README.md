@@ -156,12 +156,41 @@ cd sw/workspace/dna_lwip_app_b27/Debug && make all
 sha256sum dna_lwip_app_b27.elf
 ```
 
-**先做这个自证再信重建结果**：把 `sw/workspace/dna_lwip_app_b27/src/` 恢复到未改动状态
-（`git stash` 或从 Git 取回）后重建，ELF 必须逐字节等于本目录里那份。
-2026-09-03 实测：`touch ../src/echo.c && make all` 得到的 ELF =
-`9006d0ca7bf7b196e011bfe509c34403f1d02c4d0d1f5218a0acefbe0fead0bd`，
-与 `SHA256SUMS` 里的 `dna_lwip_app_b27.elf` 相同 —— 说明工具链、BSP、链接脚本
-都还是当初出这套制品时那一套。**没做这一步就换制品，等于拿一个没校准的秤称东西。**
+**先做这个自证再信重建结果**，但**别拿整个 ELF 的 SHA-256 当自证判据** ——
+这里有个坑，2026-09-04 实测踩到了：
+
+```bash
+# 把未改动的源码（例如某个提交里的 sw/app/echo.c）放进 workspace 后重建
+git show <某提交>:sw/app/echo.c > sw/workspace/dna_lwip_app_b27/src/echo.c
+cd sw/workspace/dna_lwip_app_b27/Debug && rm -f src/echo.o && make all
+sha256sum dna_lwip_app_b27.elf      # ← 很可能**不等于** 9006d0ca…，而这不代表出错了
+```
+
+**为什么**：编译用的是 `-g3`，DWARF 行号表里存着每条语句的行号。
+`40ba34f` 给 `sw/app/echo.c` 加了 **24 行纯注释**（那次的提交说明写明「只改注释、不动数值」，
+因为改数值要重建 ELF 并刷新 `SHA256SUMS`），但 `export/` 里的 ELF 从此没再重建过。
+于是**行号整体挪了位，调试段变了，整个文件的 SHA-256 也就变了 —— 而机器码一个字节没动**。
+
+所以正确的自证判据是**按段比对**，只看真正会被执行的部分：
+
+```bash
+OC=/tools/Xilinx/Vitis/2022.2/gnu/aarch32/lin/gcc-arm-none-eabi/bin/arm-none-eabi-objcopy
+for s in .text .data .rodata; do
+  $OC -O binary --only-section=$s hw/build/export/dna_lwip_app_b27.elf /tmp/ship$s.bin
+  $OC -O binary --only-section=$s <你重建出来的>.elf                   /tmp/new$s.bin
+  cmp /tmp/ship$s.bin /tmp/new$s.bin && echo "$s 相同"
+done
+```
+
+2026-09-04 实测：用 `a2a8067^` 的 `sw/app/echo.c` 重建出 `53352d55…`（≠ `9006d0ca…`），
+但 `.text`（115,360 B）、`.data`（3,148 B）、`.rodata`（14,607 B）**三段逐字节相同**。
+结论是工具链、BSP、链接脚本仍是当初出这套制品时那一套，可以放心换制品。
+
+**顺带钉住一个事实**：`hw/build/export/` 里的 ELF 与 `sw/app/echo.c` 自 `40ba34f`
+起就不是逐字节同源的，**差异纯粹是注释行号，已按上面的方法证明机器码相同**——
+不是「大概只是注释吧」的推测。下次谁再发现哈希对不上，不必重新怀疑一遍。
+
+**没做这一步就换制品，等于拿一个没校准的秤称东西。**
 
 `BOOT.bin` 里嵌着应用 ELF，所以换了 ELF 必须一起重生成（`.bif` 用 b27 那份，不是 b25）：
 
@@ -172,6 +201,7 @@ sha256sum dna_lwip_app_b27.elf
 
 同样先自证：不改 ELF 直接跑上面这条，输出必须等于
 `cabaf453015315ef2bab3b1947db43f6ecc62c1d51f46a8ed93691dff3fb7a92`（2026-09-03 实测成立）。
+`bootgen` 这一侧没有上面那个行号坑：它的输入就是 ELF 文件本身，输入不变输出就不变。
 
 最后刷新清单，否则 `tools/run_g3.sh` 的「制品同源性校验」会挡住你——**那是故意的**：
 
