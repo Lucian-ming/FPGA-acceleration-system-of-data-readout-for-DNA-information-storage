@@ -388,7 +388,7 @@ static int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
 typedef enum {
     PIPE_IDLE = 0,
     PIPE_WM_PREP,
-    /* 【B28】原来这里还有一个 PIPE_WM_WAIT：PIPE_WM_TX 提交 DMA、下一个 poll 才由
+    /* 【WM 批量化】原来这里还有一个 PIPE_WM_WAIT：PIPE_WM_TX 提交 DMA、下一个 poll 才由
      * PIPE_WM_WAIT 回收 BD，于是 50 个区域各占 2 个 poll 周期 ≈ 100 步。
      * 现在 PIPE_WM_TX 一次 poll 批量走 WM_REGIONS_PER_POLL 个区域、区域内有界忙等，
      * WM_WAIT 变成死状态，直接删掉，见 pipeline_step_stage1() 的 PIPE_WM_TX 分支。 */
@@ -432,7 +432,7 @@ static int rx_done        = 0;
 
 static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
 
-/* 【B28 水印预载批量化】—— 为什么是 16，以及为什么不会饿死 lwIP
+/* 【WM 批量化】—— 为什么是 16，以及为什么不会饿死 lwIP
  *
  * 改之前：PIPE_WM_TX 提交一个区域的 DMA 就 return，PIPE_WM_WAIT 在**下一个** poll
  * 里回收 BD。一个区域两个 poll 周期，50 个区域 ≈ 100 步；而 poll 有效间隔实测
@@ -573,7 +573,7 @@ static int submit_reads_chunk(void)
 
     return bd;
 }
-/* 【B28】单个水印区域的 BD 有界忙等。
+/* 【WM 批量化】单个水印区域的 BD 有界忙等。
  * 返回 0 成功，-1 失败（BD 报错或超时）。
  * 有界是关键：这段忙等发生在 lwIP 的 poll_callback 里，绝不能变成无限等。
  * 正常情况下 957 拍 ≈ 10 us 就完成，第一次 reclaim 往往就拿到了；
@@ -627,7 +627,7 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
-        /* 【B28】开始批量预载前先把 TX ring 排空。
+        /* 【WM 批量化】开始批量预载前先把 TX ring 排空。
          * 批量化之后，「本区域的 BD 完成了没有」是靠 reclaim 的**计数**判断的，
          * 而 XAxiDma_BdRingFromHw 是按提交顺序返回的：如果环上还压着上一次任务
          * 失败时残留的已完成 BD，region 0 的等待会被那个残留 BD 顶掉计数，
@@ -654,7 +654,7 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_WM_TX: {
-        /* 【B28】一次 poll 批量走 WM_REGIONS_PER_POLL 个区域。
+        /* 【WM 批量化】一次 poll 批量走 WM_REGIONS_PER_POLL 个区域。
          * 每个区域的寄存器写序列与原来**逐字节一致**（选区域 → usleep(10) →
          * 置 preload → usleep(10) → DMA → 等完成 → 清 preload → usleep(10)）：
          * 寄存器写序列本身就是被测对象（B27 的教训），这里只收掉 poll 周期的白等，
@@ -1973,7 +1973,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
     switch (g_proc_state) {
     case PROC_REQUESTED:
         pipeline_reset_counters(); pipeline_set_state(PIPE_WM_PREP);
-        /* 【B28 留证】整条流水线一共占了几个 poll 步、走了多少墙钟时间。
+        /* 【WM 批量化·留证】整条流水线一共占了几个 poll 步、走了多少墙钟时间。
          * 固定开销的量纲就是「poll 步数 × 250~500 ms」，把步数直接打出来，
          * 下一个人就不必再靠分档拟合去反推常数项（docs/18 P1 第 3 项的教训：
          * 扣除法推断一旦进了表格就会被当成实测引用）。 */
