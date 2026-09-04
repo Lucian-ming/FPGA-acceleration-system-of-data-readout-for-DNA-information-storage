@@ -52,6 +52,12 @@
 #if __has_include("proto.c")
 #include "proto.c"
 #endif
+#if __has_include("pipeline.c")
+#include "pipeline.c"
+#endif
+#if __has_include("stage3_decoder.c")
+#include "stage3_decoder.c"
+#endif
 #include "echo.c"
 
 #endif /* __ECHO_UNDER_TEST_H__ */
