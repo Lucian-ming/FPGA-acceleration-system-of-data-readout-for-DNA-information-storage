@@ -52,7 +52,7 @@ SRC="$BUILD/src/sw/app"
 mkdir -p "$BUILD/src"
 if [ "$USE_WORKTREE" = 1 ]; then
     mkdir -p "$SRC"
-    cp sw/app/*.h sw/app/echo.c "$SRC/" || { echo "✗ 复制工作树 sw/app 失败"; exit 2; }
+    cp sw/app/*.h sw/app/*.c "$SRC/" || { echo "✗ 复制工作树 sw/app 失败"; exit 2; }
     ORIGIN="工作树"
 else
     git archive "$REV" sw/app 2>/dev/null | tar -x -C "$BUILD/src" \
@@ -122,7 +122,7 @@ if [ "$SELFTEST" = 1 ]; then
                         --what "$what" --describe)
         idir="$BUILD/inj_$what"
         mkdir -p "$idir"
-        cp "$SRC"/*.h "$idir/"
+        cp "$SRC"/*.h "$SRC"/*.c "$idir/"
         if ! python3 tests/host/inject.py --src "$SRC/echo.c" \
                 --out "$idir/echo.c" --what "$what"; then
             echo "  ✗ [$what] 注入点已失效（见上）"

@@ -37,6 +37,9 @@
 #define volatile(x)
 
 /* ---- 4) 真实固件 ---- */
+#if __has_include("fw_log.c")
+#include "fw_log.c"
+#endif
 #include "echo.c"
 
 #endif /* __ECHO_UNDER_TEST_H__ */
