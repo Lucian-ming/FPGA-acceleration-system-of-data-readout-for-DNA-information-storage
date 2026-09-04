@@ -21,10 +21,10 @@
 //   NUM_LC/STRIDE 只决定比对阶段要跑多少拍，不参与装载。
 //
 // 判据（任一条不满足即 FAIL 并以非零码退出）：
-//   1. 送入 N 条读段必须收到恰好 N 条 48 B 记录（不许多、不许少）；
-//   2. **第 k 条结果记录的码字（bit 325:26）必须逐位等于送入的第 k 条读段的码字**
+//   1. 送入 N 条读段必须收到恰好 N 条 72 B 记录（不许多、不许少）；
+//   2. **第 k 条结果记录的码字（bit 525:26）必须逐位等于送入的第 k 条读段的码字**
 //      —— 这正是 B26 的判据；
-//   3. 每条记录恰好 6 拍、TLAST 只在第 6 拍、末拍高 58 bit 为 0；
+//   3. 每条记录恰好 9 拍、TLAST 只在第 9 拍、末拍高 50 bit 为 0；
 //   4. 码字字段不得含 X/Z（不许把 X 当 0）；
 //   5. 全程在随机上游空档与随机 TREADY 背压下成立；
 //   6. 超时即 FATAL。
@@ -34,22 +34,22 @@
 module tb_dna_ingress_result;
 
     // ---- 与生产一致的部分（不许改小）----
-    localparam integer READ_BPS  = 150;
-    localparam integer CODEBITS  = READ_BPS*2;                  // 300
+    localparam integer READ_BPS  = 250;
+    localparam integer CODEBITS  = READ_BPS*2;                  // 500
     localparam integer SCORE_W   = 10;
     localparam integer POS_W     = 16;
-    localparam integer RESULT_W  = CODEBITS + POS_W + SCORE_W;  // 326
-    localparam integer REF_LEN   = 957;   // 与核里 wm_waddr 的 956 回绕绑定，不能改
-    localparam integer BEATS     = 6;     // 每条记录 6 拍 x 64 bit = 48 B
+    localparam integer RESULT_W  = CODEBITS + POS_W + SCORE_W;  // 526
+    localparam integer REF_LEN   = 1055;  // 与核里 wm_waddr 的 1054 回绕绑定，不能改
+    localparam integer BEATS     = 9;     // 每条记录 9 拍 x 64 bit = 72 B
 
     // ---- 只为缩短仿真时间而改小的扫描几何 ----
     localparam integer NUM_LC    = 1;     // 生产 50
-    localparam integer STRIDE    = 8;     // 生产 807
+    localparam integer STRIDE    = 8;     // 生产 805
     localparam integer BATCH     = 8;     // 生产 64
 
     localparam integer NBATCH    = 4;                 // 4 个 batch，覆盖跨 batch 的连续装载
     localparam integer NREADS    = NBATCH * BATCH;    // 送入的读段条数
-    localparam integer NWORDS    = 10;                // 每条读段 10 个 32 bit 字（末字 12 bit 有效）
+    localparam integer NWORDS    = 16;                // 每条读段 16 个 32 bit 字（末字 20 bit 有效）
     localparam integer WM_SYMS   = NUM_LC * REF_LEN;
 
     localparam [3:0] REG0 = 4'h0;   // [0]=start [1]=preload [2]=soft_reset
@@ -143,9 +143,9 @@ module tb_dna_ingress_result;
         reg [CODEBITS-1:0] v;
         reg [31:0] s;
         begin
-            fd = $fopen("tests/golden/reads_cw.hex", "r");
+            fd = $fopen("tests/golden/se250/reads_cw.hex", "r");
             if (fd == 0) begin
-                $display("[TB] FATAL: 打不开 tests/golden/reads_cw.hex");
+                $display("[TB] FATAL: 打不开 tests/golden/se250/reads_cw.hex");
                 $fatal(1);
                 $finish;
             end
@@ -160,9 +160,9 @@ module tb_dna_ingress_result;
             end
             $fclose(fd);
 
-            fd = $fopen("tests/golden/wm_regions.hex", "r");
+            fd = $fopen("tests/golden/se250/wm_regions.hex", "r");
             if (fd == 0) begin
-                $display("[TB] FATAL: 打不开 tests/golden/wm_regions.hex");
+                $display("[TB] FATAL: 打不开 tests/golden/se250/wm_regions.hex");
                 $fatal(1);
                 $finish;
             end
@@ -264,7 +264,7 @@ module tb_dna_ingress_result;
                 repeat (50) @(posedge aclk);
                 axil_write(REG0, 32'h0);        // 退出预载模式
                 repeat (20) @(posedge aclk);
-                if (dut.wm_waddr !== 10'd0) begin
+                if (dut.wm_waddr !== 11'd0) begin
                     errors = errors + 1;
                     $display("[TB] FAIL: 区域 %0d 预载后 wm_waddr=%0d，应回到 0", r, dut.wm_waddr);
                 end
@@ -281,7 +281,7 @@ module tb_dna_ingress_result;
             for (i = 0; i < NREADS; i = i + 1) begin
                 for (w = 0; w < NWORDS; w = w + 1) begin
                     if (w == NWORDS-1)
-                        word = {20'd0, read_cw[i][CODEBITS-1:288]};   // 末字只有低 12 bit 有效
+                        word = {12'd0, read_cw[i][CODEBITS-1:480]};   // 末字只有低 20 bit 有效
                     else
                         word = read_cw[i][32*w +: 32];
                     // TLAST 打在每「帧」（BATCH 条）的最后一拍，模拟 MM2S 每个 BD 一个包
@@ -300,11 +300,11 @@ module tb_dna_ingress_result;
     // ================= 收结果并逐条比对 =================
     integer rec_cnt  = 0;
     integer beat_cnt = 0;
-    reg [383:0] rec_acc = 384'd0;
+    reg [575:0] rec_acc = 576'd0;
 
     task check_record;
         input integer idx;
-        input [383:0] acc;
+        input [575:0] acc;
         reg [RESULT_W-1:0] rec;
         reg [CODEBITS-1:0] got_cw, exp_cw;
         reg [POS_W-1:0]    got_pos;
@@ -316,9 +316,9 @@ module tb_dna_ingress_result;
             got_pos = rec[SCORE_W+POS_W-1:SCORE_W];
             got_cw  = rec[RESULT_W-1:SCORE_W+POS_W];
 
-            if (acc[383:RESULT_W] !== 58'd0) begin
+            if (acc[575:RESULT_W] !== 50'd0) begin
                 errors = errors + 1;
-                $display("[TB] FAIL: 记录 %0d 末拍高 58 bit 非零（0x%0h）", idx, acc[383:RESULT_W]);
+                $display("[TB] FAIL: 记录 %0d 末拍高 50 bit 非零（0x%0h）", idx, acc[575:RESULT_W]);
             end
             if (idx >= NREADS) begin
                 errors = errors + 1;
@@ -334,8 +334,8 @@ module tb_dna_ingress_result;
                     cw_bad = cw_bad + 1;
                     if (cw_bad <= 6) begin
                         $display("[TB] FAIL: 记录 %0d 的码字 != 送入的第 %0d 条读段", idx, idx);
-                        $display("[TB]        got = %75h", got_cw);
-                        $display("[TB]        exp = %75h", exp_cw);
+                        $display("[TB]        got = %125h", got_cw);
+                        $display("[TB]        exp = %125h", exp_cw);
                         for (j = 0; j < NREADS; j = j + 1)
                             if (got_cw === read_cw[j])
                                 $display("[TB]        >>> 它其实等于读段 %0d（错位 %0d 条）", j, j - idx);
@@ -361,7 +361,7 @@ module tb_dna_ingress_result;
                              rec_cnt, beat_cnt+1, BEATS);
                 end
                 check_record(rec_cnt, rec_acc);
-                rec_acc  = 384'd0;
+                rec_acc  = 576'd0;
                 beat_cnt = 0;
                 rec_cnt  = rec_cnt + 1;
             end else begin

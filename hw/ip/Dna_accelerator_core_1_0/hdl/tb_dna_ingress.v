@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 
 // DNA 顶层 AXIS 入口判据：
-// 1. 10x32 bit 必须组装成一条 300 bit 读段；
+// 1. 16x32 bit 必须组装成一条 500 bit 读段；
 // 2. 引擎长时间 busy 时，输入 FIFO 满后必须对 DMA 施加背压，不能静默丢数据。
 module tb_dna_ingress;
     localparam integer CLK_PERIOD = 10;
@@ -22,7 +22,7 @@ module tb_dna_ingress;
     wire [7:0] m_strb;
     wire m_last;
 
-    reg [299:0] expected_read;
+    reg [499:0] expected_read;
     integer word_index;
     integer offered_word;
     integer accepted_words;
@@ -83,7 +83,7 @@ module tb_dna_ingress;
     endtask
 
     initial begin
-        expected_read = 300'd0;
+        expected_read = 500'd0;
         accepted_words = 0;
         saw_backpressure = 0;
 
@@ -96,8 +96,9 @@ module tb_dna_ingress;
         force dut.idle_counter = 17'd100000;
         #1;
         if (!dut.trigger_timeout) begin
-            $display("[TB] idle_counter 位宽不足，100000 周期超时不可达");
+            $display("[FAIL] idle_counter 位宽不足，100000 周期超时不可达");
             $fatal(1);
+            $finish;
         end
         release dut.idle_counter;
         release dut.in_count;
@@ -106,27 +107,28 @@ module tb_dna_ingress;
         rst_n = 1'b1;
         repeat (4) @(posedge clk);
 
-        // 一条带独特尾拍的读段，钉死 10 拍组装位序。
-        for (word_index = 0; word_index < 10; word_index = word_index + 1) begin
-            if (word_index < 9)
+        // 一条带独特尾拍的读段，钉死 16 拍组装位序。
+        for (word_index = 0; word_index < 16; word_index = word_index + 1) begin
+            if (word_index < 15)
                 expected_read[word_index*32 +: 32] = 32'hA5000000 + word_index;
             else
-                expected_read[299:288] = (32'hA5000000 + word_index) & 12'hFFF;
-            send_compliant_word(32'hA5000000 + word_index, word_index == 9);
+                expected_read[499:480] = (32'hA5000000 + word_index) & 20'hFFFFF;
+            send_compliant_word(32'hA5000000 + word_index, word_index == 15);
         end
         repeat (3) @(posedge clk);
         if (dut.u_in_fifo.mem[0] !== expected_read) begin
-            $display("[TB] 组装错误: got=%h expect=%h", dut.u_in_fifo.mem[0], expected_read);
+            $display("[FAIL] 组装错误: got=%h expect=%h", dut.u_in_fifo.mem[0], expected_read);
             $fatal(1);
+            $finish;
         end
 
         // 隔离入口流控：模拟引擎长时间计算，不让它从 FIFO 取数。
         force dut.eng_busy = 1'b1;
-        for (offered_word = 0; offered_word < OFFER_READS*10; offered_word = offered_word + 1) begin
+        for (offered_word = 0; offered_word < OFFER_READS*16; offered_word = offered_word + 1) begin
             @(negedge clk);
             s_valid = 1'b1;
             s_data = offered_word;
-            s_last = ((offered_word % 10) == 9);
+            s_last = ((offered_word % 16) == 15);
             @(posedge clk);
             if (s_ready)
                 accepted_words = accepted_words + 1;
@@ -139,13 +141,15 @@ module tb_dna_ingress;
         repeat (4) @(posedge clk);
 
         if (!saw_backpressure) begin
-            $display("[TB] FIFO 满后 TREADY 从未拉低，%0d 个拍全部被接受", accepted_words);
+            $display("[FAIL] FIFO 满后 TREADY 从未拉低，%0d 个拍全部被接受", accepted_words);
             $fatal(1);
+            $finish;
         end
-        if (dut.u_in_fifo.count !== 1024 || dut.in_count !== 1024) begin
-            $display("[TB] 计数漂移: fifo_count=%0d in_count=%0d",
+        if (dut.u_in_fifo.count !== 256 || dut.in_count !== 256) begin
+            $display("[FAIL] 计数漂移: fifo_count=%0d in_count=%0d",
                      dut.u_in_fifo.count, dut.in_count);
             $fatal(1);
+            $finish;
         end
 
         release dut.eng_busy;

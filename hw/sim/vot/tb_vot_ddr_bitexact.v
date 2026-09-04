@@ -63,8 +63,8 @@ module tb_vot_ddr_bitexact;
 
     // ---------------- 规模常量（与 sw/app/echo.h、黄金向量一致）----------------
     localparam integer NUM_RECORDS   = 4096;              // make_golden.py --limit 2048 x 正反向
-    localparam integer WORDS_PER_REC = 6;                 // 每条记录 48 B
-    localparam integer IN_WORDS      = NUM_RECORDS * WORDS_PER_REC;   // 24576
+    localparam integer WORDS_PER_REC = 9;                 // 每条记录 72 B (9 拍 x 64 bit)
+    localparam integer IN_WORDS      = NUM_RECORDS * WORDS_PER_REC;   // 36864
     localparam integer OUT_BEATS     = 1266;              // ceil(81000/64)
     localparam integer OUT_BITS      = 81000;
     localparam integer LAST_BITS     = OUT_BITS - 64*(OUT_BEATS-1);   // 40
@@ -94,7 +94,7 @@ module tb_vot_ddr_bitexact;
     localparam [4:0] ST_INIT_BRAM = 5'd1;
     localparam [4:0] ST_READ_DATA = 5'd3;
 
-    localparam integer SCORE_MIN_THR = 67;      // int(0.45*150)，与 make_golden.py 一致
+    localparam integer SCORE_MIN_THR = 112;     // int(0.45*250)，与 make_golden.py 一致
 
     reg clk = 0, rstn = 0;
     always #5 clk = ~clk;                       // 100 MHz，与板上 FCLK0 相同
@@ -496,7 +496,7 @@ module tb_vot_ddr_bitexact;
     task fw_configure(input integer total_reads, input integer score_min);
         begin
             axil_write(REG_IN_ADDR,     IN_ADDR);
-            axil_write(REG_IN_BEATS,    total_reads * 6);   // 固件写的是 total_reads*6
+            axil_write(REG_IN_BEATS,    total_reads * WORDS_PER_REC);   // 固件写的是 total_reads * 9
             axil_write(REG_OUT_ADDR,    OUT_ADDR);
             axil_write(REG_OUT_BEATS,   OUT_BEATS);
             axil_write(REG_TOTAL_READS, total_reads);
@@ -505,7 +505,7 @@ module tb_vot_ddr_bitexact;
             axil_read(REG_IN_ADDR, rdata);
             if (rdata !== IN_ADDR)          begin $display("[TB] [FAIL] IN_ADDR readback %h", rdata);      errors = errors + 1; end
             axil_read(REG_IN_BEATS, rdata);
-            if (rdata !== total_reads*6)    begin $display("[TB] [FAIL] IN_BEATS readback %0d", rdata);    errors = errors + 1; end
+            if (rdata !== total_reads*WORDS_PER_REC) begin $display("[TB] [FAIL] IN_BEATS readback %0d", rdata);    errors = errors + 1; end
             axil_read(REG_OUT_ADDR, rdata);
             if (rdata !== OUT_ADDR)         begin $display("[TB] [FAIL] OUT_ADDR readback %h", rdata);     errors = errors + 1; end
             axil_read(REG_OUT_BEATS, rdata);
@@ -728,9 +728,9 @@ module tb_vot_ddr_bitexact;
     end
 
     initial begin
-        input_path      = "tests/golden/stage2_in.hex";
-        expect_thr_path = "tests/golden/stage2_expect.hex";
-        expect_raw_path = "tests/golden/stage2_rtl_expect.hex";
+        input_path      = "tests/golden/se250/stage2_in.hex";
+        expect_thr_path = "tests/golden/se250/stage2_expect.hex";
+        expect_raw_path = "tests/golden/se250/stage2_rtl_expect.hex";
         start0_ns       = 100000;      // echo.c: START=1 之后 usleep(100)
         late_ns         = 5000000;     // 5 ms：投票途中
         second_score_min = 0;          // 场景 2 的阈值：默认换成 0，让残留可观测
@@ -773,11 +773,11 @@ module tb_vot_ddr_bitexact;
         $display("[TB] start0_ns=%0d late_ns=%0d rseed=%0d wseed=%0d inject=%0s",
                  start0_ns, late_ns, rseed_arg, wseed_arg, inject_name);
 
-        // b20 注入：把读突发强行退回「每条记录固定 6 拍、从不按 4KB 页拆分」，
+        // b20 注入：把读突发强行退回「每条记录固定 9 拍、从不按 4KB 页拆分」，
         // 即缺陷 B20 修复前的行为。必须被从机的 4KB 页边界判据抓住。
         if (inj_b20) begin
-            force dut.rd_burst_beats = 3'd6;
-            $display("[TB] inject b20 : rd_burst_beats forced to 6 (pre-B20 behaviour)");
+            force dut.rd_burst_beats = 4'd9;
+            $display("[TB] inject b20 : rd_burst_beats forced to 9 (pre-B20 behaviour)");
         end
         if (inj_rot) $display("[TB] inject rot : DDR read stream rotated by one 64-bit word");
         if (inj_c4)  $display("[TB] inject c4  : BRAM clear suppressed on the second task");

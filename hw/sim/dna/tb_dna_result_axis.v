@@ -16,17 +16,17 @@
 //   FIFO，然后在 M_AXIS_RESULT 上逐拍核对。
 //
 // 判据（任一条不满足即 FAIL 并以非零码退出）：
-//   1. 每个 packet 恰好 6 拍，TLAST 只在第 6 拍拉高；
-//   2. 第 k 拍必须逐位等于 tests/golden/stage2_in.hex 里该记录的第 k 个 64-bit 字；
+//   1. 每个 packet 恰好 9 拍，TLAST 只在第 9 拍拉高；
+//   2. 第 k 拍必须逐位等于 tests/golden/se250/stage2_in.hex 里该记录的第 k 个 64-bit 字；
 //   3. 记录条数、总拍数都必须与送入的一致（不许多、不许少）；
 //   4. 全程在随机 TREADY 背压下成立（B23 正是在真实 DMA 背压下才显形）。
 //=============================================================================
 module tb_dna_result_axis;
 
     localparam integer NREC      = 64;      // 核对的记录条数
-    localparam integer BEATS     = 6;       // 每条记录 6 拍 x 64 bit = 48 B
-    localparam integer RESULT_W  = 326;     // CODEBITS(300) + POS_W(16) + SCORE_W(10)
-    localparam integer GOLD_LINES= 24576;   // stage2_in.hex 全长：4096 条 x 6 字
+    localparam integer BEATS     = 9;       // 每条记录 9 拍 x 64 bit = 72 B
+    localparam integer RESULT_W  = 526;     // CODEBITS(500) + POS_W(16) + SCORE_W(10)
+    localparam integer GOLD_LINES= 36864;   // stage2_in.hex 全长：4096 条 x 9 字
     localparam integer GAP       = 64;      // 两条记录之间的间隔拍数（模拟引擎产出节奏）
 
     reg aclk = 1'b0;
@@ -78,7 +78,7 @@ module tb_dna_result_axis;
         .M_AXIS_RESULT_TREADY  (m_tready)
     );
 
-    // ---- 黄金向量：tests/golden/stage2_in.hex（每行一个 64 bit 字，6 行一条记录）----
+    // ---- 黄金向量：tests/golden/se250/stage2_in.hex（每行一个 64 bit 字，9 行一条记录）----
     reg [63:0] gold [0:GOLD_LINES-1];
 
     // ---- 注入侧 ----
@@ -128,12 +128,12 @@ module tb_dna_result_axis;
     end
 
     //-------------------------------------------------------------------------
-    // 注入：把黄金记录的低 326 bit 直接写进结果 FIFO
+    // 注入：把黄金记录的低 526 bit 直接写进结果 FIFO
     //-------------------------------------------------------------------------
-    reg [383:0] rec_full;
+    reg [575:0] rec_full;
     integer i, k;
     initial begin
-        $readmemh("tests/golden/stage2_in.hex", gold);
+        $readmemh("tests/golden/se250/stage2_in.hex", gold);
 
         repeat (10) @(posedge aclk);
         aresetn = 1'b1;
@@ -144,7 +144,7 @@ module tb_dna_result_axis;
         force dut.eng_res_din = inj_din;
 
         for (i = 0; i < NREC; i = i + 1) begin
-            rec_full = 384'd0;
+            rec_full = 576'd0;
             for (k = 0; k < BEATS; k = k + 1)
                 rec_full[k*64 +: 64] = gold[i*BEATS + k];
 
