@@ -49,6 +49,9 @@
 #if __has_include("dma_dna.c")
 #include "dma_dna.c"
 #endif
+#if __has_include("proto.c")
+#include "proto.c"
+#endif
 #include "echo.c"
 
 #endif /* __ECHO_UNDER_TEST_H__ */
