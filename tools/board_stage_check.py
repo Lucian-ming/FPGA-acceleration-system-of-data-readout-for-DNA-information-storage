@@ -72,15 +72,15 @@ class Result:
             print(f"  {line}")
 
 
-def check_watermark(dump_dir: Path) -> Result:
+def check_watermark(dump_dir: Path, golden_dir: Path, ref_len: int = 957) -> Result:
     r = Result("展开水印 @0x10040000  vs  wm_regions.hex")
     blob = (dump_dir / "dump_wm_regions.bin").read_bytes()
-    gold = read_hex_words(GOLDEN / "wm_regions.hex")
+    gold = read_hex_words(golden_dir / "wm_regions.hex")
     got = le_words(blob, 4)
     n = min(len(got), len(gold))
     bad = [i for i in range(n) if got[i] != gold[i]]
     if bad:
-        regions = sorted({i // 957 for i in bad})
+        regions = sorted({i // ref_len for i in bad})
         r.fail(f"{len(bad)}/{n} 字不符，涉及 {len(regions)}/50 个区域，前几个：{regions[:8]}")
         r.note("→ 这是 PS 侧展开水印写进 DDR 的内容；它错说明问题在固件 expand_watermark_regions()")
     else:
@@ -88,31 +88,31 @@ def check_watermark(dump_dir: Path) -> Result:
     return r
 
 
-def check_stage1(dump_dir: Path, reads: int) -> Result:
+def check_stage1(dump_dir: Path, reads: int, golden_dir: Path, record_bytes: int = 48, beats_per_rec: int = 6) -> Result:
     r = Result("Stage1 输出 @0x10600000  vs  stage2_in.hex")
     blob = (dump_dir / "dump_stage1.bin").read_bytes()
-    gold_w = read_hex_words(GOLDEN / "stage2_in.hex")
+    gold_w = read_hex_words(golden_dir / "stage2_in.hex")
 
     def brec(i: int) -> int:
-        return int.from_bytes(blob[i * RECORD_BYTES:(i + 1) * RECORD_BYTES], "little")
+        return int.from_bytes(blob[i * record_bytes:(i + 1) * record_bytes], "little")
 
     def grec(i: int) -> int:
         v = 0
-        for k in range(BEATS_PER_RECORD):
-            v |= gold_w[i * BEATS_PER_RECORD + k] << (64 * k)
+        for k in range(beats_per_rec):
+            v |= gold_w[i * beats_per_rec + k] << (64 * k)
         return v
 
-    n_gold = len(gold_w) // BEATS_PER_RECORD
-    n = min(reads, len(blob) // RECORD_BYTES, n_gold)
+    n_gold = len(gold_w) // beats_per_rec
+    n = min(reads, len(blob) // record_bytes, n_gold)
 
     # --- 已知缺陷签名 1（B23）：TDATA 比 TVALID 早一拍 → 每包实收 [b1..b5,b5] ---
     def word(i: int, k: int) -> int:
-        off = i * RECORD_BYTES + k * 8
+        off = i * record_bytes + k * 8
         return int.from_bytes(blob[off:off + 8], "little")
 
-    dup = sum(1 for i in range(n) if word(i, 4) == word(i, 5))
+    dup = sum(1 for i in range(n) if word(i, beats_per_rec - 2) == word(i, beats_per_rec - 1))
     if dup > n * 0.5:
-        r.fail(f"【B23 签名】{dup}/{n} 条记录的第 5、6 拍完全相同 → AXIS 输出级 TDATA/TVALID 又偏了一拍")
+        r.fail(f"【B23 签名】{dup}/{n} 条记录的倒数第 1、2 拍完全相同 → AXIS 输出级 TDATA/TVALID 又偏了一拍")
 
     # --- 已知缺陷签名 2（B26）：结果整体错位若干条读段 ---
     best_off, best_hits = 0, -1
@@ -153,7 +153,7 @@ def check_stage1(dump_dir: Path, reads: int) -> Result:
     if bad_pos:
         r.fail(f"{bad_pos}/{total} 条 position >= L={L_SYMBOLS}，不可能 → 记录内容是随机比特")
 
-    r.note(f"整条 48 B 逐位相同：{exact}/{total}")
+    r.note(f"整条 {record_bytes} B 逐位相同：{exact}/{total}")
     r.note(f"码字相同：{cw_same}/{total}   score 相同：{score_same}/{total}")
     top = sorted(pos_delta.items(), key=lambda kv: -kv[1])[:3]
     r.note(f"position 差值 top3：{top}")
@@ -178,18 +178,18 @@ def _compare_words(r: Result, blob: bytes, gold_path: Path, hint: str) -> Result
     return r
 
 
-def check_stage2(dump_dir: Path) -> Result:
+def check_stage2(dump_dir: Path, golden_dir: Path) -> Result:
     r = Result("Stage2 输出 ⊕ 水印 @0x11000000  vs  sparse_expect.hex")
     r.note("注意：PS 会在 Stage2 之后就地异或水印，所以这里比的是 sparse 而不是 stage2_rtl_expect")
     return _compare_words(r, (dump_dir / "dump_stage2.bin").read_bytes(),
-                          GOLDEN / "sparse_expect.hex",
+                          golden_dir / "sparse_expect.hex",
                           "→ 输入若正确而此级错，怀疑 Voter 的 AXI 读通路或 PS 侧异或的 cache 次序")
 
 
-def check_stage3(dump_dir: Path) -> Result:
+def check_stage3(dump_dir: Path, golden_dir: Path) -> Result:
     r = Result("Stage3 输出 @0x11100000  vs  stage3_expect.hex")
     blob = (dump_dir / "dump_stage3.bin").read_bytes()[:8100]
-    r = _compare_words(r, blob, GOLDEN / "stage3_expect.hex",
+    r = _compare_words(r, blob, golden_dir / "stage3_expect.hex",
                        "→ 输入若正确而此级错，先查 B27 那类「被自己重启」的寄存器时序，"
                        "再查 Decoder 的 AXI 读通路")
     return r
@@ -201,11 +201,31 @@ def main() -> int:
     ap.add_argument("--dump-dir", type=Path, default=DEFAULT_DUMP_DIR,
                     help="dump_ddr.tcl 导出的四个 .bin 所在目录")
     ap.add_argument("--reads", type=int, default=4096, help="本次任务的记录条数（默认 4096）")
+    ap.add_argument("--read-bps", type=int, default=150, choices=[150, 250],
+                    help="读段碱基数（150 或 250，默认 150）")
+    ap.add_argument("--golden-dir", type=Path, default=None,
+                    help="黄金向量目录（默认按 read-bps 自动选 tests/golden 或 tests/golden/se250）")
     args = ap.parse_args()
 
     if not args.dump_dir.is_dir():
         print(f"FATAL: 找不到 dump 目录 {args.dump_dir}", file=sys.stderr)
         return 2
+
+    if args.golden_dir is not None:
+        golden_dir = args.golden_dir
+    elif args.read_bps == 250:
+        golden_dir = REPO / "tests" / "golden" / "se250"
+    else:
+        golden_dir = REPO / "tests" / "golden"
+
+    if args.read_bps == 250:
+        record_bytes = 72
+        beats_per_rec = 9
+        ref_len = 1055
+    else:
+        record_bytes = 48
+        beats_per_rec = 6
+        ref_len = 957
 
     checks = []
     for fn, need in ((check_watermark, "dump_wm_regions.bin"),
@@ -217,11 +237,11 @@ def main() -> int:
             return 2
 
     print(f"dump 目录：{args.dump_dir}")
-    print(f"黄金向量：{GOLDEN}")
-    checks.append(check_watermark(args.dump_dir))
-    checks.append(check_stage1(args.dump_dir, args.reads))
-    checks.append(check_stage2(args.dump_dir))
-    checks.append(check_stage3(args.dump_dir))
+    print(f"黄金向量：{golden_dir} (read_bps={args.read_bps}, {record_bytes}B/read)")
+    checks.append(check_watermark(args.dump_dir, golden_dir, ref_len))
+    checks.append(check_stage1(args.dump_dir, args.reads, golden_dir, record_bytes, beats_per_rec))
+    checks.append(check_stage2(args.dump_dir, golden_dir))
+    checks.append(check_stage3(args.dump_dir, golden_dir))
 
     for c in checks:
         c.render()

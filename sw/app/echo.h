@@ -21,8 +21,8 @@
 #include "ddr_layout.h"   /* 【C2/C3】按实际条数计算/校验 DDR 区间（主机可测） */
 #include "task_config.h"  /* 【P3】PKT_CONFIG 解析/校验/CRC（主机可测） */
 
-/* 【P3】读段碱基数：当前比特流为 SE150 综合参数（SE250 需 P7 换 RTL 参数） */
-#define READ_BASES_PER_READ     150U
+/* 【P3】读段碱基数：SE250 规格 */
+#define READ_BASES_PER_READ     250U
 /* 容量内最大的 64 对齐条数：TOTAL_READS=108000 本身不是 64 的倍数 */
 #define TASK_MAX_READS          ((TOTAL_READS / FRAME_READS) * FRAME_READS)
 
@@ -46,25 +46,25 @@
 /*=============================================================================
  * 数据尺寸参数
  *============================================================================*/
-#define READ_SIZE_BYTES         40U
+#define READ_SIZE_BYTES         64U
 #define FRAME_READS             64U
-#define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 2560B */
+#define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 4096B */
 #define TOTAL_READS             108000U
 
 /*=============================================================================
  * 水印几何（必须与 srpe_batch 的 parameter 一致）
  *
- *   REF_LEN = STRIDE + READ_BPS
- *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*807 + 150 = 40,500
+ *   REF_LEN = STRIDE + READ_BPS = 805 + 250 = 1055
+ *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*805 + 250 = 40,500
  *   水印比特数 = 2 * L = 81,000
  *
  * 【修订 B1】MAX_WATERMARK_SIZE 原为 10120，小于 81,000 bit 所需的 10,125 B；
  * 当前 process_watermark() 对长度不足或超限严格拒绝，不再静默截断。
  *============================================================================*/
 #define WM_NUM_LC               50U
-#define WM_STRIDE               807U
-#define WM_REF_LEN              957U
-#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 150U)   /* 40,500 */
+#define WM_STRIDE               805U
+#define WM_REF_LEN              1055U
+#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 250U)   /* 40,500 */
 #define WM_TOTAL_BITS           (WM_SYMBOLS * 2U)                /* 81,000 */
 #define WM_PACKED_BYTES         ((WM_TOTAL_BITS + 7U) / 8U)      /* 10,125 */
 #define MAX_WATERMARK_SIZE      10240U                           /* 上位机按 8 对齐发 10,128 */
@@ -72,8 +72,8 @@
 /* 展开后的区域缓冲：每个符号占一个 32-bit 字（低 2 位有效），
  * DNA 核预载时每拍只取 TDATA[1:0]，故必须一符号一拍地送。 */
 #define WM_REGION_SYMBOLS       WM_REF_LEN
-#define WM_REGION_BYTES         (WM_REGION_SYMBOLS * 4U)         /* 3,828 B */
-#define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 191,400 B */
+#define WM_REGION_BYTES         (WM_REGION_SYMBOLS * 4U)         /* 4,220 B */
+#define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 211,000 B */
 
 /*=============================================================================
  * DDR 地址映射 (优化后，去除重打包)
@@ -96,7 +96,7 @@
 
 /* Stage1: DNA Accelerator */
 #define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 108000×48B */
-#define DNA_ACC_RESULT_PACKED_BYTES  48U
+#define DNA_ACC_RESULT_PACKED_BYTES  72U
 #define DNA_ACC_OUTPUT_SIZE_BYTES    (TOTAL_READS * DNA_ACC_RESULT_PACKED_BYTES)
 
 /* Stage2: Voter (直接使用Stage1输出，无需中间缓冲区) */
@@ -134,7 +134,7 @@
  * 输出: 投票结果
  *   - 81000 bits = 1266个u64 (每个u64包含64位投票数据)
  *============================================================================*/
-#define VOTER_INPUT_BYTES_PER_READ   48U
+#define VOTER_INPUT_BYTES_PER_READ   72U
 #define VOTER_INPUT_TOTAL_BYTES      (TOTAL_READS * VOTER_INPUT_BYTES_PER_READ)
 #define VOTER_INPUT_BEATS            TOTAL_READS  /* ✅ 硬件自动处理6个u64/read */
 
@@ -196,7 +196,7 @@
  * 的 score_min 字段运行时下发。67 = int(0.45 × READ_BPS)，与 tests/golden 的
  * stage2_expect.hex（make_golden.py --min-score 0.45）严格一致；噪声底 59~62，
  * 分离带内 67/68 均可，但判据向量按 67 生成。 */
-#define VOTER_SCORE_MIN             67U
+#define VOTER_SCORE_MIN             112U
 
 /* 为保持代码兼容性，保留旧名称别名 */
 #define VOTER_REG_START             VOTER_REG_CTRL_STATUS

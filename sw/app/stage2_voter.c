@@ -17,13 +17,13 @@ int voter_configure_and_verify(const dna_connection_t *conn)
     const u32 in_addr = DDR_VOTER_IN_BASE;
     const u32 out_addr = DDR_VOTER_OUT_BASE;
     const u32 total_reads = conn->total_reads_received;
-    const u32 in_beats = total_reads * 6u;
+    const u32 in_beats = total_reads * (VOTER_INPUT_BYTES_PER_READ / 8u);
     const u32 out_beats = VOTER_OUTPUT_BEATS;
     const u32 score_min = conn->cfg.score_min;
 
     xil_printf("[STAGE2] Configuration:\n\r");
     xil_printf("  IN_ADDR:     0x%08X\n\r", in_addr);
-    xil_printf("  IN_BEATS:    %u (6 beats/read)\n\r", in_beats);
+    xil_printf("  IN_BEATS:    %u (%u beats/read)\n\r", in_beats, (VOTER_INPUT_BYTES_PER_READ / 8u));
     xil_printf("  OUT_ADDR:    0x%08X\n\r", out_addr);
     xil_printf("  OUT_BEATS:   %u\n\r", out_beats);
     xil_printf("  TOTAL_READS: %u\n\r", total_reads);
@@ -110,18 +110,18 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         /* -------------------- Pre-start Input Validation（全部字节视图） -------------------- */
         xil_printf("\n\r[STAGE2] Pre-start Input Validation:\n\r");
-        Xil_DCacheInvalidateRange(voter_in_addr, 48U * 10U);
+        Xil_DCacheInvalidateRange(voter_in_addr, VOTER_INPUT_BYTES_PER_READ * 10U);
         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
         usleep(1000);
 
         /* 统计前 10 个 read 的非零字节 */
         const volatile u8 *vin = (const volatile u8 *)voter_in_addr;
         u32 nz = 0;
-        for (u32 i = 0; i < 10U * 48U; i++) if (vin[i] != 0) nz++;
-        xil_printf("  Non-zero bytes: %u / %u\n\r", nz, 10U * 48U);
+        for (u32 i = 0; i < 10U * VOTER_INPUT_BYTES_PER_READ; i++) if (vin[i] != 0) nz++;
+        xil_printf("  Non-zero bytes: %u / %u\n\r", nz, 10U * VOTER_INPUT_BYTES_PER_READ);
 
-        /* 打印第 0 个 read 的 48B 字节视图（不再打印 64 位 Word0） */
-        xil_printf("\n\r[DEBUG] First read (48 bytes):\n\r");
+        /* 打印第 0 个 read 的字节视图 */
+        xil_printf("\n\r[DEBUG] First read (%u bytes):\n\r", VOTER_INPUT_BYTES_PER_READ);
         dump_read_48((const void*)voter_in_addr, 0);
 
         /* 如需：从字节解析 score/position（示例，与你的位域注释一致） */
@@ -140,8 +140,10 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         xil_printf("\n\r[STAGE2] ✓ Input validation passed\n\r");
         xil_printf("[STAGE2] Configuration:\n\r");
-        xil_printf("  Input format: 48 bytes/read (6 beats/read)\n\r");
-        xil_printf("  TOTAL_READS : %u (HW will auto-read 6 beats per read)\n\r", voter_total_reads);
+        xil_printf("  Input format: %u bytes/read (%u beats/read)\n\r",
+                   VOTER_INPUT_BYTES_PER_READ, (VOTER_INPUT_BYTES_PER_READ / 8u));
+        xil_printf("  TOTAL_READS : %u (HW will auto-read %u beats per read)\n\r",
+                   voter_total_reads, (VOTER_INPUT_BYTES_PER_READ / 8u));
 
         /* -------------------- Step 1: 读取初始状态 -------------------- */
         u32 status_init = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);

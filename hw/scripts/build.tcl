@@ -97,4 +97,9 @@ if {[file exists [file join $repo_root hw scripts collect_info.tcl]]} {
 file mkdir [file dirname $xsa_out]
 write_hw_platform -fixed -include_bit -force -file $xsa_out
 puts "===> XSA: $xsa_out"
+set bit_out [file join $proj_wk export top_bd_wrapper.bit]
+if {[file exists "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit"]} {
+  file copy -force "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit" $bit_out
+  puts "===> BIT: $bit_out"
+}
 puts "===> DONE."

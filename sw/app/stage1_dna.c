@@ -243,8 +243,8 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         rx_records_submitted = 0;
         rx_expected          = (int)total_reads;
         if (submit_rx_records() < 0) { pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
-        xil_printf("  RX BD: 1 BD/记录(48 B)，预投 %u/%u 条\n\r",
-                   rx_records_submitted, rx_records_total);
+        xil_printf("  RX BD: 1 BD/记录(%u B)，预投 %u/%u 条\n\r",
+                   DNA_ACC_RESULT_PACKED_BYTES, rx_records_submitted, rx_records_total);
         pipeline_set_state(PIPE_TX_PREFILL);
         return PIPE_STEP_PROGRESS;
     }
@@ -378,30 +378,30 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         /* 直接进入 Stage2：使用 Stage1 输出来做投票 */
         xil_printf("[STAGE1→STAGE2] Using Stage1 output directly\n\r");
         xil_printf("  Output address: 0x%08X\n\r", DDR_DNA_ACC_OUT_BASE);
-        xil_printf("  Data format: 48 bytes/read × %u reads (actual)\n\r",
-                   conn->total_reads_received);
+        xil_printf("  Data format: %u bytes/read × %u reads (actual)\n\r",
+                   DNA_ACC_RESULT_PACKED_BYTES, conn->total_reads_received);
         xil_printf("  Total size: %u bytes\n\r",
                    (u32)ddr_layout_stage1_bytes(conn->total_reads_received,
                                                 DNA_ACC_RESULT_PACKED_BYTES));
 
         /* 验证前 10 个 read 的数据新鲜度 */
-        Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, 48U * 10U);
+        Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, DNA_ACC_RESULT_PACKED_BYTES * 10U);
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
 
         /* 统计前 10 个 read 的非零字节（更直观），并展示第 0 read 的完整 48B */
         const volatile u8 *pbytes = (const volatile u8 *)DDR_DNA_ACC_OUT_BASE;
         u32 nonzero_bytes = 0;
-        for (u32 i = 0; i < 10U * 48U; i++) {
+        for (u32 i = 0; i < 10U * DNA_ACC_RESULT_PACKED_BYTES; i++) {
             if (pbytes[i] != 0) nonzero_bytes++;
         }
 
         xil_printf("\n\r[DEBUG] Output Statistics (first 10 reads):\n\r");
         xil_printf("  Non-zero bytes: %u / %u (%.1f%%)\n\r",
-                   nonzero_bytes, 10U * 48U,
-                   (float)nonzero_bytes * 100.0f / (float)(10U * 48U));
+                   nonzero_bytes, 10U * DNA_ACC_RESULT_PACKED_BYTES,
+                   (float)nonzero_bytes * 100.0f / (float)(10U * DNA_ACC_RESULT_PACKED_BYTES));
 
-        xil_printf("\n\r[DEBUG] First read (48 bytes):\n\r");
+        xil_printf("\n\r[DEBUG] First read (%u bytes):\n\r", DNA_ACC_RESULT_PACKED_BYTES);
         dump_read_48((const void*)DDR_DNA_ACC_OUT_BASE, 0);
 
         /* 友好提示：若几乎全为 0，告警一次 */

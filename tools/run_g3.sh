@@ -62,6 +62,7 @@ INVOCATION="$*"
 EXPECT_SHA="fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
 LIMIT=2048
 SCORE_MIN=67
+READ_BPS=150
 ORIENT="both"
 BOARD_IP="192.168.1.10"
 BOARD_PORT=7
@@ -115,6 +116,7 @@ while [[ $# -gt 0 ]]; do
         --limit)            LIMIT="$2"; shift 2 ;;
         --full)             LIMIT=""; shift ;;          # 不传 --limit 给 first.py = 全量
         --score-min)        SCORE_MIN="$2"; shift 2 ;;
+        --read-bps)         READ_BPS="$2"; shift 2 ;;
         --first-run-score-min) SCORE_MIN_RUN1="$2"; shift 2 ;;
         --first-run-limit)  LIMIT_RUN1="$2"; shift 2 ;;
         --run-limits)       RUN_LIMITS="$2"; shift 2 ;;
@@ -338,15 +340,23 @@ info "bit / elf / ps7_init.tcl 已从受版本管理的制品复制到 run 目�
 # ---------------------------------------------------------------------------
 say "2/7 渲染板级脚本"
 
+if [[ "$READ_BPS" -eq 250 ]]; then
+    WM_WORDS=52750
+    STAGE1_REC_WORDS=18
+else
+    WM_WORDS=47850
+    STAGE1_REC_WORDS=12
+fi
+
 render() {
     sed -e "s#@@DEVICE@@#$JTAG_DEVICE#g" \
         -e "s#@@BITFILE@@#$RUN_DIR_WIN/top_bd_wrapper.bit#g" \
         -e "s#@@ELFFILE@@#$RUN_DIR_WIN/dna_lwip_app.elf#g" \
         -e "s#@@PS7INIT@@#$RUN_DIR_WIN/ps7_init.tcl#g" \
         -e "s#@@OUTDIR@@#$RUN_DIR_WIN#g" \
-        -e "s#@@WM_WORDS@@#47850#g" \
+        -e "s#@@WM_WORDS@@#$WM_WORDS#g" \
         -e "s#@@STAGE1_RECORDS@@#$STAGE1_DUMP_RECORDS#g" \
-        -e "s#@@STAGE1_WORDS@@#$(( STAGE1_DUMP_RECORDS * 12 ))#g" \
+        -e "s#@@STAGE1_WORDS@@#$(( STAGE1_DUMP_RECORDS * STAGE1_REC_WORDS ))#g" \
         -e "s#@@STAGE2_WORDS@@#2532#g" \
         -e "s#@@STAGE3_WORDS@@#2026#g" \
         "$1" > "$2"
@@ -408,7 +418,7 @@ fi
 # ---------------------------------------------------------------------------
 say "4/7 烧录（rst -system → fpga → ps7_init → dow → con）"
 if (( DO_BOOT )); then
-    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/boot.tcl" | tr '/' '\\')" ) \
+    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/boot.tcl" | tr '/' '\\')" < /dev/null ) \
             > "$RUN_DIR/boot.out" 2>&1; then
         if grep -q "BOOT> running" "$RUN_DIR/boot.out"; then
             step_ok "烧录"
@@ -489,7 +499,8 @@ for (( r = 1; r <= RUNS; r++ )); do
     FIRST_ARGS=(--ip "$BOARD_IP" --port "$BOARD_PORT"
                 --reads "$READS_FILE" --watermark "$WM_FILE"
                 --output "$BITS_OUT" --orient "$ORIENT"
-                --result-timeout "${RUN_TO[r-1]}")
+                --result-timeout "${RUN_TO[r-1]}"
+                --read-bps "$READ_BPS")
     [[ -n "$RUN_THIS_LIMIT" ]] && FIRST_ARGS+=(--limit "$RUN_THIS_LIMIT")
     FIRST_ARGS+=(--score-min "$RUN_SCORE_MIN")
 
@@ -614,10 +625,10 @@ fi
 # ---------------------------------------------------------------------------
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
 if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
-    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/dump.tcl" | tr '/' '\\')" ) \
+    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/dump.tcl" | tr '/' '\\')" < /dev/null ) \
             > "$RUN_DIR/dump.out" 2>&1 && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
         info "四级快照已导出到 $RUN_DIR"
-        if python3 tools/board_stage_check.py --dump-dir "$RUN_DIR" --reads "$STAGE1_DUMP_RECORDS" \
+        if python3 tools/board_stage_check.py --dump-dir "$RUN_DIR" --reads "$STAGE1_DUMP_RECORDS" --read-bps "$READ_BPS" \
                 > "$RUN_DIR/stage_check.log" 2>&1; then
             step_ok "四级逐级取证（board_stage_check.py）"
         else
