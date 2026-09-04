@@ -55,6 +55,9 @@
 #if __has_include("pipeline.c")
 #include "pipeline.c"
 #endif
+#if __has_include("stage1_dna.c")
+#include "stage1_dna.c"
+#endif
 #if __has_include("stage2_voter.c")
 #include "stage2_voter.c"
 #endif
