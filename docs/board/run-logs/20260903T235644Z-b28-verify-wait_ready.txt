@@ -1,0 +1,3 @@
+[   0.0s] 第 1 次：timeout: timed out
+[   7.0s] 第 2 次：CAPS 应答正常 read_bps=150 max_reads=107968
+READY 10.1 2
