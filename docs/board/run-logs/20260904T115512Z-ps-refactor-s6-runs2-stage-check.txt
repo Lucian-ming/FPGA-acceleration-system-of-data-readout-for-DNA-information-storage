@@ -1,0 +1,23 @@
+dump 目录：/mnt/d/dna_board_smoke/g3_runs/20260904T115512Z-ps-refactor-s6-runs2
+黄金向量：/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout/tests/golden
+
+=== 展开水印 @0x10040000  vs  wm_regions.hex — ✅ PASS ===
+  47850/47850 字逐位相同
+
+=== Stage1 输出 @0x10600000  vs  stage2_in.hex — ✅ PASS ===
+  整条 48 B 逐位相同：4011/4096
+  码字相同：4096/4096   score 相同：4096/4096
+  position 差值 top3：[(0, 4011), (-30838, 3), (-8146, 2)]
+  → 未完全一致；差异若集中在少数条，多为并列被打破，通常不致命
+
+=== Stage2 输出 ⊕ 水印 @0x11000000  vs  sparse_expect.hex — ✅ PASS ===
+  注意：PS 会在 Stage2 之后就地异或水印，所以这里比的是 sparse 而不是 stage2_rtl_expect
+  整字相同 1265/1266，比特误码 0.02%
+
+=== Stage3 输出 @0x11100000  vs  stage3_expect.hex — ✅ PASS ===
+  整字相同 1012/1012，比特误码 0.00%
+
+============================================================
+逐级取证：4/4 级全部通过。
+但这**不等于 G3 闭环**——最终判据是回传经 tools/ldpc_decode.py 译码后的图片 SHA-256
+必须等于 fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3。
