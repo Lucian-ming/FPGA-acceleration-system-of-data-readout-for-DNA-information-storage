@@ -1,0 +1,24 @@
+[INFO] Connecting to 192.168.1.10:7
+[INFO] Reads file: data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq (51781 reads detected, format FASTQ)
+[INFO] 几何 read_bps=150 num_lc=50 stride=807 每条读段 40 B score_min=0
+[INFO] 取用源读段 51781 条，方向 both（每条 2 份）
+[INFO] 实际发送 103616 条（64 的整数倍，其中补零 54 条）
+[INFO] Output file: /mnt/d/dna_board_smoke/g3_runs/20260903T235915Z-e1-crossscale/dec_input_run1.txt
+[CAPS] v1 read_bps=150 num_lc=50 stride=807 max_reads=107968 features=0x1
+[INFO] CONFIG 接受：L=40500 (50x807+150), reads=103616, score_min=0
+      Watermark: 10128 bytes, 0.02s, 5.29 Mbps
+      Reads: 104 batches, 4144640 bytes, 8.90s, 3.73 Mbps
+Traceback (most recent call last):
+  File "clients/python/first.py", line 776, in <module>
+    main()
+  File "clients/python/first.py", line 769, in main
+    stats = run_client(config, log=lambda msg: print(msg))
+  File "clients/python/first.py", line 669, in run_client
+    result_size = recv_result(sock, stats, output_path, timeout=config.result_timeout)
+  File "clients/python/first.py", line 508, in recv_result
+    pkt_type, payload = recv_packet(sock, stats, timeout=timeout)
+  File "/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout/clients/python/protocol.py", line 83, in recv_packet
+    header = recv_exact(sock, HDR_SZ, stats, timeout=timeout)
+  File "/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout/clients/python/protocol.py", line 74, in recv_exact
+    chunk = sock.recv(n - len(buf))
+socket.timeout: timed out

@@ -1,0 +1,3 @@
+[   0.0s] 第 1 次：OSError: [Errno 113] No route to host
+[   5.1s] 第 2 次：CAPS 应答正常 read_bps=150 max_reads=107968
+READY 7.1 2
