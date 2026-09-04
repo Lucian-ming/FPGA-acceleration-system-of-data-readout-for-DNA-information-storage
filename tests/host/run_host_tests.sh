@@ -125,6 +125,12 @@ if [ "$SELFTEST" = 1 ]; then
                     target_file="reg_timing.c" ;;
             esac
         fi
+        if [ -f "$SRC/stage2_voter.c" ]; then
+            case "$what" in
+                drop-stage2-invalidate)
+                    target_file="stage2_voter.c" ;;
+            esac
+        fi
         desc=$(python3 tests/host/inject.py --src "$SRC/$target_file" --out /dev/null \
                         --what "$what" --describe)
         idir="$BUILD/inj_$what"
