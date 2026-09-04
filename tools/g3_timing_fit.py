@@ -27,6 +27,7 @@ import sys
 from pathlib import Path
 
 RE_RECORDS = re.compile(r"^源读段/记录\s*:\s*\d+\s*/\s*(\d+)", re.M)
+RE_RECORDS_V2 = re.compile(r"^\s*1\s+\S+\s+\d+\s+(\d+)", re.M)
 RE_RESULT = re.compile(r"Result:\s*\d+\s*bytes,\s*([0-9.]+)s")
 
 
@@ -34,7 +35,8 @@ def collect(run_dir: Path) -> tuple[int, float] | None:
     summary = run_dir / "summary.txt"
     if not summary.is_file():
         return None
-    m = RE_RECORDS.search(summary.read_text(encoding="utf-8", errors="replace"))
+    text = summary.read_text(encoding="utf-8", errors="replace")
+    m = RE_RECORDS.search(text) or RE_RECORDS_V2.search(text)
     if not m:
         return None
     records = int(m.group(1))
