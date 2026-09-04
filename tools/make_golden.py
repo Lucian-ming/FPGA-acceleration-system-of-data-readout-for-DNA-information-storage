@@ -214,9 +214,17 @@ def main(argv=None):
             if s < thr:
                 continue
             used += 1
+            # 同下面 votes_rtl：按 RTL safe_vote_value 逐票钳位。这一份是
+            # tb_vot_ddr_bitexact 在「固件时序 + SCORE_MIN」档的期望输出
+            # （stage2_expect.hex），也是 sparse/stage3/dec_input 整条下游的源头，
+            # 所以它同样必须是 RTL 语义而不是理想无限精度累加。
+            # 实测（tools/vote_range.py）：SE150 全量 score_min=67 峰值 277，
+            # 碰不到钳位；但 SE250 全量 score_min=112 峰值达 517，钳位会生效
+            # 41 次——那时这一份若还用自由累加就不再是 RTL 期望。
             idx = np.arange(p, p + rb)
-            np.add.at(votes, idx, ((a >> 1) & 1).astype(np.int32) * 2 - 1)
-            np.add.at(votes, idx + L, (a & 1).astype(np.int32) * 2 - 1)
+            for tgt, bit in ((idx, (a >> 1) & 1), (idx + L, a & 1)):
+                votes[tgt] = np.clip(
+                    votes[tgt] + (bit.astype(np.int32) * 2 - 1), -512, 511)
     consensus = (votes > 0).astype(np.uint8)
     write_hex(out / "stage2_expect.hex", pack_lsb_first(consensus), 16)
     print(f"  stage2_expect.hex    {2*L} bit（方案B：逐记录过阈值），{used}/{2*n} 条记录参与投票")
