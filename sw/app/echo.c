@@ -8,6 +8,8 @@
 #include "wm_expand.h"
 #include "fw_log.h"
 #include "reg_timing.h"
+#include "bd_ring.h"
+#include "dma_dna.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
@@ -54,21 +56,7 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
 static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err);
 static err_t poll_callback(void *arg, struct tcp_pcb *tpcb);
 
-/*============================================================================
- * DMA常量
- *============================================================================*/
-#define MAX_BD_COUNT            512
-//#define BD_SPACE_BASE           0x11000000U
-#define DMA_ADDR_ALIGNMENT      8U
-
-/*============================================================================
- * 全局
- *============================================================================*/
-static XAxiDma AxiDma;
-static XAxiDma_BdRing *TxRingPtr;
-static XAxiDma_BdRing *RxRingPtr;
-static u32 TxMaxTransferLen = 0;
-static u32 RxMaxTransferLen = 0;
+/* DMA 与 BD 环全局变量已迁至 bd_ring.{c,h} (g_bdring_ctx) */
 
 static dna_connection_t g_conn;
 static struct tcp_pcb *g_server_pcb = NULL;
@@ -88,20 +76,7 @@ typedef enum {
 
 static volatile proc_state_e g_proc_state = PROC_IDLE;
 
-/* 传输类型:决定每BD策略 */
-typedef enum {
-    XFER_TX_READS = 0,  /* MM2S:送 reads 数据 → 2560B/BD (TLAST) */
-    XFER_TX_WM    = 1,  /* MM2S:送 watermark → 16KB/BD */
-    XFER_RX_OUT   = 2   /* S2MM:收输出 → 【B21】48B/BD，DNA 核每条记录一个 TLAST packet */
-} xfer_kind_e;
 
-/*============================================================================
- * 小工具
- *============================================================================*/
-static inline u32 align_down(u32 value, u32 alignment) {
-    return (value / alignment) * alignment;
-}
-static inline u32 min_u32(u32 a, u32 b) { return (a < b) ? a : b; }
 
 /* 喂lwIP */
 static inline void keep_tcp_alive(void){
@@ -113,204 +88,7 @@ static inline void keep_tcp_alive(void){
  * IP核 START 信号控制（已迁至 reg_timing.{c,h}）
  *============================================================================*/
 
-/*============================================================================
- * 打印寄存器（已迁至 fw_log.{c,h}）
- *============================================================================*/
-static inline void dump_dma_regs(const char *tag)
-{
-    fw_dump_dma(&AxiDma, tag);
-}
-
-/*============================================================================
- * BD ring设置
- *============================================================================*/
-static int setup_bd_ring(XAxiDma_BdRing *RingPtr, u32 base, int cnt, const char *name)
-{
-    int Status;
-    XAxiDma_Bd BdTemplate;
-    Status = XAxiDma_BdRingCreate(RingPtr, base, base, BD_ALIGNMENT, cnt);
-    if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BdRingCreate failed\n\r");
-        return XST_FAILURE;
-    }
-
-    XAxiDma_BdClear(&BdTemplate);
-    Status = XAxiDma_BdRingClone(RingPtr, &BdTemplate);
-    if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BdRingClone failed\n\r");
-        return XST_FAILURE;
-    }
-
-    XAxiDma_BdRingIntDisable(RingPtr, XAXIDMA_IRQ_ALL_MASK);
-
-    u32 max_len = RingPtr->MaxTransferLen;
-    u32 aligned_max = align_down(max_len, DMA_ADDR_ALIGNMENT);
-    if (RingPtr == XAxiDma_GetTxRing(&AxiDma)) {
-        TxMaxTransferLen = aligned_max;
-    } else {
-        RxMaxTransferLen = aligned_max;
-    }
-    return XST_SUCCESS;
-}
-
-/*============================================================================
- * DNA/DMA初始化
- *============================================================================*/
-int dna_accelerator_init(void)
-{
-    XAxiDma_Config *CfgPtr = XAxiDma_LookupConfig(XPAR_AXIDMA_0_DEVICE_ID);
-    if (!CfgPtr) {
-        xil_printf("[ERROR] DMA config lookup failed\n\r");
-        return XST_FAILURE;
-    }
-    int Status = XAxiDma_CfgInitialize(&AxiDma, CfgPtr);
-    if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] DMA CfgInitialize failed\n\r");
-        return XST_FAILURE;
-    }
-    if (!XAxiDma_HasSg(&AxiDma)) {
-        xil_printf("[ERROR] DMA not in SG mode\n\r");
-        return XST_FAILURE;
-    }
-
-    TxRingPtr = XAxiDma_GetTxRing(&AxiDma);
-    RxRingPtr = XAxiDma_GetRxRing(&AxiDma);
-
-    if (setup_bd_ring(TxRingPtr, BD_SPACE_BASE_TX, MAX_BD_COUNT_TX, "TX") != XST_SUCCESS)
-        return XST_FAILURE;
-    if (setup_bd_ring(RxRingPtr, BD_SPACE_BASE_RX, MAX_BD_COUNT_RX, "RX") != XST_SUCCESS)
-        return XST_FAILURE;
-
-    if (XAxiDma_BdRingStart(TxRingPtr) != XST_SUCCESS) return XST_FAILURE;
-    if (XAxiDma_BdRingStart(RxRingPtr) != XST_SUCCESS) return XST_FAILURE;
-
-    dump_dma_regs("After init");
-    xil_printf("[INIT] DNA Accelerator ready\n\r");
-    xil_printf("[INFO] TX BD Ring: %u BDs, RX BD Ring: %u BDs\n\r",
-               MAX_BD_COUNT_TX, MAX_BD_COUNT_RX);
-    return XST_SUCCESS;
-}
-
-/*============================================================================
- * 提交一组BD(关键:根据 kind 选择 perBD)
- *============================================================================*/
-static int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
-                              u32 buffer_addr,
-                              u32 total_length,
-                              u32 max_per_bd,
-                              const char *name,
-                              xfer_kind_e kind)
-{
-    int Status;
-    XAxiDma_Bd *BdPtr, *BdCurPtr;
-
-    u32 per_bd;
-    switch (kind) {
-    case XFER_TX_READS:
-        per_bd = FRAME_BYTES;
-        break;
-    case XFER_RX_OUT:
-        /* 【B21 根因】DNA 核的 s2mm_pack64 在每条 48 B 结果的第 6 拍就拉 M_AXIS_RESULT_TLAST，
-         * 即每条记录都是一个独立的 AXIS packet。AXI DMA S2MM 在 SG 模式下遇到 TLAST 就
-         * 关闭当前 BD，所以一个 BD 只能收下一条记录（板上取证：BD 状态 0x8c000030 =
-         * Cmplt|RXSOF|RXEOF|len=48）。原实现按 16,376 B/BD 只投了 13 个 BD，
-         * 收满 13 条后 S2MM_CURDESC==S2MM_TAILDESC 进入 Idle，反压把整条链锁死。
-         * 正确做法：一条记录一个 BD，并在 ring 上滚动补投。 */
-        per_bd = DNA_ACC_RESULT_PACKED_BYTES;
-        break;
-    case XFER_TX_WM:
-    default: {
-        u32 target = min_u32(max_per_bd, 16U*1024U);
-        per_bd = align_down(target, DMA_ADDR_ALIGNMENT);
-        if (per_bd == 0) per_bd = align_down(max_per_bd, DMA_ADDR_ALIGNMENT);
-        break;
-    }
-    }
-    if (per_bd == 0) per_bd = FRAME_BYTES;
-
-    u32 bd_count = (total_length + per_bd - 1U) / per_bd;
-
-    u32 free_bd = XAxiDma_BdRingGetFreeCnt(RingPtr);
-    if (free_bd < bd_count) {
-        xil_printf("[ERROR] Not enough BDs (need %u, have %u)\n\r", bd_count, free_bd);
-        return -1;
-    }
-
-    Status = XAxiDma_BdRingAlloc(RingPtr, bd_count, &BdPtr);
-    if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BD alloc failed\n\r");
-        return -1;
-    }
-
-    BdCurPtr = BdPtr;
-    u32 remaining = total_length;
-    u32 offset    = 0;
-
-    for (u32 i = 0; i < bd_count; i++) {
-        u32 this_len = (remaining > per_bd) ? per_bd : remaining;
-        u32 addr     = buffer_addr + offset;
-
-        XAxiDma_BdSetBufAddr(BdCurPtr, addr);
-        XAxiDma_BdSetLength(BdCurPtr, this_len, RingPtr->MaxTransferLen);
-
-        u32 ctrl = 0;
-        if (RingPtr == TxRingPtr) {
-            ctrl |= XAXIDMA_BD_CTRL_TXSOF_MASK;
-            ctrl |= XAXIDMA_BD_CTRL_TXEOF_MASK;
-        }
-        XAxiDma_BdSetCtrl(BdCurPtr, ctrl);
-
-        remaining -= this_len;
-        offset    += this_len;
-        BdCurPtr   = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, BdCurPtr);
-    }
-
-    /* 【B21】BD ring 是环形的：一批 BD 可能跨过环尾回绕到环首。
-     * 原来的 Xil_DCacheFlushRange(BdPtr, bd_count*64) 假设这批 BD 在内存里连续，
-     * 回绕时会刷到环外地址、而漏掉真正回绕到环首的那几个 BD。
-     * RX 现在按 48 B/BD 投递，一次任务要用掉 4,096 个 BD 而环只有 1,024 个，
-     * 必然回绕 4 次，所以必须逐个沿 BdRingNext 刷。 */
-    {
-        XAxiDma_Bd *FlushPtr = BdPtr;
-        for (u32 i = 0; i < bd_count; i++) {
-            Xil_DCacheFlushRange((UINTPTR)FlushPtr, sizeof(XAxiDma_Bd));
-            FlushPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, FlushPtr);
-        }
-    }
-
-    Status = XAxiDma_BdRingToHw(RingPtr, bd_count, BdPtr);
-    if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] ToHw failed\n\r");
-        return -1;
-    }
-    return bd_count;
-}
-
-/* 回收已完成的BD(一次尽量多)*/
-static int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
-{
-    XAxiDma_Bd *BdPtr;
-    int n = XAxiDma_BdRingFromHw(RingPtr, max_to_reclaim, &BdPtr);
-    if (n > 0) {
-        /* 【B21】BdRingFromHw 返回的是环上一段「逻辑连续」的 BD，它可能跨过环尾回绕。
-         * 原实现用 &BdPtr[i] 线性索引，一旦回绕就会读到 BD 环之外的内存：
-         * 既可能把垃圾值误判成 BD 错误而让整条流水线 FAIL，
-         * 也可能漏掉真正回绕那几个 BD 的错误位。
-         * RX 改成 48 B/BD 后每次任务必然回绕（4,096 条记录 / 1,024 个 BD），
-         * 必须沿 BdRingNext 走。 */
-        XAxiDma_Bd *CurPtr = BdPtr;
-        for (int i=0;i<n;i++) {
-            u32 sts = XAxiDma_BdGetSts(CurPtr);
-            if (sts & XAXIDMA_BD_STS_ALL_ERR_MASK) {
-                xil_printf("[ERROR] BD status error: 0x%08X (BD %d/%d)\n\r", sts, i, n);
-                return -1;
-            }
-            CurPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, CurPtr);
-        }
-        if (XAxiDma_BdRingFree(RingPtr, n, BdPtr) != XST_SUCCESS) return -1;
-    }
-    return n;
-}
+/* DMA 与 BD 环设置已迁至 bd_ring.{c,h} 与 dma_dna.{c,h} */
 
 /*============================================================================
  * 第一级: DNA Accelerator (滑动窗+预加载)
@@ -385,8 +163,6 @@ static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
  *   而 16 的**典型**在 poll 时间仍是亚毫秒级，等于白拿。
  */
 #define WM_REGIONS_PER_POLL   16U
-#define WM_BD_WAIT_US       5000U   /* 单区域 BD 回收忙等上限（正常 ~10 us） */
-#define WM_BD_WAIT_STEP_US     5U   /* 忙等的轮询步长 */
 
 static u32   wm_poll_steps = 0;  /* 水印预载实际占用了几个 poll 步（留证用） */
 static XTime wm_t_start    = 0;  /* 预载区域循环的起点（XTime 直接测量，不是推断） */
@@ -399,7 +175,6 @@ static u32 tx_frames_done  = 0;
 /* 【B21】RX 改为「一条 48 B 记录一个 BD」后的滚动补投计数 */
 static u32 rx_records_total     = 0;   /* 本次任务应收的记录条数 = 实际读段数 */
 static u32 rx_records_submitted = 0;   /* 已交给硬件的 BD（记录）条数 */
-#define RX_OUTSTANDING_MAX  512U       /* ring 有 1024 个 BD，最多留一半在飞 */
 
 /* 【B21】Stage1 无进展看门狗。
  * poll 间隔实测 ~280 ms，不是 500 ms：
@@ -430,108 +205,43 @@ static inline void pipeline_reset_counters(void){
 
 /* 【B21】按「一条记录一个 BD」滚动补投 RX 描述符。
  * 返回本次投出的 BD 数（0 表示暂时不需要补），-1 表示失败。 */
-static int submit_rx_records(void)
+static inline int submit_rx_records(void)
 {
-    if (rx_records_submitted >= rx_records_total) return 0;
-    u32 remain = rx_records_total - rx_records_submitted;
-
-    u32 done = (rx_done > 0) ? (u32)rx_done : 0U;
-    u32 outstanding = (rx_records_submitted > done) ? (rx_records_submitted - done) : 0U;
-    if (outstanding >= RX_OUTSTANDING_MAX) return 0;
-
-    u32 n = RX_OUTSTANDING_MAX - outstanding;
-    if (n > remain) n = remain;
-
-    u32 free_bd = XAxiDma_BdRingGetFreeCnt(RxRingPtr);
-    if (n > free_bd) n = free_bd;
-    if (n == 0) return 0;
-
-    u32 addr  = DDR_DNA_ACC_OUT_BASE + rx_records_submitted * DNA_ACC_RESULT_PACKED_BYTES;
-    u32 bytes = n * DNA_ACC_RESULT_PACKED_BYTES;
-
-    int bd = submit_bd_transfer(RxRingPtr, addr, bytes, RxMaxTransferLen,
-                                "RX-DNA-RECORDS", XFER_RX_OUT);
-    if (bd < 0) return -1;
-    rx_records_submitted += n;
+    dna_rx_state_t st = {
+        .records_total = rx_records_total,
+        .records_submitted = rx_records_submitted,
+        .rx_done = rx_done
+    };
+    int bd = dna_submit_rx_records(&st);
+    rx_records_submitted = st.records_submitted;
     return bd;
 }
 
 static inline void pipeline_set_state(pipe_state_e st){ pipe_state = st; }
 
 /* 小批提交 READS */
-static int submit_reads_chunk(void)
+static inline int submit_reads_chunk(void)
 {
-    u32 remain_frames = (tx_frames_total > tx_frames_sent) ?
-                        (tx_frames_total - tx_frames_sent) : 0;
-    if (remain_frames == 0) return 0;
-
-    int reclaimed = reclaim_some_bd(TxRingPtr, 512);
-    if (reclaimed < 0) {
-        xil_printf("[ERROR] TX BD reclaim failed before submit\n\r");
-        return -1;
-    }
-    if (reclaimed > 0) {
-        tx_done += reclaimed;
-        tx_frames_done = tx_done;
-
-    }
-
-    int free_bd = XAxiDma_BdRingGetFreeCnt(TxRingPtr);
-    if (free_bd <= 128) return 0;
-
-    int can_frames = free_bd - 128;
-    if (can_frames > 100) can_frames = 100;
-    if ((u32)can_frames > remain_frames) can_frames = (int)remain_frames;
-    if (can_frames <= 0) return 0;
-
-    u32 chunk_bytes = (u32)can_frames * FRAME_BYTES;
-    u32 addr        = DDR_READS_BASE + tx_frames_sent * FRAME_BYTES;
-
-    Xil_DCacheFlushRange(addr, chunk_bytes);
-
-    int bd = submit_bd_transfer(TxRingPtr, addr, chunk_bytes, TxMaxTransferLen,
-                                "TX-READS-CHUNK", XFER_TX_READS);
-    if (bd < 0) {
-        dump_dma_regs("TX_STREAM submit failed");
-        return -1;
-    }
-
-    tx_frames_sent += (u32)can_frames;
-    tx_expected    += bd;
-
-
-
+    dna_tx_state_t st = {
+        .frames_total = tx_frames_total,
+        .frames_sent = tx_frames_sent,
+        .frames_done = tx_frames_done,
+        .tx_done = tx_done,
+        .tx_expected = tx_expected
+    };
+    int bd = dna_submit_reads_chunk(&st);
+    tx_frames_sent = st.frames_sent;
+    tx_frames_done = st.frames_done;
+    tx_done = st.tx_done;
+    tx_expected = st.tx_expected;
     return bd;
 }
+
 /* 【WM 批量化】单个水印区域的 BD 有界忙等。
- * 返回 0 成功，-1 失败（BD 报错或超时）。
- * 有界是关键：这段忙等发生在 lwIP 的 poll_callback 里，绝不能变成无限等。
- * 正常情况下 957 拍 ≈ 10 us 就完成，第一次 reclaim 往往就拿到了；
- * 超时上限 WM_BD_WAIT_US 只在硬件真的挂住时才走到，走到就 FAIL 出去。 */
-static int wm_wait_region_bd(int expected)
+ * 返回 0 成功，-1 失败（BD 报错或超时）。 */
+static inline int wm_wait_region_bd(int expected)
 {
-    int got = 0;
-    u32 waited_us = 0;
-
-    while (got < expected) {
-        int n = reclaim_some_bd(TxRingPtr, expected - got);
-        if (n < 0) {
-            xil_printf("[ERROR] WM region %u: TX BD error\n\r", wm_region);
-            return -1;
-        }
-        got += n;
-        if (got >= expected) break;
-
-        if (waited_us >= WM_BD_WAIT_US) {
-            xil_printf("[ERROR] WM region %u: TX BD timeout (%d/%d after %u us)\n\r",
-                       wm_region, got, expected, waited_us);
-            dump_dma_regs("WM region BD timeout");
-            return -1;
-        }
-        usleep(WM_BD_WAIT_STEP_US);
-        waited_us += WM_BD_WAIT_STEP_US;
-    }
-    return 0;
+    return dna_wait_wm_region_bd(wm_region, expected);
 }
 
 /* 第一级流水线步骤 */

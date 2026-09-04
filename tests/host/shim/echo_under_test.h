@@ -43,6 +43,12 @@
 #if __has_include("reg_timing.c")
 #include "reg_timing.c"
 #endif
+#if __has_include("bd_ring.c")
+#include "bd_ring.c"
+#endif
+#if __has_include("dma_dna.c")
+#include "dma_dna.c"
+#endif
 #include "echo.c"
 
 #endif /* __ECHO_UNDER_TEST_H__ */
