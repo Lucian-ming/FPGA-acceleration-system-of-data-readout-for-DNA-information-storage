@@ -5,6 +5,7 @@
 #define __PIPELINE_H__
 
 #include "xil_types.h"
+#include "xtime_l.h"
 #include "echo.h"
 
 #ifdef __cplusplus
@@ -49,6 +50,9 @@ typedef enum {
 } pipe_step_rc_e;
 
 extern volatile pipe_state_e pipe_state;
+extern u32 pipe_poll_steps;
+extern XTime pipe_t_start;
+extern u32 wm_poll_steps;
 
 static inline void pipeline_set_state(pipe_state_e st)
 {

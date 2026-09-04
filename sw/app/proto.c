@@ -9,7 +9,6 @@
 #include "xil_printf.h"
 #include "sleep.h"
 #include <string.h>
-#include <unistd.h>
 #include "netif/xadapter.h"
 
 extern struct netif *echo_netif;

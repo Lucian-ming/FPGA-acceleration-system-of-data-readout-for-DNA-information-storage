@@ -11,7 +11,6 @@
 #include "xil_cache.h"
 #include "xparameters.h"
 #include "sleep.h"
-#include <unistd.h>
 
 /*============================================================================
  * DNA/DMA初始化

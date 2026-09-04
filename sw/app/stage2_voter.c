@@ -11,7 +11,6 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
-#include <unistd.h>
 
 int voter_configure_and_verify(const dna_connection_t *conn)
 {

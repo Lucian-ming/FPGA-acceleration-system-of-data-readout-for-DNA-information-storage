@@ -15,7 +15,6 @@
 #include "xil_cache.h"
 #include "sleep.h"
 #include "xtime_l.h"
-#include <unistd.h>
 
 /* 第一级计数 */
 static int wm_tx_expected = 0;
@@ -50,10 +49,8 @@ static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
  */
 #define WM_REGIONS_PER_POLL   16U
 
-static u32   wm_poll_steps = 0;  /* 水印预载实际占用了几个 poll 步（留证用） */
+u32   wm_poll_steps = 0;  /* 水印预载实际占用了几个 poll 步（留证用） */
 static XTime wm_t_start    = 0;  /* 预载区域循环的起点（XTime 直接测量，不是推断） */
-static u32   pipe_poll_steps = 0;/* 整条流水线一共占了几个 poll 步（留证用） */
-static XTime pipe_t_start    = 0;
 static u32 tx_frames_total = 0;
 static u32 tx_frames_sent  = 0;
 static u32 tx_frames_done  = 0;

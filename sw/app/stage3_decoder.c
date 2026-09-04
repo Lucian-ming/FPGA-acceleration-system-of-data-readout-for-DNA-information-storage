@@ -9,7 +9,6 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
-#include <unistd.h>
 
 int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats)
 {
@@ -57,7 +56,6 @@ int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_b
 
 pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 {
-    u32 status;
     const u32 DEC_IN_ADDR  = DDR_VOTER_OUT_BASE;
     const u32 DEC_OUT_ADDR = DDR_DECODER_OUT_BASE;
     const u32 DEC_IN_BEATS = 1266;   // 81000位 / 64
