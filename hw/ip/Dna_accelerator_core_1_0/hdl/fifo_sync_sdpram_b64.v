@@ -1,7 +1,8 @@
 `timescale 1 ns / 1 ps
 module fifo_sync_sdpram_b64 #(
     parameter integer WIDTH = 8,
-    parameter integer DEPTH = 16
+    parameter integer DEPTH = 16,
+    parameter         RAM_STYLE = "block"
 )(
     input  wire                 clk,
     input  wire                 rst_n,     // active-low
@@ -17,7 +18,7 @@ module fifo_sync_sdpram_b64 #(
     localparam integer AW = CLOG2(DEPTH);
 
     // 存储体（单端口写 + 同步读，综合成 BRAM/URAM 由工具决定）
-    (* ram_style = "block" *) reg [WIDTH-1:0] mem [0:DEPTH-1];
+    (* ram_style = RAM_STYLE *) reg [WIDTH-1:0] mem [0:DEPTH-1];
 
     reg [AW-1:0] wptr, rptr, raddr_q;
     reg [AW:0]   count;

@@ -14,9 +14,9 @@
 module srpe_batch #(
     parameter integer BATCH     = 64,
     parameter integer NUM_LC    = 50,      // 参考区域数量
-    parameter integer STRIDE    = 807,     // 每区域可滑动位置数
-    parameter integer REF_LEN   = 957,     // 每段参考长度
-    parameter integer READ_BPS  = 150,
+    parameter integer STRIDE    = 805,     // 每区域可滑动位置数
+    parameter integer REF_LEN   = 1055,    // 每段参考长度
+    parameter integer READ_BPS  = 250,
     parameter integer SCORE_W   = 10,
     parameter integer POS_W     = 16
 )(
@@ -27,12 +27,12 @@ module srpe_batch #(
     // 从上层依次读取 BATCH 条码字，每条宽 2*READ_BPS bit。
     output reg                    cw_req,     // 请求一条读段
     input  wire                   cw_valid,   // 本周期 cw_data 有效
-    input  wire [READ_BPS*2-1:0]  cw_data,    // 300b when READ_BPS=150
+    input  wire [READ_BPS*2-1:0]  cw_data,    // 500b when READ_BPS=250
 
     // 预载水印写入口
     input  wire                   bram_write_en,
     input  wire [5:0]             bram_sel,
-    input  wire [9:0]             bram_write_addr,  // 0..REF_LEN-1 (957-1=956)
+    input  wire [10:0]            bram_write_addr,  // 0..REF_LEN-1 (1055-1=1054)
     input  wire [1:0]             bram_write_data,
 
     // 结果输出到上层 FIFO
@@ -59,13 +59,13 @@ module srpe_batch #(
         t=v-1; i=0; while(t>0) begin t=t>>1; i=i+1; end CLOG2=i;
     end endfunction
 
-    // 常量乘法 MUL957
-    // 957 = 512 + 256 + 128 + 32 + 16 + 8 + 4 + 1
-    //     = 2^9 + 2^8 + 2^7 + 2^5 + 2^4 + 2^3 + 2^2 + 2^0
-    function [15:0] MUL957; 
+    // 常量乘法 MUL1055
+    // 1055 = 1024 + 16 + 8 + 4 + 2 + 1
+    //      = 2^10 + 2^4 + 2^3 + 2^2 + 2^1 + 2^0
+    function [15:0] MUL1055; 
         input [15:0] x; 
     begin
-        MUL957 = (x<<9) + (x<<8) + (x<<7) + (x<<5) + (x<<4) + (x<<3) + (x<<2) + x;
+        MUL1055 = (x<<10) + (x<<4) + (x<<3) + (x<<2) + (x<<1) + x;
     end 
     endfunction
 
@@ -75,8 +75,8 @@ module srpe_batch #(
     (* ram_style="block", rom_style="block" *)
     reg [1:0] wm_bram [0:WM_DEPTH-1];
 
-    // 写地址：wm_wr_addr = MUL957(region) + row
-    wire [15:0] wm_wr_addr_lin = MUL957({10'd0, bram_sel}) + {6'd0, bram_write_addr};
+    // 写地址：wm_wr_addr = MUL1055(region) + row
+    wire [15:0] wm_wr_addr_lin = MUL1055({10'd0, bram_sel}) + {5'd0, bram_write_addr};
     wire [WM_AW-1:0] wm_wr_addr = wm_wr_addr_lin[WM_AW-1:0];
 
     // 读地址：wm_rd_addr = MUL957(lc_idx) + ((pos_base + i_idx) % REF_LEN)
@@ -210,10 +210,10 @@ module srpe_batch #(
 
     // (pos_base + i_idx) mod REF_LEN
     wire [16:0] add_tmp  = pos_base + i_idx;
-    wire [9:0]  addr_mod = (add_tmp >= REF_LEN) ? (add_tmp - REF_LEN) : add_tmp[9:0];
+    wire [10:0] addr_mod = (add_tmp >= REF_LEN) ? (add_tmp - REF_LEN) : add_tmp[10:0];
 
     // 水印线性读地址：lc_idx*REF_LEN + addr_mod
-    wire [15:0] wm_rd_addr_lin = MUL957({10'd0, lc_idx}) + {6'd0, addr_mod};
+    wire [15:0] wm_rd_addr_lin = MUL1055({10'd0, lc_idx}) + {5'd0, addr_mod};
     assign wm_rd_addr_d = wm_rd_addr_lin[WM_AW-1:0];
 
     // 结果输出组装
@@ -225,11 +225,12 @@ module srpe_batch #(
     wire [POS_W-1:0] region_ext = 
         {{(POS_W - REGION_W){1'b0}}, best_region[emit_idx]};
 
-    // 计算 region * 807，完整保留 POS_W 位。
+    // 计算 region * 805，完整保留 POS_W 位。
+    // 805 = 512 + 256 + 32 + 4 + 1
     wire [POS_W-1:0] region_mul_stride = 
          (region_ext << 9) + (region_ext << 8) +
          (region_ext << 5) + (region_ext << 2) +
-         (region_ext << 1) +  region_ext;  // 512+256+32+4+2+1 = 807
+          region_ext;  // 512+256+32+4+1 = 805
 
     // 全局最优位置
     wire [POS_W-1:0] global_pos = region_mul_stride + best_pos[emit_idx];
