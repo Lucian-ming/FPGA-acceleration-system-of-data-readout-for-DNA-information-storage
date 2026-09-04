@@ -25,6 +25,27 @@ fail() {
     exit 1
 }
 
+# ── git index 健康自检（多 Agent 并发写竞争 + git 2.25.1 已知 bug 可能截断 index）─
+# 必须在第一次调用 git 之前检查，否则 git 本身就会 fatal 退出
+_idx_candidates=(
+    "${GIT_DIR:-}/index"
+    "${EXPECTED_ROOT}/.git-data/index"
+    "${EXPECTED_ROOT}/.git/index"
+)
+for _idx in "${_idx_candidates[@]}"; do
+    [ -f "$_idx" ] || continue
+    _idx_size=$(stat -c%s "$_idx" 2>/dev/null || echo 0)
+    if [ "$_idx_size" -lt 12 ]; then
+        echo "⚠️  git index 已损坏（${_idx_size} 字节），自动修复中..." >&2
+        rm -f "$_idx"
+        git -C "$EXPECTED_ROOT" reset --quiet 2>/dev/null && \
+            echo "✅ git index 已重建" >&2 || \
+            echo "⚠️  index 重建失败，请手动运行: rm -f $(dirname $_idx)/index && git reset" >&2
+    fi
+    break
+done
+unset _idx_candidates _idx _idx_size
+
 command -v git >/dev/null 2>&1 || fail "git is not installed"
 
 actual_root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git worktree"
