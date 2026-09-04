@@ -239,12 +239,21 @@ def main(argv=None):
                 v |= 1 << (26 + int(k))
             for j in range(words_per_read):
                 rtl_records.append((v >> (64 * j)) & 0xFFFF_FFFF_FFFF_FFFF)
+            # 与 RTL safe_vote_value（differential_voter_v1_0.v:319-326）一致：
+            # **每收一票就钳位**，不是最后钳一次。一条记录内 idx 各不相同
+            # （p..p+rb-1 互异，两个平面又分处 idx 与 idx+L），所以这里向量化的
+            # 一次更新与逐票更新严格等价。
+            #
+            # 原实现是全程自由累加、最后 np.clip 一次，注释却写「每次 ±1 后钳位」。
+            # 两者只在**从不饱和**时才等价：自由累加到 +600 再回落 200 得 400，
+            # 逐票饱和是 511 再回落 200 得 311。tools/vote_range.py 实测：
+            # 2,048 条那档峰值仅 28/50，确实碰不到钳位（所以既有向量不受影响）；
+            # 但全量 SE250（400×/位）运行中峰值达 ±517，钳位真的会生效。
+            # 也就是说旧写法的正确性是**依赖规模的巧合**，不是构造上的等价。
             idx = np.arange(p, p + rb)
-            np.add.at(votes_rtl, idx, ((a >> 1) & 1).astype(np.int64) * 2 - 1)
-            np.add.at(votes_rtl, idx + L, (a & 1).astype(np.int64) * 2 - 1)
-    # 与 RTL safe_vote_value 一致：每次 ±1 后钳位到 [-512, 511]。
-    # 本数据量（约 15 票/位）远达不到钳位，这里只保证语义等价。
-    votes_rtl = np.clip(votes_rtl, -512, 511)
+            for tgt, bit in ((idx, (a >> 1) & 1), (idx + L, a & 1)):
+                votes_rtl[tgt] = np.clip(
+                    votes_rtl[tgt] + (bit.astype(np.int64) * 2 - 1), -512, 511)
     write_hex(out / "stage2_in.hex", rtl_records, 16)
     write_hex(out / "stage2_rtl_expect.hex",
               pack_lsb_first((votes_rtl > 0).astype(np.uint8)), 16)
