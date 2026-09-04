@@ -253,3 +253,14 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   也就是说，「板上跑出 `fcd0cf90…f2c3`」仍然是有意义的判据，
   不要据本条去掉它；本条只否掉一件事——**拿黄金向量那条链路上的图片哈希，
   去证明黄金向量用对了几何**。这两者差一个「范围」，正是上一条陷阱说的那种错法。
+- **Git 索引被意外截断为 0 字节时的特征与一键修复**：
+  多 Agent 并行或频繁提交/rebase 发生写竞争或被中断时，`.git-data/index` 可能被截断为 0 字节。
+  症状是任何 Git 命令与 VS Code 轮询立即稳定报 `fatal: .../index: index file smaller than expected`，
+  且弹窗关掉又会反复弹出。
+  **一键修复**：`rm -f .git-data/index && git reset`（从当前 HEAD 树瞬间重建完整索引）。
+  **IDE 防扰**：在 `.vscode/settings.json` 中配置 `"git.showError": false`。
+- **WSL 下调用 Windows 命令（`cmd.exe` / `powershell.exe` / `xsdb.bat`）必须重定向 stdin**：
+  在非交互式子 shell 或后台任务中执行 Windows 原生进程时，必须显式重定向输入：
+  `< /dev/null`（例如 `cmd.exe /c "..." < /dev/null`）。若缺少重定向，
+  Windows 进程会无限期挂起等待 stdin EOF，导致调用者卡死。
+
