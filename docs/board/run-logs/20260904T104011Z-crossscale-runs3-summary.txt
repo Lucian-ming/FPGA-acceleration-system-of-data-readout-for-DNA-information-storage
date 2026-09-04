@@ -1,0 +1,31 @@
+G3 一键复现  run=20260904T104011Z-crossscale-runs3
+时间(UTC)   : 20260904T104011Z
+命令        : tools/run_g3.sh --runs 3 --run-limits 4096,2048,2048 --run-score-mins 60,67,67 --tag crossscale-runs3
+任务次数    : 3（同一次上电内连续下发，中间不复位、不重烧）
+判据阈值    : score_min=67（只有这个阈值的轮次才比图片哈希）
+orient      : both（both = 每条读段发正/反两条记录），记录数按 64 对齐
+
+轮次 类型     源读段 记录数 阈值  超时(s) 实测耗时(s)
+1    弄脏轮  4096      8192      60      202      13
+2    判据轮  2048      4096      67      180      9
+3    判据轮  2048      4096      67      180      11
+
+四级取证按最后一轮算：Stage1 dump 4096 条记录
+bitstream   : 7d12552a0df87bdeee75ebe6c4d58fa0ebadfa87001a5639db8b3d138b21f9d1
+ELF         : 0c1e844ad6dd25e8d6975dbe4db9464a98001f93baac95a8e49bd2f79d457a75
+判据哈希    : fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+
+结果  步骤
+PASS    制品同源性（hw/build/export/ vs SHA256SUMS）
+PASS    烧录
+PASS    板端应用层就绪（CAPS）  — READY 7.9 1
+PASS    第 1 轮 first.py  — 8192 条记录 / score_min=60 / 13s；      Result: 8100 bytes, 12.64s, 0.01 Mbps
+PASS    第 1 轮 弄脏轮已执行  — score_min=60，8192 条记录
+PASS    第 2 轮 first.py  — 4096 条记录 / score_min=67 / 9s；      Result: 8100 bytes, 8.60s, 0.01 Mbps
+PASS    第 2 轮 唯一判据（图片 SHA-256）  — 4096 条记录：fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+PASS    第 3 轮 first.py  — 4096 条记录 / score_min=67 / 11s；      Result: 8100 bytes, 8.79s, 0.01 Mbps
+PASS    第 3 轮 唯一判据（图片 SHA-256）  — 4096 条记录：fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+PASS    第 1→2 轮 弄脏轮鉴别力自证  — 两轮回传相差 2612/64800 bit，累加器确实被写入了不同向的票
+PASS    多轮一致性（2 个判据轮同一张图片）
+PASS    连续运行无退化（同参数轮次耗时 < 1.5x）  — 逐轮耗时：13 9 11 
+PASS    四级逐级取证（board_stage_check.py）
