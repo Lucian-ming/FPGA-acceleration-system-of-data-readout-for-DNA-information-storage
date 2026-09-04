@@ -40,6 +40,9 @@
 #if __has_include("fw_log.c")
 #include "fw_log.c"
 #endif
+#if __has_include("reg_timing.c")
+#include "reg_timing.c"
+#endif
 #include "echo.c"
 
 #endif /* __ECHO_UNDER_TEST_H__ */

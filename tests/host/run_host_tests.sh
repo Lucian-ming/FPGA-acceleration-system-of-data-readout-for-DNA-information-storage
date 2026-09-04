@@ -118,13 +118,20 @@ fi
 if [ "$SELFTEST" = 1 ]; then
     note "鉴别力自证：把「拆分时顺手整理掉」的四种改动注进去，轨迹判据必须变红"
     for what in b27-start-clear dec-beats-order voter-prestart-zero drop-stage2-invalidate; do
-        desc=$(python3 tests/host/inject.py --src "$SRC/echo.c" --out /dev/null \
+        target_file="echo.c"
+        if [ -f "$SRC/reg_timing.c" ]; then
+            case "$what" in
+                b27-start-clear|dec-beats-order|voter-prestart-zero)
+                    target_file="reg_timing.c" ;;
+            esac
+        fi
+        desc=$(python3 tests/host/inject.py --src "$SRC/$target_file" --out /dev/null \
                         --what "$what" --describe)
         idir="$BUILD/inj_$what"
         mkdir -p "$idir"
         cp "$SRC"/*.h "$SRC"/*.c "$idir/"
-        if ! python3 tests/host/inject.py --src "$SRC/echo.c" \
-                --out "$idir/echo.c" --what "$what"; then
+        if ! python3 tests/host/inject.py --src "$SRC/$target_file" \
+                --out "$idir/$target_file" --what "$what"; then
             echo "  ✗ [$what] 注入点已失效（见上）"
             FAIL=$((FAIL+1)); continue
         fi

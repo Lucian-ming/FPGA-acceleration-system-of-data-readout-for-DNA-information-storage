@@ -7,6 +7,7 @@
 #include "echo.h"
 #include "wm_expand.h"
 #include "fw_log.h"
+#include "reg_timing.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
@@ -109,16 +110,8 @@ static inline void keep_tcp_alive(void){
 /* ===== 通用字节视图打印工具（已迁至 fw_log.{c,h}） ===== */
 
 /*============================================================================
- * IP核 START 信号控制
+ * IP核 START 信号控制（已迁至 reg_timing.{c,h}）
  *============================================================================*/
-static inline void trigger_ip_start(void) {
-    write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x00);
-    usleep(10);
-    write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x01);
-}
-static inline void clear_ip_start(void) {
-    write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x00);
-}
 
 /*============================================================================
  * 打印寄存器（已迁至 fw_log.{c,h}）
@@ -602,11 +595,8 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 
         while (wm_region < WM_NUM_LC && done_this_poll < WM_REGIONS_PER_POLL) {
             /* 先选区域，再进预载模式；顺序不能反 */
-            write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG1_WMSEL, wm_region);
-            usleep(10);
-            write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL,
-                        DNA_ACC_CTRL_BIT_PRELOAD);
-            usleep(10);
+            dna_select_wm_region(wm_region);
+            dna_enter_preload();
 
             wm_tx_expected = submit_bd_transfer(TxRingPtr,
                                                 DDR_WM_REGIONS_BASE + wm_region * WM_REGION_BYTES,
@@ -627,8 +617,7 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             usleep(10);
 
             /* 每个区域传完都退出预载模式，确保 wm_waddr 与区域边界对齐 */
-            write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x00);
-            usleep(10);
+            dna_leave_preload();
 
             wm_region++;
             done_this_poll++;
@@ -691,8 +680,7 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_START_IP: {
-        write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG0_CTRL, 0x01);
-        usleep(50);
+        dna_start();
         xil_printf("[STAGE1] IP core START\n\r");
         pipeline_set_state(PIPE_TX_STREAM);
         return PIPE_STEP_PROGRESS;
@@ -761,7 +749,7 @@ static pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             xil_printf("\n\r[STAGE1] COMPLETE!\n\r");
             xil_printf("  TX: sent=%u done=%d/%d\n\r", tx_frames_sent, tx_done, tx_expected);
             xil_printf("  RX: done=%d/%d\n\r", rx_done, rx_expected);
-            clear_ip_start(); usleep(100);
+            dna_stop(); usleep(100);
             pipeline_set_state(PIPE_PROGRESS);
             return PIPE_STEP_PROGRESS;
         }
@@ -874,15 +862,7 @@ static int voter_configure_and_verify(const dna_connection_t *conn)
     xil_printf("  TOTAL_READS: %u\n\r", total_reads);
     xil_printf("  SCORE_MIN:   %u\n\r", score_min);
 
-    write_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR, in_addr);
-    write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS, in_beats);
-    write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_ADDR, out_addr);
-    write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS, out_beats);
-    write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, total_reads);
-    write_reg32(VOTER_BASEADDR, VOTER_REG_SCORE_MIN, score_min);
-    __asm__ volatile("dsb sy");
-    __asm__ volatile("isb");
-    usleep(10);
+    voter_write_config(in_addr, in_beats, out_addr, out_beats, total_reads, score_min);
 
     const u32 in_addr_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_ADDR);
     const u32 in_beats_rb = read_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS);
@@ -1008,10 +988,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         /* -------------------- Step 2: 若 DONE=1，则清一次 DONE -------------------- */
         if (status_init & VOTER_STATUS_DONE) {
             xil_printf("[STAGE2] DONE set at init, clearing...\n\r");
-            write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x02);  /* bit1=1: done_clr */
-            usleep(500);                                         /* 短延时足够 */
-            write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);  /* 拉回0 */
-            usleep(100);
+            voter_clear_done();
 
             u32 st = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
             xil_printf("[STAGE2] Status after clear: 0x%02X (IDLE=%d, DONE=%d)\n\r",
@@ -1027,11 +1004,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         /* -------------------- Step 3: 若非 IDLE，则做一次轻量复位 -------------------- */
         if (!(status_init & VOTER_STATUS_IDLE)) {
             xil_printf("[STAGE2] WARNING: Voter not IDLE, resetting config...\n\r");
-            write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
-            write_reg32(VOTER_BASEADDR, VOTER_REG_IN_BEATS, 0);
-            write_reg32(VOTER_BASEADDR, VOTER_REG_OUT_BEATS, 0);
-            write_reg32(VOTER_BASEADDR, VOTER_REG_TOTAL_READS, 0);
-            usleep(2000);
+            voter_reset_regs();
 
             u32 st = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
             if (!(st & VOTER_STATUS_IDLE)) {
@@ -1051,10 +1024,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         /* -------------------- Step 5: 发送 START 脉冲（简洁稳定版） -------------------- */
         xil_printf("\n\r[START] Sending START pulse to Voter IP core...\n\r");
 
-        write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
-        usleep(100);
-
-        u32 status_before_start = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
+        u32 status_before_start = voter_prestart();
         xil_printf("[START] Status before START: 0x%02X (IDLE=%d, DONE=%d)\n\r",
                    status_before_start,
                    (status_before_start & VOTER_STATUS_IDLE) ? 1 : 0,
@@ -1067,12 +1037,8 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         }
 
         /* 发送短脉冲：bit0=1（start），bit1=0（不清done） */
-        write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x01);
-        usleep(100);
-        write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
-        usleep(100);
-
-        u32 status_after_start = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
+        u32 status_after_start;
+        voter_start_pulse(&status_after_start);
         xil_printf("[START] Status after START: 0x%02X (IDLE=%d, DONE=%d)\n\r",
                    status_after_start,
                    (status_after_start & VOTER_STATUS_IDLE) ? 1 : 0,
@@ -1155,7 +1121,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             xil_printf("[STAGE2] ========================================\n\r");
 
             /* 清除START信号 */
-            write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
+            voter_clear_start();
 
             /* 重置轮询计数 */
             poll_count = 0;
@@ -1178,7 +1144,7 @@ static pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             xil_printf("  - Verify input data format\n\r");
 
             /* 清除START信号并失败 */
-            write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
+            voter_clear_start();
             poll_count = 0;
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
@@ -1314,9 +1280,7 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
 	        // ✅ 关键修复：在做任何操作前先强制清零START和beats
 	        xil_printf("[STAGE3] Step 0: Ensuring START is cleared...\n\r");
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
+	        decoder_reset_regs();
 	        usleep(10000);  // 等待10ms
 
 	        u32 status_before_config = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
@@ -1375,24 +1339,10 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
 	        // ✅ 关键修复：写配置前再次确认START=0
 	        xil_printf("[STAGE3] Writing configuration (with safety checks)...\n\r");
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);  // 再次确认
-	        usleep(1000);
+	        decoder_confirm_idle_zero();
 
 	        // 按安全顺序写入：先写地址，最后才写beats
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  DEC_IN_ADDR);
-	        usleep(100);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_ADDR, DEC_OUT_ADDR);
-	        usleep(100);
-
-	        // ✅ 关键：最后才写beats，避免触发自动启动
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, DEC_OUT_BEATS);
-	        usleep(100);
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, DEC_IN_BEATS);  // 最后写
-
-	        /* 内存屏障 */
-	        __asm__ volatile("dsb sy");
-	        __asm__ volatile("isb");
-	        usleep(10);
+	        decoder_configure_default();
 
 	        /* 回读验证 */
 	        u32 in_addr_rb  = read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR);
@@ -1473,8 +1423,7 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	         * 整条输入被旋转，Stage3 输出与黄金 49.46% 误码（第四次上板）。
 	         * RTL 已同时修好（只认 wdata[0]=1，且忙时不接受 START），
 	         * 这里也一并改成单次脉冲，两边都不再依赖对方。 */
-	        write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x01);
-	        usleep(100);  /* 只是让 START 在 M 域被采样，期间不再碰这个寄存器 */
+	        decoder_start_once();
 
 	        xil_printf("[STAGE3] ✓ IP core started (IDLE: 1→0)\n\r");
 	        xil_printf("[STAGE3] ✓ Started, monitoring progress...\n\r");
@@ -1510,7 +1459,7 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	        /* 条件1（主判据）：DONE 标志置位 */
 	        if (status & DECODER_STATUS_DONE) {
 	            xil_printf("\n\r[STAGE3] ✓ DONE flag set after %u polls\n\r", poll_count);
-	            write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
+	            decoder_clear_start();
 	            poll_count = 0;
 	            pipeline_set_state(PIPE_DONE_STAGE3);
 	            return PIPE_STEP_PROGRESS;
@@ -1532,7 +1481,7 @@ static pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 	            if (written >= DECODER_OUTPUT_BEATS) {
 	                xil_printf("[STAGE3] ⚠️ 输出区 %u/%u 拍已全部写出，但 DONE=0；按完成收尾\n\r",
 	                           written, (u32)DECODER_OUTPUT_BEATS);
-	                write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
+	                decoder_clear_start();
 	                poll_count = 0;
 	                pipeline_set_state(PIPE_DONE_STAGE3);
 	                return PIPE_STEP_PROGRESS;
