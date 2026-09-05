@@ -119,6 +119,18 @@ tests/datasets/<dataset-id>/
 
 这将产生一个约 5×4×4×3 的分层测试矩阵，可先缩小为 smoke 子集，再将完整矩阵用于阶段验收。
 
+### 3.5 现有压测资产如何使用
+
+现有 `tools/stress_test_suite.py` 和 `tests/stress_results/` 可直接作为 T0/B1 的起点，
+但必须先按 `docs/27-stress-analysis-2026-09-05.md` 完成三项改造：
+
+1. `TestRecord` 增加 `failure_class`，分开功能、通信、工具、边界和故障注入结果；
+2. 增加 FASTQ、上传、DMA、Stage1/2/3、回传和 LDPC 分段计时；
+3. 将 `dataset_id/payload_sha256/watermark_sha256/seed` 写入每轮 JSON。
+
+在这三项完成前，压测只能作为稳定性证据，不能作为性能优化判据。737 轮旧报告中，
+边界探索失败和 `dirty_proof` 失败是预期实验结果，不应直接并入产品成功率。
+
 ---
 
 ## 4. T 线：时间优化实施步骤
@@ -149,6 +161,17 @@ tests/datasets/<dataset-id>/
 6. 对每一档至少重复 3 次，报告中位数和最大/最小值。
 
 **T0 门禁：** 没有完整分段计时，不进入 RTL 性能改造。
+
+**已有压测接入顺序：**
+
+```text
+修复统计字段
+→ failure_class
+→ 分段计时
+→ 10～20 轮 smoke
+→ 公平 CPU/FPGA 基准
+→ Stage1 RTL 改造
+```
 
 ### T1：上位机与传输优化（1~2 周）
 

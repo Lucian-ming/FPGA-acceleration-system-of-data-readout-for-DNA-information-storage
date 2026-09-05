@@ -29,6 +29,7 @@
 | [23-next-phase-plan-2026-09-04.md](23-next-phase-plan-2026-09-04.md) | **未来三阶段计划与 SE250 点亮实施方案**：近程 SE250 首次上板点亮 (S5) & 混用防呆、中程 B29 根除加固与全量点亮 (S7)、远程长效交付与技术债清零 | 规划与执行后续各阶段工作前必读 |
 | [25-master-product-plan.md](25-master-product-plan.md) | **主产品规划**：三级流水线基线、B29/B30 根治、双几何产品化路线、工业级长稳与四类并行 Agent 提示词矩阵 | 作为当前系统架构与执行总纲 |
 | [26-future-optimization-and-validation-plan-2026-09-05.md](26-future-optimization-and-validation-plan-2026-09-05.md) | **未来优化与验证实施计划**：Stage1 时间优化、数据扩展、错误鲁棒性、参数化读出与上位机产品化 | G3 之后的执行排期与验收门禁 |
+| [27-stress-analysis-2026-09-05.md](27-stress-analysis-2026-09-05.md) | **自动化压测分析**：737 轮压测证据、失败分类、分段计时、多 payload 与错误矩阵接入要求 | 使用现有压测前必读 |
 | [24-agent-prompt-full-roadmap.md](24-agent-prompt-full-roadmap.md) | **全景接入、不足审视、整改方向与演进路线图**：新 Agent 一键引导 Prompt、B29/B30 缺陷根因、实施路线图与并行提示词矩阵 | 派发新 Agent 或新会话接手项目时必读 |
 
 ## 参考资料（历史审计结果，只读）
