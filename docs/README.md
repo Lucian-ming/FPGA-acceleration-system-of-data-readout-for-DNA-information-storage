@@ -28,6 +28,7 @@
 | [20-se250-study-2026-08-30.md](20-se250-study-2026-08-30.md) | **SE250 扩展评估**（只调研不改 RTL）：几何推导、硬编码清单（RTL 11/固件 8/上位机 3/黄金 3 处）、资源与时序判据、分阶段方案 | 要把流水线从 150 bp 扩到 250 bp 时 |
 | [23-next-phase-plan-2026-09-04.md](23-next-phase-plan-2026-09-04.md) | **未来三阶段计划与 SE250 点亮实施方案**：近程 SE250 首次上板点亮 (S5) & 混用防呆、中程 B29 根除加固与全量点亮 (S7)、远程长效交付与技术债清零 | 规划与执行后续各阶段工作前必读 |
 | [25-master-product-plan.md](25-master-product-plan.md) | **主产品规划**：三级流水线基线、B29/B30 根治、双几何产品化路线、工业级长稳与四类并行 Agent 提示词矩阵 | 作为当前系统架构与执行总纲 |
+| [26-future-optimization-and-validation-plan-2026-09-05.md](26-future-optimization-and-validation-plan-2026-09-05.md) | **未来优化与验证实施计划**：Stage1 时间优化、数据扩展、错误鲁棒性、参数化读出与上位机产品化 | G3 之后的执行排期与验收门禁 |
 | [24-agent-prompt-full-roadmap.md](24-agent-prompt-full-roadmap.md) | **全景接入、不足审视、整改方向与演进路线图**：新 Agent 一键引导 Prompt、B29/B30 缺陷根因、实施路线图与并行提示词矩阵 | 派发新 Agent 或新会话接手项目时必读 |
 
 ## 参考资料（历史审计结果，只读）
