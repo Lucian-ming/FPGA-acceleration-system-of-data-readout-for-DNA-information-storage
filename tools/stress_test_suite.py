@@ -57,16 +57,26 @@ class TestRecord:
     run_id: int
     timestamp: str
     mode: str                  # 'se250' or 'se150'
+    dataset_id: str            # 'R0.83_se150' / 'R0.83_se250'
+    payload_sha256: str        # 目标 payload 哈希
+    seed: int                  # 随机种子
+    read_bps: int              # 150 或 250
     read_count: int            # 源读段数
     record_count: int          # 发送记录数 (orient both)
     score_min: int
-    tag: str                   # 'explore', 'stress', 'dirty', etc.
-    total_time: float          # 秒
-    board_result_time: float   # 硬件计算回传耗时
+    tag: str                   # 'explore', 'stress', 'dirty_proof', etc.
+    failure_class: str         # 'pass' | 'functional' | 'communication' | 'tooling' | 'boundary_expected' | 'fault_injection_expected'
+    
+    # 端到端分段耗时 (秒)
+    t_fastq_s: float           # FASTQ 解析耗时
+    t_upload_s: float          # 网络数据上传耗时 (t_wm + t_batches)
+    t_board_s: float           # 板端硬件流水与等待回传耗时 (t_result)
+    t_ldpc_s: float            # 上位机 LDPC 译码耗时
+    t_total_s: float           # 端到端总耗时
+
     raw_bit_errors: int        # 回传 64800 比特与 golden codeword 差异
     initial_syndromes: int     # 初始校验子不符数
     ldpc_iters: int            # 迭代轮数
-    ldpc_time_ms: float        # LDPC 耗时
     image_sha256: str          # 还原图像 SHA-256
     recovered: bool            # 是否成功恢复目标图像
     notes: str = ""
@@ -79,9 +89,11 @@ class StressTestSuite:
         board_port: int = 7,
         out_dir: Optional[Path] = None,
         duration_hours: float = 4.5,
+        mode: str = "auto",
     ):
         self.ip = board_ip
         self.port = board_port
+        self.mode_select = mode.lower()
         self.start_time = time.time()
         self.deadline = self.start_time + duration_hours * 3600.0
         self.duration_hours = duration_hours
@@ -120,6 +132,22 @@ class StressTestSuite:
             subprocess.run(cmd, cwd=str(REPO_ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
+
+    def get_board_mode(self, timeout: float = 3.0) -> Optional[str]:
+        """获取当前板端正在运行的模式 ('se150' / 'se250')，未响应返回 None"""
+        try:
+            import socket
+            import protocol as pr
+            with socket.create_connection((self.ip, self.port), timeout=timeout) as sock:
+                sock.settimeout(timeout)
+                caps = pr.query_caps(sock, pr.NetStats())
+                if caps.read_bps == 150:
+                    return "se150"
+                elif caps.read_bps == 250:
+                    return "se250"
+        except Exception:
+            return None
+        return None
 
     def wait_board_ready(self, max_seconds: int = 60) -> bool:
         """探针检测板端是否响应 CAPS"""
@@ -209,25 +237,37 @@ class StressTestSuite:
 
         # 1. 运行网络客户端与 FPGA 交互
         board_time = 0.0
+        t_upload = 0.0
+        dataset_id = f"R0.83_{mode}"
         try:
             stats = run_client(config, log=lambda m: None)
             board_time = getattr(stats, "t_result", 0.0)
+            t_wm = getattr(stats, "t_wm", 0.0)
+            t_batches = getattr(stats, "t_batches", 0.0)
+            t_upload = t_wm + t_batches
         except Exception as e:
             total_t = time.time() - t_start
             rec = TestRecord(
                 run_id=self.current_run_id,
                 timestamp=ts_str,
                 mode=mode,
+                dataset_id=dataset_id,
+                payload_sha256=GOLDEN_IMAGE_SHA256,
+                seed=0,
+                read_bps=read_bps,
                 read_count=reads_limit,
                 record_count=reads_limit * 2,
                 score_min=score_min,
                 tag=tag,
-                total_time=total_t,
-                board_result_time=board_time,
+                failure_class="communication",
+                t_fastq_s=0.0,
+                t_upload_s=0.0,
+                t_board_s=0.0,
+                t_ldpc_s=0.0,
+                t_total_s=total_t,
                 raw_bit_errors=-1,
                 initial_syndromes=-1,
                 ldpc_iters=-1,
-                ldpc_time_ms=0.0,
                 image_sha256="N/A",
                 recovered=False,
                 notes=f"Client communication failed: {e}",
@@ -242,16 +282,23 @@ class StressTestSuite:
                 run_id=self.current_run_id,
                 timestamp=ts_str,
                 mode=mode,
+                dataset_id=dataset_id,
+                payload_sha256=GOLDEN_IMAGE_SHA256,
+                seed=0,
+                read_bps=read_bps,
                 read_count=reads_limit,
                 record_count=reads_limit * 2,
                 score_min=score_min,
                 tag=tag,
-                total_time=total_t,
-                board_result_time=board_time,
+                failure_class="communication",
+                t_fastq_s=0.0,
+                t_upload_s=t_upload,
+                t_board_s=board_time,
+                t_ldpc_s=0.0,
+                t_total_s=total_t,
                 raw_bit_errors=-1,
                 initial_syndromes=-1,
                 ldpc_iters=-1,
-                ldpc_time_ms=0.0,
                 image_sha256="N/A",
                 recovered=False,
                 notes="Result file not generated",
@@ -290,22 +337,43 @@ class StressTestSuite:
         total_t = time.time() - t_start
 
         success = (ldpc_recovered and img_sha == GOLDEN_IMAGE_SHA256)
-        notes = "OK" if success else ("LDPC decode unconverged" if not ldpc_recovered else "Hash mismatch")
+        
+        # 判定 failure_class
+        if success:
+            fail_class = "pass"
+            notes = "OK"
+        elif tag == "dirty_proof" or (mode == "se150" and score_min != 67) or (mode == "se250" and score_min != 112):
+            fail_class = "fault_injection_expected"
+            notes = "Fault injection expected unconverged"
+        elif tag in ["explore", "binary"]:
+            fail_class = "boundary_expected"
+            notes = "Low coverage boundary expected unconverged"
+        else:
+            fail_class = "functional"
+            notes = "LDPC decode unconverged" if not ldpc_recovered else "Hash mismatch"
 
+        t_ldpc_s = ldpc_ms / 1000.0
         rec = TestRecord(
             run_id=self.current_run_id,
             timestamp=ts_str,
             mode=mode,
+            dataset_id=dataset_id,
+            payload_sha256=GOLDEN_IMAGE_SHA256,
+            seed=0,
+            read_bps=read_bps,
             read_count=reads_limit,
             record_count=reads_limit * 2,
             score_min=score_min,
             tag=tag,
-            total_time=total_t,
-            board_result_time=board_time,
+            failure_class=fail_class,
+            t_fastq_s=0.0,
+            t_upload_s=t_upload,
+            t_board_s=board_time,
+            t_ldpc_s=t_ldpc_s,
+            t_total_s=total_t,
             raw_bit_errors=bit_errors,
             initial_syndromes=init_failed,
             ldpc_iters=iters,
-            ldpc_time_ms=ldpc_ms,
             image_sha256=img_sha,
             recovered=success,
             notes=notes,
@@ -319,12 +387,12 @@ class StressTestSuite:
         with open(self.jsonl_path, "a") as f:
             f.write(json.dumps(asdict(rec)) + "\n")
 
-        status_sym = "✅ PASS" if rec.recovered else "❌ FAIL"
+        status_sym = "✅ PASS" if rec.recovered else f"❌ {rec.failure_class}"
         sha_short = rec.image_sha256[:8] if rec.image_sha256 != "N/A" else "------"
         print(
             f"[{rec.run_id:03d}][{rec.mode.upper()}][{rec.tag:7s}] 读段:{rec.read_count:5d}条({rec.record_count:6d}记) "
-            f"分阈:{rec.score_min:3d} | 板耗:{rec.board_result_time:5.2f}s | "
-            f"误码:{rec.raw_bit_errors:4d} 初始子:{rec.initial_syndromes:3d} 迭代:{rec.ldpc_iters:2d}轮({rec.ldpc_time_ms:4.1f}ms) | "
+            f"分阈:{rec.score_min:3d} | 板耗:{rec.t_board_s:5.2f}s 上传:{rec.t_upload_s:4.2f}s LDPC:{rec.t_ldpc_s*1000:4.1f}ms | "
+            f"误码:{rec.raw_bit_errors:4d} 初始子:{rec.initial_syndromes:3d} 迭代:{rec.ldpc_iters:2d}轮 | "
             f"{status_sym} SHA:{sha_short} ({rec.notes})"
         )
 
@@ -333,10 +401,15 @@ class StressTestSuite:
     def _render_markdown_summary(self):
         """实时渲染 Markdown 汇总表"""
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        passed = sum(1 for r in self.records if r.recovered)
         total = len(self.records)
+        passed = sum(1 for r in self.records if r.recovered)
+        
+        # 按照 docs/27 区分产品有效轮次与探索/自证轮次
+        product_records = [r for r in self.records if r.failure_class not in ["boundary_expected", "fault_injection_expected"]]
+        prod_total = len(product_records)
+        prod_passed = sum(1 for r in product_records if r.recovered)
+        prod_rate = (prod_passed / prod_total * 100.0) if prod_total > 0 else 100.0
 
-        # 统计 SE150 和 SE250 的成功记录
         succ_se150 = [r.read_count for r in self.records if r.mode == "se150" and r.recovered]
         succ_se250 = [r.read_count for r in self.records if r.mode == "se250" and r.recovered]
 
@@ -344,27 +417,28 @@ class StressTestSuite:
         min_se250 = min(succ_se250) if succ_se250 else "探索中"
 
         lines = [
-            f"# 自动化长时高压测试实时报告",
+            f"# 标准化长稳与分段基准测试报告",
             f"",
             f"- **更新时间**：{now_str}",
-            f"- **已完成轮次**：{total} 轮（成功 {passed} 轮，通过率 {passed/total*100:.1f}%）",
+            f"- **产品长稳通过率 (排除预期边界与弄脏)**：**{prod_passed} / {prod_total} ({prod_rate:.1f}%)**",
+            f"- **总运行轮次 (含科学探索)**：{total} 轮 (PASS: {passed})",
             f"- **SE150 最低可恢复源读段数 ($N_{{min}}$)**：**{min_se150}** 条",
             f"- **SE250 最低可恢复源读段数 ($N_{{min}}$)**：**{min_se250}** 条",
             f"- **计划运行时间**：{self.duration_hours:.1f} 小时",
             f"",
-            f"## 最近 20 轮执行记录",
+            f"## 最近 20 轮执行记录（含端到端分段耗时）",
             f"",
-            f"| 轮次 | 规格 | 标签 | 读段数 | 记录数 | 阈值 | 硬件耗时 | 初始校验子 | 迭代轮数 | 状态 | 图像 SHA-256 |",
-            f"| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+            f"| 轮次 | 规格 | 标签 | 类别 | 读段数 | 板耗 | 上传 | LDPC | 总耗时 | 初始校验子 | 迭代 | 状态 | 图像 SHA-256 |",
+            f"| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
         ]
 
         for r in self.records[-20:]:
-            st = "✅ PASS" if r.recovered else "❌ FAIL"
+            st = "✅ PASS" if r.recovered else f"❌ {r.failure_class}"
             sha = f"`{r.image_sha256[:8]}...`" if r.image_sha256 != "N/A" else "-"
             lines.append(
-                f"| {r.run_id} | {r.mode.upper()} | {r.tag} | {r.read_count} | {r.record_count} | "
-                f"{r.score_min} | {r.board_result_time:.2f}s | {r.initial_syndromes} | {r.ldpc_iters} | "
-                f"{st} | {sha} |"
+                f"| {r.run_id} | {r.mode.upper()} | {r.tag} | {r.failure_class} | {r.read_count} | "
+                f"{r.t_board_s:.2f}s | {r.t_upload_s:.2f}s | {r.t_ldpc_s*1000:.1f}ms | {r.t_total_s:.2f}s | "
+                f"{r.initial_syndromes} | {r.ldpc_iters} | {st} | {sha} |"
             )
 
         with open(self.summary_md_path, "w") as f:
@@ -450,53 +524,88 @@ class StressTestSuite:
             self.run_single(mode, n, sm, tag=tag)
 
     def run_full_suite(self):
-        """执行完整四五个小时的全面测试流程"""
-        print(f"\n>>> 启动全流程无人值守压力测试矩阵 <<<")
+        """执行全面测试流程（支持 se150, se250 或 auto 模式）"""
+        print(f"\n>>> 启动全流程无人值守压力测试矩阵 (模式: {self.mode_select.upper()}) <<<")
 
-        # -------------------------------------------------------------
-        # Phase 1: SE250 (板卡当前已运行 SE250，无需重复烧录)
-        # -------------------------------------------------------------
-        if not self.wait_board_ready(10):
-            print("[WARN] 板端未响应，先执行一次初始烧录...")
-            self.flash_mode("se250")
+        if self.mode_select == "se150":
+            cur_mode = self.get_board_mode()
+            if cur_mode != "se150":
+                print(f"[FLASH] 当前板端状态 ({cur_mode}) 不是 SE150，执行切换烧录 ...")
+                if not self.flash_mode("se150"):
+                    return
+            else:
+                print(f"[READY] 板端已处于 SE150 运行状态，跳过重复烧录，直接开始测试！")
 
-        # SE250 边界探索
-        candidates_se250 = [768, 896, 1024, 1152, 1216, 1280, 1536, 2048]
-        n_min_250 = self.explore_boundary("se250", candidates_se250, score_min=112)
-        if n_min_250 <= 0:
-            n_min_250 = 1216  # 保底默认
+            candidates_se150 = [1024, 1088, 1152, 1216, 1280, 1312, 1344, 1536, 2048]
+            n_min_150 = self.explore_boundary("se150", candidates_se150, score_min=67)
+            if n_min_150 <= 0:
+                n_min_150 = 1312
+            self.run_endurance_loop("se150", n_min_150, standard_score=67, max_runs=15)
 
-        # SE250 多尺度长跑压测
-        self.run_endurance_loop("se250", n_min_250, standard_score=112, max_runs=15)
+            cycle = 0
+            while time.time() < self.deadline:
+                cycle += 1
+                for n in [2048, 4096, 8192, 16384]:
+                    if time.time() > self.deadline:
+                        break
+                    self.run_single("se150", n, 67, tag=f"cycle_{cycle}")
 
-        # -------------------------------------------------------------
-        # Phase 2: 切换到 SE150 并执行烧录与边界探索
-        # -------------------------------------------------------------
-        if time.time() < self.deadline:
-            print(f"\n========================================================")
-            print(f">>> 切换到 SE150 制品并重新烧录板卡 <<<")
-            print(f"========================================================")
-            if self.flash_mode("se150"):
-                candidates_se150 = [384, 512, 640, 768, 896, 960, 1024, 1088, 1152, 1280, 1536, 2048]
-                n_min_150 = self.explore_boundary("se150", candidates_se150, score_min=67)
-                if n_min_150 <= 0:
-                    n_min_150 = 1088  # 保底默认
+        elif self.mode_select == "se250":
+            cur_mode = self.get_board_mode()
+            if cur_mode != "se250":
+                print(f"[FLASH] 当前板端状态 ({cur_mode}) 不是 SE250，执行切换烧录 ...")
+                if not self.flash_mode("se250"):
+                    return
+            else:
+                print(f"[READY] 板端已处于 SE250 运行状态，跳过重复烧录，直接开始测试！")
 
-                # SE150 多尺度长跑压测
-                self.run_endurance_loop("se150", n_min_150, standard_score=67, max_runs=15)
+            candidates_se250 = [768, 896, 1024, 1152, 1216, 1280, 1536, 2048]
+            n_min_250 = self.explore_boundary("se250", candidates_se250, score_min=112)
+            if n_min_250 <= 0:
+                n_min_250 = 1216
+            self.run_endurance_loop("se250", n_min_250, standard_score=112, max_runs=15)
 
-        # -------------------------------------------------------------
-        # Phase 3: 持续交替循环直至时间预算耗尽
-        # -------------------------------------------------------------
-        cycle = 0
-        while time.time() < self.deadline:
-            cycle += 1
-            print(f"\n>>> 持续加压循环 Cycle {cycle} (剩余: {(self.deadline - time.time())/3600:.2f}h) <<<")
-            # 运行一批随机尺度任务
-            for n in [2048, 4096, 8192, 16384]:
-                if time.time() > self.deadline:
-                    break
-                self.run_single("se150", n, 67, tag=f"cycle_{cycle}")
+            cycle = 0
+            while time.time() < self.deadline:
+                cycle += 1
+                for n in [2048, 4096, 8192, 16384]:
+                    if time.time() > self.deadline:
+                        break
+                    self.run_single("se250", n, 112, tag=f"cycle_{cycle}")
+
+        else:  # auto: 优先根据板端现有模式安排先后顺序
+            cur_mode = self.get_board_mode()
+            first_mode = cur_mode if cur_mode in ["se150", "se250"] else "se150"
+            second_mode = "se250" if first_mode == "se150" else "se150"
+
+            # Phase 1: first_mode
+            if not self.wait_board_ready(10) or self.get_board_mode() != first_mode:
+                self.flash_mode(first_mode)
+            cands_1 = [1024, 1152, 1216, 1312, 1536, 2048] if first_mode == "se150" else [768, 896, 1024, 1152, 1216, 1536, 2048]
+            sc_1 = 67 if first_mode == "se150" else 112
+            n_min_1 = self.explore_boundary(first_mode, cands_1, score_min=sc_1)
+            self.run_endurance_loop(first_mode, n_min_1 or (1312 if first_mode == "se150" else 1216), standard_score=sc_1, max_runs=10)
+
+            # Phase 2: second_mode
+            if time.time() < self.deadline:
+                print(f"\n========================================================")
+                print(f">>> 切换到 {second_mode.upper()} 制品并重新烧录板卡 <<<")
+                print(f"========================================================")
+                if self.flash_mode(second_mode):
+                    cands_2 = [1024, 1152, 1216, 1312, 1536, 2048] if second_mode == "se150" else [768, 896, 1024, 1152, 1216, 1536, 2048]
+                    sc_2 = 67 if second_mode == "se150" else 112
+                    n_min_2 = self.explore_boundary(second_mode, cands_2, score_min=sc_2)
+                    self.run_endurance_loop(second_mode, n_min_2 or (1312 if second_mode == "se150" else 1216), standard_score=sc_2, max_runs=10)
+
+            # Phase 3: 持续交替循环直至时间预算耗尽
+            cycle = 0
+            while time.time() < self.deadline:
+                cycle += 1
+                print(f"\n>>> 持续加压循环 Cycle {cycle} (剩余: {(self.deadline - time.time())/3600:.2f}h) <<<")
+                for n in [2048, 4096, 8192, 16384]:
+                    if time.time() > self.deadline:
+                        break
+                    self.run_single(second_mode, n, sc_2, tag=f"cycle_{cycle}")
 
         print(f"\n========================================================")
         print(f"全部测试矩阵圆满完成！报告已生成: {self.summary_md_path}")
@@ -509,6 +618,7 @@ def main():
     parser.add_argument("--ip", default="192.168.1.10", help="开发板 IP")
     parser.add_argument("--port", type=int, default=7, help="开发板端口")
     parser.add_argument("--hours", type=float, default=4.5, help="总运行时长 (小时)")
+    parser.add_argument("--mode", choices=["auto", "se150", "se250"], default="auto", help="测试模式 (auto/se150/se250)")
     parser.add_argument("--out-dir", type=Path, default=None, help="输出目录")
     args = parser.parse_args()
 
@@ -517,6 +627,7 @@ def main():
         board_port=args.port,
         out_dir=args.out_dir,
         duration_hours=args.hours,
+        mode=args.mode,
     )
     suite.run_full_suite()
 
