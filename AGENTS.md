@@ -21,6 +21,11 @@
   `bash tools/verify_repo_binding.sh --require-synced`，结果必须显示 `main...origin/main` 为 `0/0`。
 - Vivado/XSim 大型生成目录不提交，但不得自动删除；必须提交可复现入口、源文件/黄金数据 manifest、
   结果摘要和结论边界。若 GitHub ruleset 阻止直接推送，立即报告，不得改推其他仓库规避。
+- 工具生成的 `*.log`、`*.jou`、`*.str`、`*.pb` 不得留在仓库根目录；Vivado 使用
+  `tools/run_vivado_build.sh`，XSim/仿真脚本必须把日志写入对应的
+  `hw/build/xsim/<run-id>/` 或 `logs/<tool>/<run-id>/`。交接前必须执行
+  `find . -maxdepth 1 -type f \( -name '*.log' -o -name '*.jou' -o -name '*.str' -o -name '*.pb' \)`
+  并确认无输出；发现残留时先归档到带时间戳目录，不得静默删除证据。
 - **提交纪律**：禁止 `git add -A` / `git add .`，必须按文件显式 `git add <路径>`。
   多个会话并行时共用同一棵工作树，别人的半成品会和你的改动交错在 `git status` 里，
   `-A` 会把它一起提交出去（2026-08-31 就发生过一次）。提交前先 `git pull --rebase`，
@@ -263,4 +268,3 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   在非交互式子 shell 或后台任务中执行 Windows 原生进程时，必须显式重定向输入：
   `< /dev/null`（例如 `cmd.exe /c "..." < /dev/null`）。若缺少重定向，
   Windows 进程会无限期挂起等待 stdin EOF，导致调用者卡死。
-
