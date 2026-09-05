@@ -64,12 +64,14 @@ class CLDPCDecoder:
         self,
         rx_bits: np.ndarray,
         max_iter: int = 50,
-    ) -> Tuple[np.ndarray, int, int]:
-        """执行译码。
+        raise_on_error: bool = True,
+    ) -> Tuple[Optional[np.ndarray], int, int]:
+        """对接收比特流进行解交织与硬判决翻转译码。
 
         :param rx_bits: 64800 个 uint8 (0 或 1)
         :param max_iter: 最大迭代轮数
-        :return: (info_bits [54000], initial_failed, iterations)
+        :param raise_on_error: 译码失败时是否抛出异常；False 时返回 (None, init_failed, iters)
+        :return: (info_bits [54000] 或 None, initial_failed, iterations)
         """
         if rx_bits.size != N_BITS:
             raise ValueError(f"输入比特数应为 {N_BITS}，实得 {rx_bits.size}")
@@ -93,9 +95,11 @@ class CLDPCDecoder:
         )
 
         if rc != 0:
-            raise RuntimeError(
-                f"C LDPC 译码未收敛（{max_iter} 轮后仍未通过所有校验方程）"
-            )
+            if raise_on_error:
+                raise RuntimeError(
+                    f"C LDPC 译码未收敛（{max_iter} 轮后仍未通过所有校验方程）"
+                )
+            return None, initial_failed.value, iterations.value
 
         return out_info, initial_failed.value, iterations.value
 
@@ -151,7 +155,8 @@ def decode_bits_c(
     pchk_path: Path,
     perm_path: Path,
     max_iter: int = 50,
-) -> Tuple[np.ndarray, int, int]:
+    raise_on_error: bool = True,
+) -> Tuple[Optional[np.ndarray], int, int]:
     """使用 C 核心直接对接收的 64,800 比特数组进行解交织与译码。"""
     decoder = get_cached_decoder(pchk_path, perm_path)
-    return decoder.decode(rx_bits, max_iter=max_iter)
+    return decoder.decode(rx_bits, max_iter=max_iter, raise_on_error=raise_on_error)
