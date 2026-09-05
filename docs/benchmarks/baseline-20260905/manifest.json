@@ -1,0 +1,47 @@
+{
+  "manifest_version": "1.0",
+  "timestamp": "2026-09-05T20:35:00+08:00",
+  "git_commit": "fc006e609f5468f4209bdf3e0b78ba818761661b",
+  "git_branch": "main",
+  "target_board": "ZYNQ ECO (R6) XC7Z010-1CLG400C",
+  "device_clock_mhz": 100.0,
+  "power_measurement": "未测量 (待接入功率计/待实测供电轨电流)",
+  "artifacts_sha256": {
+    "BOOT.bin": "65d813604de9c848f9031d8a10713b933638a22bc29cbfd47f9cff772f5040a9",
+    "dna_accel.xsa": "a88fb70378f6b974e7ba41e3f0ea93509476feea80d58fa05964a3e97fc8ece6",
+    "top_bd_wrapper.bit": "65b3538a2d608aaf48bb47e0faf999bba8a7bc152c0ae439e2dbba53df7ee3d9",
+    "fsbl.elf": "7d7c1c78ab252d7a1279acc6f8731553f798f61e54d21fd8b4bf071a1240432a",
+    "dna_lwip_app_b27.elf": "4c2e7ff19bdfc8241425459080a76ba89346142ee2348657229f466ff3985f42"
+  },
+  "implementation_metrics": {
+    "wns_ns": 0.088,
+    "whs_ns": 0.016,
+    "tns_ns": 0.0,
+    "ths_ns": 0.0,
+    "lut_utilization_pct": 59.77,
+    "ff_utilization_pct": 38.66,
+    "bram_tile_utilization_pct": 90.0,
+    "dsp_utilization_pct": 0.0
+  },
+  "verification_ground_truth": {
+    "golden_image_sha256": "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3",
+    "ldpc_code": "DVB-S2 R=5/6 (N=64800, K=54000)",
+    "se150_profile": {
+      "read_bps": 150,
+      "recommended_score_min": 67,
+      "min_recoverable_reads": 1312,
+      "board_latency_model": "t = 4.93s + 0.9396ms/条 * 条数 (R² = 1.00000)"
+    },
+    "se250_profile": {
+      "read_bps": 250,
+      "recommended_score_min": 112,
+      "min_recoverable_reads": 1216,
+      "board_latency_model": "t ≈ 5.0s + 1.58ms/条 * 条数"
+    }
+  },
+  "proven_evidence_references": {
+    "long_stress_test": "tests/stress_results/stress_20260905T143122/summary.md (737轮, 720通过, 正常工况100%)",
+    "crossscale_3runs": "docs/board/run-logs/20260904T104011Z-crossscale-runs3-summary.txt",
+    "se150_s6_regression": "docs/board/run-logs/20260905T021433Z-se150-s6-regression-summary.txt"
+  }
+}
