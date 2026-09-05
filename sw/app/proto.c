@@ -11,6 +11,10 @@
 #include <string.h>
 #include "netif/xadapter.h"
 
+#ifndef HOST_TEST
+#include "netif/etharp.h"
+#endif
+
 extern struct netif *echo_netif;
 
 /* 喂 lwIP */
@@ -19,6 +23,21 @@ void keep_tcp_alive(void)
     if (echo_netif) {
         xemacif_input(echo_netif);
     }
+}
+
+/* 【B29 根除加固】单播刷新对端 ARP，避免长任务结束时首包命中陈旧表项。 */
+void arp_keepalive(const void *remote_ip)
+{
+#ifndef HOST_TEST
+    if (echo_netif) {
+        if (remote_ip) {
+            etharp_request(echo_netif, (const ip4_addr_t *)remote_ip);
+        }
+        xemacif_input(echo_netif);
+    }
+#else
+    (void)remote_ip;
+#endif
 }
 
 /*============================================================================

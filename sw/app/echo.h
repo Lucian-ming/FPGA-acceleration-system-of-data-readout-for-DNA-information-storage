@@ -23,7 +23,7 @@
 
 /* 【P3】读段碱基数：SE250 规格 */
 #define READ_BASES_PER_READ     250U
-/* 容量内最大的 64 对齐条数：TOTAL_READS=108000 本身不是 64 的倍数 */
+/* 容量内最大的 64 对齐条数：TOTAL_READS=129600 本身就是 64 的倍数 (2025 批) */
 #define TASK_MAX_READS          ((TOTAL_READS / FRAME_READS) * FRAME_READS)
 
 /*=============================================================================
@@ -49,7 +49,7 @@
 #define READ_SIZE_BYTES         64U
 #define FRAME_READS             64U
 #define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 4096B */
-#define TOTAL_READS             108000U
+#define TOTAL_READS             129600U
 
 /*=============================================================================
  * 水印几何（必须与 srpe_batch 的 parameter 一致）
@@ -76,36 +76,37 @@
 #define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 211,000 B */
 
 /*=============================================================================
- * DDR 地址映射 (优化后，去除重打包)
+ * DDR 地址映射 (SE250 全量布局，扩充读段区至 8.38MB，docs/20 §5.3)
  *
  * 内存布局:
  * 0x10000000 - 0x10002800  : 水印数据 (~10KB)
- * 0x10100000 - 0x105F4000  : 原始读段数据 (108000×40B = 4.32MB)
- * 0x10600000 - 0x10AEF000  : Stage1输出 (108000×48B = 5.184MB)
+ * 0x10040000 - 0x10073800  : 展开后水印区域 (211KB)
+ * 0x10100000 - 0x108E8000  : 原始读段数据 (129600×64B = 8.294MB ≤ 8.388MB)
+ * 0x10900000 - 0x111E6000  : Stage1输出 (129600×72B = 9.331MB ≤ 9.437MB)
  *                             ↑ 直接被Stage2使用，无需重打包！
- * 0x11000000 - 0x11003000  : Stage2(Voter)输出 (1266×8B = 10.128KB)
- * 0x11100000 - 0x11102000  : Stage3(Decoder)输出 (1013×8B = 8.1KB)
+ * 0x11200000 - 0x11203000  : Stage2(Voter)输出 (1266×8B = 10.128KB)
+ * 0x11300000 - 0x11302000  : Stage3(Decoder)输出 (1013×8B = 8.1KB)
  * 0x11800000 - 0x1181FFFF  : DMA TX BD空间 (2048×64B = 128KB)
  * 0x11900000 - 0x1190FFFF  : DMA RX BD空间 (1024×64B = 64KB)
  *============================================================================*/
 
 /* 输入数据区 */
 #define DDR_WATERMARK_BASE      0x10000000U    /* 上位机送来的打包水印（LSB-first） */
-#define DDR_WM_REGIONS_BASE     0x10040000U    /* 展开后的 50 个区域，共 191,400 B（修订 B1） */
-#define DDR_READS_BASE          0x10100000U    /* 原始读段数据 */
+#define DDR_WM_REGIONS_BASE     0x10040000U    /* 展开后的 50 个区域，共 211,000 B */
+#define DDR_READS_BASE          0x10100000U    /* 原始读段数据：跨度 8,388,608 B */
 
 /* Stage1: DNA Accelerator */
-#define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 108000×48B */
+#define DDR_DNA_ACC_OUT_BASE    0x10900000U    /* Stage1输出: 129600×72B = 9,331,200 B */
 #define DNA_ACC_RESULT_PACKED_BYTES  72U
 #define DNA_ACC_OUTPUT_SIZE_BYTES    (TOTAL_READS * DNA_ACC_RESULT_PACKED_BYTES)
 
 /* Stage2: Voter (直接使用Stage1输出，无需中间缓冲区) */
 #define DDR_VOTER_IN_BASE       DDR_DNA_ACC_OUT_BASE  /* ✅ 直接使用Stage1输出 */
-#define DDR_VOTER_OUT_BASE      0x11000000U    /* Stage2输出: 1266×8B = 10.128KB */
+#define DDR_VOTER_OUT_BASE      0x11200000U    /* Stage2输出: 1266×8B = 10.128KB */
 
 /* Stage3: Decoder */
 #define DDR_DECODER_IN_BASE     DDR_VOTER_OUT_BASE    /* 使用Stage2输出 */
-#define DDR_DECODER_OUT_BASE    0x11100000U    /* Stage3输出: 1013×8B = 8.1KB */
+#define DDR_DECODER_OUT_BASE    0x11300000U    /* Stage3输出: 1013×8B = 8.1KB */
 
 /* DMA BD描述符空间 */
 #define BD_SPACE_BASE_TX        0x11800000U
@@ -205,6 +206,7 @@
 /* 状态位掩码 */
 #define VOTER_STATUS_IDLE           (1U << 0)
 #define VOTER_STATUS_DONE           (1U << 1)
+#define VOTER_STATUS_ERROR          (1U << 2)
 
 /* ========= 第三个IP核: Decoder (反稀疏化解码) =========
  *

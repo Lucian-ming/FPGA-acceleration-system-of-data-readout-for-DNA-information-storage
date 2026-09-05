@@ -20,6 +20,9 @@ extern "C" {
 /* 喂 lwIP 网络接口 */
 void keep_tcp_alive(void);
 
+/* 【B29 根除加固】刷新 ARP 与网络链路保活 */
+void arp_keepalive(const void *remote_ip);
+
 /* 解析 8B 协议头（BEEF magic + type + 4B 大端长度） */
 int parse_header(u8 *buf, u16 *magic, u8 *pkt_type, u32 *payload_len);
 

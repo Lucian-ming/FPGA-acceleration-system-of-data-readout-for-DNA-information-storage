@@ -21,6 +21,12 @@ extern "C" {
 #ifndef VOTER_REG_ERR_FLAGS
 #define VOTER_REG_ERR_FLAGS     0x2Cu
 #endif
+#ifndef VOTER_DBG_ERROR_STATE
+#define VOTER_DBG_ERROR_STATE   16u
+#endif
+#ifndef VOTER_ERR_FLAGS_MASK
+#define VOTER_ERR_FLAGS_MASK    0x3u
+#endif
 
 int voter_configure_and_verify(const dna_connection_t *conn);
 pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn);

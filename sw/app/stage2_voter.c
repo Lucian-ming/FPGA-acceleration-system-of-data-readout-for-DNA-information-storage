@@ -231,12 +231,28 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
      * ======================================================================== */
     case PIPE_VOTER_WAIT: {
         static u32 poll_count = 0;
+        static u32 poll_cnt = 0;
 
         /* 读取状态寄存器 */
         u32 status = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
+        u32 dbg_state = read_reg32(VOTER_BASEADDR, VOTER_REG_DBG_STATE);
+        u32 err_flags = read_reg32(VOTER_BASEADDR, VOTER_REG_ERR_FLAGS);
+
+        /* ERROR/S_ERROR 是硬件失败，不允许依赖 DONE 或输出区哨兵继续向下游走。 */
+        if ((status & VOTER_STATUS_ERROR) ||
+            dbg_state == VOTER_DBG_ERROR_STATE ||
+            (err_flags & VOTER_ERR_FLAGS_MASK) != 0u) {
+            xil_printf("\n\r[ERROR] Voter hardware failure: STATUS=0x%02X "
+                       "DBG_STATE=%u ERR_FLAGS=0x%08X\n\r",
+                       status, dbg_state, err_flags);
+            voter_clear_start();
+            poll_count = 0;
+            poll_cnt = 0;
+            pipeline_set_state(PIPE_FAIL);
+            return PIPE_STEP_FAIL;
+        }
 
         /* ===== 追加：DONE 之外的“写进度守卫” ===== */
-        static u32 poll_cnt = 0;
         poll_cnt++;
 
         if ((poll_cnt % 2000u) == 0u) {  // 每 2000 次轮询做一次内存侧进度检查，避免串口过载
@@ -251,13 +267,10 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
             /* ---- 追加：读取硬件调试寄存器，判定所处阶段 ---- */
             if ((poll_cnt % 1000u) == 0u) {
-                const u32 status   = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);      // 0x00
-                const u32 dbg_st   = read_reg32(VOTER_BASEADDR, VOTER_REG_DBG_STATE);   // 0x18
                 const u32 dbg_wcnt = read_reg32(VOTER_BASEADDR, VOTER_REG_DBG_WRITE);   // 0x24
-                const u32 errf     = read_reg32(VOTER_BASEADDR, VOTER_REG_ERR_FLAGS);   // 0x2C
 
                 xil_printf("[DBG] STATUS=0x%02X (IDLE=%u,DONE=%u)  FSM=%u  WCOUNT=%u  ERR=0x%X\n\r",
-                           status, status & 0x1, (status>>1)&0x1, dbg_st, dbg_wcnt, errf);
+                           status, status & 0x1, (status>>1)&0x1, dbg_state, dbg_wcnt, err_flags);
 
                 /* 小抄：FSM 编码（见我们定义）
                    0:IDLE 1:INIT 2:R_SETUP 3:R_DATA 4:PARSE 5:CALC 6:V_READ 7:V_UPD
@@ -267,15 +280,14 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             }
 
             if (written >= VOTER_OUTPUT_BEATS) {
-                xil_printf("\n\r[STAGE2] ✓ Memory shows %u/%u beats written (100%%), but DONE=0.\n\r",
+                xil_printf("\n\r[ERROR] Memory shows %u/%u beats written (100%%), but DONE=0.\n\r",
                            written, VOTER_OUTPUT_BEATS);
-                xil_printf("[STAGE2] ⚠️ Treating as completed (likely OUT_BEATS mismatch blocked DONE guard).\n\r");
-
-                /* 按完成路径收尾：让 Stage3 能继续读取 */
-                write_reg32(VOTER_BASEADDR, VOTER_REG_START, 0x00);
-                pipeline_set_state(PIPE_DONE_STAGE2);
+                xil_printf("[ERROR] Voter completion protocol violated; refusing stale/partial output.\n\r");
+                voter_clear_start();
+                poll_count = 0;
                 poll_cnt = 0;
-                return PIPE_STEP_PROGRESS;
+                pipeline_set_state(PIPE_FAIL);
+                return PIPE_STEP_FAIL;
             } else {
                 xil_printf("[POLL #%u] Progress: %u/%u beats written\n\r",
                            poll_cnt, written, VOTER_OUTPUT_BEATS);
@@ -293,6 +305,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
             /* 重置轮询计数 */
             poll_count = 0;
+            poll_cnt = 0;
 
             /* 进入完成状态 */
             pipeline_set_state(PIPE_DONE_STAGE2);
@@ -314,6 +327,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             /* 清除START信号并失败 */
             voter_clear_start();
             poll_count = 0;
+            poll_cnt = 0;
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }

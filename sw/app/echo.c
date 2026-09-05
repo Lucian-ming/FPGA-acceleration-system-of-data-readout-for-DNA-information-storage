@@ -232,6 +232,11 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
 {
     dna_connection_t *conn = (dna_connection_t *)arg;
     keep_tcp_alive();
+    if (g_proc_state == PROC_RUNNING && (pipe_poll_steps % 100u) == 0u) {
+        if (conn && conn->tpcb) {
+            arp_keepalive(&conn->tpcb->remote_ip);
+        }
+    }
 
     switch (g_proc_state) {
     case PROC_REQUESTED:
@@ -260,7 +265,10 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
         }
         break;
     }
-    case PROC_DONE:   send_result(conn); g_proc_state = PROC_IDLE; break;
+    case PROC_DONE:
+        send_result(conn);
+        g_proc_state = (conn->state == STATE_IDLE) ? PROC_IDLE : PROC_FAILED;
+        break;
     case PROC_FAILED: xil_printf("[POST] Pipeline failed\n\r"); send_ack_byte(conn->tpcb, PKT_ERROR); g_proc_state = PROC_IDLE; break;
     default: break;
     }
@@ -496,6 +504,12 @@ void send_result(dna_connection_t *conn)
     xil_printf("\n\r[RESULT] Sending %u bytes (initial sndbuf=%u)\n\r",
                result_size, tcp_sndbuf(conn->tpcb));
 
+    /* 【B29 根除加固】发送前主动刷新 ARP，防止长时间计算后 ARP 老化导致首包丢弃 */
+    if (conn->tpcb) {
+        arp_keepalive(&conn->tpcb->remote_ip);
+        usleep(2000);
+    }
+
     u8 header[8];
     header[0] = (PROTOCOL_MAGIC >> 8) & 0xFF;
     header[1] = PROTOCOL_MAGIC & 0xFF;
@@ -523,7 +537,6 @@ void send_result(dna_connection_t *conn)
             continue;
         }
         xil_printf("[ERROR] Header write failed: %d\n\r", e);
-        conn->state = STATE_IDLE;
         return;
     }
     tcp_output(conn->tpcb);
@@ -564,7 +577,6 @@ void send_result(dna_connection_t *conn)
             usleep(1000);
         } else {
             xil_printf("[ERROR] Data write failed: %d @%u\n\r", e, sent);
-            conn->state = STATE_IDLE;
             return;
         }
     }
@@ -572,6 +584,28 @@ void send_result(dna_connection_t *conn)
     /* 【B29 澄清】sent 为 tcp_write 入队成功计数，非对端接收 ACK 计数；记录重试与余量以备排查 */
     xil_printf("[RESULT] Enqueued %u bytes (retries: hdr=%u, data=%u, sndbuf_zero=%u, sndbuf_avail=%u)\n\r",
                sent, hdr_retry_cnt, data_retry_cnt, sndbuf_zero_cnt, tcp_sndbuf(conn->tpcb));
+
+    /* 【B29 根除加固】等待发送队列中的数据被物理发送并确认（最多等 2000ms） */
+    int wait_ack_cycles = 0;
+    while (conn->tpcb != NULL &&
+           (conn->tpcb->unsent != NULL || conn->tpcb->unacked != NULL) &&
+           wait_ack_cycles < 2000) {
+        tcp_output(conn->tpcb);
+        keep_tcp_alive();
+        usleep(1000);
+        wait_ack_cycles++;
+    }
+    const int delivery_settled =
+        conn->tpcb != NULL && conn->tpcb->unsent == NULL && conn->tpcb->unacked == NULL;
+    xil_printf("[RESULT] Delivery settled after %d ms (unsent=%d, unacked=%d)\n\r",
+               wait_ack_cycles,
+               (conn->tpcb && conn->tpcb->unsent) ? 1 : 0,
+               (conn->tpcb && conn->tpcb->unacked) ? 1 : 0);
+
+    if (!delivery_settled) {
+        xil_printf("[ERROR] Result delivery timeout; refusing to report success\n\r");
+        return;
+    }
     conn->state = STATE_IDLE;
 }
 
