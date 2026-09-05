@@ -29,7 +29,6 @@
 | [23-next-phase-plan-2026-09-04.md](23-next-phase-plan-2026-09-04.md) | **未来三阶段计划与 SE250 点亮实施方案**：近程 SE250 首次上板点亮 (S5) & 混用防呆、中程 B29 根除加固与全量点亮 (S7)、远程长效交付与技术债清零 | 规划与执行后续各阶段工作前必读 |
 | [25-master-product-plan.md](25-master-product-plan.md) | **主产品规划**：三级流水线基线、B29/B30 根治、双几何产品化路线、工业级长稳与四类并行 Agent 提示词矩阵 | 作为当前系统架构与执行总纲 |
 | [24-agent-prompt-full-roadmap.md](24-agent-prompt-full-roadmap.md) | **全景接入、不足审视、整改方向与演进路线图**：新 Agent 一键引导 Prompt、B29/B30 缺陷根因、实施路线图与并行提示词矩阵 | 派发新 Agent 或新会话接手项目时必读 |
-| [planner-agent-prompt.md](planner-agent-prompt.md) | **规划 Agent 任务委派书**：直接发给新架构师 Agent 的任务指令，要求自主阅读全库、分析不足、设计缺陷整改与演进提示词矩阵 | 委派规划架构师 Agent 时直接使用 |
 
 ## 参考资料（历史审计结果，只读）
 
@@ -55,6 +54,7 @@
 | `tools/run_m3_bd.sh` | **M3 实际 Block Design 集成仿真**：BD-1 静态/elaboration、BD-2 控制面、BD-3 数据面 |
 | `tools/m3_mem.py` | M3 辅助：黄金 64bit 向量 ⇄ PS7 VIP DDR 的 32bit 字镜像格式互转与逐位比较 |
 | `tools/verify_repo_binding.sh` | 开发前 Git 强制门禁：核对唯一目录、main、origin 和私有仓库推送权限 |
+| `tools/run_vivado_build.sh` | Vivado 整机构建包装器：按 UTC 时间戳把 `.log/.jou` 写入 `logs/vivado/`，避免污染仓库根目录 |
 | `tools/debug_vote_diff.py` | 调试辅助：重算逐位置票值，与 Voter TB `+dump_bram` 转储的累加器做 diff |
 | `tools/ldpc_decode.py` | **P5 纯 Python 硬判决 LDPC 译码器**（Linux 替代 Windows EXE）：`verify` 用 R0.83 黄金数据自检，`decode` 译码 0/1 文本并可重建 JPEG |
 | `tools/test_ddr_layout.c` | C2/C3 的主机单元测试：按实际条数校验 DDR 区间（与固件共用 `sw/app/ddr_layout.h`） |

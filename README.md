@@ -147,10 +147,11 @@ LDPC 解码器 `resources/R5_6_LDPC_hard_decoder.exe` 只有 Windows 版本。
 ### 硬件与固件构建
 
 ```bash
-vivado -mode batch -source hw/scripts/build.tcl
+./tools/run_vivado_build.sh
 xsct sw/scripts/create_vitis.tcl
 ```
 
+Vivado 的 `.log`/`.jou` 会自动归档到 `logs/vivado/<UTC 时间戳>-<PID>/`。
 当前可上板构建对在 `hw/build/export/`，先执行
 `(cd hw/build/export && sha256sum -c SHA256SUMS)`。`design_2_wrapper.xsa` 与
 `hw/build/export/hardware.xsa` 是只读历史快照，不得替代当前 `dna_accel.xsa` 和

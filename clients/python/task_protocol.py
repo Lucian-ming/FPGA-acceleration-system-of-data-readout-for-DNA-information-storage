@@ -16,9 +16,11 @@ SE250_READ_BASES = 250
 # 与板端 PKT_CONFIG 拒绝码 2 同义（task_config.h:113-114）。
 SUPPORTED_READ_BASES = (150, 250)
 FRAME_READS = 64
-MAX_TOTAL_READS = 107_968   # = (TOTAL_READS/64)*64，echo.h:27,52；SE250 全量需 129_600
+MAX_TOTAL_READS = 129_600   # = (TOTAL_READS/64)*64，echo.h:27,52；SE250 全量需 129_600
 CONFIG_PAYLOAD_LEN = 44
 CAPS_PAYLOAD_LEN = 24
+SCORE_MIN_NUMERATOR = 45
+SCORE_MIN_DENOMINATOR = 100
 
 
 def read_size_bytes(read_bps: int = READ_BASES) -> int:
@@ -41,7 +43,7 @@ def default_score_min(read_bps: int = READ_BASES) -> int:
     docs/20 §2.2 的阈值扫描表明 0.45 对两个数据集都落在
     「真方向过阈 ~98 %、假方向 0 %」的平台区里。
     """
-    return int(0.45 * read_bps)
+    return (SCORE_MIN_NUMERATOR * read_bps) // SCORE_MIN_DENOMINATOR
 
 CONFIG_REJECT_REASONS = {
     1: "协议版本不支持",
