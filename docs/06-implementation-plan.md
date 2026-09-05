@@ -10,8 +10,8 @@
 3. 仿真/接口改动读 `08-verification-plan.md`；
 4. 板级构建/上板读 `09-board-build-and-acceptance.md`；
 5. 性能、数据扩展和上位机改动读 `11-optimization-plan.md`、`12-stress-analysis.md`；
-6. 先跑最小判据，再做长任务；
-7. 改 RTL/固件后重建 bitstream、XSA、ELF、BOOT.bin 并更新哈希。
+7. 先跑最小判据，再做长任务；
+8. 改 RTL/固件后重建 bitstream、XSA、ELF、BOOT.bin 并更新哈希。
 
 ## 变更分类
 

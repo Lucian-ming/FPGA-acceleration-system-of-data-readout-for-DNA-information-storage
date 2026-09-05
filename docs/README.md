@@ -17,6 +17,7 @@
 | [11-optimization-plan.md](11-optimization-plan.md) | Stage1、数据泛化、错误鲁棒性和上位机优化 |
 | [12-stress-analysis.md](12-stress-analysis.md) | 自动压测统计口径和后续改造 |
 | [13-final-delivery-roadmap.md](13-final-delivery-roadmap.md) | **从当前状态到最终交付的总收口计划**：终态定义、现状评价、G0～G8 阶段门禁 | 每次排期和收口前必读 |
+| [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | **并行 Agent 的 branch/worktree 创建、合并与强制回收规范** | 并行任务开始和交接前必读 |
 
 ## 参考资料
 
