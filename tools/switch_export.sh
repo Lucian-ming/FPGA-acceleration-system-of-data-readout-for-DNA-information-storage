@@ -39,18 +39,26 @@ fi
 if [[ "$TARGET" == "se150" ]]; then
     sed -i 's/#define READ_BASES_PER_READ     250U/#define READ_BASES_PER_READ     150U/' sw/app/echo.h
     sed -i 's/#define READ_SIZE_BYTES         64U/#define READ_SIZE_BYTES         40U/' sw/app/echo.h
+    sed -i 's/#define TOTAL_READS             129600U/#define TOTAL_READS             108000U/' sw/app/echo.h
     sed -i 's/#define WM_STRIDE               805U/#define WM_STRIDE               807U/' sw/app/echo.h
     sed -i 's/#define WM_REF_LEN              1055U/#define WM_REF_LEN              957U/' sw/app/echo.h
     sed -i 's/#define WM_SYMBOLS              (WM_NUM_LC \* WM_STRIDE + 250U)/#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 150U)/' sw/app/echo.h
+    sed -i 's/#define DDR_DNA_ACC_OUT_BASE    0x10900000U/#define DDR_DNA_ACC_OUT_BASE    0x10600000U/' sw/app/echo.h
+    sed -i 's/#define DDR_VOTER_OUT_BASE      0x11200000U/#define DDR_VOTER_OUT_BASE      0x11000000U/' sw/app/echo.h
+    sed -i 's/#define DDR_DECODER_OUT_BASE    0x11300000U/#define DDR_DECODER_OUT_BASE    0x11100000U/' sw/app/echo.h
     sed -i 's/#define DNA_ACC_RESULT_PACKED_BYTES  72U/#define DNA_ACC_RESULT_PACKED_BYTES  48U/' sw/app/echo.h
     sed -i 's/#define VOTER_INPUT_BYTES_PER_READ   72U/#define VOTER_INPUT_BYTES_PER_READ   48U/' sw/app/echo.h
     sed -i 's/#define VOTER_SCORE_MIN         112U/#define VOTER_SCORE_MIN         67U/' sw/app/echo.h
 else
     sed -i 's/#define READ_BASES_PER_READ     150U/#define READ_BASES_PER_READ     250U/' sw/app/echo.h
     sed -i 's/#define READ_SIZE_BYTES         40U/#define READ_SIZE_BYTES         64U/' sw/app/echo.h
+    sed -i 's/#define TOTAL_READS             108000U/#define TOTAL_READS             129600U/' sw/app/echo.h
     sed -i 's/#define WM_STRIDE               807U/#define WM_STRIDE               805U/' sw/app/echo.h
     sed -i 's/#define WM_REF_LEN              957U/#define WM_REF_LEN              1055U/' sw/app/echo.h
     sed -i 's/#define WM_SYMBOLS              (WM_NUM_LC \* WM_STRIDE + 150U)/#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 250U)/' sw/app/echo.h
+    sed -i 's/#define DDR_DNA_ACC_OUT_BASE    0x10600000U/#define DDR_DNA_ACC_OUT_BASE    0x10900000U/' sw/app/echo.h
+    sed -i 's/#define DDR_VOTER_OUT_BASE      0x11000000U/#define DDR_VOTER_OUT_BASE      0x11200000U/' sw/app/echo.h
+    sed -i 's/#define DDR_DECODER_OUT_BASE    0x11100000U/#define DDR_DECODER_OUT_BASE    0x11300000U/' sw/app/echo.h
     sed -i 's/#define DNA_ACC_RESULT_PACKED_BYTES  48U/#define DNA_ACC_RESULT_PACKED_BYTES  72U/' sw/app/echo.h
     sed -i 's/#define VOTER_INPUT_BYTES_PER_READ   48U/#define VOTER_INPUT_BYTES_PER_READ   72U/' sw/app/echo.h
     sed -i 's/#define VOTER_SCORE_MIN         67U/#define VOTER_SCORE_MIN         112U/' sw/app/echo.h

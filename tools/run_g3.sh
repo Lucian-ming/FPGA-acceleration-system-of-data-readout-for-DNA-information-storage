@@ -345,9 +345,15 @@ say "2/7 渲染板级脚本"
 if [[ "$READ_BPS" -eq 250 ]]; then
     WM_WORDS=52750
     STAGE1_REC_WORDS=18
+    STAGE1_ADDR="0x10900000"
+    STAGE2_ADDR="0x11200000"
+    STAGE3_ADDR="0x11300000"
 else
     WM_WORDS=47850
     STAGE1_REC_WORDS=12
+    STAGE1_ADDR="0x10600000"
+    STAGE2_ADDR="0x11000000"
+    STAGE3_ADDR="0x11100000"
 fi
 
 render() {
@@ -359,6 +365,9 @@ render() {
         -e "s#@@WM_WORDS@@#$WM_WORDS#g" \
         -e "s#@@STAGE1_RECORDS@@#$STAGE1_DUMP_RECORDS#g" \
         -e "s#@@STAGE1_WORDS@@#$(( STAGE1_DUMP_RECORDS * STAGE1_REC_WORDS ))#g" \
+        -e "s#@@STAGE1_ADDR@@#$STAGE1_ADDR#g" \
+        -e "s#@@STAGE2_ADDR@@#$STAGE2_ADDR#g" \
+        -e "s#@@STAGE3_ADDR@@#$STAGE3_ADDR#g" \
         -e "s#@@STAGE2_WORDS@@#2532#g" \
         -e "s#@@STAGE3_WORDS@@#2026#g" \
         "$1" > "$2"

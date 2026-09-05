@@ -10,12 +10,12 @@ puts "DUMP> target selected (no reset)"
 # 展开后的 50 个水印区域：50 x 957 x 4 B = 191400 B
 mrd -bin -file @@OUTDIR@@/dump_wm_regions.bin 0x10040000 @@WM_WORDS@@
 puts "DUMP> wm_regions done"
-# Stage1 输出：@@STAGE1_RECORDS@@ x 48 B
-mrd -bin -file @@OUTDIR@@/dump_stage1.bin 0x10600000 @@STAGE1_WORDS@@
+# Stage1 输出：@@STAGE1_RECORDS@@ x 48 B (或 72 B)
+mrd -bin -file @@OUTDIR@@/dump_stage1.bin @@STAGE1_ADDR@@ @@STAGE1_WORDS@@
 puts "DUMP> stage1 done"
 # Stage2 输出（已就地异或水印）：1266 x 8 B = 10128 B
-mrd -bin -file @@OUTDIR@@/dump_stage2.bin 0x11000000 @@STAGE2_WORDS@@
+mrd -bin -file @@OUTDIR@@/dump_stage2.bin @@STAGE2_ADDR@@ @@STAGE2_WORDS@@
 puts "DUMP> stage2 done"
 # Stage3 输出：1013 x 8 B = 8104 B
-mrd -bin -file @@OUTDIR@@/dump_stage3.bin 0x11100000 @@STAGE3_WORDS@@
+mrd -bin -file @@OUTDIR@@/dump_stage3.bin @@STAGE3_ADDR@@ @@STAGE3_WORDS@@
 puts "DUMP> stage3 done"
