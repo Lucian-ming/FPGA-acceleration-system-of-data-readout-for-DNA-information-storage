@@ -22,7 +22,7 @@
 #include "task_config.h"  /* 【P3】PKT_CONFIG 解析/校验/CRC（主机可测） */
 
 /* 【P3】读段碱基数：SE250 规格 */
-#define READ_BASES_PER_READ     250U
+#define READ_BASES_PER_READ     150U
 /* 容量内最大的 64 对齐条数：TOTAL_READS=129600 本身就是 64 的倍数 (2025 批) */
 #define TASK_MAX_READS          ((TOTAL_READS / FRAME_READS) * FRAME_READS)
 
@@ -46,10 +46,10 @@
 /*=============================================================================
  * 数据尺寸参数
  *============================================================================*/
-#define READ_SIZE_BYTES         64U
+#define READ_SIZE_BYTES         40U
 #define FRAME_READS             64U
 #define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 4096B */
-#define TOTAL_READS             129600U
+#define TOTAL_READS             108000U
 
 /*=============================================================================
  * 水印几何（必须与 srpe_batch 的 parameter 一致）
@@ -62,9 +62,9 @@
  * 当前 process_watermark() 对长度不足或超限严格拒绝，不再静默截断。
  *============================================================================*/
 #define WM_NUM_LC               50U
-#define WM_STRIDE               805U
-#define WM_REF_LEN              1055U
-#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 250U)   /* 40,500 */
+#define WM_STRIDE               807U
+#define WM_REF_LEN              957U
+#define WM_SYMBOLS              (WM_NUM_LC * WM_STRIDE + 150U)   /* 40,500 */
 #define WM_TOTAL_BITS           (WM_SYMBOLS * 2U)                /* 81,000 */
 #define WM_PACKED_BYTES         ((WM_TOTAL_BITS + 7U) / 8U)      /* 10,125 */
 #define MAX_WATERMARK_SIZE      10240U                           /* 上位机按 8 对齐发 10,128 */
@@ -96,17 +96,17 @@
 #define DDR_READS_BASE          0x10100000U    /* 原始读段数据：跨度 8,388,608 B */
 
 /* Stage1: DNA Accelerator */
-#define DDR_DNA_ACC_OUT_BASE    0x10900000U    /* Stage1输出: 129600×72B = 9,331,200 B */
-#define DNA_ACC_RESULT_PACKED_BYTES  72U
+#define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 129600×72B = 9,331,200 B */
+#define DNA_ACC_RESULT_PACKED_BYTES  48U
 #define DNA_ACC_OUTPUT_SIZE_BYTES    (TOTAL_READS * DNA_ACC_RESULT_PACKED_BYTES)
 
 /* Stage2: Voter (直接使用Stage1输出，无需中间缓冲区) */
 #define DDR_VOTER_IN_BASE       DDR_DNA_ACC_OUT_BASE  /* ✅ 直接使用Stage1输出 */
-#define DDR_VOTER_OUT_BASE      0x11200000U    /* Stage2输出: 1266×8B = 10.128KB */
+#define DDR_VOTER_OUT_BASE      0x11000000U    /* Stage2输出: 1266×8B = 10.128KB */
 
 /* Stage3: Decoder */
 #define DDR_DECODER_IN_BASE     DDR_VOTER_OUT_BASE    /* 使用Stage2输出 */
-#define DDR_DECODER_OUT_BASE    0x11300000U    /* Stage3输出: 1013×8B = 8.1KB */
+#define DDR_DECODER_OUT_BASE    0x11100000U    /* Stage3输出: 1013×8B = 8.1KB */
 
 /* DMA BD描述符空间 */
 #define BD_SPACE_BASE_TX        0x11800000U
@@ -135,7 +135,7 @@
  * 输出: 投票结果
  *   - 81000 bits = 1266个u64 (每个u64包含64位投票数据)
  *============================================================================*/
-#define VOTER_INPUT_BYTES_PER_READ   72U
+#define VOTER_INPUT_BYTES_PER_READ   48U
 #define VOTER_INPUT_TOTAL_BYTES      (TOTAL_READS * VOTER_INPUT_BYTES_PER_READ)
 #define VOTER_INPUT_BEATS            TOTAL_READS  /* ✅ 硬件自动处理6个u64/read */
 
