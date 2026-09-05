@@ -71,6 +71,7 @@ module srpe_batch #(
     wire [WM_AW-1:0] wm_wr_addr = wm_wr_addr_lin[WM_AW-1:0];
 
     // 读地址与数据寄存器
+    reg  [5:0]       lc_idx;
     reg  [15:0]      wm_rd_offset;
     wire [15:0]      wm_rd_addr_lin = lc_idx * REF_LEN + wm_rd_offset;
     wire [WM_AW-1:0] wm_rd_addr_d   = wm_rd_addr_lin[WM_AW-1:0];
@@ -342,8 +343,11 @@ module srpe_batch #(
 
                     // 在 pre_cnt == 7 给出读段第 0 碱基地址，在 pre_cnt == 8 给出第 1 碱基地址
                     if (pre_cnt == 7) begin
+                    // 当 pre_cnt == 8 给出读段第 0 碱基地址，在 pre_cnt == 9 给出第 1 碱基地址
+                    if (pre_cnt == 8) begin
                         a_addr <= 9'd0;
                     end else if (pre_cnt == 8) begin
+                    end else if (pre_cnt == 9) begin
                         a_addr <= 9'd1;
                     end
 
@@ -382,6 +386,8 @@ module srpe_batch #(
                     // 下一拍读段与水印地址推进
                     if (run_cnt + 3 < READ_BPS) begin
                         a_addr <= run_cnt + 3;
+                    if (run_cnt + 2 < READ_BPS) begin
+                        a_addr <= run_cnt + 2;
                     end
                     wm_rd_offset <= ((pos_base + 11 + run_cnt) >= REF_LEN) ? 
                                     (REF_LEN - 1) : (pos_base + 11 + run_cnt);
@@ -404,6 +410,9 @@ module srpe_batch #(
 
                         // 组 1: 2 vs 3
                         if (!pos_valid[3] || (score[2][t] >= score[3][t])) begin
+                        if (!pos_valid[2]) begin
+                            m1_sc[t] <= {SCORE_W{1'b0}}; m1_p[t] <= 3'd0;
+                        end else if (!pos_valid[3] || (score[2][t] >= score[3][t])) begin
                             m1_sc[t] <= score[2][t]; m1_p[t] <= 3'd2;
                         end else begin
                             m1_sc[t] <= score[3][t]; m1_p[t] <= 3'd3;
@@ -411,6 +420,9 @@ module srpe_batch #(
 
                         // 组 2: 4 vs 5
                         if (!pos_valid[5] || (score[4][t] >= score[5][t])) begin
+                        if (!pos_valid[4]) begin
+                            m2_sc[t] <= {SCORE_W{1'b0}}; m2_p[t] <= 3'd0;
+                        end else if (!pos_valid[5] || (score[4][t] >= score[5][t])) begin
                             m2_sc[t] <= score[4][t]; m2_p[t] <= 3'd4;
                         end else begin
                             m2_sc[t] <= score[5][t]; m2_p[t] <= 3'd5;
@@ -418,6 +430,9 @@ module srpe_batch #(
 
                         // 组 3: 6 vs 7
                         if (!pos_valid[7] || (score[6][t] >= score[7][t])) begin
+                        if (!pos_valid[6]) begin
+                            m3_sc[t] <= {SCORE_W{1'b0}}; m3_p[t] <= 3'd0;
+                        end else if (!pos_valid[7] || (score[6][t] >= score[7][t])) begin
                             m3_sc[t] <= score[6][t]; m3_p[t] <= 3'd6;
                         end else begin
                             m3_sc[t] <= score[7][t]; m3_p[t] <= 3'd7;
