@@ -20,7 +20,7 @@ FASTQ → Stage1 水印滑窗比对 → Stage2 投票 → Stage3 反稀疏化 �
 
 ## 新会话阅读顺序
 
-只需按 [`docs/README.md`](docs/README.md) 阅读 `docs/01`～`docs/12`；历史完整快照位于 `docs/archive/history/2026/`，不要默认扫描。
+只需按 [`docs/README.md`](docs/README.md) 阅读 `docs/01`～`docs/13`；历史完整快照位于 `docs/archive/history/2026/`，不要默认扫描。
 
 ## 快速验证
 
@@ -39,7 +39,7 @@ bash tools/run_g3.sh --full --read-bps 250 --score-min 112 \
   --reads "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE250.fastq"
 ```
 
-完整构建与上板顺序见 [`docs/09-board-build-and-acceptance.md`](docs/09-board-build-and-acceptance.md)。
+完整构建与上板顺序见 [`docs/09-board-build-and-acceptance.md`](docs/09-board-build-and-acceptance.md)。从当前到最终交付的收口门禁见 [`docs/13-final-delivery-roadmap.md`](docs/13-final-delivery-roadmap.md)。
 
 ## 目录
 

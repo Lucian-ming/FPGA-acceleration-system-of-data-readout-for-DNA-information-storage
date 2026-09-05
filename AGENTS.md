@@ -115,6 +115,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 | `docs/10-current-handoff.md` | 当前接手顺序与主线 |
 | `docs/11-optimization-plan.md` | Stage1、数据、鲁棒性与上位机优化 |
 | `docs/12-stress-analysis.md` | 自动压测统计口径与后续改造 |
+| `docs/13-final-delivery-roadmap.md` | 从当前状态到最终交付的总收口计划与硬门禁 |
 | `docs/archive/history/2026/` | 历史交接、旧计划和旧状态全文，只用于追溯 |
 | `docs/reference/` | 数据集与历史审计参考 |
 
