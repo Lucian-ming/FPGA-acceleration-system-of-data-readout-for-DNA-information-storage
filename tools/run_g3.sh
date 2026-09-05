@@ -73,6 +73,7 @@ TAG=""
 DO_BOOT=1
 DO_DUMP=1
 DO_UART=1
+UART_PORT="${UART_PORT:-}"
 STAGE1_DUMP_RECORDS=""       # 空 = min(本次记录数, 4096)，黄金向量只覆盖 4096 条
 # 【二次任务判据的关键】第一轮用一个**不同的** score_min 把 Voter 累加器「弄脏」。
 # 为什么必须不同：Voter 的票是有符号累加（±1，饱和到 [-512,+511]），
@@ -137,6 +138,7 @@ while [[ $# -gt 0 ]]; do
         --skip-boot)        DO_BOOT=0; shift ;;
         --skip-dump)        DO_DUMP=0; shift ;;
         --no-uart)          DO_UART=0; shift ;;
+        --uart-port)        UART_PORT="$2"; shift 2 ;;
         -h|--help)          usage 0 ;;
         *) echo "未知参数：$1" >&2; usage 2 ;;
     esac
@@ -388,11 +390,21 @@ trap stop_uart EXIT INT TERM
 
 say "3/7 串口实录"
 if (( DO_UART )); then
+    if [[ -z "$UART_PORT" ]]; then
+        DETECTED_PORT="$(powershell.exe -NoProfile -Command "(Get-PnpDevice -PresentOnly | Where-Object { \$_.FriendlyName -match 'CH340.*COM' }).FriendlyName -replace '.*(COM[0-9]+).*', '\$1'" < /dev/null 2>/dev/null | tr -d '\r\n' || true)"
+        if [[ -n "$DETECTED_PORT" && "$DETECTED_PORT" =~ ^COM[0-9]+$ ]]; then
+            UART_PORT="$DETECTED_PORT"
+        else
+            UART_PORT="COM6"
+        fi
+    fi
     powershell.exe -NoProfile -ExecutionPolicy Bypass \
         -File "$(echo "$RUN_DIR_WIN/uart_cap.ps1" | tr '/' '\\')" \
         -LogPath "$(echo "$RUN_DIR_WIN/uart.log" | tr '/' '\\')" \
         -Seconds "$UART_SECONDS" \
         -StopFile "$(echo "$RUN_DIR_WIN/uart.stop" | tr '/' '\\')" \
+        -PortName "$UART_PORT" \
+        < /dev/null \
         > "$RUN_DIR/uart_cap.out" 2>&1 &
     UART_PID=$!
     sleep 3
@@ -401,9 +413,9 @@ if (( DO_UART )); then
     # param() 块直接语法错误，进程压根没跑到打开串口那一步，
     # 于是「没有 OPEN_FAIL」被误判成成功，整轮跑完才发现根本没有串口实录。
     if grep -q "^CAPTURING" "$RUN_DIR/uart_cap.out" 2>/dev/null; then
-        info "COM6@115200 抓取中，上限 ${UART_SECONDS}s（收工时用 stop 文件收尾）"
+        info "${UART_PORT}@115200 抓取中，上限 ${UART_SECONDS}s（收工时用 stop 文件收尾）"
     else
-        info "串口实录没起来（COM6 被占用？或 ps1 解析失败），详见 $RUN_DIR/uart_cap.out"
+        info "串口实录没起来（${UART_PORT} 被占用？或 ps1 解析失败），详见 $RUN_DIR/uart_cap.out"
         sed -n '1,6p' "$RUN_DIR/uart_cap.out" 2>/dev/null | sed 's/^/      /'
         step_skip "串口实录" "未能启动，见 uart_cap.out"
         UART_PID=""
