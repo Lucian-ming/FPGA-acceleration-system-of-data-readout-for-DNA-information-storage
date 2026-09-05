@@ -1838,6 +1838,14 @@ GUI 继续只调用其公共入口。`PKT_RESULT` 同时新增 8,100 B 精确长
 真实 `ldpc_pipeline(auto)` 对 `tests/golden/dec_input.txt` 5 轮收敛，输出 54,000 bit，JPEG SHA-256
 为 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
 
+### ~~C12 上位机工业级重构与 C 原生极速 LDPC 译码核心~~ ✅ 已闭环（2026-09-05）
+
+纯 Python LDPC 译码在高迭代轮次时耗时数秒，且旧 GUI 缺少双几何选择、读长自适应与流水线性能看板。
+1. **C 原生 Min-Sum 核心**：编写 `clients/python/c_ldpc_accel.c` 与 `c_ldpc.py`，实现 DVB-S2 R=5/6 高速译码器并严密复现虚拟列哨兵机制。对 64,800 bit 黄金输入执行 45 轮高强度迭代耗时仅 141.7 ms（提速近 10x），重建图片 SHA-256 绝对逐位吻合 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
+2. **双几何自适应探测与耗时建模**：在 `first.py` 中实现 `inspect_reads_file`，对输入 FASTQ 自动识别 150bp（SE150，`score_min=67`）与 250bp（SE250，`score_min=112`），并按实测闭环公式 `t = 4.93s + 0.9396ms * 记录数` 在线预估硬件耗时。
+3. **现代化工业控制台**：全面重构 `gui_app.py`，加入 IP 连接测试、几何模式自适应推荐、五段流水线步进指示器、进度与耗时面板、内嵌 JPEG 缩略图视窗与彩色日志终端。
+4. **测试与回归**：全套 25/25 项客户端单元测试全绿；RTL XSim 13/13 项仿真全绿。
+
 ---
 
 ## 已验证的构建结果（2026-08-08，Vivado/Vitis 2022.2，WSL `/tools/Xilinx`）
