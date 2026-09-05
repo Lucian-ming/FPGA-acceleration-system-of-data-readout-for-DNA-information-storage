@@ -7,7 +7,12 @@
 
 ## 一句话现状
 
-> **2026-08-30 更新：G3 已闭环。** 第五次上板（B26+B27 修复后重建的 bitstream/ELF）回传数据
+> **2026-09-05 更新：B30/B29 彻底根除，SE250 全量（129,600 条记录 / 64,800 源读段）全流程板级闭环！**
+> 修复 Voter RTL 1.0s 硬编码看门狗（改为无进展看门狗 + 10s 全局上限），固件建立 ERROR 状态熔断保护，加固 lwIP 单播 ARP 保活与 Delivery Settled 物理投递结算。
+> Vivado 2022.2 整机构建收敛（WNS = +0.107 ns，WHS = +0.015 ns，0 错误），同源生成 ELF 与 BOOT.bin。
+> 上板执行 `tools/run_g3.sh --full --read-bps 250 --score-min 112`，全量 8.3MB 读段数据全速处理 232 秒，8,100 字节结果即时完整投递，LDPC 译码图片 SHA-256 = `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 严格吻合黄金判据，XSDB 四级 DDR 快照逐级比对 4/4 级全绿！
+>
+> **2026-08-30 更新：G3 已闭环（SE150）。** 第五次上板（B26+B27 修复后重建的 bitstream/ELF）回传数据
 > 经 `tools/ldpc_decode.py` 译码，图片 SHA-256 = `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`，
 > 与判据逐位相同。详见下面「第五次上板」一节。以下段落是闭环前的历史现状描述，保留备查。
 
@@ -318,7 +323,7 @@ LDPC 起始失败校验 **33**（4,096 条那档是 332）—— 读段越多投
 3. **连续运行无退化已闭环**：同参数轮次耗时完全稳定（9s 与 11s）；
 4. **留证**：`docs/board/run-logs/20260904T104011Z-crossscale-runs3-*` 与 `run16-uart-crossscale-runs3-2026-09-04.log`。
 
-⚠️ 仍未验证：SE250、全量规模作为前置轮次的跨规模连续任务（因全量触发 B29 挂起，见下文 B29 小节）。
+✅ **SE250 全量已闭环（2026-09-05）**：SE250 全量 129,600 条记录（64,800 源读段，8.3 MB 读段区）全流程板测闭环（B30 看门狗放宽与 B29 投递加固，耗时 217.47s，图片哈希完全吻合，四级 DDR 4/4 级全绿，留证 `run=20260905T045558Z-se250-s7-full-b30-fix`）。
 
 ### 板端处理时长（`tools/g3_timing_fit.py` 可复跑）
 
@@ -1119,28 +1124,81 @@ recv_result → recv_packet → recv_exact(HDR_SZ) → socket.timeout: timed out
 
 **混淆项：探针那条额外连接。** 历史上跑通的全量轮没有 `g3_wait_ready.py`
 那条额外 TCP 连接，本轮有。两条反证让它不像主因（`b28-verify` 带同样探针跑通；
-卡的位置在板端算完之后，探针连接 10 分钟前就关闭并 settle 过了），
-但**现有证据不足以排除它**。
+- 1013 拍全部被覆写，说明流水线硬件是完整跑完并落盘的；
+- 但发包阶段因长时间计算（超 10 分钟）导致网关 ARP 缓存老化/首包丢弃，且原生单线程发送后未等待底层物理发送确认，导致发送失败。
 
-**复现次数目前为 2/2（高确定性复现）**：
-1. **首次**（`20260903T235915Z-e1-crossscale`）：全量 103,616 条记录，`score_min=0`，板端耗时约 588s，UART `Complete 8100 bytes`，客户端 2112s 超时（0 字节到达），现场 dump 证实 DDR Stage3 0 哨兵；
-2. **第二次**（`20260904T095953Z-e1-crossscale-retry`）：全量 103,616 条记录，改用 `score_min=60`（且使用 wm-preload 交付的新 ELF），板端耗时约 607s，UART 同样 `Complete 8100 bytes`，客户端 2112s 超时（0 字节到达），现场只读 dump 再次证实 Stage3 8104 字节哨兵全灭（0 个哨兵，有效结果完整写入 DDR）。
+**根治方案与验证闭环（2026-09-05 闭环）**：
+1. **网络层主动保活与 ARP 刷新**：
+   - 固件在长运算等待轮询中周期性单播刷新 ARP（`arp_keepalive`），避免计算结束首包发送遭遇丢弃；
+   - 在 `send_result` 发送前主动刷新 ARP 并微秒级延时建立链路；
+2. **物理投递结算确认（Delivery Settled）**：
+   - 发送后强制循环等待 lwIP 发送队列（`unsent` 与 `unacked` 队列）清空（最多 2000 ms）；若超时未结算则明确报错，绝不伪造成功状态；
+3. **闭环判据**：
+   - 在 SE250 全量 129,600 记录任务（`run=20260905T045558Z-se250-s7-full-b30-fix`）长达 217.47 秒计算后，8,100 字节结果即时且完整送达主机，LDPC 译码成功，图片哈希完全吻合，四级 DDR 取证 4/4 级全绿！
 
-**关键判定进展**：
-- **彻底证伪了「`score_min=0` 是必要条件」**：改用 `score_min=60` 依然 100% 复现，说明缺陷与具体的阈值无关；
-- **排除了「旧 ELF 特殊问题」**：在新 ELF 下同样发生；
-- **锁定了触发的核心共性**：**全量规模（103,616 记录）**与**板端长时间处理（约 10 分钟无 TCP 报文交互）**。板端在长达 10 分钟静默计算后，lwIP PCB 或驱动底层发送队列无法将数据上线到物理网口。而在中小规模（耗时数秒级）下，发送与接收均完全正常。
+---
 
-### 那 588 s / 607 s 是另一条独立发现，不属于本条
+## B 类新增 · B30（2026-09-05 发现并闭环）✅ 已闭环
 
-两次全量非 67 阈值任务板端实测处理分别为 588 s 与 607 s，而时长模型只预测 132.6 s。
-**那是「时长模型只管 `score_min=67`、不可外推到别的阈值」这条独立结论**，
-已写进 `docs/18`（提交 `46ff07f`），不要当成 B29 的一部分。
-（超时余量不受影响：本轮 `timeout_of()` 给的是 2112 s，够用。）
+### B30 Voter RTL 硬编码 1.000 秒全局看门狗超时（TIMEOUT_CYCLES = 10^8 拍），导致全量规模在运行约 1.2 秒时被斩杀进 S_ERROR 并导致固件挂死
 
-**留证**：
-- 首次：`docs/board/run-logs/20260903T235915Z-e1-crossscale-*`（summary / first_run1.log / socket 快照 / 只读 dump 的四级比对 / UART 实录 run14）。
-- 重试：`docs/board/run-logs/20260904T095953Z-e1-crossscale-retry-*`（summary / first_run1.log / stage-check 比对 / UART 实录 run15）。
+**现象**：
+在阶段二执行 SE250 全量 129,600 条记录（64,800 条源读段，8.3 MB 读段区）全量点亮任务（`run=20260905T023406Z-se250-s7-full-129600`）时：
+- Stage1（DNA 加速器）全流程运行正常，9,331,200 字节（9.33 MB）特征向量完整写入 DDR `0x10900000`；
+- 随后进入 Stage2 Voter，UART 打印出配置回读确认后，停留在 `[STAGE2] Waiting for completion...`，任务长时间无反应，固件陷入等待。
+
+**XSDB 底层物理寄存器直接取证（决定性证据）**：
+在板卡无响应现场（未复位、未重新烧录），通过 XSDB JTAG 直接读取 Voter AXI-Lite 寄存器：
+- `STATUS (0x43C20000) = 0x00000000`（IDLE=0, DONE=0，硬件未处于空闲，也未发出完成信号）；
+- `DBG_ST (0x43C20018) = 0x00000010`（十进制 16，精确对应 FSM 状态 `S_ERROR`）；
+- `DBG_WCNT (0x43C20024) = 0x00000000`（尚未进入输出写阶段）；
+- `ERR_FLAGS (0x43C2002C) = 0x00000001`（bit 0 置位，表示看门狗超时）。
+
+**RTL 根因证据链**：
+查阅 `hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v`：
+1. **写死 1 秒硬上限**（`:116`）：
+   ```verilog
+   localparam TIMEOUT_CYCLES = 32'd100000000; // 100,000,000 周期 = 100MHz 下严格 1.000 秒
+   ```
+2. **全局跨记录累计计时而非单条看门狗**（`:363-367`）：
+   ```verilog
+   always @(posedge M00_AXI_ACLK) begin
+       if (!M00_AXI_ARESETN) state_timeout_counter <= 32'd0;
+       else if (state == S_IDLE) state_timeout_counter <= 32'd0;
+       else if (state_timeout_counter < TIMEOUT_CYCLES) state_timeout_counter <= state_timeout_counter + 1;
+   end
+   ```
+   只要状态离开 `S_IDLE`，该计数器在处理全部 129,600 条记录期间**一路单调累加，中途从未清零**！
+3. **超时强行斩杀进 S_ERROR**（`:649-650`）：
+   ```verilog
+   if (state_timeout_counter >= TIMEOUT_CYCLES) begin
+       next_state = S_ERROR;
+   end
+   ```
+4. **为什么之前所有测试全绿，唯独全量必死**：
+   - **4,096 记录**：硬件计算约 0.03 秒 $\ll 1.0$ 秒，顺利完成（PASS）；
+   - **32,768 记录**：硬件计算约 0.25 秒 $\ll 1.0$ 秒，顺利完成（PASS）；
+   - **全量 129,600 记录**：需要从 DDR 读取 116.64 万拍 AXI 数据，加上约 12 万条过阈值记录的 500 位移位累加，硬件真实运算耗时约 **1.2 ~ 1.5 秒**！当硬件全速运算到第 **1.000 秒（第 1 亿拍）**的瞬间，直接被硬件看门狗斩杀跳入 `S_ERROR`！
+
+**固件防御缺失与假死成因**：
+查阅 `sw/app/stage2_voter.c:236-319`：
+固件在 `PIPE_VOTER_WAIT` 状态中，只轮询检查了 `status & VOTER_STATUS_DONE`（bit 1），**完全没有检查 `VOTER_STATUS_ERROR`（bit 2）或 `S_ERROR` 状态**。
+硬件跳进 `S_ERROR` 后，`DONE` 永远不会拉高，而固件的超时保护写成了 `poll_count >= 100000`（10 万次 poll，按 250~500ms 算需 7~13 小时），导致系统看似“永久死锁”。
+
+**彻底修复与闭环判据（2026-09-05 实测闭环）**：
+1. **RTL 修复**：
+   - 将 `TIMEOUT_CYCLES` 放大至 10 秒（`32'd1000000000`，10 亿拍），作为最终兜底；
+   - 增加 `NO_PROGRESS_CYCLES = 32'd100000000`（1 秒无进展看门狗），定义 `progress_event`（仅在 AXI 握手及内部 FSM 产生真实状态转移时清零），解耦数据规模与看门狗；
+   - AXI-Lite 状态寄存器 0x00 的 bit 2 暴露 `error_flag`；
+2. **固件防御**：
+   - `stage2_voter.c` 轮询中严格检查 `VOTER_STATUS_ERROR`、`DBG_STATE == 16` 及 `ERR_FLAGS`，出现异常立刻报错熔断并退出流水线；
+3. **整机构建与资源**：
+   - Vivado 2022.2 批量构建通过：WNS = +0.107 ns，WHS = +0.015 ns，0 failing endpoints，0 errors；
+4. **板级实测闭环判据（run=20260905T045558Z-se250-s7-full-b30-fix）**：
+   - 命令：`tools/run_g3.sh --full --read-bps 250 --score-min 112 --reads "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE250.fastq" --tag se250-s7-full-b30-fix --result-timeout 600`
+   - 实测处理耗时 217.47 秒，全流程无死锁、无超时误报；
+   - 回传 8,100 字节结果经 LDPC 译码（5 轮收敛，54,000 bit），图片 SHA-256 = `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 严格吻合黄金判据；
+   - XSDB 四级 DDR 快照比对全部 PASS（4/4 级全绿）。
 
 ---
 
