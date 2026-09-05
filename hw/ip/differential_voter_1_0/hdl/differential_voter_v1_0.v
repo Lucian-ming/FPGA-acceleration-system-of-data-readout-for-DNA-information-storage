@@ -1,34 +1,34 @@
 // ================================================================
 // File   : differential_voter_v1_0_fixed_final.v
-// Desc   : Voter(µÚ¶ş¸öIPºË) -- BRAMÍÆ¶Ï + DONEÓïÒåĞŞÕı + ARADDRÊ±ĞòÎÈ¹Ì + Ä©ÅÄWSTRBÓ²¼şÍÆµ¼
+// Desc   : Voter(ç¬¬äºŒä¸ªIPæ ¸) -- BRAMæ¨æ–­ + DONEè¯­ä¹‰ä¿®æ­£ + ARADDRæ—¶åºç¨³å›º + æœ«æ‹WSTRBç¡¬ä»¶æ¨å¯¼
 //
 // Key Fixes:
-//   1) BRAM: UG901 Ä£°å£¨¶ÁµØÖ·´òÒ»ÅÄ + Í¬²½¶Á£©£¬(* ram_style="block" *)
-//   2) DONE: ½øÈë S_DONE ¼´ÖÃÎ»£»ÔÚ START / DONE_CLR Ê±ÇåÁã
-//   3) AXI-Read: ARVALID ±ê×¼Âö³åÎÕÊÖ£»ARADDR ÓÃ¼Ä´æÆ÷Ëø´æ
-//   4) WSTRB: ÓÉ TOTAL_BITS Ó²¼şÍÆµ¼Ä©ÅÄÑÚÂë£¬²»ÒÀÀµÈí¼ş out_beats
-//   5) RREADY: ÔÚ S_READ_SETUP Óë S_READ_DATA ¾ùÎª 1£¬±ÜÃâ DDR ¶Á³¬Ê±
-//   6) µ÷ÊÔÔöÇ¿£º²ÉÑù²¢±©Â¶ last_rresp µ½ AXI-Lite 0x0E
+//   1) BRAM: UG901 æ¨¡æ¿ï¼ˆè¯»åœ°å€æ‰“ä¸€æ‹ + åŒæ­¥è¯»ï¼‰ï¼Œ(* ram_style="block" *)
+//   2) DONE: è¿›å…¥ S_DONE å³ç½®ä½ï¼›åœ¨ START / DONE_CLR æ—¶æ¸…é›¶
+//   3) AXI-Read: ARVALID æ ‡å‡†è„‰å†²æ¡æ‰‹ï¼›ARADDR ç”¨å¯„å­˜å™¨é”å­˜
+//   4) WSTRB: ç”± TOTAL_BITS ç¡¬ä»¶æ¨å¯¼æœ«æ‹æ©ç ï¼Œä¸ä¾èµ–è½¯ä»¶ out_beats
+//   5) RREADY: åœ¨ S_READ_SETUP ä¸ S_READ_DATA å‡ä¸º 1ï¼Œé¿å… DDR è¯»è¶…æ—¶
+//   6) è°ƒè¯•å¢å¼ºï¼šé‡‡æ ·å¹¶æš´éœ² last_rresp åˆ° AXI-Lite 0x0E
 //
-// 2026-08-16 »Æ½ğ Testbench ĞŞ¸´£¨ÅĞ¾İ¼û docs/03-status.md B13~B15/C4£©£º
-//   B13) Í¶Æ±¶ÁÁ÷Ë®Ïß´íÎ»£ºbram_addr¡úbram_dout_r ¹² 3 ÅÄ£¬¶øÃ¿Î»Í¶Æ±Ñ­»·
-//        Ö»ÓĞ 3 ÅÄ£¬S_VOTE_UPDATE ¶Áµ½µÄÊÇ¡¾ÉÏÒ»Î»¡¿µÄÀÛ¼ÓÆ÷¡£ĞŞ¸´£ºÑ­»·
-//        ¸ÄÎª 4 ÅÄ£¨²åÈë S_VOTE_WAIT£©£¬ÅĞ¾ö¸ÄÓÃ 2 ÅÄ¶ÔÆëµÄ bram_dout¡£
-//   B14) Êä³öÅĞ¾ö (bram_dout > 0) ÊÇÎŞ·ûºÅ±È½Ï£¬¸ºÆ±£¨Èç -1=10'h3FF£©
-//        ±»ÅĞ³É 1¡£ĞŞ¸´£º°´·ûºÅÎ» + ·ÇÁãÅĞ¶Ï¡£
-//   B15) Ã¿ 64-bit ×Ö¶ª 1 bit£º×Ö×°Âúºó FSM ÏÈÈÆ»Ø S_OUTPUT_ADDR/PACK ¶à
-//        ´ò°üÒ»ÅÄ£¬Ëæºó S_WAIT_BRESP Çå output_word °ÑËüÄ¨µô£¨81000/65¡Ö1247£¬
-//        ÓëÊµ²âÉÙĞ´ 19 ÅÄÎÇºÏ£©¡£ĞŞ¸´£º×°Âúµ±ÅÄÖ±½Ó×ª S_OUTPUT_SETUP¡£
-//   C4)  µÚ¶ş´Î START ²»ÔÙ¸´ÓÃ¾ÉÀÛ¼ÓÆ÷£ºÃ¿´Î START ¶¼×ß S_INIT_BRAM ÇåÁã¡£
-//   B16) S_READ_DATA Íê³ÉÌõ¼ş (beat_count>=6 && RVALID) ÒÀÀµ×îºóÒ»¸ö beat
-//        ÎÕÊÖºó RVALID ÈÔ±£³Ö¡ª¡ªºÏ¹æ´Ó»ú»áÔÚ RLAST ÎÕÊÖºó³·ÏÂ RVALID£¬
-//        ÕæÊµ»¥Á¬ÉÏ DUT ½«ËÀËø¡£ĞŞ¸´£ºÖ»¿´ÎÕÊÖ¼ÆÊı¡£
-//   D1/D2) ĞÂÔö AXI-Lite 0x30 SCORE_MIN£ºscore < SCORE_MIN µÄ¼ÇÂ¼ÔÚ
-//        S_PARSE_READ Ö±½ÓÌø¹ı¡¢²»Í¶Æ±£¨·´Ïò»¥²¹·½°¸ B µÄ°å¶ËÈ¡Éá£»
-//        ÉÏÎ»»úÕı·´Ë«Ïò·¢ËÍ£¬´íÎó·½Ïò/²¹Áã¼ÇÂ¼·ÖÊıµÍÓÚãĞÖµ±»¶ªÆú£©¡£
-//        ¸´Î»Ä¬ÈÏ 0 = ²»¹ıÂË£¬Óë¾ÉĞĞÎª¼æÈİ¡£
+// 2026-08-16 é»„é‡‘ Testbench ä¿®å¤ï¼ˆåˆ¤æ®è§ docs/03-status.md B13~B15/C4ï¼‰ï¼š
+//   B13) æŠ•ç¥¨è¯»æµæ°´çº¿é”™ä½ï¼šbram_addrâ†’bram_dout_r å…± 3 æ‹ï¼Œè€Œæ¯ä½æŠ•ç¥¨å¾ªç¯
+//        åªæœ‰ 3 æ‹ï¼ŒS_VOTE_UPDATE è¯»åˆ°çš„æ˜¯ã€ä¸Šä¸€ä½ã€‘çš„ç´¯åŠ å™¨ã€‚ä¿®å¤ï¼šå¾ªç¯
+//        æ”¹ä¸º 4 æ‹ï¼ˆæ’å…¥ S_VOTE_WAITï¼‰ï¼Œåˆ¤å†³æ”¹ç”¨ 2 æ‹å¯¹é½çš„ bram_doutã€‚
+//   B14) è¾“å‡ºåˆ¤å†³ (bram_dout > 0) æ˜¯æ— ç¬¦å·æ¯”è¾ƒï¼Œè´Ÿç¥¨ï¼ˆå¦‚ -1=10'h3FFï¼‰
+//        è¢«åˆ¤æˆ 1ã€‚ä¿®å¤ï¼šæŒ‰ç¬¦å·ä½ + éé›¶åˆ¤æ–­ã€‚
+//   B15) æ¯ 64-bit å­—ä¸¢ 1 bitï¼šå­—è£…æ»¡å FSM å…ˆç»•å› S_OUTPUT_ADDR/PACK å¤š
+//        æ‰“åŒ…ä¸€æ‹ï¼Œéšå S_WAIT_BRESP æ¸… output_word æŠŠå®ƒæŠ¹æ‰ï¼ˆ81000/65â‰ˆ1247ï¼Œ
+//        ä¸å®æµ‹å°‘å†™ 19 æ‹å»åˆï¼‰ã€‚ä¿®å¤ï¼šè£…æ»¡å½“æ‹ç›´æ¥è½¬ S_OUTPUT_SETUPã€‚
+//   C4)  ç¬¬äºŒæ¬¡ START ä¸å†å¤ç”¨æ—§ç´¯åŠ å™¨ï¼šæ¯æ¬¡ START éƒ½èµ° S_INIT_BRAM æ¸…é›¶ã€‚
+//   B16) S_READ_DATA å®Œæˆæ¡ä»¶ (beat_count>=6 && RVALID) ä¾èµ–æœ€åä¸€ä¸ª beat
+//        æ¡æ‰‹å RVALID ä»ä¿æŒâ€”â€”åˆè§„ä»æœºä¼šåœ¨ RLAST æ¡æ‰‹åæ’¤ä¸‹ RVALIDï¼Œ
+//        çœŸå®äº’è¿ä¸Š DUT å°†æ­»é”ã€‚ä¿®å¤ï¼šåªçœ‹æ¡æ‰‹è®¡æ•°ã€‚
+//   D1/D2) æ–°å¢ AXI-Lite 0x30 SCORE_MINï¼šscore < SCORE_MIN çš„è®°å½•åœ¨
+//        S_PARSE_READ ç›´æ¥è·³è¿‡ã€ä¸æŠ•ç¥¨ï¼ˆåå‘äº’è¡¥æ–¹æ¡ˆ B çš„æ¿ç«¯å–èˆï¼›
+//        ä¸Šä½æœºæ­£ååŒå‘å‘é€ï¼Œé”™è¯¯æ–¹å‘/è¡¥é›¶è®°å½•åˆ†æ•°ä½äºé˜ˆå€¼è¢«ä¸¢å¼ƒï¼‰ã€‚
+//        å¤ä½é»˜è®¤ 0 = ä¸è¿‡æ»¤ï¼Œä¸æ—§è¡Œä¸ºå…¼å®¹ã€‚
 //
-// Date  : 2025-11-04 ³õ°æ / 2026-08-16 »Æ½ğÏòÁ¿¶ÔÆëĞŞ¸´
+// Date  : 2025-11-04 åˆç‰ˆ / 2026-08-16 é»„é‡‘å‘é‡å¯¹é½ä¿®å¤
 // ================================================================
 
 `timescale 1 ns / 1 ps
@@ -110,20 +110,20 @@ module differential_voter_v1_0 #
     output wire                               M00_AXI_BREADY
 );
 
-    // ----------------- ³£Á¿/¸¨Öú -----------------
+    // ----------------- å¸¸é‡/è¾…åŠ© -----------------
     localparam integer WORDS_PER_READ   = 9; // 9 x 64b
-    localparam integer TOTAL_BEATS_HW   = (TOTAL_BITS + 63) / 64; // Ó²¼şÓ¦Ğ´ÅÄÊı
+    localparam integer TOTAL_BEATS_HW   = (TOTAL_BITS + 63) / 64; // ç¡¬ä»¶åº”å†™æ‹æ•°
     localparam [31:0] TIMEOUT_CYCLES    = 32'd1000000000; // 10 s @100 MHz
     localparam [31:0] NO_PROGRESS_CYCLES = 32'd100000000; // 1 s without AXI/FSM progress
 
-    // ----------------- AXI-Lite Ó³Éä -----------------
+    // ----------------- AXI-Lite æ˜ å°„ -----------------
     wire [31:0] in_addr_s, out_addr_s, in_beats_s, out_beats_s;
     wire [31:0] total_reads_cfg_s;
-    wire [31:0] score_min_cfg_s;   // ¡¾D1/D2¡¿·ÖÊıãĞÖµ£¨0x30£©£¬0 = ²»¹ıÂË
+    wire [31:0] score_min_cfg_s;   // ã€D1/D2ã€‘åˆ†æ•°é˜ˆå€¼ï¼ˆ0x30ï¼‰ï¼Œ0 = ä¸è¿‡æ»¤
     wire        start_pulse_s, done_clr_s;
     reg         done_s, idle_s, error_s;
 
-    // µ÷ÊÔ¼Ä´æÆ÷
+    // è°ƒè¯•å¯„å­˜å™¨
     reg [31:0] debug_state_count;
     reg [31:0] debug_pack_count;
     reg [31:0] debug_setup_count;
@@ -132,7 +132,7 @@ module differential_voter_v1_0 #
 
     reg        axi_bresp_error;
 
-    // >>> ĞÂÔö£º¶ÁÍ¨µÀ×îºóÒ»´Î RRESP ²ÉÑù£¨[1:0]£©
+    // >>> æ–°å¢ï¼šè¯»é€šé“æœ€åä¸€æ¬¡ RRESP é‡‡æ ·ï¼ˆ[1:0]ï¼‰
     reg [1:0]  last_rresp;
 
     axi_slave_voter u_axil (
@@ -176,11 +176,11 @@ module differential_voter_v1_0 #
         .debug_write_count     (debug_write_count),
         .debug_first_write_addr(debug_first_write_addr),
 
-        // >>> ĞÂÔöÓ³Éä£ºRRESP Ö»¶ÁÊÓÍ¼
+        // >>> æ–°å¢æ˜ å°„ï¼šRRESP åªè¯»è§†å›¾
         .last_rresp            (last_rresp)
     );
 
-    // ----------------- ¿çÊ±ÖÓÓòÍ¬²½µ½ M00_AXI_ACLK -----------------
+    // ----------------- è·¨æ—¶é’ŸåŸŸåŒæ­¥åˆ° M00_AXI_ACLK -----------------
     reg [31:0] in_addr, out_addr, in_beats, out_beats, total_reads_cfg;
     reg [31:0] score_min_cfg;
     always @(posedge M00_AXI_ACLK) begin
@@ -190,7 +190,7 @@ module differential_voter_v1_0 #
             in_beats        <= 32'd0;
             out_beats       <= 32'd0;
             total_reads_cfg <= 32'd0;
-            score_min_cfg   <= 32'd0;   // ¸´Î»Ä¬ÈÏ²»¹ıÂË£¨Ïòºó¼æÈİ£©
+            score_min_cfg   <= 32'd0;   // å¤ä½é»˜è®¤ä¸è¿‡æ»¤ï¼ˆå‘åå…¼å®¹ï¼‰
         end else begin
             in_addr         <= in_addr_s;
             out_addr        <= out_addr_s;
@@ -201,7 +201,7 @@ module differential_voter_v1_0 #
         end
     end
 
-    // START µ¥Âö³å CDC
+    // START å•è„‰å†² CDC
     reg [2:0] start_sync_reg;
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN)
@@ -211,7 +211,7 @@ module differential_voter_v1_0 #
     end
     wire start_latched_pulse = start_sync_reg[1] & ~start_sync_reg[0];
 
-    // ----------------- Ö÷×´Ì¬»ú -----------------
+    // ----------------- ä¸»çŠ¶æ€æœº -----------------
     localparam [4:0]
         S_IDLE            = 5'd0,
         S_INIT_BRAM       = 5'd1,
@@ -220,7 +220,7 @@ module differential_voter_v1_0 #
         S_PARSE_READ      = 5'd4,
         S_CALC_ADDR       = 5'd5,
         S_VOTE_READ       = 5'd6,
-        S_VOTE_WAIT       = 5'd17,  // ¡¾ĞŞ¶© B13¡¿µÈ bram_dout ¶ÔÆë£¨2 ÅÄ¶ÁÑÓ³Ù£©
+        S_VOTE_WAIT       = 5'd17,  // ã€ä¿®è®¢ B13ã€‘ç­‰ bram_dout å¯¹é½ï¼ˆ2 æ‹è¯»å»¶è¿Ÿï¼‰
         S_VOTE_UPDATE     = 5'd7,
         S_NEXT_READ       = 5'd8,
         S_OUTPUT_PREFETCH = 5'd9,
@@ -234,31 +234,31 @@ module differential_voter_v1_0 #
 
     reg [4:0] state, next_state;
 
-    // ----------------- Êı¾İÂ·¾¶¼Ä´æÆ÷ -----------------
+    // ----------------- æ•°æ®è·¯å¾„å¯„å­˜å™¨ -----------------
     reg [63:0] read_words [0:8];
     reg [3:0]  read_beat_count;
 
-    // ¡¾S1 Ê±Ğò¸ÄÔì 2026-09-03¡¿Ô­Îª reg [299:0] current_codeword£¬ÅĞ¾ö´¦°´
-    // bit_in_codeword Ëæ»úË÷Òı£¬×ÛºÏ³É 300 Ñ¡ 1 ¶àÂ·Ñ¡ÔñÆ÷£¨SE250 ÏÂÊÇ 500 Ñ¡ 1£©¡£
-    // ÄÇÊÇ implementation-timing.rpt µÚ 1~4 Ãû¹Ø¼üÂ·¾¶µÄ¹²Í¬Ô´Í·
-    // £¨LUT6¡úMUXF7¡úMUXF8¡úLUT6¡úMUXF7¡úLUT6¡úCARRY4¡Á2¡úLUT2£¬9 ¼¶Âß¼­£¬
-    //  9.666 ns Êı¾İÂ·¾¶¡¢×ßÏßÕ¼ 66.5%£©£¬Õû»ú WNS Ö»Ê£ +0.088 ns¡£
-    // bit_in_codeword ÔÚÍ¶Æ±Ñ­»·ÀïÑÏ¸ñ 0¡úCODEWORD_BITS-1 Ë³ĞòµİÔö£¬
-    // ¸ù±¾²»ĞèÒªËæ»ú·ÃÎÊ£º¸Ä³ÉÒÆÎ»¼Ä´æÆ÷£¬Ã¿ÅÄÖ»¿´×îµÍÎ»¡£
-    // Î»¿íÍ¬Ê±¸ÄÎª¸úËæ CODEWORD_BITS£¨Ô­×ÖÃæÁ¿ 300 ²»Ëæ parameter ±ä£¬ÊÇ SE250 µÄ¿Ó£©¡£
+    // ã€S1 æ—¶åºæ”¹é€  2026-09-03ã€‘åŸä¸º reg [299:0] current_codewordï¼Œåˆ¤å†³å¤„æŒ‰
+    // bit_in_codeword éšæœºç´¢å¼•ï¼Œç»¼åˆæˆ 300 é€‰ 1 å¤šè·¯é€‰æ‹©å™¨ï¼ˆSE250 ä¸‹æ˜¯ 500 é€‰ 1ï¼‰ã€‚
+    // é‚£æ˜¯ implementation-timing.rpt ç¬¬ 1~4 åå…³é”®è·¯å¾„çš„å…±åŒæºå¤´
+    // ï¼ˆLUT6â†’MUXF7â†’MUXF8â†’LUT6â†’MUXF7â†’LUT6â†’CARRY4Ã—2â†’LUT2ï¼Œ9 çº§é€»è¾‘ï¼Œ
+    //  9.666 ns æ•°æ®è·¯å¾„ã€èµ°çº¿å  66.5%ï¼‰ï¼Œæ•´æœº WNS åªå‰© +0.088 nsã€‚
+    // bit_in_codeword åœ¨æŠ•ç¥¨å¾ªç¯é‡Œä¸¥æ ¼ 0â†’CODEWORD_BITS-1 é¡ºåºé€’å¢ï¼Œ
+    // æ ¹æœ¬ä¸éœ€è¦éšæœºè®¿é—®ï¼šæ”¹æˆç§»ä½å¯„å­˜å™¨ï¼Œæ¯æ‹åªçœ‹æœ€ä½ä½ã€‚
+    // ä½å®½åŒæ—¶æ”¹ä¸ºè·Ÿéš CODEWORD_BITSï¼ˆåŸå­—é¢é‡ 300 ä¸éš parameter å˜ï¼Œæ˜¯ SE250 çš„å‘ï¼‰ã€‚
     reg [CODEWORD_BITS-1:0] codeword_sr;
     reg [15:0]  current_position;
 
     reg [8:0]   bit_in_codeword;
 
-    reg [16:0]  bram_addr;        // ¶Á/Ğ´µØÖ·
+    reg [16:0]  bram_addr;        // è¯»/å†™åœ°å€
     reg  signed [9:0] bram_din;
     reg               bram_we;
 
-    // BRAM ÊµÌå + Í¬²½¶Á¼Ä´æÆ÷
-    // ¡¾ĞŞ¶© B13¡¿¶ÁÍ¨Â·Ö»ÓĞÁ½¼¶£ºbram_addr ¡ú£¨´òÒ»ÅÄ£©bram_raddr_q ¡ú
-    // £¨Í¬²½¶Á³ö£©bram_dout¡£Ô­ÏÈ»¹ÓĞÒ»¼¶ bram_dout_r£¬Ê¹Êı¾İÍí 3 ÅÄ²Åµ½£¬
-    // Óë 3 ÅÄµÄÍ¶Æ±Ñ­»·´í¿ªÒ»Î»¡ª¡ªÒÑ±»É¾³ı£¬¸ÄÓÉ FSM ²åÈë S_VOTE_WAIT ¶ÔÆë¡£
+    // BRAM å®ä½“ + åŒæ­¥è¯»å¯„å­˜å™¨
+    // ã€ä¿®è®¢ B13ã€‘è¯»é€šè·¯åªæœ‰ä¸¤çº§ï¼šbram_addr â†’ï¼ˆæ‰“ä¸€æ‹ï¼‰bram_raddr_q â†’
+    // ï¼ˆåŒæ­¥è¯»å‡ºï¼‰bram_doutã€‚åŸå…ˆè¿˜æœ‰ä¸€çº§ bram_dout_rï¼Œä½¿æ•°æ®æ™š 3 æ‹æ‰åˆ°ï¼Œ
+    // ä¸ 3 æ‹çš„æŠ•ç¥¨å¾ªç¯é”™å¼€ä¸€ä½â€”â€”å·²è¢«åˆ é™¤ï¼Œæ”¹ç”± FSM æ’å…¥ S_VOTE_WAIT å¯¹é½ã€‚
     (* ram_style = "block" *) reg [9:0] bram [0:TOTAL_BITS-1];
     reg [16:0] bram_raddr_q;
     reg [9:0]  bram_dout;
@@ -269,35 +269,35 @@ module differential_voter_v1_0 #
 
     reg [16:0] pre_calc_addr;
 
-    reg [16:0] init_addr;          // 17Î»£¬×ã¹»¸²¸Ç 81000
+    reg [16:0] init_addr;          // 17ä½ï¼Œè¶³å¤Ÿè¦†ç›– 81000
     reg [31:0] read_count;
     reg [31:0] total_reads;
 
     reg [31:0] read_addr;
-    reg [31:0] read_addr_reg;      // ARADDR Ëø´æ
-    // B20 ĞŞ¸´£ºAXI ¹æ·¶ A3.4.1 ÒªÇóÍ»·¢²»µÃ¿çÔ½ 4KB ±ß½ç¡£Ã¿Ìõ¼ÇÂ¼ 48B¡¢²½³¤
-    // Ò²ÊÇ 48B£¬¶ø 4096 ²»ÊÇ 48 µÄÕûÊı±¶£¬¹Ì¶¨ 6 ÅÄÍ»·¢»áÖÜÆÚĞÔ¿çÒ³£¨4096 Ìõ
-    // ¼ÇÂ¼ÖĞ 32 ´Î£¬Ê×´ÎÔÚ¼ÇÂ¼ 85 / 0x...0ff0£©¡£ÕâÀï°Ñ¿çÒ³µÄ¶Á²ğ³ÉÁ½±Ê£º
-    // ÏÈ¶Áµ½Ò³±ß½ç£¬ÔÙ´ÓÒ³±ß½ç¶ÁÍê±¾Ìõ¼ÇÂ¼Ê£ÓàµÄÅÄ¡£
-    reg [31:0] rd_ptr;             // ±¾Ìõ¼ÇÂ¼ÏÂÒ»±ÊÍ»·¢µÄÆğÊ¼µØÖ·
-    reg [3:0]  rd_burst_beats;     // ±¾±ÊÍ»·¢µÄÅÄÊı£¨1..9£©
-    reg [3:0]  rd_burst_done;      // ±¾±ÊÍ»·¢ÒÑÊÕµ½µÄÅÄÊı
+    reg [31:0] read_addr_reg;      // ARADDR é”å­˜
+    // B20 ä¿®å¤ï¼šAXI è§„èŒƒ A3.4.1 è¦æ±‚çªå‘ä¸å¾—è·¨è¶Š 4KB è¾¹ç•Œã€‚æ¯æ¡è®°å½• 48Bã€æ­¥é•¿
+    // ä¹Ÿæ˜¯ 48Bï¼Œè€Œ 4096 ä¸æ˜¯ 48 çš„æ•´æ•°å€ï¼Œå›ºå®š 6 æ‹çªå‘ä¼šå‘¨æœŸæ€§è·¨é¡µï¼ˆ4096 æ¡
+    // è®°å½•ä¸­ 32 æ¬¡ï¼Œé¦–æ¬¡åœ¨è®°å½• 85 / 0x...0ff0ï¼‰ã€‚è¿™é‡ŒæŠŠè·¨é¡µçš„è¯»æ‹†æˆä¸¤ç¬”ï¼š
+    // å…ˆè¯»åˆ°é¡µè¾¹ç•Œï¼Œå†ä»é¡µè¾¹ç•Œè¯»å®Œæœ¬æ¡è®°å½•å‰©ä½™çš„æ‹ã€‚
+    reg [31:0] rd_ptr;             // æœ¬æ¡è®°å½•ä¸‹ä¸€ç¬”çªå‘çš„èµ·å§‹åœ°å€
+    reg [3:0]  rd_burst_beats;     // æœ¬ç¬”çªå‘çš„æ‹æ•°ï¼ˆ1..9ï¼‰
+    reg [3:0]  rd_burst_done;      // æœ¬ç¬”çªå‘å·²æ”¶åˆ°çš„æ‹æ•°
 
-    // Êä³ö´ò°ü
+    // è¾“å‡ºæ‰“åŒ…
     reg [16:0] output_bit_count;
     reg [63:0] output_word;
     reg [5:0]  bit_in_output;
 
     reg [31:0] write_addr;
     reg [31:0] total_write_count;
-    reg [31:0] remaining_beats;    // ½ö¹©µ÷ÊÔ£¬WSTRB ²»ÔÙÒÀÀµ´ËÖµ
+    reg [31:0] remaining_beats;    // ä»…ä¾›è°ƒè¯•ï¼ŒWSTRB ä¸å†ä¾èµ–æ­¤å€¼
 
     reg        pack_trigger;
     reg        pack_pending;
-    reg  [1:0] output_addr_wait;   // ¡¾ĞŞ¶© B13¡¿Êä³ö¶Á¶ÔÆëÒªµÈ 2 ÅÄ£¨bram_dout Á½¼¶£©
+    reg  [1:0] output_addr_wait;   // ã€ä¿®è®¢ B13ã€‘è¾“å‡ºè¯»å¯¹é½è¦ç­‰ 2 æ‹ï¼ˆbram_dout ä¸¤çº§ï¼‰
     reg        first_write_captured;
 
-    // ----------------- Î»ÖÃ/°²È«º¯Êı -----------------
+    // ----------------- ä½ç½®/å®‰å…¨å‡½æ•° -----------------
     function [16:0] calc_layer_position;
         input [8:0]  bit_idx;
         input [15:0] position;
@@ -326,22 +326,22 @@ module differential_voter_v1_0 #
         end
     endfunction
 
-    // ----------------- Ìõ¼ş/³¬Ê± -----------------
+    // ----------------- æ¡ä»¶/è¶…æ—¶ -----------------
     wire init_complete        = (FAST_INIT) ? (init_addr >= 17'd63) : (init_addr >= (TOTAL_BITS - 1));
     wire read_setup_complete  = 1'b1;
-    // ¡¾ĞŞ¶© B16¡¿Íê³ÉÌõ¼şÖ»¿´ÎÕÊÖ¼ÆÊı£ºµÚ 6 ´ÎÎÕÊÖ·¢ÉúÔÚ RLAST ÄÇÅÄ£¬
-    // beat_count Òªµ½ÏÂÒ»ÅÄ²ÅµÈÓÚ 6£»¶øºÏ¹æ´Ó»úÔÚ RLAST ÎÕÊÖºó¼´³·ÏÂ RVALID¡£
-    // Ô­Ìõ¼ş (beat_count>=6 && RVALID) ÒÀÀµ²ĞÁôµÄ RVALID µçÆ½£¬ÕæÊµ»¥Á¬ÉÏ»áËÀËø¡£
+    // ã€ä¿®è®¢ B16ã€‘å®Œæˆæ¡ä»¶åªçœ‹æ¡æ‰‹è®¡æ•°ï¼šç¬¬ 6 æ¬¡æ¡æ‰‹å‘ç”Ÿåœ¨ RLAST é‚£æ‹ï¼Œ
+    // beat_count è¦åˆ°ä¸‹ä¸€æ‹æ‰ç­‰äº 6ï¼›è€Œåˆè§„ä»æœºåœ¨ RLAST æ¡æ‰‹åå³æ’¤ä¸‹ RVALIDã€‚
+    // åŸæ¡ä»¶ (beat_count>=6 && RVALID) ä¾èµ–æ®‹ç•™çš„ RVALID ç”µå¹³ï¼ŒçœŸå®äº’è¿ä¸Šä¼šæ­»é”ã€‚
     wire read_data_complete   = (read_beat_count >= 4'd9);
-    // Ò³ÄÚÊ£ÓàÅÄÊı£¨rd_ptr ºãÎª 8B ¶ÔÆë£©Óë±¾¼ÇÂ¼Ê£ÓàÅÄÊı£¬È¡½ÏĞ¡ÕßÎª±¾±ÊÍ»·¢³¤¶È
+    // é¡µå†…å‰©ä½™æ‹æ•°ï¼ˆrd_ptr æ’ä¸º 8B å¯¹é½ï¼‰ä¸æœ¬è®°å½•å‰©ä½™æ‹æ•°ï¼Œå–è¾ƒå°è€…ä¸ºæœ¬ç¬”çªå‘é•¿åº¦
     wire [9:0] rd_beats_to_page_end = (13'd4096 - {1'b0, rd_ptr[11:0]}) >> 3;
     wire [3:0] rd_beats_remaining   = WORDS_PER_READ[3:0] - read_beat_count;
     wire [3:0] rd_next_burst_beats  =
         (rd_beats_to_page_end < {6'd0, rd_beats_remaining}) ? rd_beats_to_page_end[3:0]
                                                            : rd_beats_remaining;
     wire rd_burst_complete    = (rd_burst_done >= rd_burst_beats);
-    // ¡¾D1/D2¡¿±È¶Ô·ÖµÍÓÚãĞÖµµÄ¼ÇÂ¼²»²ÎÓëÍ¶Æ±£¨º¬ÉÏÎ»»ú²¹ÁãµÄÎ²Åú¼ÇÂ¼£©¡£
-    // parse_score ÔÚ S_PARSE_READ ÅÄ´Ó read_words[0] ×éºÏ¶Á³ö£¬ÌìÈ»ÓĞĞ§¡£
+    // ã€D1/D2ã€‘æ¯”å¯¹åˆ†ä½äºé˜ˆå€¼çš„è®°å½•ä¸å‚ä¸æŠ•ç¥¨ï¼ˆå«ä¸Šä½æœºè¡¥é›¶çš„å°¾æ‰¹è®°å½•ï¼‰ã€‚
+    // parse_score åœ¨ S_PARSE_READ æ‹ä» read_words[0] ç»„åˆè¯»å‡ºï¼Œå¤©ç„¶æœ‰æ•ˆã€‚
     wire score_below_min      = ({22'd0, parse_score} < score_min_cfg);
     wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
 
@@ -362,15 +362,15 @@ module differential_voter_v1_0 #
     reg [31:0] global_timeout_counter;
     reg [31:0] no_progress_counter;
 
-    // ----------------- BRAM Í¬²½¶ÁĞ´£¨UG901 Ä£°å£© -----------------
+    // ----------------- BRAM åŒæ­¥è¯»å†™ï¼ˆUG901 æ¨¡æ¿ï¼‰ -----------------
     always @(posedge M00_AXI_ACLK) begin
         if (bram_we)
-            bram[bram_addr] <= bram_din;     // Ğ´
-        bram_raddr_q <= bram_addr;           // ¶ÁµØÖ·´òÒ»ÅÄ
-        bram_dout    <= bram[bram_raddr_q];  // Í¬²½¶Á
+            bram[bram_addr] <= bram_din;     // å†™
+        bram_raddr_q <= bram_addr;           // è¯»åœ°å€æ‰“ä¸€æ‹
+        bram_dout    <= bram[bram_raddr_q];  // åŒæ­¥è¯»
     end
 
-    // ----------------- ×´Ì¬¼Ä´æ & ³¬Ê±¼ÆÊı -----------------
+    // ----------------- çŠ¶æ€å¯„å­˜ & è¶…æ—¶è®¡æ•° -----------------
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) state <= S_IDLE;
         else                  state <= next_state;
@@ -393,7 +393,7 @@ module differential_voter_v1_0 #
         end
     end
 
-    // ----------------- Êı¾İÂ·¾¶£¨Ê±Ğò£© -----------------
+    // ----------------- æ•°æ®è·¯å¾„ï¼ˆæ—¶åºï¼‰ -----------------
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
 
@@ -437,7 +437,7 @@ module differential_voter_v1_0 #
             rd_burst_done       <= 4'd0;
             total_reads         <= 32'd0;
 
-            // >>> ĞÂÔö¸´Î»
+            // >>> æ–°å¢å¤ä½
             last_rresp          <= 2'b00;
         end else begin
             bram_we      <= 1'b0;
@@ -478,8 +478,8 @@ module differential_voter_v1_0 #
                         debug_setup_count    <= 32'd0;
                         debug_write_count    <= 32'd0;
 
-                        // ¡¾ĞŞ¶© C4¡¿Ã¿´ÎÈÎÎñ¶¼´ÓÁãÀÛ¼Ó£ºÔ­ÊµÏÖ¿¿ bram_initialized
-                        // Ö»ÔÚÊ×´Î START ÇåÁã£¬µÚ¶ş´ÎÈÎÎñ»áÔÚÉÏÒ»ÂÖµÄ¾ÉÆ±ÉÏµş¼Ó¡£
+                        // ã€ä¿®è®¢ C4ã€‘æ¯æ¬¡ä»»åŠ¡éƒ½ä»é›¶ç´¯åŠ ï¼šåŸå®ç°é  bram_initialized
+                        // åªåœ¨é¦–æ¬¡ START æ¸…é›¶ï¼Œç¬¬äºŒæ¬¡ä»»åŠ¡ä¼šåœ¨ä¸Šä¸€è½®çš„æ—§ç¥¨ä¸Šå åŠ ã€‚
                         init_addr          <= 17'd0;
                     end
                 end
@@ -495,10 +495,10 @@ module differential_voter_v1_0 #
                 end
 
                 S_READ_SETUP: begin
-                    // ÓÃ rd_ptr ¶ø·Ç read_addr£º²ğ·ÖºóµÄµÚ¶ş±ÊÒª´ÓÒ³±ß½ç¿ªÊ¼¡£
-                    // read_beat_count ÊÇ¡¸±¾Ìõ¼ÇÂ¼¡¹µÄÅÄË÷Òı£¬Ğè¿çÁ½±ÊÍ»·¢Á¬Ğø£¬
-                    // Òò´Ë²»ÄÜÔÚÕâÀïÇåÁã£¬¸Äµ½¼ÇÂ¼ÇĞ»»´¦Çå¡£
-                    read_addr_reg   <= rd_ptr;      // Ëø´æARµØÖ·
+                    // ç”¨ rd_ptr è€Œé read_addrï¼šæ‹†åˆ†åçš„ç¬¬äºŒç¬”è¦ä»é¡µè¾¹ç•Œå¼€å§‹ã€‚
+                    // read_beat_count æ˜¯ã€Œæœ¬æ¡è®°å½•ã€çš„æ‹ç´¢å¼•ï¼Œéœ€è·¨ä¸¤ç¬”çªå‘è¿ç»­ï¼Œ
+                    // å› æ­¤ä¸èƒ½åœ¨è¿™é‡Œæ¸…é›¶ï¼Œæ”¹åˆ°è®°å½•åˆ‡æ¢å¤„æ¸…ã€‚
+                    read_addr_reg   <= rd_ptr;      // é”å­˜ARåœ°å€
                     rd_burst_beats  <= rd_next_burst_beats;
                     rd_burst_done   <= 4'd0;
                     debug_state_count <= state;
@@ -510,7 +510,7 @@ module differential_voter_v1_0 #
                         read_beat_count <= read_beat_count + 1;
                         rd_burst_done   <= rd_burst_done + 1;
                         rd_ptr          <= rd_ptr + 32'd8;
-                        // >>> ĞÂÔö£º²ÉÑù RRESP£¨Ö»ÔÚÎÕÊÖ³É¹¦Ê±£©
+                        // >>> æ–°å¢ï¼šé‡‡æ · RRESPï¼ˆåªåœ¨æ¡æ‰‹æˆåŠŸæ—¶ï¼‰
                         last_rresp <= M00_AXI_RRESP;
                     end
                     debug_state_count <= state;
@@ -544,8 +544,8 @@ module differential_voter_v1_0 #
                 end
 
                 S_VOTE_READ: begin
-                    // ¡¾ĞŞ¶© B13¡¿bram_addr ÔÚÉÏÒ»ÅÄ£¨S_CALC_ADDR Ä©ÑØ£©²Å¸üĞÂ£¬
-                    // Á½¼¶¶Á¹ÜÏßÒªÔÙµÈÒ»ÅÄÊı¾İ²Å¶ÔÆëµ½ S_VOTE_UPDATE¡£
+                    // ã€ä¿®è®¢ B13ã€‘bram_addr åœ¨ä¸Šä¸€æ‹ï¼ˆS_CALC_ADDR æœ«æ²¿ï¼‰æ‰æ›´æ–°ï¼Œ
+                    // ä¸¤çº§è¯»ç®¡çº¿è¦å†ç­‰ä¸€æ‹æ•°æ®æ‰å¯¹é½åˆ° S_VOTE_UPDATEã€‚
                     debug_state_count <= state;
                 end
 
@@ -554,8 +554,8 @@ module differential_voter_v1_0 #
                 end
 
                 S_VOTE_UPDATE: begin
-                    // ¡¾ĞŞ¶© B13¡¿¸ÄÓÃ bram_dout£¨Á½¼¶£ºbram_addr¡úbram_raddr_q¡úbram_dout£©£¬
-                    // ±¾ÅÄÇ¡ºÃ¶ÔÆë±¾Î»µÄÀÛ¼ÓÆ÷£»Ô­ÏÈµÄ bram_dout_r ÍíÒ»ÅÄ£¬¶Áµ½ÉÏÒ»Î»¡£
+                    // ã€ä¿®è®¢ B13ã€‘æ”¹ç”¨ bram_doutï¼ˆä¸¤çº§ï¼šbram_addrâ†’bram_raddr_qâ†’bram_doutï¼‰ï¼Œ
+                    // æœ¬æ‹æ°å¥½å¯¹é½æœ¬ä½çš„ç´¯åŠ å™¨ï¼›åŸå…ˆçš„ bram_dout_r æ™šä¸€æ‹ï¼Œè¯»åˆ°ä¸Šä¸€ä½ã€‚
                     if (codeword_sr[0]) begin
                         bram_din         <= safe_vote_value(bram_dout + 10'sd1);
                     end else begin
@@ -566,11 +566,11 @@ module differential_voter_v1_0 #
                     if (bit_in_codeword < CODEWORD_BITS - 1)
                         bit_in_codeword <= bit_in_codeword + 1;
 
-                    // ¡¾S1¡¿±¾ÅÄÏû·ÑÁË×îµÍÎ»£¬ÓÒÒÆÒ»Î»¶Ô×¼ÏÂÒ»Î»¡£
-                    // S_VOTE_UPDATE Ã¿Ìõ¼ÇÂ¼Ç¡ºÃ½ø CODEWORD_BITS ´Î
-                    // £¨vote_update_complete Ö®ºó×ª S_NEXT_READ£¬¼û next_state£©£¬
-                    // ËùÒÔ×îºóÒ»´Î¶àÒÆµÄÄÇÒ»Î»²»»á±»¶Áµ½£¬ÇÒÏÂÒ»Ìõ¼ÇÂ¼µÄ
-                    // S_PARSE_READ »áÕûÌåÖØÔØ£¬Òò´Ë²»ĞèÒªÌõ¼ş±£»¤¡£
+                    // ã€S1ã€‘æœ¬æ‹æ¶ˆè´¹äº†æœ€ä½ä½ï¼Œå³ç§»ä¸€ä½å¯¹å‡†ä¸‹ä¸€ä½ã€‚
+                    // S_VOTE_UPDATE æ¯æ¡è®°å½•æ°å¥½è¿› CODEWORD_BITS æ¬¡
+                    // ï¼ˆvote_update_complete ä¹‹åè½¬ S_NEXT_READï¼Œè§ next_stateï¼‰ï¼Œ
+                    // æ‰€ä»¥æœ€åä¸€æ¬¡å¤šç§»çš„é‚£ä¸€ä½ä¸ä¼šè¢«è¯»åˆ°ï¼Œä¸”ä¸‹ä¸€æ¡è®°å½•çš„
+                    // S_PARSE_READ ä¼šæ•´ä½“é‡è½½ï¼Œå› æ­¤ä¸éœ€è¦æ¡ä»¶ä¿æŠ¤ã€‚
                     codeword_sr <= {1'b0, codeword_sr[CODEWORD_BITS-1:1]};
 
                     debug_state_count <= state;
@@ -592,8 +592,8 @@ module differential_voter_v1_0 #
                 end
 
                 S_OUTPUT_ADDR: begin
-                    // ¡¾ĞŞ¶© B13¡¿bram_dout Á½¼¶¶Á¹ÜÏß£º¸øµØÖ·ºóÒªµÈ 2 ÅÄÊı¾İ²Åµ½£¬
-                    // Òò´Ë ADDR ¹² 3 ÅÄ£¨¸øµØÖ· + µÈ 2 ÅÄ£©£¬PACK ÅÄÕıºÃÈ¡µ½±¾Î»¡£
+                    // ã€ä¿®è®¢ B13ã€‘bram_dout ä¸¤çº§è¯»ç®¡çº¿ï¼šç»™åœ°å€åè¦ç­‰ 2 æ‹æ•°æ®æ‰åˆ°ï¼Œ
+                    // å› æ­¤ ADDR å…± 3 æ‹ï¼ˆç»™åœ°å€ + ç­‰ 2 æ‹ï¼‰ï¼ŒPACK æ‹æ­£å¥½å–åˆ°æœ¬ä½ã€‚
                     if (output_addr_wait == 2'd0) begin
                         if (output_bit_count < TOTAL_BITS)
                             bram_addr <= output_bit_count;
@@ -609,16 +609,16 @@ module differential_voter_v1_0 #
                 S_OUTPUT_PACK: begin
                     debug_state_count <= state;
                     if (output_bit_count < TOTAL_BITS) begin
-                        // ¡¾ĞŞ¶© B14¡¿bram_dout ÊÇÎŞ·ûºÅµÄ£º¸ºÆ±£¨Èç -1=10'h3FF£©
-                        // Ö±½Ó >0 ±È½Ï»áÎóÅĞ³É 1¡£°´²¹ÂëÓïÒå£º·Ç¸ºÇÒ·ÇÁã²ÅÊÇ 1¡£
+                        // ã€ä¿®è®¢ B14ã€‘bram_dout æ˜¯æ— ç¬¦å·çš„ï¼šè´Ÿç¥¨ï¼ˆå¦‚ -1=10'h3FFï¼‰
+                        // ç›´æ¥ >0 æ¯”è¾ƒä¼šè¯¯åˆ¤æˆ 1ã€‚æŒ‰è¡¥ç è¯­ä¹‰ï¼šéè´Ÿä¸”éé›¶æ‰æ˜¯ 1ã€‚
                         output_word[bit_in_output] <= ~bram_dout[9] && (bram_dout != 10'd0);
 
                         if (bit_in_output == 6'd63) begin
-                            pack_trigger  <= 1'b1;   // Âú 64b
+                            pack_trigger  <= 1'b1;   // æ»¡ 64b
                             pack_pending  <= 1'b1;
                             bit_in_output <= 6'd0;
                         end else if (output_bit_count == TOTAL_BITS - 1) begin
-                            pack_trigger  <= 1'b1;   // Î²°ü <64b
+                            pack_trigger  <= 1'b1;   // å°¾åŒ… <64b
                             pack_pending  <= 1'b1;
                             bit_in_output <= 6'd0;
                         end else begin
@@ -645,7 +645,7 @@ module differential_voter_v1_0 #
 
                 S_WAIT_BRESP: begin
                     if (M00_AXI_BVALID && M00_AXI_BRESP == 2'b00) begin
-                        pack_pending  <= 1'b0;     // ±¾ÅÄĞ´Çå¿Õ´ıĞ´
+                        pack_pending  <= 1'b0;     // æœ¬æ‹å†™æ¸…ç©ºå¾…å†™
                         output_word   <= 64'd0;
                         bit_in_output <= 6'd0;
                     end
@@ -654,7 +654,7 @@ module differential_voter_v1_0 #
 
                 S_DONE:  debug_state_count <= state;
                 S_ERROR: begin
-                    // ³ö´íÒ²ÇåÀí´ıĞ´£¬±ÜÃâ²ĞÁô
+                    // å‡ºé”™ä¹Ÿæ¸…ç†å¾…å†™ï¼Œé¿å…æ®‹ç•™
                     pack_pending  <= 1'b0;
                     output_word   <= 64'd0;
                     bit_in_output <= 6'd0;
@@ -666,8 +666,8 @@ module differential_voter_v1_0 #
         end
     end
 
-    // ----------------- ×´Ì¬×ªÒÆ -----------------
-    // ¡¾ĞŞ¶© B15¡¿±¾ÅÄÊÇ·ñ×°ÂúÒ»¸ö×Ö£¨º¬Î²°ü£©£º×°Âúµ±ÅÄÖ±½Ó×ª S_OUTPUT_SETUP¡£
+    // ----------------- çŠ¶æ€è½¬ç§» -----------------
+    // ã€ä¿®è®¢ B15ã€‘æœ¬æ‹æ˜¯å¦è£…æ»¡ä¸€ä¸ªå­—ï¼ˆå«å°¾åŒ…ï¼‰ï¼šè£…æ»¡å½“æ‹ç›´æ¥è½¬ S_OUTPUT_SETUPã€‚
     wire word_done = (bit_in_output == 6'd63) || (output_bit_count == TOTAL_BITS - 1);
 
     always @(*) begin
@@ -678,16 +678,16 @@ module differential_voter_v1_0 #
             next_state = S_ERROR;
         end else begin
             case (state)
-                // ¡¾ĞŞ¶© C4¡¿Ã¿´Î START ¶¼×ßÇåÁãÂ·¾¶£¨81,000 ÅÄ ¡Ö 0.81 ms @100 MHz£©
+                // ã€ä¿®è®¢ C4ã€‘æ¯æ¬¡ START éƒ½èµ°æ¸…é›¶è·¯å¾„ï¼ˆ81,000 æ‹ â‰ˆ 0.81 ms @100 MHzï¼‰
                 S_IDLE:            next_state = start_latched_pulse ? S_INIT_BRAM : S_IDLE;
                 S_INIT_BRAM:       next_state = init_complete ? S_READ_SETUP : S_INIT_BRAM;
                 S_READ_SETUP:      next_state = read_setup_complete ? S_READ_DATA  : S_READ_SETUP;
                 S_READ_DATA:       next_state = !rd_burst_complete ? S_READ_DATA
                                               : (read_data_complete ? S_PARSE_READ : S_READ_SETUP);
-                // ¡¾D1/D2¡¿µÍ·Ö¼ÇÂ¼Ö±½ÓÌøµ½ÏÂÒ»Ìõ£¬²»½øÈëÍ¶Æ±Ñ­»·
+                // ã€D1/D2ã€‘ä½åˆ†è®°å½•ç›´æ¥è·³åˆ°ä¸‹ä¸€æ¡ï¼Œä¸è¿›å…¥æŠ•ç¥¨å¾ªç¯
                 S_PARSE_READ:      next_state = score_below_min ? S_NEXT_READ : S_CALC_ADDR;
                 S_CALC_ADDR:       next_state = S_VOTE_READ;
-                S_VOTE_READ:       next_state = S_VOTE_WAIT;   // ¡¾ĞŞ¶© B13¡¿
+                S_VOTE_READ:       next_state = S_VOTE_WAIT;   // ã€ä¿®è®¢ B13ã€‘
                 S_VOTE_WAIT:       next_state = S_VOTE_UPDATE;
                 S_VOTE_UPDATE:     next_state = vote_update_complete ? S_NEXT_READ : S_CALC_ADDR;
                 S_NEXT_READ:       next_state = (read_count >= total_reads - 1) ? S_OUTPUT_PREFETCH : S_READ_SETUP;
@@ -698,9 +698,9 @@ module differential_voter_v1_0 #
                 end
 
                 S_OUTPUT_PACK: begin
-                    // ¡¾ĞŞ¶© B15¡¿×°Âúµ±ÅÄÖ±½ÓÈ¥·¢Ğ´ÇëÇó¡£Ô­ÊµÏÖÏÈÈÆ»Ø ADDR/PACK
-                    // ¶à´ò°üÒ»ÅÄ£¬¶ø S_WAIT_BRESP »áÇå output_word£¬ÄÇÒ» bit ±»
-                    // ¾²Ä¬¶ªÆú£¨Ã¿ 64 bit ¶ª 1 bit£¬Êµ²âÖ»Ğ´³ö 1,247/1,266 ÅÄ£©¡£
+                    // ã€ä¿®è®¢ B15ã€‘è£…æ»¡å½“æ‹ç›´æ¥å»å‘å†™è¯·æ±‚ã€‚åŸå®ç°å…ˆç»•å› ADDR/PACK
+                    // å¤šæ‰“åŒ…ä¸€æ‹ï¼Œè€Œ S_WAIT_BRESP ä¼šæ¸… output_wordï¼Œé‚£ä¸€ bit è¢«
+                    // é™é»˜ä¸¢å¼ƒï¼ˆæ¯ 64 bit ä¸¢ 1 bitï¼Œå®æµ‹åªå†™å‡º 1,247/1,266 æ‹ï¼‰ã€‚
                     if (word_done)                        next_state = S_OUTPUT_SETUP;
                     else if (output_bit_count >= TOTAL_BITS) next_state = S_DONE;
                     else                                     next_state = S_OUTPUT_ADDR;
@@ -719,12 +719,12 @@ module differential_voter_v1_0 #
                 S_WAIT_BRESP: begin
                     if (M00_AXI_BVALID) begin
                         if (M00_AXI_BRESP != 2'b00)                      next_state = S_ERROR;
-                        else if (output_bit_count >= TOTAL_BITS && !pack_pending) next_state = S_DONE; // Ğ´Íê×îºóÒ»ÅÄ
+                        else if (output_bit_count >= TOTAL_BITS && !pack_pending) next_state = S_DONE; // å†™å®Œæœ€åä¸€æ‹
                         else                                              next_state = S_OUTPUT_ADDR;
                     end else next_state = S_WAIT_BRESP;
                 end
 
-                // >>> ÓëĞŞ¸´·½°¸Ò»ÖÂ£ºS_ERROR ±ØĞëÍË³ö
+                // >>> ä¸ä¿®å¤æ–¹æ¡ˆä¸€è‡´ï¼šS_ERROR å¿…é¡»é€€å‡º
                 S_DONE:  next_state = S_IDLE;
                 S_ERROR: next_state = S_IDLE;
                 default: next_state = S_IDLE;
@@ -733,7 +733,7 @@ module differential_voter_v1_0 #
     end
 
     // ----------------- AXI Read Channel -----------------
-    // ARVALID£ºÔÚ S_READ_SETUP À­¸ßÒ»´Î£¬ARREADY ½ÓÊÜºóÀ­µÍ£¨²»ÒÀÀµ next_state£©
+    // ARVALIDï¼šåœ¨ S_READ_SETUP æ‹‰é«˜ä¸€æ¬¡ï¼ŒARREADY æ¥å—åæ‹‰ä½ï¼ˆä¸ä¾èµ– next_stateï¼‰
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
             M00_AXI_ARVALID <= 1'b0;
@@ -745,8 +745,8 @@ module differential_voter_v1_0 #
         end
     end
 
-    assign M00_AXI_ARADDR  = read_addr_reg; // µØÖ·ÒÑÔÚ S_READ_SETUP Ëø´æ
-    assign M00_AXI_ARLEN   = {4'd0, rd_burst_beats} - 8'd1; // ±¾±ÊÍ»·¢ÅÄÊı-1£¨B20£©
+    assign M00_AXI_ARADDR  = read_addr_reg; // åœ°å€å·²åœ¨ S_READ_SETUP é”å­˜
+    assign M00_AXI_ARLEN   = {4'd0, rd_burst_beats} - 8'd1; // æœ¬ç¬”çªå‘æ‹æ•°-1ï¼ˆB20ï¼‰
     assign M00_AXI_ARSIZE  = 3'b011;        // 8B
     assign M00_AXI_ARBURST = 2'b01;         // INCR
     assign M00_AXI_ARLOCK  = 1'b0;
@@ -754,9 +754,9 @@ module differential_voter_v1_0 #
     assign M00_AXI_ARPROT  = 3'b000;
     assign M00_AXI_ARQOS   = 4'b0000;
 
-    // >>> ¹Ø¼üĞŞ¸´£ºRREADY must be high during AR handshake to avoid DDR timeout
-    // Ô­£ºassign M00_AXI_RREADY = (state == S_READ_DATA);
-    // ÏÖ£º
+    // >>> å…³é”®ä¿®å¤ï¼šRREADY must be high during AR handshake to avoid DDR timeout
+    // åŸï¼šassign M00_AXI_RREADY = (state == S_READ_DATA);
+    // ç°ï¼š
     assign M00_AXI_RREADY  = (state == S_READ_DATA) || (state == S_READ_SETUP);
 
     // ----------------- AXI Write Channel -----------------
@@ -772,7 +772,7 @@ module differential_voter_v1_0 #
         if (!M00_AXI_ARESETN) begin
             M00_AXI_AWVALID <= 1'b0;
             M00_AXI_AWADDR  <= 32'd0;
-            M00_AXI_AWLEN   <= 8'd0; // µ¥ÅÄ
+            M00_AXI_AWLEN   <= 8'd0; // å•æ‹
         end else begin
             if (state == S_OUTPUT_SETUP && pack_pending) begin
                 if (!M00_AXI_AWVALID) begin
@@ -788,7 +788,7 @@ module differential_voter_v1_0 #
         end
     end
 
-    // Ó²¼şÍÆµ¼Ä©ÅÄ WSTRB ÑÚÂë
+    // ç¡¬ä»¶æ¨å¯¼æœ«æ‹ WSTRB æ©ç 
     wire [5:0] last_bits  = TOTAL_BITS[5:0];                                // TOTAL_BITS % 64
     wire [3:0] last_bytes = (last_bits == 0) ? 4'd8 : ((last_bits + 6'd7) >> 3);
     wire [7:0] last_mask  = (last_bytes == 8) ? 8'hFF : ((8'h01 << last_bytes) - 1);
@@ -805,7 +805,7 @@ module differential_voter_v1_0 #
             if (state == S_OUTPUT_WRITE && pack_pending) begin
                 if (!M00_AXI_WVALID) begin
                     M00_AXI_WVALID <= 1'b1;
-                    M00_AXI_WLAST  <= 1'b1; // µ¥ÅÄ
+                    M00_AXI_WLAST  <= 1'b1; // å•æ‹
                 end else if (M00_AXI_WREADY) begin
                     M00_AXI_WVALID <= 1'b0;
                     M00_AXI_WLAST  <= 1'b0;
@@ -817,10 +817,10 @@ module differential_voter_v1_0 #
         end
     end
 
-    // B Í¨µÀÎÕÊÖ
+    // B é€šé“æ¡æ‰‹
     assign M00_AXI_BREADY = 1'b1;
 
-    // BRESP Í³¼Æ
+    // BRESP ç»Ÿè®¡
     reg [31:0] bresp_cnt_ok, bresp_cnt_err;
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
@@ -836,7 +836,7 @@ module differential_voter_v1_0 #
         end
     end
 
-    // ----------------- DONE / IDLE / ERROR£¨µ¥µãÇı¶¯£© -----------------
+    // ----------------- DONE / IDLE / ERRORï¼ˆå•ç‚¹é©±åŠ¨ï¼‰ -----------------
     always @(posedge M00_AXI_ACLK) begin
         if (!M00_AXI_ARESETN) begin
             done_s  <= 1'b0;
@@ -850,7 +850,7 @@ module differential_voter_v1_0 #
                 error_s <= 1'b0;
             end else begin
                 if (start_latched_pulse) begin
-                    // Æô¶¯Í¬Ê±Çå DONE/ERROR£¬±ÜÃâ¶ş´ÎÆô¶¯²ĞÁô
+                    // å¯åŠ¨åŒæ—¶æ¸… DONE/ERRORï¼Œé¿å…äºŒæ¬¡å¯åŠ¨æ®‹ç•™
                     done_s  <= 1'b0;
                     error_s <= 1'b0;
                 end
@@ -858,7 +858,7 @@ module differential_voter_v1_0 #
                 if (state == S_ERROR)
                     error_s <= 1'b1;
 
-                // ½øÈë S_DONE ¼´ÖÃÎ» DONE£¨FSM ÒÑÈ·±£È«²¿Ğ´Ìá½»Íê³É£©
+                // è¿›å…¥ S_DONE å³ç½®ä½ DONEï¼ˆFSM å·²ç¡®ä¿å…¨éƒ¨å†™æäº¤å®Œæˆï¼‰
                 if (state == S_DONE)
                     done_s <= 1'b1;
             end
@@ -883,10 +883,10 @@ endmodule
 // 0x24: DBG_WRITE
 // 0x28: DBG_FIRST_AWADDR
 // 0x2C: ERR_FLAGS (R: bit0 ERROR_S, bit1 AXI_BRESP_ERROR)
-// 0x30: SCORE_MIN  ¡¾D1/D2¡¿±È¶Ô·ÖãĞÖµ£»score < SCORE_MIN µÄ¼ÇÂ¼²»Í¶Æ±¡£
-//       ¸´Î»Ä¬ÈÏ 0£¨²»¹ıÂË£©¡£×¢£º06-implementation-plan Ô­Ğ´ 0x18£¬
-//       µ« 0x18 ÒÑ±» DBG_STATE Õ¼ÓÃ£¬Êµ¼ÊÂäÔÚ 0x30¡£
-// 0x38: LAST_RRESP (R: bit[1:0] ×îºóÒ»´Î¶ÁÍ¨µÀ RRESP)
+// 0x30: SCORE_MIN  ã€D1/D2ã€‘æ¯”å¯¹åˆ†é˜ˆå€¼ï¼›score < SCORE_MIN çš„è®°å½•ä¸æŠ•ç¥¨ã€‚
+//       å¤ä½é»˜è®¤ 0ï¼ˆä¸è¿‡æ»¤ï¼‰ã€‚æ³¨ï¼š06-implementation-plan åŸå†™ 0x18ï¼Œ
+//       ä½† 0x18 å·²è¢« DBG_STATE å ç”¨ï¼Œå®é™…è½åœ¨ 0x30ã€‚
+// 0x38: LAST_RRESP (R: bit[1:0] æœ€åä¸€æ¬¡è¯»é€šé“ RRESP)
 // ================================================================
 module axi_slave_voter #
 (
@@ -934,7 +934,7 @@ module axi_slave_voter #
     input  wire [31:0] debug_write_count,
     input  wire [31:0] debug_first_write_addr,
 
-    // >>> ĞÂÔö£º±©Â¶ last_rresp
+    // >>> æ–°å¢ï¼šæš´éœ² last_rresp
     input  wire [1:0]  last_rresp
 );
 
@@ -952,7 +952,7 @@ module axi_slave_voter #
     assign S_AXI_AWREADY = ~aw_pending & ~S_AXI_BVALID;
     assign S_AXI_WREADY = ~w_pending & ~S_AXI_BVALID;
 
-    // ----------------- Ğ´Í¨µÀ -----------------
+    // ----------------- å†™é€šé“ -----------------
     always @(posedge S_AXI_ACLK) begin
         if (!S_AXI_ARESETN) begin
             S_AXI_BVALID    <= 1'b0;
@@ -994,7 +994,7 @@ module axi_slave_voter #
                     5'h03: out_addr        <= write_data;
                     5'h04: out_beats       <= write_data;
                     5'h05: total_reads_cfg <= write_data;
-                    5'h0C: score_min_cfg   <= write_data;   // 0x30¡¾D1/D2¡¿
+                    5'h0C: score_min_cfg   <= write_data;   // 0x30ã€D1/D2ã€‘
                     default: ;
                 endcase
                 S_AXI_BVALID <= 1'b1;
@@ -1003,13 +1003,13 @@ module axi_slave_voter #
 
             if (S_AXI_BVALID && S_AXI_BREADY) begin
                 S_AXI_BVALID <= 1'b0;
-                start_pulse  <= 1'b0; // Âö³å×Ô¶¯Çå
+                start_pulse  <= 1'b0; // è„‰å†²è‡ªåŠ¨æ¸…
                 done_clr     <= 1'b0;
             end
         end
     end
 
-    // ----------------- ¶ÁÍ¨µÀ -----------------
+    // ----------------- è¯»é€šé“ -----------------
     reg ar_hs;
     always @(posedge S_AXI_ACLK) begin
         if (!S_AXI_ARESETN) begin
@@ -1037,7 +1037,7 @@ module axi_slave_voter #
                     5'h0A: S_AXI_RDATA <= debug_first_write_addr;
                     5'h0B: S_AXI_RDATA <= {30'd0, bresp_err_flag, error_flag};
                     5'h0C: S_AXI_RDATA <= score_min_cfg;
-                    // >>> ĞÂÔö£º0x38
+                    // >>> æ–°å¢ï¼š0x38
                     5'h0E: S_AXI_RDATA <= {30'd0, last_rresp};
                     default: S_AXI_RDATA <= 32'd0;
                 endcase

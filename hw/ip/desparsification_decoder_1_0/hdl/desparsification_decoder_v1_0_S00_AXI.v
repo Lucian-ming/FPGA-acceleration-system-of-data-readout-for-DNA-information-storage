@@ -1,9 +1,9 @@
 // FILE: desparsification_decoder_v1_0_S00_AXI.v
-// ĞŞ¸´µã£º
-//  - Ğ´Í¨µÀ²ÉÓÃ Xilinx Ä£°åÊ½ÎÕÊÖ£ºAW/W ·ÖÅÄµ½´ïÒ²ÄÜÕıÈ·Ó¦´ğ BVALID
-//  - 32-bit AXI-Lite£¬µØÖ·Ó³Éä£º
-//    0x00 CTRL[0]=ap_start(W1P)£¬0x04 STATUS{idle,done}
-//    0x10/0x14 ÊäÈë»ùµØÖ·µÍ/¸ß£¬0x18/0x1C Êä³ö»ùµØÖ·µÍ/¸ß
+// ä¿®å¤ç‚¹ï¼š
+//  - å†™é€šé“é‡‡ç”¨ Xilinx æ¨¡æ¿å¼æ¡æ‰‹ï¼šAW/W åˆ†æ‹åˆ°è¾¾ä¹Ÿèƒ½æ­£ç¡®åº”ç­” BVALID
+//  - 32-bit AXI-Liteï¼Œåœ°å€æ˜ å°„ï¼š
+//    0x00 CTRL[0]=ap_start(W1P)ï¼Œ0x04 STATUS{idle,done}
+//    0x10/0x14 è¾“å…¥åŸºåœ°å€ä½/é«˜ï¼Œ0x18/0x1C è¾“å‡ºåŸºåœ°å€ä½/é«˜
 
 `timescale 1 ns / 1 ps
 
@@ -42,7 +42,7 @@ module desparsification_decoder_v1_0_S00_AXI #
     input  wire                           S00_AXI_RREADY
 );
 
-    // µØÖ·Ó³Éä£¨word µØÖ·£©
+    // åœ°å€æ˜ å°„ï¼ˆword åœ°å€ï¼‰
     localparam ADDR_CTRL      = 6'h00;
     localparam ADDR_STATUS    = 6'h04;
     localparam ADDR_IN_L      = 6'h10;
@@ -50,7 +50,7 @@ module desparsification_decoder_v1_0_S00_AXI #
     localparam ADDR_OUT_L     = 6'h18;
     localparam ADDR_OUT_H     = 6'h1C;
 
-    // ÄÚ²¿ AXI ĞÅºÅ
+    // å†…éƒ¨ AXI ä¿¡å·
     reg [C_S_AXI_ADDR_WIDTH-1:0] axi_awaddr, axi_araddr;
     reg axi_awready, axi_wready, axi_bvalid;
     reg [1:0] axi_bresp;
@@ -59,11 +59,11 @@ module desparsification_decoder_v1_0_S00_AXI #
     reg [C_S_AXI_DATA_WIDTH-1:0] axi_rdata;
     reg aw_en;
 
-    // Ğ´¼Ä´æÆ÷£¨ÓÃ»§£©
+    // å†™å¯„å­˜å™¨ï¼ˆç”¨æˆ·ï¼‰
     reg        int_ap_start;
     reg [31:0] in_l, in_h, out_l, out_h;
 
-    // Á¬½Óµ½¶Ë¿Ú
+    // è¿æ¥åˆ°ç«¯å£
     assign S00_AXI_AWREADY = axi_awready;
     assign S00_AXI_WREADY  = axi_wready;
     assign S00_AXI_BVALID  = axi_bvalid;
@@ -73,9 +73,9 @@ module desparsification_decoder_v1_0_S00_AXI #
     assign S00_AXI_RRESP   = axi_rresp;
     assign S00_AXI_RDATA   = axi_rdata;
 
-    localparam integer ADDR_LSB = 2; // 32-bit ¶ÔÆë
+    localparam integer ADDR_LSB = 2; // 32-bit å¯¹é½
 
-    // AWREADY£¨Ä£°åĞ´·¨£©
+    // AWREADYï¼ˆæ¨¡æ¿å†™æ³•ï¼‰
     always @(posedge S00_AXI_ACLK) begin
         if (!S00_AXI_ARESETN) begin
             axi_awready <= 1'b0; aw_en <= 1'b1;
@@ -90,14 +90,14 @@ module desparsification_decoder_v1_0_S00_AXI #
         end
     end
 
-    // ¼ÇÂ¼ AWADDR
+    // è®°å½• AWADDR
     always @(posedge S00_AXI_ACLK) begin
         if (!S00_AXI_ARESETN) axi_awaddr <= 0;
         else if (~axi_awready && S00_AXI_AWVALID && S00_AXI_WVALID && aw_en)
             axi_awaddr <= S00_AXI_AWADDR;
     end
 
-    // WREADY£¨Ä£°åĞ´·¨£©
+    // WREADYï¼ˆæ¨¡æ¿å†™æ³•ï¼‰
     always @(posedge S00_AXI_ACLK) begin
         if (!S00_AXI_ARESETN) axi_wready <= 1'b0;
         else if (~axi_wready && S00_AXI_WVALID && S00_AXI_AWVALID && aw_en)
@@ -106,7 +106,7 @@ module desparsification_decoder_v1_0_S00_AXI #
             axi_wready <= 1'b0;
     end
 
-    // Ğ´Êı¾İµ½ÓÃ»§¼Ä´æÆ÷
+    // å†™æ•°æ®åˆ°ç”¨æˆ·å¯„å­˜å™¨
     integer i;
     wire slv_reg_wren = axi_wready && S00_AXI_WVALID && axi_awready && S00_AXI_AWVALID;
     always @(posedge S00_AXI_ACLK) begin
@@ -128,12 +128,12 @@ module desparsification_decoder_v1_0_S00_AXI #
                 default:;
             endcase
         end else if (ap_done) begin
-            // Íê³Éºó×Ô¶¯Çå 0£¨W1P£©
+            // å®Œæˆåè‡ªåŠ¨æ¸… 0ï¼ˆW1Pï¼‰
             int_ap_start <= 1'b0;
         end
     end
 
-    // BRESP£¨Ä£°åĞ´·¨£©
+    // BRESPï¼ˆæ¨¡æ¿å†™æ³•ï¼‰
     always @(posedge S00_AXI_ACLK) begin
         if (!S00_AXI_ARESETN) begin
             axi_bvalid <= 1'b0; axi_bresp <= 2'b00;
@@ -187,7 +187,7 @@ module desparsification_decoder_v1_0_S00_AXI #
         end
     end
 
-    // Êä³öµ½¶¥²ã
+    // è¾“å‡ºåˆ°é¡¶å±‚
     always @(*) begin
         ap_start             = int_ap_start & ~ap_done;
         ddr_input_base_addr  = {in_h,  in_l};

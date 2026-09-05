@@ -8,12 +8,12 @@ module Dna_accelerator_core_v1_0_S_AXIS_DATA #
 (
     input  wire                            S_AXIS_ACLK,
     input  wire                            S_AXIS_ARESETN,
-    // ½ö×÷"¶¥²ãÕæÊµ TREADY"µÄÅÔÂ·ÊäÈë£»±¾Ä£¿é²»Çı¶¯Ëü
+    // ä»…ä½œ"é¡¶å±‚çœŸå® TREADY"çš„æ—è·¯è¾“å…¥ï¼›æœ¬æ¨¡å—ä¸é©±åŠ¨å®ƒ
     input  wire                            S_AXIS_TREADY,
     input  wire [C_S_AXIS_TDATA_WIDTH-1:0] S_AXIS_TDATA,
     input  wire [(C_S_AXIS_TDATA_WIDTH/8)-1:0] S_AXIS_TSTRB,
     input  wire                            S_AXIS_TLAST,
     input  wire                            S_AXIS_TVALID
 );
-    // Õ¼Î»Ä£¿é£¬²»°üº¬Âß¼­
+    // å ä½æ¨¡å—ï¼Œä¸åŒ…å«é€»è¾‘
 endmodule

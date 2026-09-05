@@ -13,11 +13,11 @@ module fifo_sync_sdpram_b64 #(
     output reg  [WIDTH-1:0]     dout,
     output wire                 empty
 );
-    // log2 ¼ÆËã
+    // log2 è®¡ç®—
     function integer CLOG2; input integer v; integer t,i; begin t=v-1; i=0; while(t>0) begin t=t>>1; i=i+1; end CLOG2=i; end endfunction
     localparam integer AW = CLOG2(DEPTH);
 
-    // ´æ´¢Ìå£¨µ¥¶Ë¿ÚĞ´ + Í¬²½¶Á£¬×ÛºÏ³É BRAM/URAM ÓÉ¹¤¾ß¾ö¶¨£©
+    // å­˜å‚¨ä½“ï¼ˆå•ç«¯å£å†™ + åŒæ­¥è¯»ï¼Œç»¼åˆæˆ BRAM/URAM ç”±å·¥å…·å†³å®šï¼‰
     (* ram_style = RAM_STYLE *) reg [WIDTH-1:0] mem [0:DEPTH-1];
 
     reg [AW-1:0] wptr, rptr, raddr_q;
@@ -26,12 +26,12 @@ module fifo_sync_sdpram_b64 #(
     assign full  = (count == DEPTH[AW:0]);
     assign empty = (count == { (AW+1){1'b0} });
 
-    // Ğ´¶Ë¿Ú
+    // å†™ç«¯å£
     always @(posedge clk) begin
         if (wr_en && !full) mem[wptr] <= din;
     end
 
-    // ¶ÁµØÖ·´òÒ»ÅÄ£¬ÏÂÒ»ÅÄÊä³ö£¨Í¬²½¶Á 1 ÅÄÑÓ³Ù£©
+    // è¯»åœ°å€æ‰“ä¸€æ‹ï¼Œä¸‹ä¸€æ‹è¾“å‡ºï¼ˆåŒæ­¥è¯» 1 æ‹å»¶è¿Ÿï¼‰
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             raddr_q <= {AW{1'b0}};
@@ -42,7 +42,7 @@ module fifo_sync_sdpram_b64 #(
         end
     end
 
-    // Ö¸Õë/¼ÆÊı
+    // æŒ‡é’ˆ/è®¡æ•°
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             wptr<=0; rptr<=0; count<=0;

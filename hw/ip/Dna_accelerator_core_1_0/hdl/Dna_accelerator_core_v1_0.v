@@ -20,11 +20,11 @@ module Dna_accelerator_core_v1_0 #(
     parameter integer CODEBITS  = READ_BPS*2,              // e.g. 500
     parameter integer SCORE_W   = 10,
     parameter integer POS_W     = 16,
-    // ¡¾ÐÞ¸Ä1¡¿È«¾Ö²ÎÊýµ÷Õû
-    parameter integer NUM_LC    = 50,      // ²Î¿¼Æ¬¶ÎÊýÁ¿£º50
-    parameter integer REF_LEN   = 1055,    // Ã¿¶Î²Î¿¼³¤¶È£º1055 bp
-    parameter integer STRIDE    = 805,     // Ã¿¶Î¿É»¬¶¯Î»ÖÃÊý£º805
-    // ¡¾ÐÞ¸Ä2¡¿½á¹û¿í¶È = CODEBITS + POS_W + SCORE_W£¨region ÐÅÏ¢ÒÑºÏ²¢µ½ global_pos ÖÐ£©
+    // ã€ä¿®æ”¹1ã€‘å…¨å±€å‚æ•°è°ƒæ•´
+    parameter integer NUM_LC    = 50,      // å‚è€ƒç‰‡æ®µæ•°é‡ï¼š50
+    parameter integer REF_LEN   = 1055,    // æ¯æ®µå‚è€ƒé•¿åº¦ï¼š1055 bp
+    parameter integer STRIDE    = 805,     // æ¯æ®µå¯æ»‘åŠ¨ä½ç½®æ•°ï¼š805
+    // ã€ä¿®æ”¹2ã€‘ç»“æžœå®½åº¦ = CODEBITS + POS_W + SCORE_Wï¼ˆregion ä¿¡æ¯å·²åˆå¹¶åˆ° global_pos ä¸­ï¼‰
     parameter integer RESULT_W  = CODEBITS + POS_W + SCORE_W,
     parameter integer BATCH     = 64
 )(
@@ -168,8 +168,8 @@ module Dna_accelerator_core_v1_0 #(
         end
     end
 
-    // Ô¤ÔØ²»¾­¹ýÊäÈë FIFO£»Õý³£¶Á¶ÎÖ»ÓÐÔÚ FIFO ¿É½ÓÄÉÊ±²ÅÎÕÊÖ¡£
-    // Ò»Ìõ¶Á¶ÎÍê³Éºó in_wr ÑÓ³ÙÒ»ÅÄ£¬Òò´Ë FIFO ÂúÊ±±ØÐëÖ±½Ó×èÖ¹ÏÂÒ»ÅÄ½øÈë¡£
+    // é¢„è½½ä¸ç»è¿‡è¾“å…¥ FIFOï¼›æ­£å¸¸è¯»æ®µåªæœ‰åœ¨ FIFO å¯æŽ¥çº³æ—¶æ‰æ¡æ‰‹ã€‚
+    // ä¸€æ¡è¯»æ®µå®ŒæˆåŽ in_wr å»¶è¿Ÿä¸€æ‹ï¼Œå› æ­¤ FIFO æ»¡æ—¶å¿…é¡»ç›´æŽ¥é˜»æ­¢ä¸‹ä¸€æ‹è¿›å…¥ã€‚
     assign S_AXIS_DATA_TREADY = preload_mode_s ? 1'b1 : ~in_full;
 
     // Assemble read data
@@ -217,12 +217,12 @@ module Dna_accelerator_core_v1_0 #(
         end
     end
 
-    // ¡¾Éî¶ÈÓÅ»¯¡¿ÊäÈë FIFO: 2048 ¡ú 1024 ¡ú 256£¨2026-09-03 ½×¶Î S1£©
-    // ÒýÇæµÄÆô¶¯Ìõ¼þÊÇ in_count >= BATCH£¨=64£¬¼ûÏÂ·½ trigger_full_batch£©£¬
-    // ¶ø S_AXIS_DATA_TREADY = ~in_full ±¾À´¾ÍÔÚ×ö±³Ñ¹£¬Éî¶ÈÖ»Ó°Ïì»º³åÓàÁ¿¡¢
-    // ²»Ó°ÏìÕýÈ·ÐÔ¡£1024 ÉîÊôÓÚÑÏÖØ¹ýÁ¿£ºSE150 ÏÂËü³Ôµô 8¡ÁRAMB36 + 1¡ÁRAMB18£¬
-    // ¶ø SE250 °Ñ¿í¶È´Ó 300 ÍÆµ½ 500 ºóÐèÒª 14 ¿é£¬Õû»ú BRAM »á´Ó 90% Ö±½Ó±¬±í
-    // £¨docs/20 ¡ì4.2£©¡£256 ÉîÈÔÊÇ BATCH µÄ 4 ±¶ÓàÁ¿¡£
+    // ã€æ·±åº¦ä¼˜åŒ–ã€‘è¾“å…¥ FIFO: 2048 â†’ 1024 â†’ 256ï¼ˆ2026-09-03 é˜¶æ®µ S1ï¼‰
+    // å¼•æ“Žçš„å¯åŠ¨æ¡ä»¶æ˜¯ in_count >= BATCHï¼ˆ=64ï¼Œè§ä¸‹æ–¹ trigger_full_batchï¼‰ï¼Œ
+    // è€Œ S_AXIS_DATA_TREADY = ~in_full æœ¬æ¥å°±åœ¨åšèƒŒåŽ‹ï¼Œæ·±åº¦åªå½±å“ç¼“å†²ä½™é‡ã€
+    // ä¸å½±å“æ­£ç¡®æ€§ã€‚1024 æ·±å±žäºŽä¸¥é‡è¿‡é‡ï¼šSE150 ä¸‹å®ƒåƒæŽ‰ 8Ã—RAMB36 + 1Ã—RAMB18ï¼Œ
+    // è€Œ SE250 æŠŠå®½åº¦ä»Ž 300 æŽ¨åˆ° 500 åŽéœ€è¦ 14 å—ï¼Œæ•´æœº BRAM ä¼šä»Ž 90% ç›´æŽ¥çˆ†è¡¨
+    // ï¼ˆdocs/20 Â§4.2ï¼‰ã€‚256 æ·±ä»æ˜¯ BATCH çš„ 4 å€ä½™é‡ã€‚
     fifo_sync_sdpram_b64 #(.WIDTH(CODEBITS), .DEPTH(256)) u_in_fifo (
         .clk   (aclk),
         .rst_n (aresetn & ~soft_reset_s),
@@ -238,15 +238,15 @@ module Dna_accelerator_core_v1_0 #(
     // Preload watermark with overflow protection
     // =================================================
     reg        wm_we;
-    reg [10:0] wm_waddr;     // µÝÔöÖ¸Õë
-    reg [10:0] wm_waddr_q;   // [B25] Óë wm_wdata / wm_we Í¬ÅÄµÄÐ´µØÖ·
+    reg [10:0] wm_waddr;     // é€’å¢žæŒ‡é’ˆ
+    reg [10:0] wm_waddr_q;   // [B25] ä¸Ž wm_wdata / wm_we åŒæ‹çš„å†™åœ°å€
     reg [1:0]  wm_wdata;
 
-    // [B25] wm_we / wm_wdata ¶¼ÊÇ¼Ä´æÊä³ö£¨ÏÂÒ»ÅÄ²ÅÓÐÐ§£©£¬¶ø wm_waddr ÔÚÍ¬Ò»¸ö
-    // always ¿éÀïµ±ÅÄ¾Í×ÔÔöÁË¡£ÓÚÊÇµÚ k ¸ö·ûºÅÔÚ wm_we À­¸ßÄÇÒ»ÅÄ¿´µ½µÄµØÖ·ÒÑ¾­ÊÇ k+1£¬
-    // ÕûÌõË®Ó¡±»Ð´Æ«Ò»¸ö·ûºÅ£¬°åÉÏ±íÏÖÎªÃ¿Ìõ¼ÇÂ¼±¨¸æµÄ position ºã±È»Æ½ð´ó 1
-    // £¨4,009/4,095 Ìõ¾«È· +1£¬ÆäÓàÊÇÒò´Ë±»´òÆÆµÄ²¢ÁÐ£©¡£
-    // ÐÞ·¨£ºÁí´æÒ»¸öÓë wm_wdata Í¬ÅÄµÄ wm_waddr_q ×÷ÎªÕæÕýµÄÐ´µØÖ·¡£
+    // [B25] wm_we / wm_wdata éƒ½æ˜¯å¯„å­˜è¾“å‡ºï¼ˆä¸‹ä¸€æ‹æ‰æœ‰æ•ˆï¼‰ï¼Œè€Œ wm_waddr åœ¨åŒä¸€ä¸ª
+    // always å—é‡Œå½“æ‹å°±è‡ªå¢žäº†ã€‚äºŽæ˜¯ç¬¬ k ä¸ªç¬¦å·åœ¨ wm_we æ‹‰é«˜é‚£ä¸€æ‹çœ‹åˆ°çš„åœ°å€å·²ç»æ˜¯ k+1ï¼Œ
+    // æ•´æ¡æ°´å°è¢«å†™åä¸€ä¸ªç¬¦å·ï¼Œæ¿ä¸Šè¡¨çŽ°ä¸ºæ¯æ¡è®°å½•æŠ¥å‘Šçš„ position æ’æ¯”é»„é‡‘å¤§ 1
+    // ï¼ˆ4,009/4,095 æ¡ç²¾ç¡® +1ï¼Œå…¶ä½™æ˜¯å› æ­¤è¢«æ‰“ç ´çš„å¹¶åˆ—ï¼‰ã€‚
+    // ä¿®æ³•ï¼šå¦å­˜ä¸€ä¸ªä¸Ž wm_wdata åŒæ‹çš„ wm_waddr_q ä½œä¸ºçœŸæ­£çš„å†™åœ°å€ã€‚
     always @(posedge aclk or negedge aresetn) begin
         wm_we <= 1'b0;
         if (!aresetn || soft_reset_s) begin
@@ -255,8 +255,8 @@ module Dna_accelerator_core_v1_0 #(
         end else if (preload_mode_s && S_AXIS_DATA_TVALID && S_AXIS_DATA_TREADY) begin
             wm_we    <= 1'b1;
             wm_wdata <= S_AXIS_DATA_TDATA[1:0];
-            // ¡¾ÐÞ¸´3¡¿·ÀÒç³ö£ºÐ´Âú 957 ¸ö symbol ºó×Ô¶¯¹éÁã
-            wm_waddr_q <= wm_waddr;   // [B25] Ð´µØÖ·±ØÐëÓëÊý¾ÝÍ¬ÅÄ£¬¼ûÏÂ·½×¢ÊÍ
+            // ã€ä¿®å¤3ã€‘é˜²æº¢å‡ºï¼šå†™æ»¡ 957 ä¸ª symbol åŽè‡ªåŠ¨å½’é›¶
+            wm_waddr_q <= wm_waddr;   // [B25] å†™åœ°å€å¿…é¡»ä¸Žæ•°æ®åŒæ‹ï¼Œè§ä¸‹æ–¹æ³¨é‡Š
             wm_waddr <= (wm_waddr == 11'd1054) ? 11'd0 : (wm_waddr + 11'd1);
         end
     end
@@ -283,11 +283,11 @@ module Dna_accelerator_core_v1_0 #(
         end else begin
             // Default pull low
             in_rd      <= 1'b0;
-            // [B26] Ô­À´ÊÇ eng_cw_vld <= in_rd£¬×¢ÊÍ»¹Ð´×Å¡¸FIFO ¶ÁÑÓ³Ù 1 ÅÄ¡¹¡£
-            // µ« fifo_sync_sdpram_b64 ÊÇÁ½¼¶Í¬²½¶Á£¨raddr_q <= rptr; dout <= mem[raddr_q]£©£¬
-            // pop Ö®ºó dout Òª 3 ÅÄ²ÅÎÈ¶¨£¬Ôç²ÉÑù»á°ÑÉÏÒ»Ìõ¼ÇÂ¼µ±³É±¾Ìõ£¬
-            // °åÉÏ±íÏÖÎª½á¹ûÕûÌå´íÎ»Ò»Ìõ¶Á¶Î£¨¶Á¶Î 0 µÄ½á¹û¶ªÊ§¡¢Ä©Î²¶àÒ»Ìõ£©¡£
-            // ¸ÄÎªÑÓµ½ in_rd_d2 ²ÅÖÃ valid£¬²¢ÓÃ cw_hold Ëø´æ×¡ÄÇÒ»ÅÄµÄÊý¾Ý¡£
+            // [B26] åŽŸæ¥æ˜¯ eng_cw_vld <= in_rdï¼Œæ³¨é‡Šè¿˜å†™ç€ã€ŒFIFO è¯»å»¶è¿Ÿ 1 æ‹ã€ã€‚
+            // ä½† fifo_sync_sdpram_b64 æ˜¯ä¸¤çº§åŒæ­¥è¯»ï¼ˆraddr_q <= rptr; dout <= mem[raddr_q]ï¼‰ï¼Œ
+            // pop ä¹‹åŽ dout è¦ 3 æ‹æ‰ç¨³å®šï¼Œæ—©é‡‡æ ·ä¼šæŠŠä¸Šä¸€æ¡è®°å½•å½“æˆæœ¬æ¡ï¼Œ
+            // æ¿ä¸Šè¡¨çŽ°ä¸ºç»“æžœæ•´ä½“é”™ä½ä¸€æ¡è¯»æ®µï¼ˆè¯»æ®µ 0 çš„ç»“æžœä¸¢å¤±ã€æœ«å°¾å¤šä¸€æ¡ï¼‰ã€‚
+            // æ”¹ä¸ºå»¶åˆ° in_rd_d2 æ‰ç½® validï¼Œå¹¶ç”¨ cw_hold é”å­˜ä½é‚£ä¸€æ‹çš„æ•°æ®ã€‚
             in_rd_d1   <= in_rd;
             in_rd_d2   <= in_rd_d1;
             if (in_rd_d2)
@@ -364,13 +364,13 @@ module Dna_accelerator_core_v1_0 #(
     // Engine output -> result FIFO -> 64bit pack -> AXIS OUT
     // =================================================
     wire                 res_full, res_empty;
-    wire                 res_rd;   // [B24] ÓÉ u_pack.din_rd Çý¶¯£ºÒ»Ìõ¼ÇÂ¼Ö» pop Ò»´Î
+    wire                 res_rd;   // [B24] ç”± u_pack.din_rd é©±åŠ¨ï¼šä¸€æ¡è®°å½•åª pop ä¸€æ¬¡
     wire [RESULT_W-1:0]  res_out;
 
     wire                  eng_res_wr;
     wire [RESULT_W-1:0]   eng_res_din;
 
-    // ¡¾ÐÞ¸Ä3¡¿ÊµÀý»¯ srpe_batch: .NUM_LC(50), .STRIDE(807), .REF_LEN(957) 
+    // ã€ä¿®æ”¹3ã€‘å®žä¾‹åŒ– srpe_batch: .NUM_LC(50), .STRIDE(807), .REF_LEN(957) 
     srpe_batch #(
         .BATCH    (BATCH),
         .NUM_LC   (NUM_LC),
@@ -397,7 +397,7 @@ module Dna_accelerator_core_v1_0 #(
         .done             (eng_done)
     );
 
-    // ¡¾Éî¶ÈÓÅ»¯¡¿Êä³ö FIFO: 256 ¡ú 128
+    // ã€æ·±åº¦ä¼˜åŒ–ã€‘è¾“å‡º FIFO: 256 â†’ 128
     fifo_sync_sdpram_b64 #(.WIDTH(RESULT_W), .DEPTH(64), .RAM_STYLE("distributed")) u_res_fifo (
         .clk   (aclk),
         .rst_n (aresetn & ~soft_reset_s),
@@ -414,11 +414,11 @@ module Dna_accelerator_core_v1_0 #(
     wire [63:0] pack_dat;
     wire        pack_last;
 
-    // [B24] fifo_sync_sdpram_b64 ÊÇÁ½¼¶Í¬²½¶Á£¨raddr_q -> dout£©£¬pop Ö®ºó dout Òª 2 ÅÄ
-    // ²ÅÎÈ¶¨¡£Ô­À´Ö»ÓÃÁË res_empty ÑÓÒ»ÅÄµÄ res_empty_q£¬ÇÒ res_rd ÔÚ´ò°ü¹ý³ÌÖÐ»á·´¸´
-    // pop£¨¼ûÏÂ£©£¬Á½Õßµþ¼Ó»áÂ©¼ÇÂ¼¡£ÏÖÔÚÁ½µÀ±£»¤¶¼Òª£ºres_empty_q ¸²¸Ç¡¸¸ÕÐ´½ø¿Õ
-    // FIFO¡¹ÄÇÒ»´Î£¨dout ÒªÏÂÒ»ÅÄ²Å³öÀ´£©£¬res_settle ¸²¸Ç¡¸¸Õ pop Íê¡¹£¨rptr->raddr_q
-    // ->dout ¹² 3 ÅÄ²ÅÎÈ¶¨£©¡£ÉÙÈÎºÎÒ»µÀ£¬packer ¶¼»áËøµ½ X »òÉÏÒ»Ìõ¼ÇÂ¼¡£
+    // [B24] fifo_sync_sdpram_b64 æ˜¯ä¸¤çº§åŒæ­¥è¯»ï¼ˆraddr_q -> doutï¼‰ï¼Œpop ä¹‹åŽ dout è¦ 2 æ‹
+    // æ‰ç¨³å®šã€‚åŽŸæ¥åªç”¨äº† res_empty å»¶ä¸€æ‹çš„ res_empty_qï¼Œä¸” res_rd åœ¨æ‰“åŒ…è¿‡ç¨‹ä¸­ä¼šåå¤
+    // popï¼ˆè§ä¸‹ï¼‰ï¼Œä¸¤è€…å åŠ ä¼šæ¼è®°å½•ã€‚çŽ°åœ¨ä¸¤é“ä¿æŠ¤éƒ½è¦ï¼šres_empty_q è¦†ç›–ã€Œåˆšå†™è¿›ç©º
+    // FIFOã€é‚£ä¸€æ¬¡ï¼ˆdout è¦ä¸‹ä¸€æ‹æ‰å‡ºæ¥ï¼‰ï¼Œres_settle è¦†ç›–ã€Œåˆš pop å®Œã€ï¼ˆrptr->raddr_q
+    // ->dout å…± 3 æ‹æ‰ç¨³å®šï¼‰ã€‚å°‘ä»»ä½•ä¸€é“ï¼Œpacker éƒ½ä¼šé”åˆ° X æˆ–ä¸Šä¸€æ¡è®°å½•ã€‚
     reg res_empty_q;
     always @(posedge aclk or negedge aresetn) begin
         if (!aresetn || soft_reset_s) res_empty_q <= 1'b1;
@@ -445,20 +445,20 @@ module Dna_accelerator_core_v1_0 #(
         .m_rdy  (M_AXIS_RESULT_TREADY)
     );
 
-    // [B24] Ô­À´ÕâÀïÊÇ£º
+    // [B24] åŽŸæ¥è¿™é‡Œæ˜¯ï¼š
     //     res_rd <= ~res_empty & M_AXIS_RESULT_TREADY & pack_vld;
-    // ËüÔÚÒ»Ìõ¼ÇÂ¼µÄ 6 ÅÄ´ò°ü¹ý³ÌÖÐ»á·´¸´°Ñ FIFO pop µô£¬ÊôÓÚ¡¸Ò»Ìõ¼ÇÂ¼ pop ¶à´Î¡¹£¬
-    // ½á¹û FIFO Àï»ýÑ¹Ê±»áÕûÌõÕûÌõµØ¶ª¼ÇÂ¼¡£ÏÖÔÚ¸ÄÓÉ u_pack ÔÚËø´æ¼ÇÂ¼ÄÇÒ»ÅÄ
-    // Êä³öµ¥ÅÄ din_rd£¬±£Ö¤Ò»Ìõ¼ÇÂ¼Ö» pop Ò»´Î¡£
+    // å®ƒåœ¨ä¸€æ¡è®°å½•çš„ 6 æ‹æ‰“åŒ…è¿‡ç¨‹ä¸­ä¼šåå¤æŠŠ FIFO pop æŽ‰ï¼Œå±žäºŽã€Œä¸€æ¡è®°å½• pop å¤šæ¬¡ã€ï¼Œ
+    // ç»“æžœ FIFO é‡Œç§¯åŽ‹æ—¶ä¼šæ•´æ¡æ•´æ¡åœ°ä¸¢è®°å½•ã€‚çŽ°åœ¨æ”¹ç”± u_pack åœ¨é”å­˜è®°å½•é‚£ä¸€æ‹
+    // è¾“å‡ºå•æ‹ din_rdï¼Œä¿è¯ä¸€æ¡è®°å½•åª pop ä¸€æ¬¡ã€‚
 
     // AXIS OUT
-    // [B23] Ô­ÊµÏÖ TVALID/TLAST ¼Ä´æÒ»ÅÄ¡¢TDATA È´×éºÏÖ±Á¬ pack_dat£¬Êý¾Ý±È valid Ôç
-    // Ò»ÕûÅÄ£¬Ã¿´ÎÎÕÊÖ²Éµ½µÄ¶¼ÊÇ¡¸ÏÂÒ»ÅÄ¡¹µÄÊý¾Ý£ºÃ¿¸ö 48 B °üÊµÊÕ [b1,b2,b3,b4,b5,b5]£¬
-    // Ê×ÅÄ£¨score[9:0] + position[15:0] + Âë×ÖµÍ 38 bit£©±»¶ª¡¢Ä©ÅÄ±»²ÉÁ½´Î¡£
-    // °åÉÏÈ¡Ö¤£ºB[i][k] == G[i+1][k+1]£¨k=0..4£©20,470/20,475 ÅÄÎÇºÏ£¬
-    // B[i][5] == B[i][4] 4,095/4,095 Ìõ³ÉÁ¢£¬Ïê¼û docs/03-status.md B23¡£
-    // s2mm_pack64 ÖØÐ´ºó±¾Éí¾ÍÊÇºÏ¹æµÄ AXI-Stream master£¨Êä³öÒÑ¼Ä´æ¡¢Ö»ÔÚ
-    // m_vld && m_rdy Ê±ÍÆ½ø£©£¬Òò´ËÕâÀïÖ±½ÓÁ¬³öÈ¥£¬ÈýÕßÌìÈ»Í¬ÅÄ£¬²»ÔÙÐèÒª¶îÍâ¼Ä´æ¼¶¡£
+    // [B23] åŽŸå®žçŽ° TVALID/TLAST å¯„å­˜ä¸€æ‹ã€TDATA å´ç»„åˆç›´è¿ž pack_datï¼Œæ•°æ®æ¯” valid æ—©
+    // ä¸€æ•´æ‹ï¼Œæ¯æ¬¡æ¡æ‰‹é‡‡åˆ°çš„éƒ½æ˜¯ã€Œä¸‹ä¸€æ‹ã€çš„æ•°æ®ï¼šæ¯ä¸ª 48 B åŒ…å®žæ”¶ [b1,b2,b3,b4,b5,b5]ï¼Œ
+    // é¦–æ‹ï¼ˆscore[9:0] + position[15:0] + ç å­—ä½Ž 38 bitï¼‰è¢«ä¸¢ã€æœ«æ‹è¢«é‡‡ä¸¤æ¬¡ã€‚
+    // æ¿ä¸Šå–è¯ï¼šB[i][k] == G[i+1][k+1]ï¼ˆk=0..4ï¼‰20,470/20,475 æ‹å»åˆï¼Œ
+    // B[i][5] == B[i][4] 4,095/4,095 æ¡æˆç«‹ï¼Œè¯¦è§ docs/03-status.md B23ã€‚
+    // s2mm_pack64 é‡å†™åŽæœ¬èº«å°±æ˜¯åˆè§„çš„ AXI-Stream masterï¼ˆè¾“å‡ºå·²å¯„å­˜ã€åªåœ¨
+    // m_vld && m_rdy æ—¶æŽ¨è¿›ï¼‰ï¼Œå› æ­¤è¿™é‡Œç›´æŽ¥è¿žå‡ºåŽ»ï¼Œä¸‰è€…å¤©ç„¶åŒæ‹ï¼Œä¸å†éœ€è¦é¢å¤–å¯„å­˜çº§ã€‚
     assign M_AXIS_RESULT_TVALID = pack_vld;
     assign M_AXIS_RESULT_TLAST  = pack_last;
     assign M_AXIS_RESULT_TDATA  = pack_dat;

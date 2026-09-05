@@ -1,7 +1,7 @@
 // FILE: desparsification_decoder_v1_0_M00_AXI.v
-// ĞŞ¸´µã£º
-//  - ½« WSTRB ´Ó¹Ì¶¨È« 1 ¸ÄÎªÓÉÉÏ²ãÊäÈë£¨Ö§³ÖÎ²°ü²¿·Ö×Ö½ÚĞ´£©
-//  - ÆäËû¶Á/Ğ´ FSM¡¢ÎÕÊÖ¡¢¼ÆÊı±£³ÖÔ­Ñù
+// ä¿®å¤ç‚¹ï¼š
+//  - å°† WSTRB ä»å›ºå®šå…¨ 1 æ”¹ä¸ºç”±ä¸Šå±‚è¾“å…¥ï¼ˆæ”¯æŒå°¾åŒ…éƒ¨åˆ†å­—èŠ‚å†™ï¼‰
+//  - å…¶ä»–è¯»/å†™ FSMã€æ¡æ‰‹ã€è®¡æ•°ä¿æŒåŸæ ·
 
 `timescale 1 ns / 1 ps
 
@@ -14,7 +14,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     input  wire                              M00_AXI_ACLK,
     input  wire                              M00_AXI_ARESETN,
 
-    // ÃüÁî½Ó¿Ú
+    // å‘½ä»¤æ¥å£
     input  wire                              start_read_transaction,
     input  wire [C_M_AXI_ADDR_WIDTH-1:0]     read_addr,
     input  wire [7:0]                        read_len,
@@ -27,7 +27,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     output reg                               write_data_ready,
     input  wire [C_M_AXI_DATA_WIDTH-1:0]     write_data,
     input  wire                              write_data_valid,
-    input  wire [C_M_AXI_DATA_WIDTH/8-1:0]   write_strb,      // ¡û ĞÂÔö
+    input  wire [C_M_AXI_DATA_WIDTH/8-1:0]   write_strb,      // â† æ–°å¢
     output reg                               write_done,
 
     // AXI4 Master
@@ -43,7 +43,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     input  wire                              M00_AXI_AWREADY,
 
     output wire [C_M_AXI_DATA_WIDTH-1:0]     M00_AXI_WDATA,
-    output wire [C_M_AXI_DATA_WIDTH/8-1:0]   M00_AXI_WSTRB,   // ¡û ¸ÄÎªÓÃ write_strb
+    output wire [C_M_AXI_DATA_WIDTH/8-1:0]   M00_AXI_WSTRB,   // â† æ”¹ä¸ºç”¨ write_strb
     output wire                              M00_AXI_WLAST,
     output wire                              M00_AXI_WVALID,
     input  wire                              M00_AXI_WREADY,
@@ -70,7 +70,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     output wire                              M00_AXI_RREADY
 );
 
-    // ¶Á/Ğ´ FSM£¨ÓëÄãÔ­ÎÄ¼şÒ»ÖÂ£¬ÕâÀïÊ¡ÂÔ²»±ä²¿·Ö£©
+    // è¯»/å†™ FSMï¼ˆä¸ä½ åŸæ–‡ä»¶ä¸€è‡´ï¼Œè¿™é‡Œçœç•¥ä¸å˜éƒ¨åˆ†ï¼‰
     localparam RD_IDLE=2'b00, RD_SEND_ADDR=2'b01, RD_READ_DATA=2'b10;
     localparam WR_IDLE=3'b000, WR_SEND_ADDR=3'b001, WR_WRITE_DATA=3'b010, WR_GET_RESP=3'b011;
 
@@ -81,7 +81,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     reg [7:0] write_beat_counter;
     reg arvalid_reg, awvalid_reg, wvalid_reg, wlast_reg, bready_reg, rready_reg;
 
-    // ¹Ì¶¨ÊôĞÔ
+    // å›ºå®šå±æ€§
     assign M00_AXI_ARBURST = 2'b01; // INCR
     assign M00_AXI_ARSIZE  = $clog2(C_M_AXI_DATA_WIDTH/8);
     assign M00_AXI_ARLOCK  = 1'b0;
@@ -96,7 +96,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     assign M00_AXI_AWPROT  = 3'b000;
     assign M00_AXI_AWQOS   = 4'b0000;
 
-    // Á¬½Ó
+    // è¿æ¥
     assign M00_AXI_ARADDR  = int_araddr;
     assign M00_AXI_ARLEN   = int_arlen;
     assign M00_AXI_ARVALID = arvalid_reg;
@@ -106,7 +106,7 @@ module desparsification_decoder_v1_0_M00_AXI #
     assign M00_AXI_AWVALID = awvalid_reg;
 
     assign M00_AXI_WDATA   = write_data;
-    assign M00_AXI_WSTRB   = write_strb; // ¡û ĞŞ¸´£ºÓÉÉÏ²ã¿ØÖÆ£¬Ö§³ÖÎ²°ü²¿·ÖĞ´
+    assign M00_AXI_WSTRB   = write_strb; // â† ä¿®å¤ï¼šç”±ä¸Šå±‚æ§åˆ¶ï¼Œæ”¯æŒå°¾åŒ…éƒ¨åˆ†å†™
     assign M00_AXI_WLAST   = wlast_reg;
     assign M00_AXI_WVALID  = wvalid_reg;
 
