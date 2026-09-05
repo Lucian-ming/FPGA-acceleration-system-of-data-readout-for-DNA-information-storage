@@ -1,6 +1,6 @@
 # CPU vs FPGA 严格公平消融对比报告（消除稻草人对比）
 
-> 依据 `docs/26-future-optimization-and-validation-plan-2026-09-05.md` 规范生成。
+> 依据 `docs/07-performance.md` 规范生成。
 > 严禁使用未优化的单核 Python 代表 CPU，本评测包含高度优化的 C 语言位平面位运算多核实现与真实硬件实测对比。
 
 ## 1. 详细性能与能效比实测对照表

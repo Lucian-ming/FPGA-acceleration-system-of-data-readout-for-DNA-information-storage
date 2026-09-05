@@ -1,174 +1,71 @@
-# 🧬 DNA 存储读出 FPGA 加速系统
+# DNA 存储读出 FPGA 加速系统
 
-在 **Xilinx Zynq-7000 (xc7z010clg400-1)** 上实现 DNA 信息存储的读出流水线：
-把测序读段（FASTQ）还原成原始文件。
+在 AMD/Xilinx Zynq-7000 上实现 DNA 信息存储读出：
 
-```
-PC ──TCP──► ARM(裸机+lwIP) ──DMA──► ①水印比对 ──► ②投票重建 ──► ③反稀疏化 ──► PC ──► ④LDPC ──► 图片
-                                    PL 加速                                        PC 端
+```text
+FASTQ → Stage1 水印滑窗比对 → Stage2 投票 → Stage3 反稀疏化 → LDPC → 原始文件
 ```
 
----
+## 当前状态
 
-## ⚠️ 项目状态（截至 2026-08-29）
+截至 2026-09-05，SE150/SE250 均已完成真实板端 G3 闭环；SE250 全量 129,600 条记录和连续任务也已通过。当前未关闭重点是：
 
-**离线算法、三级 RTL、主机/固件单测和可上板构建均已通过；真实开发板端到端结果尚未验收。**
-接手开发请先读 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)
-和 [`docs/03-status.md`](docs/03-status.md)；想直接知道「现在该做什么」看
-[`docs/14-next-steps-2026-08-29.md`](docs/14-next-steps-2026-08-29.md)。
+- Stage1 公平性能优化；
+- 多 payload 泛化；
+- 测序错误/覆盖度鲁棒性；
+- 上位机性能与可维护性；
+- 实测功耗和长期稳定性。
 
-⚠️ 仿真证据目录（`hw/build/xsim/`）不入 Git，只存在于跑过它的那台机器。文档里的运行 ID
-在新 clone 上必然不存在，这是预期状态；要宣称同样的结论必须本机重跑。
+最终哈希判据、适用范围和未关闭问题见 [`docs/03-status.md`](docs/03-status.md)。
 
-接手者必须使用 WSL 原生文件系统中的本项目 checkout 并绑定当前 GitHub 私有仓库；禁止 `git init`、
-嵌套项目或在同一任务中同时修改多个 checkout。用户明确授权的新 WSL clone 可以使用。
-开始开发前先运行 `bash tools/verify_repo_binding.sh --remote`；所有提交必须推送
-`origin/main`，交接前用 `--require-synced` 确认本地与远端同步。
+## 新会话阅读顺序
 
-- ✅ **算法链路已在软件上端到端跑通并验证**：原始 FASTQ → 比对 → 投票 → 反稀疏化 → LDPC
-  → 还原出的 JPEG 与 `Milk coronet.jpg` 的 SHA-256 完全相同。
-- ✅ **反向互补板端取舍已完成（方案B，离线判据闭环）**：Voter 新增 `SCORE_MIN`(0x30)
-  阈值过滤，`first.py` 双向发送 + 分数阈值丢弃错误方向；码字误码率 2.33% → 0.14%，
-  LDPC 可解。上板验收待做。
-- ✅ 已完成并有离线判据：PS 水印区域展开（B1 主机单测）、读段位序/位平面（B2/B4）、
-  Stage1 三处同步读流水线修复（B10/B11/B12）、Stage3 数据通路与 AXI 控制层（B5--B9）、
-  **Stage2 投票核（B13--B16/C4，2026-08-16 黄金 Testbench 逐位通过）**。
-  PS 端水印 XOR（B3）已在 `PIPE_DONE_STAGE2` 实际调用；其输入（Stage2 输出）已有黄金向量背书。
-- ✅ C1~C4 完成：PS 按实际条数配置 Voter、DDR 布局主机单测、协议层 64 倍数校验、
-  二次任务清零累加器；修改后的 Voter 重新综合在 100 MHz 收敛（WNS +2.48 ns），
-  ELF 已用 xsct 重建。
-- ✅ P3 任务配置化（离线部分）：PKT_CONFIG/PKT_CAPS 协议 + 严格校验 + 上位机自动
-  推导几何与 `--dry-run`；SCORE_MIN/条数现在是运行时下发而非编译期常量。
-- ✅ **M3 发现并修复真实 RTL 缺陷 B20（2026-08-29）**：换上可用的仿真内存端点后，
-  AXI 协议检查器抓到 Voter 的读突发**跨越 4 KB 边界**（`ARADDR=0x10600ff0, ARLEN=5`），
-  违反 AXI 规范 A3.4.1，4096 条记录中出现 32 次。根因是既有 Stage2 黄金 TB 的内存模型
-  把返回拍数写死为 6、无视 `ARLEN`，因而长期掩盖了该缺陷。
-  已按「跨页拆分突发」修复 RTL，并把黄金 TB 的检查换成真正的 4 KB 边界属性。
-  验证：`run_sim.sh` 11/11、`run_xsim.sh` 6/6、M2 完整串联全链 PASS（图片哈希不变）、
-  BD-3ext 的 Voter 与 Decoder 均**逐位通过且零协议违规**。详见
-  [`docs/15-m3-bd-simulation-2026-08-29.md`](docs/15-m3-bd-simulation-2026-08-29.md) §6.6。
-- ⛔ **板级 DDR 配置修正（2026-08-29）**：确认目标板为 **ZYNQ ECO R6**（资料已入库
-  `docs/board/zynq-eco-7010/`）。实物只有**一颗 16 bit `MT41J256M16`**，而工程此前固化的是
-  32 bit 双颗——规格书明确「不更改不能运行」。追查发现历史 XSA 本身就是 32 bit 双颗，
-  **属于另一块板**。`bd.tcl` 已修正，但 `hw/build/export/` 全套制品因此**作废，必须重建**。
-  影响面很窄：地址布局与 PL 侧完全不动。详见
-  [`docs/16-board-zynq-eco-7010.md`](docs/16-board-zynq-eco-7010.md)。
-- ⚙️ **M3 实际 Block Design 集成仿真（2026-08-29）**：DUT 为 `bd.tcl` 生成的实际
-  `top_bd_wrapper`。**BD-1（地址图/黑盒/elaboration）与 BD-2（控制面 71 项检查）已通过**；
-  **BD-3 数据面未通过**，卡在 Vivado 2022.2 PS7 VIP 的 HP0 从机读通路不返回数据
-  （已排除设计侧因素，不为此改生产 BD）。入口 `bash tools/run_m3_bd.sh`，
-  详见 [`docs/15-m3-bd-simulation-2026-08-29.md`](docs/15-m3-bd-simulation-2026-08-29.md)。
-- ✅ **M2 完整三级 XSim 串联（2026-08-28）**：2,048 条原始读段展开为 4,096 条
-  正向/反向记录，Stage1 64/64 batch → Stage2 → PS 等价 XOR → Stage3 全部使用上一级
-  实际输出；LDPC 5 轮收敛，重建 JPEG 的 SHA-256 为目标值 `fcd0cf90...b6b1f2c3`。
-  Stage2 注入单 bit 故障后 Stage3 scoreboard 能稳定检出，排除了假绿。
-- ✅ R3 PL 收口：DNA FIFO 满背压、DNA/Voter/Desparsifier AXI-Lite AW/W 独立握手、
-  尾批超时位宽；全量 `bash tools/run_sim.sh` 11 项通过，DNA/Voter/Desparsifier
-  三个顶层 100 MHz 综合通过（DNA WNS `+0.543 ns`、Voter WNS `+2.480 ns`，
-  Desparsifier 0 errors / 0 critical warnings）。
-- ✅ A3 可上板构建链已关闭：Vivado/Vitis 2022.2 已生成同源 bitstream、XSA、FSBL、
-  应用 ELF 和 BOOT.bin，完整实现 100 MHz 收敛（WNS `+0.145 ns`）；制品和报告已纳入
-  `hw/build/export/`。⚠️ P3 板端握手联调与 G3 真实回传仍待上板。
-- ✅ LDPC 有纯 Python 参考实现（`tools/ldpc_decode.py`，Linux 可跑）：黄金自检
-  88 bit 错误 5 轮收敛、重建 JPEG 与原图逐字节相同（Windows EXE 保留给 GUI）。
+只需按 [`docs/README.md`](docs/README.md) 阅读 `docs/01`～`docs/12`；历史完整快照位于 `docs/archive/history/2026/`，不要默认扫描。
 
-历史演示中存在「直接用已知正确结果生成图片」的通道。
-`data/` 与 `archive/` 里的参考结果**只能作为离线比对的 oracle**，
-任何情况下都不得进入生产路径。
-
----
-
-## 📁 目录结构
-
-```
-├─ docs/                 文档（先看 docs/README.md 索引）
-├─ tools/golden_model.py 黄金参考模型 / 验收基准
-├─ hw/                   PL 工程
-│  ├─ ip/                三个自研 IP（RTL + IP-XACT 封装）
-│  ├─ constr/            顶层时钟与接口约束
-│  └─ scripts/           Vivado 构建 Tcl
-├─ sw/                   PS 裸机软件
-│  ├─ app/               lwIP + 三级流水线调度（echo.c/echo.h 是核心）
-│  ├─ linker/            链接脚本
-│  └─ scripts/           XSCT 构建脚本
-├─ clients/python/       上位机 CLI(first.py) / GUI(gui_app.py) / LDPC 封装
-├─ data/R0.83_data/      R0.83 数据集（输入 + 黄金参考，只读）
-└─ archive/              历史提交资产与原始数据包（只读）
-```
-
-## 🚀 快速开始
-
-### 核验唯一仓库绑定（任何开发前强制执行）
+## 快速验证
 
 ```bash
 bash tools/verify_repo_binding.sh --remote
-```
-
-### 验证算法契约（不需要板子，1 秒）
-
-```bash
 python3 tools/golden_model.py verify-code
+bash tools/run_sim.sh
+bash tools/run_xsim.sh all
+STAGE1_JOBS=3 bash tools/run_m2_full.sh
 ```
 
-### Vivado/XSim 仿真（不需要板子）
+板端 G3：
 
 ```bash
-bash tools/run_xsim.sh all              # 三个 IP 的 6 项独立黄金回归
-STAGE1_JOBS=3 bash tools/run_m2_full.sh # 2,048 条完整三级串联 + LDPC/图片哈希
+bash tools/run_g3.sh --full --read-bps 250 --score-min 112 \
+  --reads "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE250.fastq"
 ```
 
-完整串联不会把 `stage2_expect.hex` / `stage3_expect.hex` 注入级间通路；它们只作为
-scoreboard。所有实际 checkpoint、日志和哈希保存在 `hw/build/xsim/m2_full/<UTC时间>/`。
+完整构建与上板顺序见 [`docs/09-board-build-and-acceptance.md`](docs/09-board-build-and-acceptance.md)。
 
-### 软件复现整条流水线（不需要板子，全量约 4 分钟）
+## 目录
 
-```bash
-python3 tools/golden_model.py simulate --limit 60000 --rc --progress 10000
+```text
+docs/                 当前文档和历史归档
+hw/                   Vivado、IP、RTL、仿真和约束
+sw/                   Zynq PS 裸机/lwIP 固件
+clients/python/       CLI、GUI、LDPC 和协议
+tools/                黄金模型、构建、仿真、压测和板测工具
+data/R0.83_data/      只读真实基准数据
+archive/              历史提交资产，只读
 ```
 
-会打印每一级与黄金数据的符合率，并产出可喂给 LDPC 的 `dec_input.txt`。
-去掉 `--rc` 就能复现「当前实现的天花板」：码字误码率 2.33%，无法译码；
-加上 `--rc` 则降到 0.014%，可以完全纠正。
+## 开发门禁
 
-### 上位机（需要板子）
+- 只在 WSL 原生 checkout 的 `main` 开发；
+- 开始前运行 `bash tools/verify_repo_binding.sh --remote`；
+- 禁止修改 `data/R0.83_data/`；
+- 不得用历史正确结果绕过 FPGA 生产路径；
+- 改 RTL/固件后必须重建 `.bit/.xsa/.elf/BOOT.bin` 并更新哈希；
+- 提交前显式指定路径，推送后确认 `main...origin/main = 0/0`；
+- 新证据必须写入带时间戳目录和 `docs/` 摘要。
 
-```bash
-cd clients/python
-python first.py --ip 192.168.1.10 --port 7 \
-    --watermark "../../data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt" \
-    --reads "../../data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq" \
-    --output dec_input.txt
-python gui_app.py          # 图形界面，跑完自动调用 LDPC 解码器
-```
+## 环境
 
-需要 Python ≥ 3.8（`first.py` 已移除 `dataclass(slots=True)` 限制）。
-LDPC 解码器 `resources/R5_6_LDPC_hard_decoder.exe` 只有 Windows 版本。
-
-### 硬件与固件构建
-
-```bash
-./tools/run_vivado_build.sh
-xsct sw/scripts/create_vitis.tcl
-```
-
-Vivado 的 `.log`/`.jou` 会自动归档到 `logs/vivado/<UTC 时间戳>-<PID>/`。
-当前可上板构建对在 `hw/build/export/`，先执行
-`(cd hw/build/export && sha256sum -c SHA256SUMS)`。`design_2_wrapper.xsa` 与
-`hw/build/export/hardware.xsa` 是只读历史快照，不得替代当前 `dna_accel.xsa` 和
-`BOOT.bin`。构建细节、哈希和 Bootgen 复现命令见 `hw/build/export/README.md`。
-
-## 🔧 环境
-
-- Vivado / Vitis 2022.2
-- 器件 `xc7z010clg400-1`，PL 100 MHz，GP0 + HP0，GEM0，UART1
-- 板端静态 IP `192.168.1.10:7`（硬编码于 `sw/app/main.c`）
-
-## 📚 下一步
-
-最终交接见 [`docs/12-main-handoff-2026-08-21.md`](docs/12-main-handoff-2026-08-21.md)，
-详细实施计划见 [`docs/06-implementation-plan.md`](docs/06-implementation-plan.md)。下一步只有一条主路径：
-使用 `hw/build/export/BOOT.bin` 烧板（历史 XSA 里的 Voter 是 B13~B16 修复之前的版本，
-**直接烧旧比特流必错**）→ 2,048 条读段双向发送 → 真实回传 →
-`python3 tools/ldpc_decode.py decode` → 图片 SHA-256 必须等于 `fcd0cf90...b6b1f2c3`。
-之后再处理 A7 LICENSE 和 P7 Stage1 架构改造。
-调试期只需要传 2,048 条读段（80 KB），不必传全部 51,781 条。
+- Vivado/Vitis 2022.2；
+- 当前目标器件 `xc7z010clg400-1`，PL 100 MHz；
+- 目标板为 ZYNQ ECO(R6)，DDR 配置见 `docs/09-board-build-and-acceptance.md`；
+- 工具生成日志不得留在仓库根目录。

@@ -34,7 +34,7 @@
   **暂存区（索引）是整棵工作树共享的一份**，而 `git commit` 提交的是**索引的全部内容**，
   不是「你 add 的那些」。你 `git add` 之后、`git commit` 之前，索引会被别的会话改掉，
   两个方向都出过事（均为 2026-09-03/04 实况）：
-  - **别人的文件混进你的提交**：`7747e9e` 把 `docs/22` 和 `docs/README.md` 卷进了一个
+  - **别人的文件混进你的提交**：`7747e9e` 把 `docs/archive/history/2026/22-ps-refactor-plan.md` 和 `docs/README.md` 卷进了一个
     纯 RTL 提交。当事会话确实只 add 了三个 RTL 文件、提交前也复核过 `git status`。
   - **你自己的文件被踢出索引**：另一会话 add 完之后，`git diff --cached` 里多出了两个
     从没 add 过的 `tests/host/golden/*`，而自己的 `tools/run_g3.sh` 反而掉了出去。
@@ -102,90 +102,38 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 
 | 文档 | 作用 |
 | --- | --- |
-| `docs/README.md` | 文档索引 |
+| `docs/README.md` | 精简文档索引与阅读顺序 |
 | `docs/01-architecture.md` | 系统架构与算法模型 |
-| `docs/02-data-contract.md` | **数据格式的唯一权威规范**（编码、位序、5b4b 码表） |
-| `docs/03-status.md` | 现状与缺陷清单（含 `文件:行号` 证据） |
-| `docs/04-roadmap.md` | 开发顺序与验收判据 |
-| `docs/05-interfaces.md` | TCP 协议、寄存器、DDR 地址 |
-| `docs/08-handoff-2026-08-10.md` | 历史快照（Stage1/Stage3 修复与复核） |
-| `docs/09-handoff-2026-08-16.md` | **当前可交接基线**、已复跑判据和下一阻塞项 |
-| `docs/12-main-handoff-2026-08-21.md` | **当前主分支交接**、Git 门禁、构建和上板步骤 |
-| `docs/13-xsim-simulation-plan.md` | XSim 分层仿真计划、判据和留证规则 |
-| `docs/14-next-steps-2026-08-29.md` | 历史快照：G3 闭环**前**的排序（已被 `docs/18` 取代） |
-| `docs/15-m3-bd-simulation-2026-08-29.md` | **M3 实际 BD 集成仿真结果**与 BD-3 阻塞证据 |
-| `docs/16-board-zynq-eco-7010.md` | **板级配置唯一权威**：ZYNQ ECO(R6) 实物参数、DDR 修正与上板顺序 |
-| `docs/17-parallel-tasks-2026-08-29.md` | 并行任务简报：B21 的两条定位路径与会话互斥约定 |
-| `docs/18-next-steps-2026-08-30.md` | **当前行动计划**：G3 闭环后的排队、适用范围与技术债 |
-| `docs/19-parallel-sessions-2026-08-30.md` | 并行会话简报（**历史，已完结**）：分工/互斥的做法与提示词；§3 是一份「结论被实测推翻」的复盘 |
-| `docs/21-parallel-plan-2026-08-31.md` | **当前并行推进计划**：四条线的冲突矩阵、板子令牌协议与五段提示词 |
-| `docs/20-se250-study-2026-08-30.md` | **SE250 扩展评估**：几何推导、硬编码清单与分阶段方案（只调研，未改 RTL） |
-| `docs/reference/` | 历史审计结果（数据集校验和、文件索引、缺口清单、提交归档），只读参考 |
+| `docs/02-data-contract.md` | 数据格式唯一权威规范 |
+| `docs/03-status.md` | 当前闭环状态、未关闭问题与证据边界 |
+| `docs/04-roadmap.md` | 总体开发顺序与验收判据 |
+| `docs/05-interfaces.md` | TCP、寄存器、DMA、DDR 地址 |
+| `docs/06-implementation-plan.md` | 开发前检查、变更分类与提交门禁 |
+| `docs/07-performance.md` | CPU/FPGA 性能基线与瓶颈 |
+| `docs/08-verification-plan.md` | 仿真、接口、BD 与 G3 验证层级 |
+| `docs/09-board-build-and-acceptance.md` | 板级配置、构建与上板验收 |
+| `docs/10-current-handoff.md` | 当前接手顺序与主线 |
+| `docs/11-optimization-plan.md` | Stage1、数据、鲁棒性与上位机优化 |
+| `docs/12-stress-analysis.md` | 自动压测统计口径与后续改造 |
+| `docs/archive/history/2026/` | 历史交接、旧计划和旧状态全文，只用于追溯 |
+| `docs/reference/` | 数据集与历史审计参考 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
 
 ## 事实边界
 
-- **G3 已于 2026-08-30 闭环。** 板端回传经 `tools/ldpc_decode.py` 译码后图片 SHA-256 =
-  `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`，与判据逐位相同；
-  板上四级 DDR 快照逐级比对全过（`tools/board_stage_check.py`）。
-  **一条命令即可复现：`tools/run_g3.sh`**（单一 PASS/FAIL、非零退出码）。
-- **闭环的适用范围（当日 6 轮上板实测，全部由 `run_g3.sh` 驱动，逐轮同一张图片哈希）**：
-  SE150、`--orient both`、`score_min 67`，**规模 4,096 / 8,192 / 16,384 / 32,768 /
-  103,616（全量 51,781 条源读段）条记录**，以及**同一次上电内连续两次任务**
-  （两轮回传比特流逐位相同，不只是最终图片哈希相同）。
-  二次任务这条要看清楚口径：**同参数两轮测不出「Voter 累加器没清零」**
-  （票是有符号累加、输出按符号判决，`clip(x±1)` 对起始值单调 ⇒ 输出必然逐位相同，
-  逐位相同恰是该缺陷的必然输出）。累加器复位是靠
-  `run_g3.sh --runs 2 --first-run-score-min 0`（第一轮换阈值把累加器弄脏）
-  在 2026-08-31 于板上补齐的，该判据自带鉴别力自证。详见 `docs/03-status.md` 同名小节。
-  **尚未验证**：SE250、以全量规模作为前置轮次的跨规模连续任务（因全量弄脏轮稳定触发 B29 挂起，见下；非全量跨规模已闭环）。不得据此声称「系统已全面正确」。
-  ⚠️ **跨规模与多轮连续任务的实测闭环（2026-09-04 更新）**：
-  - **非全量跨规模、三轮连续任务与无退化已全面闭环**（`run 20260904T104011Z-crossscale-runs3`）：
-    第 1 轮 8,192 记录（`score_min=60` 弄脏）→ 第 2 轮 4,096 记录（`score_min=67` 判据）→ 第 3 轮 4,096 记录（`score_min=67` 判据）。两轮判据轮图片哈希均逐位匹配 `fcd0cf90…f2c3`，弄脏轮鉴别力自证两轮相差 2,612/64,800 bit，同参数连续运行无退化（9s vs 11s），四级 DDR 取证 4/4 级全绿！
-  - **全量跨规模受限于 B29**：两次全量弄脏尝试（首次 `score_min=0`、重试 `score_min=60`，均耗时 ~10 分钟）均在第 1 轮命中 B29（板端算完落盘、8,100 B 全部入队，但一个字节都没上线），彻底**证伪了「`score_min=0` 是必要条件」**。全量规模作为前置轮次的连续任务需待 B29 修复后复测。
-- **「同一次连接内跑两次任务」现有协议不支持**，且是设计如此不是缺陷：
-  `conn->configured` 对重复 `PKT_CONFIG` 直接拒绝（拒绝码 8，`echo.c:1691`）。
-  二次任务必须另开一条连接；硬件状态不随新连接复位，所以有价值的判据是
-  「同一次上电内两条连接」，已由 `run_g3.sh --runs 2` 覆盖。
-- **板端处理时长已量化**：改前基线 `t = 28.90 s + 1.0012 ms/条 × 条数`（2026-08-30）；
-  **2026-09-04 水印预载批量化闭环后新模型为 `t = 4.93 s + 0.9396 ms/条 × 条数`（四档实测 4,096~103,616 条，R² = 1.00000，全量实测 102.30 s）**。
-  原 28.90 s 的固定开销已压缩至 4.93 s（预载步数由约 100 步压缩至 4 步，耗时 ~1 s），与数据规模无关。
-  docs/18 先前「全量必然超时 ≈800 s」的结论**已作废**，作废理由见 docs/18 P1 第 3 项：
-  它把一个扣除法推断当成了实测。
-- **判据纪律不变**：界面成功、图片生成、EXE 正常退出、仿真全绿都不能证明流水线正确。
-  唯一判据始终是板端实际回传的数据经 LDPC 后与 R0.83 参考逐位/逐哈希相同。
-  这条纪律在 G3 闭环后**更要守住**——2026-08-29 到 30 修掉的 7 个缺陷里，
-  有 5 个（B23/B24/B25/B26/B27）在所有仿真里都是绿的，只有上板才暴露。
-- **算法本身已被证明正确**：`python3 tools/golden_model.py verify-code` 会用黄金数据证明
-  「编码序列 ⊕ 水印 → 5b4b → codeword_R083.txt」逐位成立。要做的是让 RTL 对齐这个模型。
-- **历史演示存在「用正确结果直接生成图片」的通道。**
-  `data/R0.83_data/` 与 `archive/submission_2025-11-07/演示文件/` 里的
-  `result.txt`/`dec_input.txt`/`decoded_bits.txt`/`decoded_image.jpg`/`codeword_R083.txt`/
-  `source_bit.txt`/`Milk coronet.jpg` **只能被测试代码读取做显式比较**，
-  绝不可进入生产路径。`clients/python/gui_app.spec` 已移除 `dec_input.txt`；后续修改打包规则时
-  必须保持这一点。
-- 两份 XSA 字节相同（SHA-256 `79c64736...e6eb33`），是历史硬件快照，
-  **不是**当前 Tcl 已被证明可再生的产物。
-- **历史 XSA 是另一块板**：其 DDR 为 32 bit 双颗 `MT41J128M16`，而目标 ZYNQ ECO(R6)
-  实物是单颗 16 bit `MT41J256M16HA-125`。板级配置的唯一权威是
-  `docs/16-board-zynq-eco-7010.md` 与 `docs/board/zynq-eco-7010/`，
-  **禁止**再据历史 XSA 回退 DDR 配置。
-- `hw/build/export/` 中的制品已按 ECO 板的 16 bit DDR 配置、并含 B20/B23/B24/B25/B26/B27
-  修复整套重建（2026-08-30），是 G3 闭环那一轮实际烧录的版本。
-  改动 RTL 或固件后**必须整套重建并刷新 `SHA256SUMS`**，否则制品与源码不同源。
-- `archive/submission_2025-11-07/..._重要代码.rar` 尚未解压（环境缺 RAR5 工具）；
-  解压后必须先做来源/哈希差异审计再决定是否导入。
-- **仿真喂黄金数据、板上走真实接口——差异就在这里。** 2026-08-29~30 修掉的 7 个缺陷里，
-  B23/B24/B25/B26/B27 五个全部落在这条缝上：`run_m2_full.sh` 的 Stage1 只编译
-  `srpe_batch.v` + `tb_srpe_batch.v`，直接抓引擎的 `res_din`，**完全绕开**
-  `Dna_accelerator_core_v1_0.v` 的 AXIS 输入/输出级；`tb_srpe_batch` 也是把水印直接灌进 BRAM，
-  不走 `preload_mode + S_AXIS` 的 DMA 预载通路。于是这些缺陷在所有仿真里都是绿的。
-  **新增或修改任何跨 IP 接口（AXIS 握手、DMA、寄存器时序、FIFO 读延迟）时，
-  判据必须建在真实接口上**，不能继续用 VIP 内存喂黄金数据糊过去。
-  现有的接口级判据：`run_xsim.sh result_axis`（DNA 核 AXIS 出口）、
-  `ingress_result`（入口采样）、`dec_restart`（Decoder 寄存器时序）、
-  `vot_ddr`（Voter 的 AXI 读/写通路走类 DDR 从机 + 固件寄存器时序，含 3 档故障注入自检）。
+当前有效事实只看 `docs/03-status.md`，不要从历史文档推断现状：
+
+- G3 已闭环：SE150/SE250 均有真实板端回传、LDPC 图片哈希和四级 DDR 证据；
+- SE250 全量 129,600 条记录与连续任务已闭环；
+- 当前板级唯一配置见 `docs/09-board-build-and-acceptance.md` 与 `docs/board/zynq-eco-7010/`；
+- 当前性能模型是板测事实，不等于 FPGA 已击败优化 CPU；公平基准和 Stage1 展开仍是下一阶段；
+- 多 payload 泛化、错误鲁棒性曲线、实测功耗和新板迁移没有证据前不得宣称完成；
+- 历史完整证据保留在 `docs/archive/history/2026/`，归档内容不能覆盖当前状态；
+- `data/R0.83_data/` 和历史演示结果只可由测试代码显式比较，不能进入生产路径；
+- RTL/固件变化后必须重建整套制品并刷新 `SHA256SUMS`；
+- 仿真喂黄金数据不等于真实接口正确，跨 IP 接口改动必须有 AXIS/DMA/DDR/寄存器判据；
+- 最终正确性判据仍是板端实际回传经 LDPC 后与参考逐位/逐哈希一致。
 
 ## 开发前检查表
 
@@ -250,7 +198,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   `dec_input` 照样译出 `fcd0cf90…f2c3`、与 `codeword_R083.txt` 的误码照样
   36/64,800。**唯一有鉴别力的是 `wm_regions.hex`**：SE250 应为 52,750 行 /
   `bf8795dd…`，一旦等于 SE150 的 `f352853912338cd0…` 就是该缺陷的特征签名。
-  故障注入实测见 docs/20 §6「鉴别力实测」；`tools/make_golden.py` 已内置哨兵会红。
+  故障注入实测见 docs/archive/history/2026/20-se250-study-2026-08-30.md §6「鉴别力实测」；`tools/make_golden.py` 已内置哨兵会红。
   **注意这条实测的适用范围**：它测的是**主机侧黄金模型**
   （`tools/make_golden.py`）——那里几何只喂水印区域展开，Stage1 直接在整条 `ref`
   上滑窗，所以下游整条链路与几何无关。**板上不是这样**：`wm_regions` 预载进

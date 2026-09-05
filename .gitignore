@@ -50,3 +50,8 @@ view.md
 
 # 压测中间转储数据文件（体积过大且已在 results.jsonl 完整记录）
 tests/stress_results/**/dec_run_*.txt
+# docs 历史归档需要纳入版本管理；仅仓库根 archive/ 继续忽略。
+!docs/archive/
+!docs/archive/history/
+!docs/archive/history/2026/
+!docs/archive/history/2026/**
