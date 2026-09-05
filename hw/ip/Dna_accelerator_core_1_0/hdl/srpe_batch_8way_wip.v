@@ -350,7 +350,6 @@ module srpe_batch #(
                     // pre_cnt == 9 为预装填最后一拍，下一拍进入 S_RUN（首拍数据完美对齐就绪）
                     if (pre_cnt == 9) begin
                         run_cnt <= 0;
-                        if (READ_BPS > 2) a_addr <= 9'd2;
                         wm_rd_offset <= ((pos_base + 10) >= REF_LEN) ? (REF_LEN - 1) : (pos_base + 10);
                         st <= S_RUN;
                     end
