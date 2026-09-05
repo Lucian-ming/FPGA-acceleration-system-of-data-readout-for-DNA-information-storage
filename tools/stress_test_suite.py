@@ -211,7 +211,7 @@ class StressTestSuite:
         board_time = 0.0
         try:
             stats = run_client(config, log=lambda m: None)
-            board_time = stats.phase_seconds.get("result", 0.0)
+            board_time = getattr(stats, "t_result", 0.0)
         except Exception as e:
             total_t = time.time() - t_start
             rec = TestRecord(
