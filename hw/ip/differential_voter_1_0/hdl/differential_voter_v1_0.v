@@ -113,7 +113,8 @@ module differential_voter_v1_0 #
     // ----------------- 常量/辅助 -----------------
     localparam integer WORDS_PER_READ   = 9; // 9 x 64b
     localparam integer TOTAL_BEATS_HW   = (TOTAL_BITS + 63) / 64; // 硬件应写拍数
-    localparam        TIMEOUT_CYCLES    = 32'd100000000;
+    localparam [31:0] TIMEOUT_CYCLES    = 32'd1000000000; // 10 s @100 MHz
+    localparam [31:0] NO_PROGRESS_CYCLES = 32'd100000000; // 1 s without AXI/FSM progress
 
     // ----------------- AXI-Lite 映射 -----------------
     wire [31:0] in_addr_s, out_addr_s, in_beats_s, out_beats_s;
@@ -344,7 +345,22 @@ module differential_voter_v1_0 #
     wire score_below_min      = ({22'd0, parse_score} < score_min_cfg);
     wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
 
-    reg [31:0] state_timeout_counter;
+    // A long task is valid as long as AXI or the internal pipeline is advancing.
+    // The absolute counter catches runaway tasks; the no-progress counter catches
+    // a missing R/B response without penalising large record counts.
+    wire progress_event =
+        (M00_AXI_ARVALID && M00_AXI_ARREADY) ||
+        (M00_AXI_RVALID  && M00_AXI_RREADY)  ||
+        (M00_AXI_AWVALID && M00_AXI_AWREADY) ||
+        (M00_AXI_WVALID  && M00_AXI_WREADY)  ||
+        (M00_AXI_BVALID  && M00_AXI_BREADY)  ||
+        (state == S_INIT_BRAM && init_addr <= (TOTAL_BITS - 1)) ||
+        (state == S_CALC_ADDR) ||
+        (state == S_VOTE_UPDATE) ||
+        (state == S_OUTPUT_PACK && output_bit_count < TOTAL_BITS);
+
+    reg [31:0] global_timeout_counter;
+    reg [31:0] no_progress_counter;
 
     // ----------------- BRAM 同步读写（UG901 模板） -----------------
     always @(posedge M00_AXI_ACLK) begin
@@ -361,9 +377,20 @@ module differential_voter_v1_0 #
     end
 
     always @(posedge M00_AXI_ACLK) begin
-        if (!M00_AXI_ARESETN) state_timeout_counter <= 32'd0;
-        else if (state == S_IDLE) state_timeout_counter <= 32'd0;
-        else if (state_timeout_counter < TIMEOUT_CYCLES) state_timeout_counter <= state_timeout_counter + 1;
+        if (!M00_AXI_ARESETN) begin
+            global_timeout_counter <= 32'd0;
+            no_progress_counter    <= 32'd0;
+        end else if (state == S_IDLE) begin
+            global_timeout_counter <= 32'd0;
+            no_progress_counter    <= 32'd0;
+        end else begin
+            if (global_timeout_counter < TIMEOUT_CYCLES)
+                global_timeout_counter <= global_timeout_counter + 1;
+            if (progress_event)
+                no_progress_counter <= 32'd0;
+            else if (no_progress_counter < NO_PROGRESS_CYCLES)
+                no_progress_counter <= no_progress_counter + 1;
+        end
     end
 
     // ----------------- 数据路径（时序） -----------------
@@ -646,7 +673,8 @@ module differential_voter_v1_0 #
     always @(*) begin
         next_state = state;
 
-        if (state_timeout_counter >= TIMEOUT_CYCLES) begin
+        if (global_timeout_counter >= TIMEOUT_CYCLES ||
+            no_progress_counter >= NO_PROGRESS_CYCLES) begin
             next_state = S_ERROR;
         end else begin
             case (state)
@@ -843,7 +871,7 @@ endmodule
 // ================================================================
 // AXI-Lite Slave
 // Map (word-addressed):
-// 0x00: CTRL/STATUS  (W: bit0 START, bit1 DONE_CLR; R: bit0 IDLE, bit1 DONE)
+// 0x00: CTRL/STATUS  (W: bit0 START, bit1 DONE_CLR; R: bit0 IDLE, bit1 DONE, bit2 ERROR)
 // 0x04: IN_ADDR
 // 0x08: IN_BEATS
 // 0x0C: OUT_ADDR
@@ -996,7 +1024,7 @@ module axi_slave_voter #
 
             if (ar_hs) begin
                 case (raddr)
-                    5'h00: S_AXI_RDATA <= {30'd0, done, idle};
+                    5'h00: S_AXI_RDATA <= {29'd0, error_flag, done, idle};
                     5'h01: S_AXI_RDATA <= in_addr;
                     5'h02: S_AXI_RDATA <= in_beats;
                     5'h03: S_AXI_RDATA <= out_addr;

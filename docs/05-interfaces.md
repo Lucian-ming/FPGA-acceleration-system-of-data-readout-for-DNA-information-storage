@@ -136,7 +136,7 @@ AXI-Lite 控制口遵循 AW/W 独立握手：DNA、Voter、Desparsifier 三个�
 | 偏移 | 读/写 | 含义 |
 | --- | --- | --- |
 | 0x00 | W | [0]=`start_pulse`，[1]=`done_clr` |
-| 0x00 | R | [0]=`idle`，[1]=`done` |
+| 0x00 | R | [0]=`idle`，[1]=`done`，[2]=`error`（硬件进入 `S_ERROR`） |
 | 0x04 | RW | `IN_ADDR` 输入 DDR 基址 |
 | 0x08 | RW | `IN_BEATS` 输入拍数（= 记录数 × 6；硬件实际按 `TOTAL_READS` 计数） |
 | 0x0C | RW | `OUT_ADDR` 输出 DDR 基址 |
