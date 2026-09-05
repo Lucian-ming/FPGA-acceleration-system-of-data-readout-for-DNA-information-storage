@@ -15,6 +15,7 @@ struct pbuf {
 };
 
 struct tcp_pcb;
+struct tcp_seg;
 typedef err_t (*tcp_recv_fn)(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
 typedef err_t (*tcp_poll_fn)(void *arg, struct tcp_pcb *tpcb);
 typedef err_t (*tcp_accept_fn)(void *arg, struct tcp_pcb *newpcb, err_t err);
@@ -30,6 +31,9 @@ struct tcp_pcb {
     int            aborted;
     int            nagle_off;
     u16            sndbuf;      /* 剩余发送窗口，tcp_output 后恢复 */
+    u32            remote_ip;  /* 主机模型只需提供可取地址 */
+    struct tcp_seg *unsent;
+    struct tcp_seg *unacked;
 };
 
 #define SOF_KEEPALIVE        0x08U

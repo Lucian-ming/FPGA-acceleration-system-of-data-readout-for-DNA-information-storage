@@ -25,7 +25,7 @@ GOLDEN_DIR=tests/golden
 TRACE_GOLDEN=tests/host/golden/echo_trace_se150_128reads.txt
 TRACE_META=tests/host/golden/echo_trace_se150_128reads.meta
 SHIM=tests/host/shim
-CFLAGS="-O1 -std=gnu11 -Wall -Wextra -Wno-unused-parameter -Wno-int-to-pointer-cast -Wno-sign-compare -Wno-unused-variable -Wno-unused-function"
+CFLAGS="-O1 -std=gnu11 -DHOST_TEST -Wall -Wextra -Wno-unused-parameter -Wno-int-to-pointer-cast -Wno-sign-compare -Wno-unused-variable -Wno-unused-function"
 
 REV=HEAD
 USE_WORKTREE=0

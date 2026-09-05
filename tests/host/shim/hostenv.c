@@ -682,13 +682,18 @@ err_t tcp_write(struct tcp_pcb *pcb, const void *data, u16 len, u8 flags)
     memcpy(g_txbuf + g_txlen, data, len);
     g_txlen += len;
     pcb->sndbuf = (u16)(pcb->sndbuf - len);
+    pcb->unsent = (struct tcp_seg *)1;
     host_trace_add("TCP WRITE %u", (unsigned)len);
     return ERR_OK;
 }
 
 err_t tcp_output(struct tcp_pcb *pcb)
 {
-    if (pcb) pcb->sndbuf = 8192;   /* 模拟窗口被 ACK 打开 */
+    if (pcb) {
+        pcb->sndbuf = 8192;   /* 模拟窗口被 ACK 打开 */
+        pcb->unsent = NULL;
+        pcb->unacked = NULL;
+    }
     host_trace_add("TCP OUTPUT");
     return ERR_OK;
 }
