@@ -138,7 +138,6 @@ module srpe_batch #(
     reg [READ_BPS-1:0] cw_lo_sr;
 
     // 位置比对控制
-    reg [5:0]   lc_idx;
     reg [15:0]  pos_cnt;
     reg [15:0]  pos_base;
     reg [8:0]   pre_cnt;
@@ -341,12 +340,9 @@ module srpe_batch #(
                         wm_win[7] <= wm_sym_q;
                     end
 
-                    // 在 pre_cnt == 7 给出读段第 0 碱基地址，在 pre_cnt == 8 给出第 1 碱基地址
-                    if (pre_cnt == 7) begin
                     // 当 pre_cnt == 8 给出读段第 0 碱基地址，在 pre_cnt == 9 给出第 1 碱基地址
                     if (pre_cnt == 8) begin
                         a_addr <= 9'd0;
-                    end else if (pre_cnt == 8) begin
                     end else if (pre_cnt == 9) begin
                         a_addr <= 9'd1;
                     end
@@ -384,8 +380,6 @@ module srpe_batch #(
                     wm_win[7] <= wm_sym_q;
 
                     // 下一拍读段与水印地址推进
-                    if (run_cnt + 3 < READ_BPS) begin
-                        a_addr <= run_cnt + 3;
                     if (run_cnt + 2 < READ_BPS) begin
                         a_addr <= run_cnt + 2;
                     end
@@ -409,7 +403,6 @@ module srpe_batch #(
                         end
 
                         // 组 1: 2 vs 3
-                        if (!pos_valid[3] || (score[2][t] >= score[3][t])) begin
                         if (!pos_valid[2]) begin
                             m1_sc[t] <= {SCORE_W{1'b0}}; m1_p[t] <= 3'd0;
                         end else if (!pos_valid[3] || (score[2][t] >= score[3][t])) begin
@@ -419,7 +412,6 @@ module srpe_batch #(
                         end
 
                         // 组 2: 4 vs 5
-                        if (!pos_valid[5] || (score[4][t] >= score[5][t])) begin
                         if (!pos_valid[4]) begin
                             m2_sc[t] <= {SCORE_W{1'b0}}; m2_p[t] <= 3'd0;
                         end else if (!pos_valid[5] || (score[4][t] >= score[5][t])) begin
@@ -429,7 +421,6 @@ module srpe_batch #(
                         end
 
                         // 组 3: 6 vs 7
-                        if (!pos_valid[7] || (score[6][t] >= score[7][t])) begin
                         if (!pos_valid[6]) begin
                             m3_sc[t] <= {SCORE_W{1'b0}}; m3_p[t] <= 3'd0;
                         end else if (!pos_valid[7] || (score[6][t] >= score[7][t])) begin
