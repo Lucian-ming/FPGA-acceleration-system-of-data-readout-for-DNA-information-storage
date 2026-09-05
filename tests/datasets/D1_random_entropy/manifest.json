@@ -1,0 +1,43 @@
+{
+  "dataset_id": "D1_random_entropy",
+  "created_at_utc": "2026-09-05T13:14:04.243971+00:00",
+  "provenance": {
+    "tier": "D1",
+    "description": "独立合成 Payload 数据集，完全重新全流程编码与模拟测序，杜绝数据单一性质疑",
+    "generator": "tools/generate_payload_dataset.py"
+  },
+  "payload": {
+    "type": "random",
+    "original_bytes": 6750,
+    "info_bits": 54000,
+    "sha256": "d7cbdc06d173b6ec01b7fce8646249589e5f1611ca4fe0fedd25187af0cc7b5f",
+    "source_file": "source_payload.bin"
+  },
+  "ldpc": {
+    "standard": "DVB-S2",
+    "rate": "5/6",
+    "n_bits": 64800,
+    "k_info": 54000,
+    "codeword_sha256": "67bfe4a2652e4e546c9a4a6b7f7f5af4650f06278e498a3eb573f32319e0018a",
+    "codeword_file": "codeword.txt"
+  },
+  "watermark": {
+    "length_bits": 81000,
+    "sha256": "be9b7799dff00851263fcf53b2e3aafa4d28b27104f07c2c9adb96f9f156f7eb",
+    "watermark_file": "watermark.txt"
+  },
+  "reference_dna": {
+    "length_nt": 40500,
+    "sha256": "3127aaaa72c92d9aea1d8fac7bc7b9b06adc242ba7a94153091da701c7837064",
+    "reference_file": "reference_sequence.txt"
+  },
+  "sequencing": {
+    "read_len": 150,
+    "reads_count": 4096,
+    "orient": "both",
+    "seed": 202,
+    "fastq_file": "reads_se150.fastq",
+    "fastq_sha256": "f7e1d90172b76747ed6ae27d02f1986d47433fe41d151216485bd78be41e7542"
+  },
+  "oracle_verified": true
+}
