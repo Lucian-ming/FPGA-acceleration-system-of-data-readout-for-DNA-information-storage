@@ -111,6 +111,9 @@ class ReadFileInfo:
     path: Path
     format: str
     total_reads: int
+    detected_read_bps: Optional[int] = None
+    suggested_score_min: Optional[int] = None
+    estimated_seconds: Optional[float] = None
 
 
 @dataclass()  # 注意: 原为 slots=True，仅为省内存但会把最低版本抬到 Py3.10，去掉以便更广泛地运行与测试
@@ -223,10 +226,17 @@ def detect_file_format(reads_file: Path) -> str:
 
 def count_reads_in_file(reads_file: Path, format_type: str = "auto") -> int:
     """统计文件中的读段数量。"""
+    count, _ = inspect_reads_file(reads_file, format_type)
+    return count
+
+
+def inspect_reads_file(reads_file: Path, format_type: str = "auto") -> tuple[int, Optional[int]]:
+    """统计读段总数并采样探测典型读长 (bp)。"""
     if format_type == "auto":
         format_type = detect_file_format(reads_file)
 
     count = 0
+    sample_lengths = []
     with reads_file.open("r", encoding="utf-8", errors="ignore") as handle:
         if format_type == "fastq":
             while True:
@@ -238,24 +248,54 @@ def count_reads_in_file(reads_file: Path, format_type: str = "auto") -> int:
                 qual = handle.readline()
                 if seq and plus and qual:
                     count += 1
+                    if len(sample_lengths) < 20:
+                        sample_lengths.append(len(seq.strip()))
                 else:
                     break
         else:
             for line in handle:
-                if line.strip():
+                s = line.strip()
+                if s:
                     count += 1
-    return count
+                    if len(sample_lengths) < 20:
+                        sample_lengths.append(len(s))
+
+    detected_bps = None
+    if sample_lengths:
+        avg_len = sum(sample_lengths) // len(sample_lengths)
+        if 130 <= avg_len <= 170:
+            detected_bps = 150
+        elif 220 <= avg_len <= 280:
+            detected_bps = 250
+        else:
+            detected_bps = avg_len
+    return count, detected_bps
+
+
+def estimate_processing_time(total_reads: int, orient: str = "both") -> float:
+    """基于板端实测模型 t = 4.93s + 0.9396ms * 记录数，预估处理耗时 (秒)。"""
+    records = total_reads * 2 if orient == "both" else total_reads
+    return 4.93 + 0.0009396 * records
 
 
 def analyze_reads_file(path: Path, format_hint: str = "auto") -> ReadFileInfo:
-    """Return format + total count for the supplied reads file."""
+    """Return format + total count + detected read length for the supplied reads file."""
     if not path.exists():
         raise FileNotFoundError(f"Reads file not found: {path}")
     fmt = format_hint
     if fmt == "auto":
         fmt = detect_file_format(path)
-    count = count_reads_in_file(path, fmt)
-    return ReadFileInfo(path=path, format=fmt, total_reads=count)
+    count, detected_bps = inspect_reads_file(path, fmt)
+    score_min = default_score_min(detected_bps) if detected_bps in SUPPORTED_READ_BASES else None
+    est_sec = estimate_processing_time(count) if count > 0 else None
+    return ReadFileInfo(
+        path=path,
+        format=fmt,
+        total_reads=count,
+        detected_read_bps=detected_bps,
+        suggested_score_min=score_min,
+        estimated_seconds=est_sec,
+    )
 
 
 def seq_to_read_bytes(seq: str, read_bps: int = READ_BASES) -> bytes:

@@ -174,18 +174,27 @@ class LDPCBackendTests(unittest.TestCase):
             root = Path(directory)
             source = root / "result.txt"
             source.write_text("0" * 64_800, encoding="utf-8")
-            expected = ldpc_pipeline.LDPCResult(
+            expected_c = ldpc_pipeline.LDPCResult(
+                source, root / "dec_input.txt", root / "decoded_bits.txt",
+                root / "decoded_image.jpg", "c_accel"
+            )
+            expected_native = ldpc_pipeline.LDPCResult(
                 source, root / "dec_input.txt", root / "decoded_bits.txt",
                 root / "decoded_image.jpg", "native"
             )
-            with mock.patch.object(ldpc_pipeline, "_run_native", return_value=expected) as native, \
-                    mock.patch.object(ldpc_pipeline, "_run_external") as external:
-                result = ldpc_pipeline.run_ldpc_decoder(
-                    source, output_dir=root, backend="auto"
-                )
-        self.assertEqual(result.backend, "native")
-        native.assert_called_once()
-        external.assert_not_called()
+            # 1. 当 C 加速器存在时，auto 优先选用 c_accel
+            with mock.patch.object(ldpc_pipeline, "is_c_accel_available", return_value=True), \
+                    mock.patch.object(ldpc_pipeline, "_run_c_accel", return_value=expected_c) as run_c:
+                res_c = ldpc_pipeline.run_ldpc_decoder(source, output_dir=root, backend="auto")
+                self.assertEqual(res_c.backend, "c_accel")
+                run_c.assert_called_once()
+
+            # 2. 当 C 加速器缺失时，auto 优雅降级至 native
+            with mock.patch.object(ldpc_pipeline, "is_c_accel_available", return_value=False), \
+                    mock.patch.object(ldpc_pipeline, "_run_native", return_value=expected_native) as run_nat:
+                res_nat = ldpc_pipeline.run_ldpc_decoder(source, output_dir=root, backend="auto")
+                self.assertEqual(res_nat.backend, "native")
+                run_nat.assert_called_once()
 
 
 if __name__ == "__main__":
@@ -338,3 +347,59 @@ class SE250GeometryTests(unittest.TestCase):
             encoded = first.seq_to_read_bytes(seq, 250)
             self.assertEqual(encoded[:63].hex(), golden[i], f"第 {i} 条读段不一致")
             self.assertEqual(encoded[63], 0)
+
+
+class CLDPCAndAdaptivityTests(unittest.TestCase):
+    GOLDEN_SE250 = REPO / "tests" / "golden" / "se250"
+    SE150_FASTQ = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
+    SE250_FASTQ = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE250.fastq"
+
+    def test_c_accel_availability_and_bit_exactness(self) -> None:
+        """C 加速器必须可用且译码结果与黄金图片哈希 100% 逐位吻合。"""
+        import c_ldpc
+        self.assertTrue(c_ldpc.is_c_accel_available(), "libc_ldpc.so 应该存在且可被加载")
+
+        pchk = CLIENT / "resources" / "dvb_s2_r5_6.pchk"
+        perm = CLIENT / "resources" / "permutation64800"
+        dec_input = self.GOLDEN_SE250 / "dec_input.txt"
+
+        bits_str = ldpc_pipeline.read_bit_text(dec_input)
+        import numpy as np
+        rx = np.frombuffer(bits_str.encode("ascii"), dtype=np.uint8) - ord("0")
+
+        info, failed, iters = c_ldpc.decode_bits_c(rx, pchk, perm)
+        self.assertEqual(len(info), 54_000)
+        self.assertEqual(failed, 141)
+        self.assertEqual(iters, 45)
+
+        jpeg = ldpc_pipeline.bits_to_jpeg_bytes(info)
+        sha = hashlib.sha256(jpeg).hexdigest()
+        self.assertEqual(
+            sha,
+            "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3",
+            "C 加速器译码图片哈希必须与 R0.83 黄金标准完全逐位相同",
+        )
+
+    def test_ldpc_pipeline_auto_selects_c_accel(self) -> None:
+        """ldpc_pipeline 在 auto 模式下优先选用 c_accel。"""
+        dec_input = self.GOLDEN_SE250 / "dec_input.txt"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            res = ldpc_pipeline.run_ldpc_decoder(dec_input, output_dir=Path(tmpdir), backend="auto")
+            self.assertEqual(res.backend, "c_accel")
+            self.assertTrue(res.decoded_bits_path.is_file())
+            self.assertTrue(res.image_path.is_file())
+
+    @unittest.skipUnless(SE150_FASTQ.exists() and SE250_FASTQ.exists(), "缺少 data/R0.83_data 时跳过")
+    def test_reads_adaptive_detection_and_estimation(self) -> None:
+        """自适应探测必须精确识别 150bp 与 250bp 并给出匹配阈值与耗时模型。"""
+        info150 = first.analyze_reads_file(self.SE150_FASTQ)
+        self.assertEqual(info150.total_reads, 51_781)
+        self.assertEqual(info150.detected_read_bps, 150)
+        self.assertEqual(info150.suggested_score_min, 67)
+        self.assertAlmostEqual(info150.estimated_seconds, 102.24, delta=0.5)
+
+        info250 = first.analyze_reads_file(self.SE250_FASTQ)
+        self.assertEqual(info250.total_reads, 64_800)
+        self.assertEqual(info250.detected_read_bps, 250)
+        self.assertEqual(info250.suggested_score_min, 112)
+        self.assertAlmostEqual(info250.estimated_seconds, 126.70, delta=0.5)

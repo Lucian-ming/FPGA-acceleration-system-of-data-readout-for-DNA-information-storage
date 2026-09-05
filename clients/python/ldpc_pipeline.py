@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
+import numpy as np
+from c_ldpc import decode_bits_c, is_c_accel_available
 from native_ldpc import bits_to_jpeg_bytes, decode_file, read_bit_text
 
 DECODER_EXE = "R5_6_LDPC_hard_decoder.exe"
@@ -21,7 +23,7 @@ DECODER_DLLS = ("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")
 DEC_INPUT_NAME = "dec_input.txt"
 DECODER_OUTPUT_BITS = "TestBitStream.txt"
 DECODER_OUTPUT_IMAGE = "image.jpg"
-SUPPORTED_BACKENDS = ("auto", "native", "external")
+SUPPORTED_BACKENDS = ("auto", "c_accel", "native", "external")
 
 
 @dataclass
@@ -98,6 +100,35 @@ def _run_native(
         decoded_bits_path=decoded_bits_path,
         image_path=image_path,
         backend="native",
+    )
+
+
+def _run_c_accel(
+    result_bits_path: Path,
+    output_dir: Path,
+    dec_input_path: Path,
+    log: Callable[[str], None],
+) -> LDPCResult:
+    pchk = resource_path(DECODER_PCHK)
+    permutation = resource_path(DECODER_PERM)
+    bits = read_bit_text(dec_input_path)
+    rx = np.frombuffer(bits.encode("ascii"), dtype=np.uint8) - ord("0")
+
+    info, failed, iterations = decode_bits_c(rx, pchk, permutation)
+
+    decoded_bits_path = output_dir / "decoded_bits.txt"
+    image_path = output_dir / "decoded_image.jpg"
+    decoded_bits_path.write_text("".join("01"[int(bit)] for bit in info), encoding="utf-8")
+    image_path.write_bytes(bits_to_jpeg_bytes(info))
+    log(f"[LDPC] c_accel 极速收敛：起始失败校验 {failed}，迭代 {iterations} 轮")
+    log(f"[LDPC] 已保存解码比特 {decoded_bits_path}")
+    log(f"[LDPC] 已保存图像 {image_path}")
+    return LDPCResult(
+        result_path=result_bits_path,
+        dec_input_path=dec_input_path,
+        decoded_bits_path=decoded_bits_path,
+        image_path=image_path,
+        backend="c_accel",
     )
 
 
@@ -190,10 +221,23 @@ def run_ldpc_decoder(
     output_dir.mkdir(parents=True, exist_ok=True)
     emit = log or (lambda _message: None)
     bits, dec_input_path = _write_dec_input(result_bits_path, output_dir)
-    selected = "native" if backend == "auto" else backend
-    emit(f"[LDPC] 后端: {selected}")
+
+    if backend == "auto":
+        selected = "c_accel" if is_c_accel_available() else "native"
+    else:
+        selected = backend
+
+    emit(f"[LDPC] 后端: {selected} (请求模式: {backend})")
     emit(f"[LDPC] 输入: {result_bits_path} ({len(bits)} bit)")
 
-    if selected == "native":
+    if selected == "c_accel":
+        try:
+            return _run_c_accel(result_bits_path, output_dir, dec_input_path, emit)
+        except Exception as exc:
+            if backend == "auto":
+                emit(f"[LDPC] 警告: c_accel 运行异常 ({exc})，自动降级至 native 解释执行")
+                return _run_native(result_bits_path, output_dir, dec_input_path, emit)
+            raise
+    elif selected == "native":
         return _run_native(result_bits_path, output_dir, dec_input_path, emit)
     return _run_external(result_bits_path, output_dir, dec_input_path, bits, emit)
