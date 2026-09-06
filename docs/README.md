@@ -17,7 +17,10 @@
 | [11-optimization-plan.md](11-optimization-plan.md) | Stage1、数据泛化、错误鲁棒性和上位机优化 |
 | [12-stress-analysis.md](12-stress-analysis.md) | 自动压测统计口径和后续改造 |
 | [13-final-delivery-roadmap.md](13-final-delivery-roadmap.md) | **从当前状态到最终交付的总收口计划**：终态定义、现状评价、G0～G8 阶段门禁 | 每次排期和收口前必读 |
-| [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | **并行 Agent 的 branch/worktree 创建、合并与强制回收规范** | 并行任务开始和交接前必读 |
+| [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | 当前有效的共享 main 并行与回收纪律 | 并行任务开始和交接前必读 |
+| [15-resume-and-parallel-plan.md](15-resume-and-parallel-plan.md) | 中断恢复、最终目标与 W0～W4 并行计划 | 新主会话执行入口 |
+| [16-interrupted-work-audit-2026-09-06.md](16-interrupted-work-audit-2026-09-06.md) | 本轮中断遗留物清点与 dump 复核证据 | 了解本轮审计结果 |
+| [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词 | 启动新会话时使用 |
 
 ## 参考资料
 
