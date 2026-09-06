@@ -31,6 +31,7 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "clients" / "python"))
 
 from clients.python.native_ldpc import (
     load_pchk,
@@ -54,6 +55,82 @@ SPARSIFY_MAP = {
     val4: [(code5 >> (4 - k)) & 1 for k in range(5)]
     for code5, val4 in DESPARSIFY_TABLE.items()
 }
+
+import c_ldpc
+
+BASES = ["A", "C", "G", "T"]
+OTHER_BASES = {
+    "A": ["C", "G", "T"],
+    "C": ["A", "G", "T"],
+    "G": ["A", "C", "T"],
+    "T": ["A", "C", "G"],
+    "N": ["A", "C", "G", "T"],
+}
+
+
+def mutate_read_sequence(
+    seq: str,
+    qual: str,
+    sub_rate: float,
+    ins_rate: float,
+    del_rate: float,
+    rng: np.random.Generator,
+    fixed_len: bool = True,
+) -> tuple[str, str, int, int, int]:
+    """对单条读段注入替换 (sub)、缺失 (del)、插入 (ins) 错误，并做定长适配（docs/15 §8）。"""
+    orig_len = len(seq)
+    seq_chars = list(seq)
+    qual_chars = list(qual)
+
+    n_sub = 0
+    n_del = 0
+    n_ins = 0
+
+    # 1. 替换 (Substitution)
+    if sub_rate > 0.0:
+        sub_mask = rng.random(len(seq_chars)) < sub_rate
+        for idx in np.where(sub_mask)[0]:
+            orig = seq_chars[idx].upper()
+            candidates = OTHER_BASES.get(orig, BASES)
+            seq_chars[idx] = candidates[rng.integers(0, len(candidates))]
+            n_sub += 1
+
+    # 2. 缺失 (Deletion)
+    if del_rate > 0.0 and len(seq_chars) > 1:
+        del_mask = rng.random(len(seq_chars)) < del_rate
+        keep_indices = [i for i, d in enumerate(del_mask) if not d]
+        n_del += len(seq_chars) - len(keep_indices)
+        if keep_indices:
+            seq_chars = [seq_chars[i] for i in keep_indices]
+            qual_chars = [qual_chars[i] for i in keep_indices]
+
+    # 3. 插入 (Insertion)
+    if ins_rate > 0.0:
+        ins_mask = rng.random(len(seq_chars)) < ins_rate
+        new_seq = []
+        new_qual = []
+        for idx in range(len(seq_chars)):
+            new_seq.append(seq_chars[idx])
+            new_qual.append(qual_chars[idx])
+            if ins_mask[idx]:
+                new_seq.append(BASES[rng.integers(0, 4)])
+                new_qual.append("!")
+                n_ins += 1
+        seq_chars = new_seq
+        qual_chars = new_qual
+
+    # 4. 定长适配 (命名：插删加定长适配 fixed_len_adaptation)
+    if fixed_len:
+        if len(seq_chars) > orig_len:
+            seq_chars = seq_chars[:orig_len]
+            qual_chars = qual_chars[:orig_len]
+        elif len(seq_chars) < orig_len:
+            pad_len = orig_len - len(seq_chars)
+            for _ in range(pad_len):
+                seq_chars.append(BASES[rng.integers(0, 4)])
+                qual_chars.append("!")
+
+    return "".join(seq_chars), "".join(qual_chars), n_sub, n_del, n_ins
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -156,8 +233,12 @@ def simulate_sequencing_reads(
     qual_char: str = "F",
     min_coverage_tile: bool = True,
     tile_step: int = 50,
-) -> list[tuple[str, str, str, str]]:
-    """从参考序列生成测序读段（FASTQ 4行格式）。"""
+    sub_rate: float = 0.0,
+    ins_rate: float = 0.0,
+    del_rate: float = 0.0,
+    return_stats: bool = False,
+) -> Any:
+    """从参考序列生成测序读段（FASTQ 4行格式），支持 D2 受控噪声注入。"""
     rng = np.random.default_rng(seed)
     ref_len = len(ref_seq)
     max_start = ref_len - read_len
@@ -181,6 +262,10 @@ def simulate_sequencing_reads(
 
     qual = qual_char * read_len
     records = []
+    tot_sub = 0
+    tot_del = 0
+    tot_ins = 0
+    has_noise = (sub_rate > 0.0 or ins_rate > 0.0 or del_rate > 0.0)
 
     for i, pos in enumerate(start_positions):
         sub_seq = ref_seq[pos : pos + read_len]
@@ -193,11 +278,147 @@ def simulate_sequencing_reads(
 
         direction = "rc" if is_rc else "fwd"
         read_seq = reverse_complement(sub_seq) if is_rc else sub_seq
+        current_qual = qual
+
+        if has_noise:
+            read_seq, current_qual, n_s, n_d, n_i = mutate_read_sequence(
+                read_seq, current_qual, sub_rate, ins_rate, del_rate, rng, fixed_len=True
+            )
+            tot_sub += n_s
+            tot_del += n_d
+            tot_ins += n_i
+
         header = f"@read_{i:06d}_pos_{pos:05d}_orient_{direction} 1:N:0:ATTACTCG+AGCGAATG"
-        records.append((header, read_seq, "+", qual))
+        records.append((header, read_seq, "+", current_qual))
+
+    if return_stats:
+        total_bases = reads_count * read_len
+        noise_stats = {
+            "target_sub_rate": sub_rate,
+            "target_ins_rate": ins_rate,
+            "target_del_rate": del_rate,
+            "actual_substitutions": tot_sub,
+            "actual_deletions": tot_del,
+            "actual_insertions": tot_ins,
+            "effective_mutation_rate": round((tot_sub + tot_del + tot_ins) / max(1, total_bases), 6),
+            "length_adaptation": "插删加定长适配 (fixed_len_adaptation)",
+        }
+        return records, noise_stats
 
     return records
 
+
+
+def verify_readout_pipeline(
+    ref_dna_seq: str,
+    wm_bits: np.ndarray,
+    read_records: list[tuple[str, str, str, str]],
+    expected_cw: np.ndarray,
+    pchk_path: Path,
+    perm_path: Path,
+    score_min: Optional[int] = None,
+    read_len: int = 150,
+) -> dict[str, Any]:
+    """对生成的数据集读段执行全流程软件读出验证 (Stage 1~4 端到端闭环)。"""
+    L = len(ref_dna_seq)
+    half = L
+    ref_sym = ((wm_bits[:half] << 1) | wm_bits[half:]).astype(np.uint8)
+
+    if score_min is None:
+        score_min = 67 if read_len == 150 else 112
+
+    seqs = [r[1] for r in read_records]
+    R = np.array([[BASE2VAL[c] for c in s] for s in seqs], dtype=np.uint8)
+
+    c_lib_path = REPO_ROOT / "tools" / "libalign_fast.so"
+    align_pos = []
+    align_score = []
+    records_arr = []
+
+    if c_lib_path.exists():
+        import ctypes
+        lib = ctypes.CDLL(str(c_lib_path))
+        lib.align_reads_fast.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_int,
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_int, ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int),
+        ]
+        lib.align_reads_fast.restype = None
+
+        rec_fwd = R
+        rec_rc = np.array([[(BASE2VAL[c] ^ 1) for c in s[::-1]] for s in seqs], dtype=np.uint8)
+        ref_ptr = np.ascontiguousarray(ref_sym, dtype=np.uint8).ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
+
+        for rec_group in [rec_fwd, rec_rc]:
+            n_grp = len(rec_group)
+            reads_ptr = np.ascontiguousarray(rec_group, dtype=np.uint8).ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
+            out_d = np.empty(n_grp, dtype=np.int32)
+            out_p = np.empty(n_grp, dtype=np.int32)
+            out_s = np.empty(n_grp, dtype=np.int32)
+            lib.align_reads_fast(
+                ref_ptr, L, reads_ptr, n_grp, read_len, 8,
+                out_d.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+                out_p.ctypes.data_as(ctypes.POINTER(ctypes.c_int)),
+                out_s.ctypes.data_as(ctypes.POINTER(ctypes.c_int))
+            )
+            for j in range(n_grp):
+                records_arr.append(rec_group[j])
+                align_pos.append(out_p[j])
+                align_score.append(out_s[j])
+    else:
+        n_pad = L + read_len
+        size = 1 << (n_pad - 1).bit_length()
+        spec = [np.fft.rfft((ref_sym == s).astype(np.float64), size) for s in range(4)]
+        maxpos = L - read_len
+
+        def _align_single(a: np.ndarray) -> tuple[int, int]:
+            sc = np.zeros(size)
+            for s in range(4):
+                sc += np.fft.irfft(spec[s] * np.fft.rfft((a == s).astype(np.float64)[::-1], size), size)
+            v = sc[read_len - 1 : read_len + maxpos]
+            p = int(np.argmax(v))
+            return p, int(round(v[p]))
+
+        for i in range(len(seqs)):
+            pf, sf = _align_single(R[i])
+            pr, sr = _align_single((R[i] ^ 1)[::-1])
+            records_arr.append(R[i]); align_pos.append(pf); align_score.append(sf)
+            records_arr.append((R[i] ^ 1)[::-1]); align_pos.append(pr); align_score.append(sr)
+
+    votes = np.zeros(2 * L, dtype=np.int32)
+    used = 0
+    for j in range(len(records_arr)):
+        s = align_score[j]
+        if s >= score_min:
+            used += 1
+            p = align_pos[j]
+            a = records_arr[j]
+            idx = np.arange(p, p + read_len)
+            for tgt, bit in ((idx, (a >> 1) & 1), (idx + L, a & 1)):
+                votes[tgt] = np.clip(votes[tgt] + (bit.astype(np.int32) * 2 - 1), -512, 511)
+
+    consensus = (votes > 0).astype(np.uint8)
+    sparse = consensus ^ wm_bits
+    dec_input = desparsify(sparse)
+    raw_errs = int(np.sum(dec_input != expected_cw))
+
+    info_bits, init_syn, iters = c_ldpc.decode_bits_c(
+        dec_input, pchk_path, perm_path, max_iter=50, raise_on_error=False
+    )
+    converged = (info_bits is not None)
+    rec_sha = hashlib.sha256(np.packbits(info_bits[:54000]).tobytes()).hexdigest() if converged else "LDPC_FAILED"
+
+    return {
+        "score_min": score_min,
+        "used_records": used,
+        "total_records": len(records_arr),
+        "raw_bit_errors": raw_errs,
+        "initial_syndromes": init_syn,
+        "ldpc_iterations": iters,
+        "ldpc_converged": converged,
+        "recovered_sha256": rec_sha,
+    }
 
 
 def generate_dataset(
@@ -212,10 +433,20 @@ def generate_dataset(
     watermark_path: Optional[Path] = None,
     pchk_path: Optional[Path] = None,
     perm_path: Optional[Path] = None,
+    tier: Optional[str] = None,
+    base_dataset: Optional[str] = None,
+    sub_rate: float = 0.0,
+    ins_rate: float = 0.0,
+    del_rate: float = 0.0,
+    verify_readout: bool = True,
+    score_min: Optional[int] = None,
 ) -> dict:
     """生成完整的数据集套件，执行闭环自证，并生成 manifest.json 与校验和。"""
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    if tier is None:
+        tier = "D2" if (sub_rate > 0.0 or ins_rate > 0.0 or del_rate > 0.0) else "D1"
+
     if pchk_path is None:
         pchk_path = REPO_ROOT / "clients" / "python" / "resources" / "dvb_s2_r5_6.pchk"
     if perm_path is None:
@@ -223,9 +454,11 @@ def generate_dataset(
     if watermark_path is None:
         watermark_path = REPO_ROOT / "data" / "R0.83_data" / "Source data" / "Watermark sequences" / "r0.83_watermark.txt"
 
-    print(f"=== 正在生成数据集: {dataset_id} ===")
+    print(f"=== 正在生成数据集: {dataset_id} ({tier}) ===")
     print(f"  Payload 类型: {payload_type}, 原始大小: {len(payload_data)} 字节")
     print(f"  测序参数: read_len={read_len}, reads_count={reads_count}, orient={orient}, seed={seed}")
+    if tier == "D2":
+        print(f"  D2 受控噪声: sub={sub_rate}, ins={ins_rate}, del={del_rate}, 基底={base_dataset}")
 
     # 1. 原始 Payload 处理
     raw_payload_file = output_dir / "source_payload.bin"
@@ -263,13 +496,17 @@ def generate_dataset(
     ref_seq_file.write_text(ref_dna_seq, encoding="utf-8")
     ref_seq_sha = sha256_file(ref_seq_file)
 
-    # 6. 模拟测序生成 FASTQ
-    read_records = simulate_sequencing_reads(
+    # 6. 模拟测序生成 FASTQ (支持 D2 受控噪声注入)
+    read_records, noise_stats = simulate_sequencing_reads(
         ref_dna_seq,
         read_len=read_len,
         reads_count=reads_count,
         orient=orient,
         seed=seed,
+        sub_rate=sub_rate,
+        ins_rate=ins_rate,
+        del_rate=del_rate,
+        return_stats=True,
     )
     fastq_file = output_dir / f"reads_se{read_len}.fastq"
     with fastq_file.open("w", encoding="utf-8") as f:
@@ -283,7 +520,7 @@ def generate_dataset(
     rec_cw = desparsify(sparse_stream)
     if not np.array_equal(rec_cw, interleaved_cw):
         raise RuntimeError("Oracle 失败: 反稀疏化与原码字不符！")
-    
+
     # (b) LDPC 译码逆运算自测
     perm = load_permutation(perm_path)
     natural_decoded = deinterleave(interleaved_cw, perm)
@@ -294,22 +531,45 @@ def generate_dataset(
         raise RuntimeError(f"Oracle 失败: 原始无错码字解出 {syn_fail} 失败校验, {iters} 轮迭代！")
     if not np.array_equal(decoded_info, info_bits):
         raise RuntimeError("Oracle 失败: 解码信息位与输入 Payload 不符！")
-    
+
     recovered_bytes = bits_to_bytes(decoded_info)[:len(payload_data)]
     if recovered_bytes != payload_data:
         raise RuntimeError("Oracle 失败: 解出字节流与原始字节流不符！")
     print("  [PASS] Oracle 闭环验证 100% 逐位吻合 (0 错误，0 迭代，完全闭环)！")
 
+    # (c) 全流程软件读出自检 (Stage 1~4 端到端闭环验证)
+    readout_stats = None
+    if verify_readout:
+        print("  执行全流程软件读出自验 (Stage 1~4 端到端)...")
+        readout_stats = verify_readout_pipeline(
+            ref_dna_seq, wm_bits, read_records, interleaved_cw,
+            pchk_path, perm_path, score_min=score_min, read_len=read_len,
+        )
+        readout_stats["matches_source"] = (readout_stats["recovered_sha256"] == payload_sha)
+        print(f"  [READOUT VERIFY] 误码: {readout_stats['raw_bit_errors']}, "
+              f"LDPC迭代: {readout_stats['ldpc_iterations']}, "
+              f"收敛闭环: {readout_stats['ldpc_converged'] and readout_stats['matches_source']}")
+
     # 8. 生成 manifest.json
     now_utc = datetime.now(timezone.utc).isoformat()
+    prov = {
+        "tier": tier,
+        "description": (
+            "受控噪声注入数据集（明确基底 + 精确替换/插入/删除率控制与定长适配）"
+            if tier == "D2"
+            else "独立合成 Payload 数据集，完全重新全流程编码与模拟测序，杜绝数据单一性质疑"
+        ),
+        "generator": "tools/generate_payload_dataset.py",
+    }
+    if base_dataset:
+        prov["base_dataset"] = base_dataset
+    if tier == "D2":
+        prov["noise_model"] = noise_stats
+
     manifest = {
         "dataset_id": dataset_id,
         "created_at_utc": now_utc,
-        "provenance": {
-            "tier": "D1",
-            "description": "独立合成 Payload 数据集，完全重新全流程编码与模拟测序，杜绝数据单一性质疑",
-            "generator": "tools/generate_payload_dataset.py",
-        },
+        "provenance": prov,
         "payload": {
             "type": payload_type,
             "original_bytes": len(payload_data),
@@ -345,6 +605,8 @@ def generate_dataset(
         },
         "oracle_verified": True,
     }
+    if readout_stats is not None:
+        manifest["readout_verification"] = readout_stats
 
     manifest_file = output_dir / "manifest.json"
     manifest_file.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -445,6 +707,13 @@ def main():
     parser.add_argument("--reads-count", type=int, default=4096, help="生成测序读段数")
     parser.add_argument("--orient", type=str, default="both", choices=["both", "fwd", "rc"], help="读段方向")
     parser.add_argument("--seed", type=int, default=42, help="随机数种子")
+    parser.add_argument("--tier", type=str, choices=["D1", "D2"], default=None, help="数据集层级 (D1/D2)")
+    parser.add_argument("--base-dataset", type=str, default=None, help="D2 衍生基底数据集 ID")
+    parser.add_argument("--sub-rate", type=float, default=0.0, help="替换错误率 (Substitution)")
+    parser.add_argument("--ins-rate", type=float, default=0.0, help="插入错误率 (Insertion)")
+    parser.add_argument("--del-rate", type=float, default=0.0, help="缺失错误率 (Deletion)")
+    parser.add_argument("--score-min", type=int, default=None, help="读出验证的比对门限")
+    parser.add_argument("--no-readout-verify", action="store_true", help="跳过读出验证")
 
     args = parser.parse_args()
 
@@ -454,11 +723,16 @@ def main():
         return
 
     if not args.payload_file:
-        print("错误: 必须指定 --suite 生成全套数据集，或提供 --payload-file 指定自定义数据", file=sys.stderr)
-        parser.print_help()
-        sys.exit(1)
+        if args.payload_type == "random":
+            rng = np.random.default_rng(args.seed)
+            payload_data = rng.bytes(6750)
+        else:
+            print("错误: 必须指定 --suite 生成全套数据集，或提供 --payload-file 指定自定义数据（或 --payload-type random）", file=sys.stderr)
+            parser.print_help()
+            sys.exit(1)
+    else:
+        payload_data = args.payload_file.read_bytes()
 
-    payload_data = args.payload_file.read_bytes()
     out_dir = args.output_dir or (base_dir / args.dataset_id)
     generate_dataset(
         dataset_id=args.dataset_id,
@@ -469,6 +743,13 @@ def main():
         reads_count=args.reads_count,
         orient=args.orient,
         seed=args.seed,
+        tier=args.tier,
+        base_dataset=args.base_dataset,
+        sub_rate=args.sub_rate,
+        ins_rate=args.ins_rate,
+        del_rate=args.del_rate,
+        verify_readout=(not args.no_readout_verify),
+        score_min=args.score_min,
     )
 
 
