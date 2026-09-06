@@ -27,6 +27,7 @@ if str(CLIENT_DIR) not in sys.path:
     sys.path.insert(0, str(CLIENT_DIR))
 
 import first  # noqa: E402
+import readout  # noqa: E402
 import fast_readout as readout  # noqa: E402
 from task_protocol import TaskSpec, read_size_bytes  # noqa: E402
 

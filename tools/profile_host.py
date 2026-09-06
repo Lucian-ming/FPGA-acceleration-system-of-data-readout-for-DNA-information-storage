@@ -37,6 +37,7 @@ if str(CLIENT_DIR) not in sys.path:
 import c_ldpc  # noqa: E402
 import first  # noqa: E402
 import ldpc_pipeline  # noqa: E402
+import readout  # noqa: E402
 import fast_readout as readout  # noqa: E402
 from task_protocol import (  # noqa: E402
     FRAME_READS,
