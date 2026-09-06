@@ -1,6 +1,6 @@
 {
   "dataset_id": "D1_random_entropy",
-  "created_at_utc": "2026-09-05T13:14:04.243971+00:00",
+  "created_at_utc": "2026-09-05T13:38:12.319747+00:00",
   "provenance": {
     "tier": "D1",
     "description": "独立合成 Payload 数据集，完全重新全流程编码与模拟测序，杜绝数据单一性质疑",
@@ -37,7 +37,7 @@
     "orient": "both",
     "seed": 202,
     "fastq_file": "reads_se150.fastq",
-    "fastq_sha256": "f7e1d90172b76747ed6ae27d02f1986d47433fe41d151216485bd78be41e7542"
+    "fastq_sha256": "33409af01c6a4d258db88ed6f762e5f61b48d7428b2d1975faf906942f767865"
   },
   "oracle_verified": true
 }

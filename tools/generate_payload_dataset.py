@@ -154,6 +154,8 @@ def simulate_sequencing_reads(
     orient: str = "both",
     seed: int = 42,
     qual_char: str = "F",
+    min_coverage_tile: bool = True,
+    tile_step: int = 50,
 ) -> list[tuple[str, str, str, str]]:
     """从参考序列生成测序读段（FASTQ 4行格式）。"""
     rng = np.random.default_rng(seed)
@@ -162,8 +164,21 @@ def simulate_sequencing_reads(
     if max_start <= 0:
         raise ValueError(f"参考序列长度 {ref_len} 必须大于读长 {read_len}")
 
-    # 均匀采样读段起始位置
-    start_positions = rng.integers(0, max_start + 1, size=reads_count)
+    if min_coverage_tile and reads_count >= 1000:
+        # 1. 平铺保底读段（确保全长 0 盲区，消除高熵数据因泊松随机抽样导致的零覆盖空洞）
+        tiled_starts = list(range(0, max_start + 1, tile_step))
+        if tiled_starts[-1] != max_start:
+            tiled_starts.append(max_start)
+        remaining = max(0, reads_count - len(tiled_starts))
+        random_starts = rng.integers(0, max_start + 1, size=remaining).tolist()
+        all_starts = tiled_starts + random_starts
+        # 打乱顺序以保持测序真实性
+        rng.shuffle(all_starts)
+        start_positions = all_starts[:reads_count]
+    else:
+        # 纯随机采样
+        start_positions = rng.integers(0, max_start + 1, size=reads_count).tolist()
+
     qual = qual_char * read_len
     records = []
 
@@ -182,6 +197,7 @@ def simulate_sequencing_reads(
         records.append((header, read_seq, "+", qual))
 
     return records
+
 
 
 def generate_dataset(
