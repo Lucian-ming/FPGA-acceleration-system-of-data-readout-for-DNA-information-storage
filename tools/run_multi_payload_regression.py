@@ -292,23 +292,25 @@ class MultiPayloadRegression:
         t0 = time.time()
         print(f"\n--- [BOARD] 板级上板实测: {cfg['id']} ({cfg['type']}) -> {self.ip}:{self.port} ---")
 
+        out_dump = DATASETS_DIR / cfg["id"] / "board_output.bin"
+        out_dump.parent.mkdir(parents=True, exist_ok=True)
+
         client_cfg = ClientConfig(
             ip=self.ip,
             port=self.port,
-            reads_file=str(cfg["fastq"]),
-            limit_reads=cfg["read_count"],
+            watermark=Path(cfg["watermark"]),
+            reads=Path(cfg["fastq"]),
+            out=out_dump,
+            send_limit=cfg["read_count"],
             read_bps=150,
             score_min=cfg["score_min"],
             orient="both",
-            preload_watermark=True,
-            watermark_file=str(cfg["watermark"]),
-            write_out=False,
-            golden_check=False,
-            output_file=None,
+            post=True,
+            result_timeout=180.0,
         )
 
         try:
-            rx_arr, report = run_client(client_cfg)
+            stats = run_client(client_cfg)
         except Exception as e:
             print(f"  [ERROR] 板端通信异常: {e}")
             return PayloadTestResult(
@@ -326,22 +328,25 @@ class MultiPayloadRegression:
                 notes=f"Communication error: {e}",
             )
 
+        raw_bytes = out_dump.read_bytes()
+        if len(raw_bytes) == 64800:
+            rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8) - ord('0')
+        elif len(raw_bytes) == 8100:
+            rx_bits = np.unpackbits(np.frombuffer(raw_bytes, dtype=np.uint8))
+        else:
+            rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8)
         golden_cw_text = read_file_text(cfg["codeword"])
+        source_len = cfg["source_payload"].stat().st_size if (cfg.get("source_payload") and cfg["source_payload"].exists()) else None
         passed, raw_errs, init_failed, iters, rec_sha = self.decode_and_verify(
-            rx_arr, golden_cw_text, cfg["expected_sha256"], cfg["type"]
+            rx_bits, golden_cw_text, cfg["expected_sha256"], cfg["type"], source_len=source_len
         )
         elapsed = time.time() - t0
-
-        out_dump = DATASETS_DIR / cfg["id"] / "board_output.bin"
-        if not out_dump.parent.exists():
-            out_dump.parent.mkdir(parents=True, exist_ok=True)
-        out_dump.write_bytes(np.packbits(rx_arr).tobytes())
 
         print(f"  结果: 误码={raw_errs} bit, LDPC轮数={iters}, 匹配={passed}, 耗时={elapsed:.2f}s")
         return PayloadTestResult(
             dataset_id=cfg["id"],
             data_type=cfg["type"],
-            original_size_bytes=len(rx_arr) // 8,
+            original_size_bytes=len(raw_bytes),
             read_count=cfg["read_count"],
             raw_bit_errors=raw_errs,
             initial_syndromes=init_failed,
