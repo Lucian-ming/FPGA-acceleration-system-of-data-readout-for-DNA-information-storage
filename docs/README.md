@@ -1,6 +1,7 @@
 # 文档索引（精简版）
 
-新会话只需按以下顺序阅读，不要默认扫描历史归档：
+新会话先读 03、15 和本索引，按任务补读其余文档；不要默认扫描历史归档。
+文档 13 是终态门禁，15 是当前执行队列，16 是本轮审计证据，互不替代。
 
 | 文档 | 用途 |
 |---|---|
@@ -16,11 +17,11 @@
 | [10-current-handoff.md](10-current-handoff.md) | 当前接手顺序和主线任务 |
 | [11-optimization-plan.md](11-optimization-plan.md) | Stage1、数据泛化、错误鲁棒性和上位机优化 |
 | [12-stress-analysis.md](12-stress-analysis.md) | 自动压测统计口径和后续改造 |
-| [13-final-delivery-roadmap.md](13-final-delivery-roadmap.md) | **从当前状态到最终交付的总收口计划**：终态定义、现状评价、G0～G8 阶段门禁 | 每次排期和收口前必读 |
-| [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | 当前有效的共享 main 并行与回收纪律 | 并行任务开始和交接前必读 |
-| [15-resume-and-parallel-plan.md](15-resume-and-parallel-plan.md) | 中断恢复、最终目标与 W0～W4 并行计划 | 新主会话执行入口 |
-| [16-interrupted-work-audit-2026-09-06.md](16-interrupted-work-audit-2026-09-06.md) | 本轮中断遗留物清点与 dump 复核证据 | 了解本轮审计结果 |
-| [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词 | 启动新会话时使用 |
+| [13-final-delivery-roadmap.md](13-final-delivery-roadmap.md) | 终态定义、候选池、G0～G8 阶段门禁 |
+| [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | 当前有效的共享 main 并行与强制回收纪律 |
+| [15-resume-and-parallel-plan.md](15-resume-and-parallel-plan.md) | 当前执行入口：中断恢复、任务卡与 W0～W5 并行计划 |
+| [16-interrupted-work-audit-2026-09-06.md](16-interrupted-work-audit-2026-09-06.md) | 本轮遗留物清点、报告纠偏与 dump 复核证据 |
+| [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词 |
 
 ## 参考资料
 

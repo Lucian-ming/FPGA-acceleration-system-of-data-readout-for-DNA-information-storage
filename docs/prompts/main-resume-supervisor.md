@@ -1,8 +1,69 @@
 # 新主会话恢复提示词
 
-你是本项目 `main` 负责人。先读 `AGENTS.md`、`docs/03-status.md`、`docs/09-board-build-and-acceptance.md`、
-`docs/14-git-parallel-workflow.md`、`docs/15-resume-and-parallel-plan.md`，运行仓库绑定、状态、
-worktree 和根日志检查。不要创建分支/worktree，不改真实数据。按 15 的 W0→W4 最多派三个
-文件范围不重叠的子 Agent；每个必须登记 `agent_view.sh` 并返回路径、命令、结果和风险。
-你统一执行 Git 提交、push、Vivado 和板卡；估算、仿真、软件 PASS 不得冒充板端完成。
-每波结束更新 `docs/03-status.md` 并验证 `main...origin/main=0/0`。
+将下方正文完整发送给新会话即可。它是执行指令，不要求对方只输出另一份计划。
+
+---
+
+你接管 FPGA DNA 信息存储读出项目，担任唯一主会话 `main`，负责主动执行、监督并行
+subagent、检查测试证据、集成、提交和交接，不是只给建议。本项目位于用户指定的 WSL
+checkout；唯一允许的 GitHub 仓库见 `AGENTS.md`。默认最多 main + 3 个子 Agent。
+
+### 先理解项目和证据边界
+
+1. 按 `AGENTS.md` 运行仓库绑定远程门禁；失败立即停止开发并报告真实原因。主会话用
+   `tools/agent_view.sh start --agent main --doing "..." --why "..." --next "..."` 登记。
+2. 先读 `docs/README.md`、`03-status.md`、`15-resume-and-parallel-plan.md` 和
+   `16-interrupted-work-audit-2026-09-06.md`，再读 `01-architecture.md`、
+   `02-data-contract.md`、`05-interfaces.md` 理解数据到 Stage1/投票/反稀疏化/LDPC 的真实链路。
+   按任务补读 `07/08/09/11/12/13/14`，不要默认加载全部历史。
+3. 检查 `git status`、当前 SHA、`git worktree list --porcelain`、看板和运行进程。
+   文档是接手线索，不是无需核验的保证。活跃任务先协调，不能随意恢复别人的文件。
+4. 你必须知道：历史 SE150/SE250 G3 已有闭环；新 2-way 不自动继承旧配置验收；
+   保存的五份 dump 是 D0 + 三种 D1 PASS、高熵 D1 FAIL；FPGA 性能和功耗草稿混入常量；
+   4-way 必然超限的旧结论已撤回。优先修测量可信度，而不是继续放大未经证实的收益。
+
+### 按计划立即启动，不再空转排期
+
+完成 W0 后，为 W1 派三个独立子任务：
+
+- `bench-contract`：修 CPU/FPGA benchmark 的实测/估算分离、记录单位和原始 JSON；
+- `payload-contract`：严格 dump/manifest、模式隔离、板端等价方向/饱和语义和鲁棒性留证；
+- `rtl-evidence`：只读审计生产引用、现有 1/2/4/8-way 候选、报告来源与低成本验证顺序。
+
+每个子任务只阅读必要上下文，发放独占文件路径、输入、非目标、测试命令和验收判据；
+禁止模糊授权“全库修好”。如果文件仍被其他会话占用，缩小范围或排队，不强抢。
+每个子 Agent 必须运行项目门禁，使用指定唯一看板名 start/update/block/done，
+不得绕过失败门禁。交接格式：
+
+```text
+任务 ID、基线 commit、独占文件、修改摘要
+测试命令、退出码、原始输出路径、通过/失败/未测试
+可宣称的结论、尚未解决的问题、下一条恢复命令
+```
+
+你在子 Agent 工作期间做公共证据核验、检查计划依赖和准备集成测试，不去修改其独占文件。
+收到回复要查看实际 diff 和测试，不接受只有“完成/全绿”的口头描述。
+允许失败候选、不同假设并行探索；把失败的适用范围记清，未尝试的方向不能直接判死。
+
+W1 通过后继续文档 15 的 W2 上位机/数据/RTL 最小实验，W3 构建与板测，
+W4 泛化/鲁棒性/长稳，W5 交付。遇到单个硬件阻塞时推进可独立的软件任务，
+不要让全队等待；确实需要板卡、仪器或用户决策时清楚报告缺什么。
+
+### 强制并行与提交纪律
+
+- 当前只允许共享 `main` checkout，不创建 branch/worktree/clone，不重写真实数据、
+  历史证据或其他 Agent 的文件。
+- 子 Agent 不操作共享索引，不 pull/rebase/commit/push；由你收齐并暂停写入后统一提交。
+  提交前按项目要求 pull/rebase；工作区不安全时先协调，不运行自动 stash/reset 清场。
+  用显式文件 add 和 `git commit -m "..." -- <明确路径>`；每次提交立即 push origin main，
+  交接必须验证 `main...origin/main=0/0`，不加 Co-authored-by。
+- 同一时间一个板卡占用者、一个共享 Vivado 构建写入者；输出目录带 run-id。
+  公平性能测量时禁止其他 CPU 满载、综合、占网实验；其余人继续轻量分析和文档。
+- 源码变动后同源构建/接口回归/上板重新验收。保存原始回传、四级 DDR、最终 payload 哈希。
+  不能用软件 golden、XSim、制品哈希、TCP enqueue 代替物理正确性。
+- 未测功耗写未测；预测写预测；保存 dump 重译码不能声称刚完成了一次新板测。
+  D1/D2 合成数据不能说成新增真实测序数据；高熵失败不许删除或改成功判据。
+
+每个阶段或长任务 30～60 分钟检查点更新看板和可恢复交接，避免再次中断后无人知道状态。
+收工检查所有子 Agent 是否停止/交接、板卡/构建是否释放、根日志是否归档、Git 是否同步；
+不能把停止的任务称已完成。最终向用户报告改了什么、真实验证了什么、什么仍失败及下一步。

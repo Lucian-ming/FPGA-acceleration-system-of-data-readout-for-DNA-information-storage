@@ -19,6 +19,10 @@
 - 只允许在 `main` 开发。所有有意义的源码、脚本、测试摘要和交接文档必须提交，并在每次提交后执行
   `git push origin main`；禁止留下仅存在本地的提交。交接前运行
   `bash tools/verify_repo_binding.sh --require-synced`，结果必须显示 `main...origin/main` 为 `0/0`。
+- **本轮并行执行约束**：主会话是唯一 Git 写入者，子 Agent 不 add/commit/pull/rebase/stash/
+  reset/switch/clean/push；子任务交付由 main 审查后统一提交、立即推送。main 操作 Git 前须
+  暂停写入并核对其他会话，不能在活跃子任务中触发 autostash。路径限定 commit 仍然必须使用。
+  当前不创建分支/worktree，独占路径、资源和中断回收按 `docs/14-git-parallel-workflow.md`。
 - Vivado/XSim 大型生成目录不提交，但不得自动删除；必须提交可复现入口、源文件/黄金数据 manifest、
   结果摘要和结论边界。若 GitHub ruleset 阻止直接推送，立即报告，不得改推其他仓库规避。
 - 工具生成的 `*.log`、`*.jou`、`*.str`、`*.pb` 不得留在仓库根目录；Vivado 使用
