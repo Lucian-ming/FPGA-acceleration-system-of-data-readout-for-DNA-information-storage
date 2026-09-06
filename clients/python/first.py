@@ -50,6 +50,12 @@ from task_protocol import (
     default_score_min,
     read_size_bytes,
 )
+from fast_readout import (
+    fast_iter_read_batches,
+    fast_pack_watermark_bits,
+    fast_unpack_result,
+    seq_to_read_bytes as fast_seq_to_read_bytes,
+)
 
 # ============================================================================
 # 基础常量
@@ -313,21 +319,7 @@ def seq_to_read_bytes(seq: str, read_bps: int = READ_BASES) -> bytes:
     截断/补 N 一律按传入的 read_bps 做：这个参数写死成 150 的话，SE250 的
     250 bp 读段会被静默砍成 150 bp（docs/reference/dataset.md 记过这个风险）。
     """
-    s = seq.strip().upper()
-    if len(s) < read_bps:
-        s += "N" * (read_bps - len(s))
-    elif len(s) > read_bps:
-        s = s[:read_bps]
-
-    data = bytearray(read_size_bytes(read_bps))
-    for idx, base in enumerate(s):
-        pair = BASE2BITS.get(base, "00")
-        if pair[0] == "1":                       # 高位平面
-            data[idx >> 3] |= 1 << (idx & 7)
-        if pair[1] == "1":                       # 低位平面
-            k = read_bps + idx
-            data[k >> 3] |= 1 << (k & 7)
-    return bytes(data)
+    return fast_seq_to_read_bytes(seq, read_bps)
 
 
 def iter_source_seqs(path: Path, limit: int, format_type: str = "auto") -> Iterable[str]:
@@ -396,48 +388,15 @@ def iter_read_batches(
     read_bps: int = READ_BASES,
 ) -> Iterable[bytes]:
     """产出 PKT_BATCH 的负载块；不足 send_total 的部分补零读段。"""
-    if source_reads <= 0 or send_total <= 0:
-        raise ValueError("source_reads 与 send_total 必须为正数")
-    if batch_size <= 0:
-        raise ValueError("batch_size 必须为正数")
-    if send_total % FRAME_READS:
-        raise ValueError(f"send_total 必须为 {FRAME_READS} 的整数倍")
-
-    batch: list = []
-    count = 0
-    expected_real = min(source_reads * (2 if orient == "both" else 1), send_total)
-
-    def flush():
-        header = struct.pack(">I", len(batch))
-        return header + b"".join(batch)
-
-    for read in iter_reads(reads_file, source_reads, format_type, orient, read_bps):
-        if count >= send_total:
-            break
-        batch.append(read)
-        count += 1
-        if len(batch) >= batch_size:
-            yield flush()
-            batch.clear()
-
-    if count != expected_real:
-        raise ValueError(
-            f"读段文件提前结束：预期生成 {expected_real} 条有效方向记录，实得 {count} 条"
-        )
-
-    # 补零到 64 的整数倍（这些补零读段的比对分接近 0，会被板端阈值丢掉）
-    while count < send_total:
-        batch.append(b"\x00" * read_size_bytes(read_bps))
-        count += 1
-        if len(batch) >= batch_size:
-            yield flush()
-            batch.clear()
-
-    if batch:
-        yield flush()
-
-    if count != send_total:
-        raise RuntimeError(f"预期生成 {send_total} 条读段，实际生成 {count} 条")
+    return fast_iter_read_batches(
+        reads_file=reads_file,
+        source_reads=source_reads,
+        send_total=send_total,
+        batch_size=batch_size,
+        format_type=format_type,
+        orient=orient,
+        read_bps=read_bps,
+    )
 
 
 # ============================================================================
@@ -460,24 +419,7 @@ def load_watermark_bits(path: Path) -> str:
 
 
 def pack_watermark_bits(bits: str, task: TaskSpec) -> bytes:
-    if len(bits) != task.watermark_bits:
-        raise ValueError(
-            f"水印位数必须严格等于任务声明 {task.watermark_bits}，实得 {len(bits)}"
-        )
-
-    # 与读段一致：码流顺序 + 字节内 LSB-first（docs/02-data-contract.md）。
-    payload = bytearray((len(bits) + 7) // 8)
-    for idx, ch in enumerate(bits):
-        if ch == "1":
-            payload[idx >> 3] |= 1 << (idx & 7)
-
-    padding = (WM_ALIGN - (len(payload) % WM_ALIGN)) % WM_ALIGN
-    if padding:
-        payload.extend(b"\x00" * padding)
-
-    if len(payload) > MAX_WATERMARK:
-        raise ValueError(f"Watermark payload too large: {len(payload)} bytes > {MAX_WATERMARK} bytes")
-    return bytes(payload)
+    return fast_pack_watermark_bits(bits, task)
 
 
 def send_watermark(
@@ -553,7 +495,7 @@ def recv_result(
             f"PKT_RESULT 长度应为 {RESULT_BYTES} B，实得 {len(payload)} B"
         )
 
-    bit_string = "".join("01"[(payload[idx // 8] >> (idx % 8)) & 1] for idx in range(len(payload) * 8))
+    bit_string = fast_unpack_result(payload)
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(bit_string, encoding="utf-8")
     return len(payload)
