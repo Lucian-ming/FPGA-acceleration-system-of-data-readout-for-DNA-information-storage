@@ -32,21 +32,21 @@
 ### P1 · Stage1 吞吐
 
 W1-A 已重构 `tools/run_cpu_benchmark.py` 并通过单测（commit `f7c898d`）：建立 MEASURED / HISTORICAL / ESTIMATED 严格三级分型，功耗标记未测，彻底清除虚假 FPGA 常量与未实测能效比。
-现行生产线确认为 2-way（见 `docs/benchmarks/stage1-candidate-audit.md`），4-way 理论放得下（8 RAMB36，约 14.7k LUT）但存在单拍选优组合时序与 `< STRIDE` 边界缺陷。下一阶段需先完成公平优化 C 单核/多核基准与 4-way 修复。
+W2-R 已完成 4-way 边界缺陷修复（`<= STRIDE`）与两拍流水化时序闭环（commit `5af3fa3`，详见 `docs/benchmarks/stage1-4way-timing-closure.md`）：全量 50 区域仿真相对 2-way 提速 1.929x 且 100% 逐位一致，Vivado OOC 实测 WNS @ 100MHz 达 **+2.197 ns**，RAMB36 保持为 8 块，LUT 仅占用 8,673（49.3%），证明 4-way 具备在 7010 芯片上的落地可行性。
 
 ### P2 · 多 payload 泛化
 
 W1-B 已重构 `tools/run_multi_payload_regression.py` 并通过单测（commit `73168c1`）：全量 64,800 字节合法性校验，8,100 字节固定 LSB-first 位序；复核磁盘 5 份 dump 保持已知 4 PASS + 1 FAIL 事实边界。
-高熵样本原始误码 2,671 bit，LDPC 50 轮失败已明确留存作为 W2-D 定位对象；不能宣布 G4 完成。
+W2-D 已通过五级分级诊断（commit `5797a17`，`tools/debug_high_entropy.py`）定位高熵失败根因：彻底排除生成器缺陷与反稀疏化扩散，证实主因为高熵序列下水印伪互相关（期望 70.9 vs 伪相关 63.2）与门限（60）不适配，导致 82.1% 伪读段误入并稀释投票；在门限 65 下原始误码骤降至 236 bit 且 LDPC 成功收敛。已支持多 seed 与 D2 受控噪声生成。
 
 ### P3 · 错误鲁棒性曲线
 
 W1-B 已重构 `tools/run_robustness_scan.py` 并建立“板端等价模式”（both 双向独立过门限、逐票饱和截断 [-128, 127]；commit `73168c1`）。
-原最佳方向软件模式已隔离并标注不可作为硬件 G5 验收。下一阶段（W2-D）需开展多采样种子与板端等价深度扫描。
+原最佳方向软件模式已隔离并标注不可作为硬件 G5 验收。
 
-### P4 · 上位机可维护性
+### P4 · 上位机性能与可维护性
 
-W1 阶段已建立基准与回归单测契约。下一阶段（W2-H）针对流式解析、批量打包与 LDPC 开销开展无损优化，由 profiling 和逐位一致性驱动。
+W2-H 已完成上位机 FASTQ 向量化解析与位平面打包无损优化（commit `2743beb`，`clients/python/fast_readout.py`）：全量 51,781 条读段批次打包耗时由 3.38s 降至 0.11s（加速 30.4x，吞吐达 46.5 万 reads/s），全链路主机侧处理占比压缩至 0.13%，消除了流水线停顿瓶颈；单测 25/25 与性能回归 7/7 全绿通过，100% 逐位一致。
 
 ### P5 · 工程技术债
 
