@@ -25,6 +25,7 @@ sw/workspace/
 # Python 缓存
 __pycache__/
 *.py[cod]
+tools/*.so
 
 # 本地导入的只读数据与历史归档。
 # 校验和、来源和使用约束记录在 docs/reference/；如需远端保存大文件，请另行使用 Git LFS 或制品库。
