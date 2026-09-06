@@ -20,7 +20,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -46,6 +46,48 @@ import readout as rd
 def read_file_text(path: Path) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
+
+def unpack_dump_bytes(raw_bytes: bytes, bitorder: str = "little") -> np.ndarray:
+    """严格全文件校验并解包 dump 字节流为 64,800 位 uint8 数组 (0 或 1)。
+
+    遵循 docs/02-data-contract.md 与 docs/15 §5 (任务 B) 规范：
+    1. 64,800 字节规格（未压缩）：
+       - ASCII 格式：所有 64,800 字节均必须为 b'0' (48) 或 b'1' (49)。
+       - 纯二进制位数组格式：所有 64,800 字节均必须为 0x00 或 0x01。
+       严格执行全文件校验（绝不只测前 100 字节！）。若包含任何非法字节立即抛出 ValueError。
+    2. 8,100 字节规格（压缩字节流）：
+       - 64,800 位被压缩成 8,100 字节。按契约必须采用字节内 LSB-first (bitorder='little') 解包。
+    
+    若长度既不是 64,800 也不是 8,100，或字节包含非法值，必须明确抛出 ValueError，严禁静默跳过！
+    """
+    n_bytes = len(raw_bytes)
+    if n_bytes == 64800:
+        arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+        # 全量检查 ASCII '0'/'1'
+        if np.all((arr == ord("0")) | (arr == ord("1"))):
+            return (arr - ord("0")).astype(np.uint8)
+        # 全量检查整数 0/1
+        if np.all((arr == 0) | (arr == 1)):
+            return arr.copy().astype(np.uint8)
+
+        # 发现非法字节，定位并报错
+        invalid_mask = ~((arr == ord("0")) | (arr == ord("1")) | (arr == 0) | (arr == 1))
+        invalid_indices = np.where(invalid_mask)[0]
+        bad_idx = int(invalid_indices[0])
+        bad_val = int(arr[bad_idx])
+        raise ValueError(
+            f"64,800 字节 dump 文件存在非法字节：索引 {bad_idx} 处字节为 0x{bad_val:02X} "
+            f"(ASCII {chr(bad_val)!r}，数值 {bad_val})，不属于合法 ASCII '0'/'1' 或二进制 0/1"
+        )
+    elif n_bytes == 8100:
+        arr = np.frombuffer(raw_bytes, dtype=np.uint8)
+        return np.unpackbits(arr, bitorder=bitorder).astype(np.uint8)
+    else:
+        raise ValueError(
+            f"Dump 文件长度非法: {n_bytes} 字节（合法规格必须是 64,800 字节未压缩或 8,100 字节压缩包）"
+        )
+
+
 PCHK_PATH = RES_DIR / "dvb_s2_r5_6.pchk"
 PERM_PATH = RES_DIR / "permutation64800"
 
@@ -56,6 +98,7 @@ class PayloadTestResult:
     data_type: str
     original_size_bytes: int
     read_count: int
+    score_min: int
     raw_bit_errors: int
     initial_syndromes: int
     ldpc_iters: int
@@ -63,6 +106,7 @@ class PayloadTestResult:
     expected_sha256: str
     passed: bool
     elapsed_seconds: float
+    board_elapsed_seconds: Optional[float] = None
     notes: str = ""
 
 
@@ -233,6 +277,7 @@ class MultiPayloadRegression:
             data_type=cfg["type"],
             original_size_bytes=len(rx_bits) // 8,
             read_count=len(R),
+            score_min=thr,
             raw_bit_errors=raw_errs,
             initial_syndromes=init_failed,
             ldpc_iters=iters,
@@ -240,56 +285,105 @@ class MultiPayloadRegression:
             expected_sha256=cfg["expected_sha256"],
             passed=passed,
             elapsed_seconds=elapsed,
+            board_elapsed_seconds=None,
             notes="Golden pure software model",
         )
 
-    def run_check_saved_dumps(self, cfg: Dict[str, Any]) -> Optional[PayloadTestResult]:
-        """复查磁盘上保存的物理板测 DUMP 文件"""
-        dump_path = DATASETS_DIR / cfg["id"] / "board_output.bin"
-        if not dump_path.exists():
-            return None
+    def run_check_saved_dumps(self, cfg: Dict[str, Any]) -> PayloadTestResult:
+        """严格复查磁盘上保存的物理板测 DUMP 文件。
 
+        严禁建立 TCP 连接或访问板卡；
+        不可把主机执行 LDPC 的耗时误报为“板测耗时”；
+        缺文件或格式损坏必须明确报错失败，严禁静默跳过！
+        """
+        dump_path = DATASETS_DIR / cfg["id"] / "board_output.bin"
         t0 = time.time()
         print(f"\n--- [SAVED DUMP] 校验板测留证: {cfg['id']} ---")
+
+        score_min = cfg.get("score_min", 67)
+
+        # 门禁 1: 文件存在性
+        if not dump_path.exists():
+            err_msg = f"未找到板测 dump 文件: {dump_path}"
+            print(f"  [ERROR] {err_msg}")
+            return PayloadTestResult(
+                dataset_id=cfg["id"],
+                data_type=cfg["type"],
+                original_size_bytes=0,
+                read_count=cfg["read_count"],
+                score_min=score_min,
+                raw_bit_errors=-1,
+                initial_syndromes=-1,
+                ldpc_iters=-1,
+                recovered_sha256="FILE_NOT_FOUND",
+                expected_sha256=cfg["expected_sha256"],
+                passed=False,
+                elapsed_seconds=0.0,
+                board_elapsed_seconds=None,
+                notes=f"Offline dump check failed: {err_msg}",
+            )
+
+        # 门禁 2: 全文件严格字节校验与解包
         raw_bytes = dump_path.read_bytes()
-        if len(raw_bytes) == 64800:
-            if set(raw_bytes[:100]).issubset({ord('0'), ord('1')}):
-                rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8) - ord('0')
-            else:
-                rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8)
-        elif len(raw_bytes) == 8100:
-            rx_bits = np.unpackbits(np.frombuffer(raw_bytes, dtype=np.uint8))
-        else:
-            print(f"  [ERROR] {dump_path} 长度为 {len(raw_bytes)} (期望 64800 或 8100 字节)")
-            return None
+        try:
+            rx_bits = unpack_dump_bytes(raw_bytes, bitorder="little")
+        except Exception as e:
+            err_msg = f"Dump 文件校验失败: {e}"
+            print(f"  [ERROR] {err_msg}")
+            return PayloadTestResult(
+                dataset_id=cfg["id"],
+                data_type=cfg["type"],
+                original_size_bytes=len(raw_bytes),
+                read_count=cfg["read_count"],
+                score_min=score_min,
+                raw_bit_errors=-1,
+                initial_syndromes=-1,
+                ldpc_iters=-1,
+                recovered_sha256="FORMAT_ERROR",
+                expected_sha256=cfg["expected_sha256"],
+                passed=False,
+                elapsed_seconds=0.0,
+                board_elapsed_seconds=None,
+                notes=f"Offline dump check failed: {err_msg}",
+            )
 
         golden_cw_text = read_file_text(cfg["codeword"])
-        source_len = cfg["source_payload"].stat().st_size if (cfg.get("source_payload") and cfg["source_payload"].exists()) else None
+        source_len = (
+            cfg["source_payload"].stat().st_size
+            if (cfg.get("source_payload") and cfg["source_payload"].exists())
+            else None
+        )
 
         passed, raw_errs, init_failed, iters, rec_sha = self.decode_and_verify(
             rx_bits, golden_cw_text, cfg["expected_sha256"], cfg["type"], source_len=source_len
         )
-        elapsed = time.time() - t0
+        host_decode_elapsed = time.time() - t0
 
-        print(f"  结果: 误码={raw_errs} bit, LDPC轮数={iters}, 匹配={passed}, 耗时={elapsed:.2f}s")
+        print(
+            f"  结果: 误码={raw_errs} bit, LDPC轮数={iters}, 匹配={passed}, "
+            f"主机译码耗时={host_decode_elapsed:.2f}s (板端耗时 N/A)"
+        )
         return PayloadTestResult(
             dataset_id=cfg["id"],
             data_type=cfg["type"],
-            original_size_bytes=8100,
+            original_size_bytes=len(raw_bytes),
             read_count=cfg["read_count"],
+            score_min=score_min,
             raw_bit_errors=raw_errs,
             initial_syndromes=init_failed,
             ldpc_iters=iters,
             recovered_sha256=rec_sha,
             expected_sha256=cfg["expected_sha256"],
             passed=passed,
-            elapsed_seconds=elapsed,
-            notes="Physical board output verification",
+            elapsed_seconds=host_decode_elapsed,
+            board_elapsed_seconds=None,
+            notes="Offline dump check (Host LDPC decode only, live board time N/A)",
         )
 
     def run_board_test(self, cfg: Dict[str, Any]) -> PayloadTestResult:
-        """执行物理板端交互读出"""
+        """执行物理板端交互读出。"""
         t0 = time.time()
+        score_min = cfg.get("score_min", 67)
         print(f"\n--- [BOARD] 板级上板实测: {cfg['id']} ({cfg['type']}) -> {self.ip}:{self.port} ---")
 
         out_dump = DATASETS_DIR / cfg["id"] / "board_output.bin"
@@ -303,7 +397,7 @@ class MultiPayloadRegression:
             out=out_dump,
             send_limit=cfg["read_count"],
             read_bps=150,
-            score_min=cfg["score_min"],
+            score_min=score_min,
             orient="both",
             post=True,
             result_timeout=180.0,
@@ -318,6 +412,7 @@ class MultiPayloadRegression:
                 data_type=cfg["type"],
                 original_size_bytes=0,
                 read_count=cfg["read_count"],
+                score_min=score_min,
                 raw_bit_errors=-1,
                 initial_syndromes=-1,
                 ldpc_iters=-1,
@@ -325,22 +420,42 @@ class MultiPayloadRegression:
                 expected_sha256=cfg["expected_sha256"],
                 passed=False,
                 elapsed_seconds=time.time() - t0,
+                board_elapsed_seconds=None,
                 notes=f"Communication error: {e}",
             )
 
         raw_bytes = out_dump.read_bytes()
-        if len(raw_bytes) == 64800:
-            rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8) - ord('0')
-        elif len(raw_bytes) == 8100:
-            rx_bits = np.unpackbits(np.frombuffer(raw_bytes, dtype=np.uint8))
-        else:
-            rx_bits = np.frombuffer(raw_bytes, dtype=np.uint8)
+        try:
+            rx_bits = unpack_dump_bytes(raw_bytes, bitorder="little")
+        except Exception as e:
+            return PayloadTestResult(
+                dataset_id=cfg["id"],
+                data_type=cfg["type"],
+                original_size_bytes=len(raw_bytes),
+                read_count=cfg["read_count"],
+                score_min=score_min,
+                raw_bit_errors=-1,
+                initial_syndromes=-1,
+                ldpc_iters=-1,
+                recovered_sha256="UNPACK_ERROR",
+                expected_sha256=cfg["expected_sha256"],
+                passed=False,
+                elapsed_seconds=time.time() - t0,
+                board_elapsed_seconds=None,
+                notes=f"Board output unpack failed: {e}",
+            )
+
         golden_cw_text = read_file_text(cfg["codeword"])
-        source_len = cfg["source_payload"].stat().st_size if (cfg.get("source_payload") and cfg["source_payload"].exists()) else None
+        source_len = (
+            cfg["source_payload"].stat().st_size
+            if (cfg.get("source_payload") and cfg["source_payload"].exists())
+            else None
+        )
         passed, raw_errs, init_failed, iters, rec_sha = self.decode_and_verify(
             rx_bits, golden_cw_text, cfg["expected_sha256"], cfg["type"], source_len=source_len
         )
         elapsed = time.time() - t0
+        board_elapsed = getattr(stats, "total_time", elapsed)
 
         print(f"  结果: 误码={raw_errs} bit, LDPC轮数={iters}, 匹配={passed}, 耗时={elapsed:.2f}s")
         return PayloadTestResult(
@@ -348,6 +463,7 @@ class MultiPayloadRegression:
             data_type=cfg["type"],
             original_size_bytes=len(raw_bytes),
             read_count=cfg["read_count"],
+            score_min=score_min,
             raw_bit_errors=raw_errs,
             initial_syndromes=init_failed,
             ldpc_iters=iters,
@@ -355,21 +471,24 @@ class MultiPayloadRegression:
             expected_sha256=cfg["expected_sha256"],
             passed=passed,
             elapsed_seconds=elapsed,
+            board_elapsed_seconds=board_elapsed,
             notes="Live board execution",
         )
 
-    def generate_report(self, report_path: Path):
-        """生成 Markdown 格式的完整泛化验证报告"""
+    def generate_report(self, report_path: Path, run_id: str = "") -> Path:
+        """生成 Markdown 格式的完整泛化验证报告并落盘 JSON。"""
         lines = [
             "# 多 Payload 独立泛化回归测试报告",
             "",
+            f"> 运行标识 (run-id): `{run_id}`",
             f"> 生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')} CST",
-            f"> 判定标准: LDPC 5/6 收敛且 SHA-256 与独立源文件逐位 100% 匹配",
+            "> 判定标准: LDPC 5/6 收敛且 SHA-256 与独立源文件逐位 100% 匹配",
+            "> 说明: 高熵随机样本（D1_random_entropy）比对门限特设为 60，其余样本比对门限为 67",
             "",
             "## 1. 测试结果汇总",
             "",
-            "| 数据集 ID | 数据类型 | 规模 | 误码 (bit) | 初始校验子 | LDPC 轮数 | 耗时 (s) | 最终哈希匹配 | 结论 |",
-            "|---|---|---:|---:|---:|---:|---:|:---:|:---:|",
+            "| 数据集 ID | 数据类型 | 比对门限 | 规模 | 误码 (bit) | 初始校验子 | LDPC 轮数 | 耗时说明 | 最终哈希匹配 | 结论 |",
+            "|---|---|---:|---:|---:|---:|---:|:---:|:---:|:---:|",
         ]
 
         total_pass = 0
@@ -378,14 +497,20 @@ class MultiPayloadRegression:
             if r.passed:
                 total_pass += 1
             hash_match = "100% 吻合" if r.passed else "不匹配"
+            time_str = (
+                f"板测 {r.board_elapsed_seconds:.2f}s"
+                if r.board_elapsed_seconds is not None
+                else f"主机 {r.elapsed_seconds:.2f}s (板端N/A)"
+            )
             lines.append(
-                f"| `{r.dataset_id}` | {r.data_type} | {r.read_count} 条 | {r.raw_bit_errors} | "
-                f"{r.initial_syndromes} | {r.ldpc_iters} | {r.elapsed_seconds:.2f}s | {hash_match} | {status_icon} |"
+                f"| `{r.dataset_id}` | {r.data_type} | {r.score_min} | {r.read_count} 条 | {r.raw_bit_errors} | "
+                f"{r.initial_syndromes} | {r.ldpc_iters} | {time_str} | {hash_match} | {status_icon} |"
             )
 
+        pass_rate = (total_pass / max(1, len(self.results))) * 100.0
         lines.extend([
             "",
-            f"**总计通过率**: {total_pass} / {len(self.results)} ({total_pass/max(1, len(self.results))*100:.1f}%)",
+            f"**总计通过率**: {total_pass} / {len(self.results)} ({pass_rate:.1f}%)",
             "",
             "## 2. 独立 Payload 详细哈希对照表",
             "",
@@ -396,24 +521,67 @@ class MultiPayloadRegression:
         for r in self.results:
             lines.append(f"| `{r.dataset_id}` | `{r.expected_sha256}` | `{r.recovered_sha256}` | {r.notes} |")
 
-        lines.append("")
+        lines.extend([
+            "",
+            "## 3. 科学事实边界与已知未关闭项（Known Boundaries）",
+            "",
+            "- **4 PASS + 1 FAIL 事实**: 现有 5 份保存 dump 中，D0 图片、D1 文本、D1 二值几何图案、D1 稀疏跳变均 100% 恢复成功；",
+            "  唯独高熵随机样本 `D1_random_entropy` 原始误码达 2671 bit，LDPC 50 轮未收敛 (FAIL)。",
+            "- **门限差异**: `D1_random_entropy` 降门限至 60 仍未通过；不可通过篡改判据或隐藏变量掩盖高熵随机样本的失败。",
+            "- **严禁虚假全绿**: 任何阶段复核必须忠实重现该事实，作为下一阶段算法/硬件优化的基线依据。",
+            "",
+        ])
+
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text("\n".join(lines), encoding="utf-8")
+
+        # 结构化 JSON 存盘
+        json_path = report_path.with_name("results.json")
+        json_data = {
+            "run_id": run_id,
+            "timestamp": time.time(),
+            "total_pass": total_pass,
+            "total_count": len(self.results),
+            "results": [asdict(r) for r in self.results],
+        }
+        json_path.write_text(json.dumps(json_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
         print(f"\n[REPORT] 完整报告已生成至: {report_path}")
+        print(f"[JSON]   结构化结果已保存至: {json_path}")
+        return report_path
 
 
 def main():
     parser = argparse.ArgumentParser(description="多 Payload 自动化泛化回归工具")
-    parser.add_argument("--mode", choices=["golden", "board", "check-dumps"], default="golden", help="测试模式")
+    parser.add_argument(
+        "--mode", choices=["golden", "board", "check-dumps"], default="golden", help="测试模式"
+    )
     parser.add_argument("--ip", default="192.168.1.10", help="开发板 IP")
     parser.add_argument("--port", type=int, default=7, help="开发板端口")
-    parser.add_argument("--report", default=str(REPO_ROOT / "docs" / "multi_payload_regression_report.md"), help="报告输出路径")
+    parser.add_argument(
+        "--out-dir",
+        default=None,
+        help="输出目录 (默认写入 logs/multi_payload/<run-id>/，严禁自动覆盖 docs/)",
+    )
+    parser.add_argument("--report", default=None, help="自定义报告输出文件路径")
     args = parser.parse_args()
+
+    run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}"
+    if args.out_dir:
+        out_dir = Path(args.out_dir)
+    else:
+        out_dir = REPO_ROOT / "logs" / "multi_payload" / run_id
+
+    if args.report:
+        report_file = Path(args.report)
+    else:
+        report_file = out_dir / "report.md"
 
     reg = MultiPayloadRegression(board_ip=args.ip, board_port=args.port)
     configs = reg.get_dataset_configs()
 
     print(f"=== 多 Payload 独立泛化回归测试启动 (模式: {args.mode.upper()}) ===")
+    print(f"  日志与报告输出目录: {out_dir}")
 
     for cfg in configs:
         if args.mode == "golden":
@@ -421,20 +589,19 @@ def main():
             reg.results.append(res)
         elif args.mode == "check-dumps":
             res = reg.run_check_saved_dumps(cfg)
-            if res:
-                reg.results.append(res)
+            reg.results.append(res)
         elif args.mode == "board":
             res = reg.run_board_test(cfg)
             reg.results.append(res)
 
-    reg.generate_report(Path(args.report))
+    reg.generate_report(report_file, run_id=run_id)
 
     all_passed = all(r.passed for r in reg.results)
     if all_passed:
         print("\n🎉 [ALL PASSED] 所有 Payload 均已成功通过全流程验证！")
         return 0
     else:
-        print("\n⚠️ [FAILURE] 部分 Payload 验证未通过，请检查日志！")
+        print("\n⚠️ [FAILURE] 部分 Payload 验证未通过，请检查日志与报告！")
         return 1
 
 
