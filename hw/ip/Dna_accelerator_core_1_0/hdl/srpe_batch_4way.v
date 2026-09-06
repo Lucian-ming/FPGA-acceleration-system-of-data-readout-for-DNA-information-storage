@@ -11,8 +11,12 @@
 // =============================================================
 `timescale 1 ns / 1 ps
 
+`ifndef SRPE_BATCH_4WAY_MODNAME
+`define SRPE_BATCH_4WAY_MODNAME srpe_batch
+`endif
+
 (* keep_hierarchy = "yes" *)
-module srpe_batch #(
+module `SRPE_BATCH_4WAY_MODNAME #(
     parameter integer BATCH     = 64,
     parameter integer NUM_LC    = 50,      // 参考区域数量
     parameter integer STRIDE    = 805,     // 每区域可滑动位置数
@@ -118,13 +122,14 @@ module srpe_batch #(
                      S_INITC      = 4'd5,
                      S_LAUNCH     = 4'd6,
                      S_RUN        = 4'd7,
-                     S_UPD        = 4'd8,
-                     S_NEXT       = 4'd9,
-                     S_EMIT       = 4'd10,
-                     S_EMIT2      = 4'd11,
-                     S_EMIT_FINAL = 4'd12,
-                     S_DONE       = 4'd13,
-                     S_EMIT_W     = 4'd14;
+                     S_UPD1       = 4'd8,
+                     S_UPD2       = 4'd9,
+                     S_NEXT       = 4'd10,
+                     S_EMIT       = 4'd11,
+                     S_EMIT2      = 4'd12,
+                     S_EMIT_FINAL = 4'd13,
+                     S_DONE       = 4'd14,
+                     S_EMIT_W     = 4'd15;
 
     reg [3:0]  st;
 
@@ -155,14 +160,21 @@ module srpe_batch #(
     // 4 组独立分数累加器：score[p][t]
     reg [SCORE_W-1:0] score [0:P_WAYS-1][0:BATCH-1];
 
-    // 4 个候选位置有效标志（防止超出 STRIDE 越界）
+    // 4 个候选位置有效标志（防止超出 STRIDE 越界，包含 STRIDE 边界）
     wire [3:0] pos_valid;
     genvar gv;
     generate
         for (gv=0; gv<P_WAYS; gv=gv+1) begin: gen_pos_val
-            assign pos_valid[gv] = (pos_base + gv < STRIDE);
+            assign pos_valid[gv] = (pos_base + gv <= STRIDE);
         end
     endgenerate
+
+    // 流水选优树第一级寄存器（S_UPD1 -> S_UPD2）
+    reg                   stage1_res_valid;
+    reg [REGION_W-1:0]    stage1_lc_idx;
+    reg [POS_W-1:0]       stage1_pos   [0:BATCH-1];
+    reg [SCORE_W-1:0]     stage1_score [0:BATCH-1];
+    reg [CODEBITS-1:0]    stage1_cw    [0:BATCH-1];
 
     // 匹配比较矩阵：match_mask[p][t] 表示位置 p 对读段 t 的当前碱基是否完全一致
     wire [63:0] match_mask [0:P_WAYS-1];
@@ -224,10 +236,15 @@ module srpe_batch #(
             emit_idx        <= 6'd0;
             emit_i          <= 9'd0;
             cw_acc          <= {CODEBITS{1'b0}};
+            stage1_res_valid <= 1'b0;
+            stage1_lc_idx    <= {REGION_W{1'b0}};
             for (t=0; t<BATCH; t=t+1) begin
-                best_sc[t]     <= {SCORE_W{1'b0}};
-                best_pos[t]    <= {POS_W{1'b0}};
-                best_region[t] <= {REGION_W{1'b0}};
+                best_sc[t]      <= {SCORE_W{1'b0}};
+                best_pos[t]     <= {POS_W{1'b0}};
+                best_region[t]  <= {REGION_W{1'b0}};
+                stage1_score[t] <= {SCORE_W{1'b0}};
+                stage1_pos[t]   <= {POS_W{1'b0}};
+                stage1_cw[t]    <= {CODEBITS{1'b0}};
                 for (p=0; p<P_WAYS; p=p+1) score[p][t] <= {SCORE_W{1'b0}};
             end
             for (p=0; p<P_WAYS; p=p+1) wm_win[p] <= 2'b00;
@@ -308,21 +325,26 @@ module srpe_batch #(
                 end
 
                 S_INITC: begin
-                    lc_idx   <= 0;
-                    pos_cnt  <= 0;
-                    pos_base <= 0;
+                    lc_idx           <= 0;
+                    pos_cnt          <= 0;
+                    pos_base         <= 0;
+                    stage1_res_valid <= 1'b0;
+                    stage1_lc_idx    <= {REGION_W{1'b0}};
                     for (t=0; t<BATCH; t=t+1) begin
-                        best_sc[t]     <= {SCORE_W{1'b0}};
-                        best_pos[t]    <= {POS_W{1'b0}};
-                        best_region[t] <= {REGION_W{1'b0}};
+                        best_sc[t]      <= {SCORE_W{1'b0}};
+                        best_pos[t]     <= {POS_W{1'b0}};
+                        best_region[t]  <= {REGION_W{1'b0}};
+                        stage1_score[t] <= {SCORE_W{1'b0}};
+                        stage1_pos[t]   <= {POS_W{1'b0}};
                     end
                     st <= S_LAUNCH;
                 end
 
                 S_LAUNCH: begin
-                    pos_base <= pos_cnt;
-                    pre_cnt  <= 0;
-                    run_cnt  <= 0;
+                    pos_base         <= pos_cnt;
+                    pre_cnt          <= 0;
+                    run_cnt          <= 0;
+                    stage1_res_valid <= 1'b0;
                     for (t=0; t<BATCH; t=t+1) begin
                         for (p=0; p<P_WAYS; p=p+1) score[p][t] <= {SCORE_W{1'b0}};
                     end
@@ -383,13 +405,16 @@ module srpe_batch #(
                                     (REF_LEN - 1) : (pos_base + 7 + run_cnt);
 
                     if (run_cnt == READ_BPS - 1) begin
-                        st <= S_UPD;
+                        st <= S_UPD1;
                     end
                 end
 
-                // 选优阶段：4 选 1 并更新全局历史最优
-                S_UPD: begin
-                    for (t=0; t<BATCH; t=t+1) begin: blk_upd
+                // 选优流水级 1：4 选 1 局部选优，结果打入流水寄存器
+                S_UPD1: begin
+                    stage1_res_valid <= 1'b1;
+                    stage1_lc_idx    <= lc_idx;
+
+                    for (t=0; t<BATCH; t=t+1) begin: blk_upd1
                         reg [SCORE_W-1:0] s01, s23, top_sc;
                         reg [1:0]         p01, p23, top_p;
 
@@ -409,20 +434,29 @@ module srpe_batch #(
                             s23 = score[3][t]; p23 = 2'd3;
                         end
 
-                        // 4 选 1
+                        // 4 选 1（并列严格偏向低序号）
                         if (s01 >= s23) begin
                             top_sc = s01; top_p = p01;
                         end else begin
                             top_sc = s23; top_p = p23;
                         end
 
-                        // 与全局历史最优比较
-                        if (top_sc > best_sc[t]) begin
-                            best_sc[t]     <= top_sc;
-                            best_pos[t]    <= pos_base + top_p;
-                            best_region[t] <= lc_idx;
+                        stage1_score[t] <= top_sc;
+                        stage1_pos[t]   <= pos_base + top_p;
+                    end
+                    st <= S_UPD2;
+                end
+
+                // 选优流水级 2：与全局历史最优比较并更新
+                S_UPD2: begin
+                    for (t=0; t<BATCH; t=t+1) begin: blk_upd2
+                        if (stage1_res_valid && (stage1_score[t] > best_sc[t])) begin
+                            best_sc[t]     <= stage1_score[t];
+                            best_pos[t]    <= stage1_pos[t];
+                            best_region[t] <= stage1_lc_idx;
                         end
                     end
+                    stage1_res_valid <= 1'b0;
                     st <= S_NEXT;
                 end
 
