@@ -21,6 +21,9 @@ sw/workspace/
 *.str
 *.pb
 *.wdb
+logs/benchmarks/
+logs/multi_payload/
+logs/robustness/
 
 # Python 缓存
 __pycache__/
