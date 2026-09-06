@@ -63,7 +63,7 @@ module tb_vot_ddr_bitexact;
 
     // ---------------- 规模常量（与 sw/app/echo.h、黄金向量一致）----------------
     localparam integer NUM_RECORDS   = 4096;              // make_golden.py --limit 2048 x 正反向
-    localparam integer WORDS_PER_REC = 9;                 // 每条记录 72 B (9 拍 x 64 bit)
+    localparam integer WORDS_PER_REC = 6;                 // 每条记录 72 B (9 拍 x 64 bit)
     localparam integer IN_WORDS      = NUM_RECORDS * WORDS_PER_REC;   // 36864
     localparam integer OUT_BEATS     = 1266;              // ceil(81000/64)
     localparam integer OUT_BITS      = 81000;
@@ -94,7 +94,7 @@ module tb_vot_ddr_bitexact;
     localparam [4:0] ST_INIT_BRAM = 5'd1;
     localparam [4:0] ST_READ_DATA = 5'd3;
 
-    localparam integer SCORE_MIN_THR = 112;     // int(0.45*250)，与 make_golden.py 一致
+    localparam integer SCORE_MIN_THR = 67;      // int(0.45*150)，与 make_golden.py 一致
 
     reg clk = 0, rstn = 0;
     always #5 clk = ~clk;                       // 100 MHz，与板上 FCLK0 相同
@@ -728,9 +728,9 @@ module tb_vot_ddr_bitexact;
     end
 
     initial begin
-        input_path      = "tests/golden/se250/stage2_in.hex";
-        expect_thr_path = "tests/golden/se250/stage2_expect.hex";
-        expect_raw_path = "tests/golden/se250/stage2_rtl_expect.hex";
+        input_path      = "tests/golden/stage2_in.hex";
+        expect_thr_path = "tests/golden/stage2_expect.hex";
+        expect_raw_path = "tests/golden/stage2_rtl_expect.hex";
         start0_ns       = 100000;      // echo.c: START=1 之后 usleep(100)
         late_ns         = 5000000;     // 5 ms：投票途中
         second_score_min = 0;          // 场景 2 的阈值：默认换成 0，让残留可观测

@@ -41,8 +41,8 @@ module differential_voter_v1_0 #
     parameter integer C_M00_AXI_ADDR_WIDTH = 32,
     parameter integer MAX_BURST_LEN        = 16,
     parameter integer TOTAL_BITS           = 81000,
-    parameter integer CODEWORD_BITS        = 500,
-    parameter integer UPPER_LAYER_BITS     = 250,
+    parameter integer CODEWORD_BITS        = 300,
+    parameter integer UPPER_LAYER_BITS     = 150,
     parameter integer LAYER_SIZE           = 40500,
     parameter integer FAST_INIT            = 0
 )
@@ -111,7 +111,7 @@ module differential_voter_v1_0 #
 );
 
     // ----------------- 常量/辅助 -----------------
-    localparam integer WORDS_PER_READ   = 9; // 9 x 64b
+    localparam integer WORDS_PER_READ   = 6; // 6 x 64b
     localparam integer TOTAL_BEATS_HW   = (TOTAL_BITS + 63) / 64; // 硬件应写拍数
     localparam [31:0] TIMEOUT_CYCLES    = 32'd1000000000; // 10 s @100 MHz
     localparam [31:0] NO_PROGRESS_CYCLES = 32'd100000000; // 1 s without AXI/FSM progress
@@ -235,8 +235,8 @@ module differential_voter_v1_0 #
     reg [4:0] state, next_state;
 
     // ----------------- 数据路径寄存器 -----------------
-    reg [63:0] read_words [0:8];
-    reg [3:0]  read_beat_count;
+    reg [63:0] read_words [0:5];
+    reg [2:0]  read_beat_count;
 
     // 【S1 时序改造 2026-09-03】原为 reg [299:0] current_codeword，判决处按
     // bit_in_codeword 随机索引，综合成 300 选 1 多路选择器（SE250 下是 500 选 1）。
@@ -332,10 +332,10 @@ module differential_voter_v1_0 #
     // 【修订 B16】完成条件只看握手计数：第 6 次握手发生在 RLAST 那拍，
     // beat_count 要到下一拍才等于 6；而合规从机在 RLAST 握手后即撤下 RVALID。
     // 原条件 (beat_count>=6 && RVALID) 依赖残留的 RVALID 电平，真实互连上会死锁。
-    wire read_data_complete   = (read_beat_count >= 4'd9);
+    wire read_data_complete   = (read_beat_count >= 3'd6);
     // 页内剩余拍数（rd_ptr 恒为 8B 对齐）与本记录剩余拍数，取较小者为本笔突发长度
     wire [9:0] rd_beats_to_page_end = (13'd4096 - {1'b0, rd_ptr[11:0]}) >> 3;
-    wire [3:0] rd_beats_remaining   = WORDS_PER_READ[3:0] - read_beat_count;
+    wire [2:0] rd_beats_remaining   = WORDS_PER_READ[2:0] - read_beat_count;
     wire [3:0] rd_next_burst_beats  =
         (rd_beats_to_page_end < {6'd0, rd_beats_remaining}) ? rd_beats_to_page_end[3:0]
                                                            : rd_beats_remaining;
@@ -433,8 +433,8 @@ module differential_voter_v1_0 #
             read_addr_reg       <= 32'd0;
             read_addr           <= 32'd0;
             rd_ptr              <= 32'd0;
-            rd_burst_beats      <= 4'd0;
-            rd_burst_done       <= 4'd0;
+            rd_burst_beats      <= 3'd0;
+            rd_burst_done       <= 3'd0;
             total_reads         <= 32'd0;
 
             // >>> 新增复位
@@ -460,7 +460,7 @@ module differential_voter_v1_0 #
                         total_reads       <= total_reads_cfg;
                         read_addr         <= in_addr;
                         rd_ptr            <= in_addr;
-                        read_beat_count   <= 4'd0;
+                        read_beat_count   <= 3'd0;
 
                         output_bit_count  <= 17'd0;
                         output_word       <= 64'd0;
@@ -500,7 +500,7 @@ module differential_voter_v1_0 #
                     // 因此不能在这里清零，改到记录切换处清。
                     read_addr_reg   <= rd_ptr;      // 锁存AR地址
                     rd_burst_beats  <= rd_next_burst_beats;
-                    rd_burst_done   <= 4'd0;
+                    rd_burst_done   <= 3'd0;
                     debug_state_count <= state;
                 end
 
@@ -524,10 +524,7 @@ module differential_voter_v1_0 #
                     codeword_sr[165:102]  <= read_words[2][63:0];
                     codeword_sr[229:166]  <= read_words[3][63:0];
                     codeword_sr[293:230]  <= read_words[4][63:0];
-                    codeword_sr[357:294]  <= read_words[5][63:0];
-                    codeword_sr[421:358]  <= read_words[6][63:0];
-                    codeword_sr[485:422]  <= read_words[7][63:0];
-                    codeword_sr[499:486]  <= read_words[8][13:0];
+                    codeword_sr[299:294]  <= read_words[5][5:0];
 
                     bit_in_codeword <= 9'd0;
 
@@ -582,7 +579,7 @@ module differential_voter_v1_0 #
                         read_addr  <= read_addr + (WORDS_PER_READ * 8);
                         rd_ptr     <= read_addr + (WORDS_PER_READ * 8);
                     end
-                    read_beat_count <= 4'd0;
+                    read_beat_count <= 3'd0;
                     debug_state_count <= state;
                 end
 
@@ -746,7 +743,7 @@ module differential_voter_v1_0 #
     end
 
     assign M00_AXI_ARADDR  = read_addr_reg; // 地址已在 S_READ_SETUP 锁存
-    assign M00_AXI_ARLEN   = {4'd0, rd_burst_beats} - 8'd1; // 本笔突发拍数-1（B20）
+    assign M00_AXI_ARLEN   = {5'd0, rd_burst_beats} - 8'd1; // 本笔突发拍数-1（B20）
     assign M00_AXI_ARSIZE  = 3'b011;        // 8B
     assign M00_AXI_ARBURST = 2'b01;         // INCR
     assign M00_AXI_ARLOCK  = 1'b0;

@@ -23,9 +23,9 @@ module tb_srpe_batch;
 
     localparam integer BATCH    = 64;
     localparam integer NUM_LC   = 50;
-    localparam integer STRIDE   = 805;
-    localparam integer REF_LEN  = 1055;
-    localparam integer READ_BPS = 250;
+    localparam integer STRIDE   = 807;
+    localparam integer REF_LEN  = 957;
+    localparam integer READ_BPS = 150;
     localparam integer CODEBITS = READ_BPS * 2;
     localparam integer SCORE_W  = 10;
     localparam integer POS_W    = 16;
@@ -115,21 +115,21 @@ module tb_srpe_batch;
     integer plusarg_result;
     integer dump_stage1_en;
     integer dump_fd;
-    reg [575:0] dump_rec;
+    reg [383:0] dump_rec;
 
     // Optional checkpoint export for a real stage-to-stage regression.  The
     // default golden test remains unchanged; when requested, this file is
-    // the actual Stage1 result, nine LSB-first 64-bit words per record.
+    // the actual Stage1 result, six LSB-first 64-bit words per record.
     initial dump_stage1_en = $value$plusargs("dump_stage1=%s", dump_stage1_path);
 
     initial begin
-        reads_path = "tests/golden/se250/reads_cw.hex";
-        expect_path = "tests/golden/se250/stage1_fwd_expect.txt";
+        reads_path = "tests/golden/reads_cw.hex";
+        expect_path = "tests/golden/stage1_fwd_expect.txt";
         max_ties = (BATCH * 5) / 100;
         plusarg_result = $value$plusargs("reads=%s", reads_path);
         plusarg_result = $value$plusargs("expect=%s", expect_path);
         plusarg_result = $value$plusargs("max_ties=%d", max_ties);
-        $readmemh("tests/golden/se250/wm_regions.hex", wm_sym);
+        $readmemh("tests/golden/wm_regions.hex", wm_sym);
         $readmemh(reads_path, reads);
 
         // 读正向期望：跳过以 '#' 开头的注释行
@@ -235,7 +235,7 @@ module tb_srpe_batch;
                 dump_rec[SCORE_W-1:0] = got_sc[i];
                 dump_rec[SCORE_W+POS_W-1:SCORE_W] = got_pos[i];
                 dump_rec[RESULT_W-1:SCORE_W+POS_W] = got_cw[i];
-                for (j = 0; j < 9; j = j + 1)
+                for (j = 0; j < 6; j = j + 1)
                     $fdisplay(dump_fd, "%016h", dump_rec[j*64 +: 64]);
             end
             $fclose(dump_fd);

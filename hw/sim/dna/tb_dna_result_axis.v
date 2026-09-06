@@ -24,9 +24,9 @@
 module tb_dna_result_axis;
 
     localparam integer NREC      = 64;      // 核对的记录条数
-    localparam integer BEATS     = 9;       // 每条记录 9 拍 x 64 bit = 72 B
-    localparam integer RESULT_W  = 526;     // CODEBITS(500) + POS_W(16) + SCORE_W(10)
-    localparam integer GOLD_LINES= 36864;   // stage2_in.hex 全长：4096 条 x 9 字
+    localparam integer BEATS     = 6;       // 每条记录 6 拍 x 64 bit = 48 B
+    localparam integer RESULT_W  = 326;     // CODEBITS(300) + POS_W(16) + SCORE_W(10)
+    localparam integer GOLD_LINES= 24576;   // stage2_in.hex 全长：4096 条 x 6 字
     localparam integer GAP       = 64;      // 两条记录之间的间隔拍数（模拟引擎产出节奏）
 
     reg aclk = 1'b0;
@@ -128,12 +128,12 @@ module tb_dna_result_axis;
     end
 
     //-------------------------------------------------------------------------
-    // 注入：把黄金记录的低 526 bit 直接写进结果 FIFO
+    // 注入：把黄金记录的低 326 bit 直接写进结果 FIFO
     //-------------------------------------------------------------------------
-    reg [575:0] rec_full;
+    reg [383:0] rec_full;
     integer i, k;
     initial begin
-        $readmemh("tests/golden/se250/stage2_in.hex", gold);
+        $readmemh("tests/golden/stage2_in.hex", gold);
 
         repeat (10) @(posedge aclk);
         aresetn = 1'b1;
@@ -144,13 +144,14 @@ module tb_dna_result_axis;
         force dut.eng_res_din = inj_din;
 
         for (i = 0; i < NREC; i = i + 1) begin
-            rec_full = 576'd0;
+            rec_full = 384'd0;
             for (k = 0; k < BEATS; k = k + 1)
                 rec_full[k*64 +: 64] = gold[i*BEATS + k];
 
             // FIFO 满就等
             while (dut.res_full === 1'b1) @(posedge aclk);
 
+            // 写入结果 FIFO（低 326 bit 是有效记录内容）
             @(negedge aclk);
             inj_din = rec_full[RESULT_W-1:0];
             inj_wr  = 1'b1;

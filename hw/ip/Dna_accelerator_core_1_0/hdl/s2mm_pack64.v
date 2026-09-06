@@ -14,7 +14,7 @@
 // 保证「一条记录只 pop 一次」（原来的 res_rd 在打包过程中会反复 pop，见 B24）。
 //=============================================================================
 module s2mm_pack64 #(
-    parameter integer R = 526
+    parameter integer R = 326
 )(
     input  wire         clk,
     input  wire         rst_n,
@@ -26,29 +26,26 @@ module s2mm_pack64 #(
     output reg          m_last,
     input  wire         m_rdy
 );
-    localparam integer BEATS = 9;
+    localparam integer BEATS = 6;
 
-    reg [3:0]   beat;
+    reg [2:0]   beat;
     reg         busy;
     reg [R-1:0] lat;
 
     wire fire = m_vld & m_rdy;      // 真正的握手
 
-    // 526 bit -> 9 x 64 bit（末拍只有 14 bit 有效，高位补零）
+    // 326 bit -> 6 x 64 bit（末拍只有 6 bit 有效，高位补零）
     function [63:0] slice_of;
-        input [3:0]   idx;
+        input [2:0]   idx;
         input [R-1:0] v;
         begin
             case (idx)
-                4'd0: slice_of = v[63:0];
-                4'd1: slice_of = v[127:64];
-                4'd2: slice_of = v[191:128];
-                4'd3: slice_of = v[255:192];
-                4'd4: slice_of = v[319:256];
-                4'd5: slice_of = v[383:320];
-                4'd6: slice_of = v[447:384];
-                4'd7: slice_of = v[511:448];
-                4'd8: slice_of = {50'b0, v[525:512]};
+                3'd0: slice_of = v[63:0];
+                3'd1: slice_of = v[127:64];
+                3'd2: slice_of = v[191:128];
+                3'd3: slice_of = v[255:192];
+                3'd4: slice_of = v[319:256];
+                3'd5: slice_of = {58'b0, v[325:320]};
                 default: slice_of = 64'd0;
             endcase
         end
@@ -57,7 +54,7 @@ module s2mm_pack64 #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             busy   <= 1'b0;
-            beat   <= 4'd0;
+            beat   <= 3'd0;
             m_vld  <= 1'b0;
             m_last <= 1'b0;
             m_dat  <= 64'd0;
@@ -71,9 +68,9 @@ module s2mm_pack64 #(
                     lat    <= din;
                     din_rd <= 1'b1;          // 一条记录只 pop 一次
                     busy   <= 1'b1;
-                    beat   <= 4'd0;
+                    beat   <= 3'd0;
                     m_vld  <= 1'b1;
-                    m_dat  <= slice_of(4'd0, din);
+                    m_dat  <= slice_of(3'd0, din);
                     m_last <= 1'b0;
                 end
             end else if (fire) begin
@@ -82,10 +79,10 @@ module s2mm_pack64 #(
                     m_vld  <= 1'b0;
                     m_last <= 1'b0;
                 end else begin
-                    beat   <= beat + 4'd1;
+                    beat   <= beat + 3'd1;
                     m_vld  <= 1'b1;
-                    m_dat  <= slice_of(beat + 4'd1, lat);
-                    m_last <= ((beat + 4'd1) == (BEATS-1));
+                    m_dat  <= slice_of(beat + 3'd1, lat);
+                    m_last <= ((beat + 3'd1) == (BEATS-1));
                 end
             end
             // 未握手时 m_vld / m_dat / m_last 保持不变（AXI-Stream 要求）

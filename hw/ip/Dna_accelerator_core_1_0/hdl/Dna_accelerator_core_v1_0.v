@@ -16,15 +16,15 @@ module Dna_accelerator_core_v1_0 #(
     parameter integer C_S_AXIS_DATA_TDATA_WIDTH    = 32,
     parameter integer C_M_AXIS_RESULT_TDATA_WIDTH  = 64,
     // ===== Algorithm/Data params =====
-    parameter integer READ_BPS  = 250,                     // bits per read (symbols*2)
-    parameter integer CODEBITS  = READ_BPS*2,              // e.g. 500
+    parameter integer READ_BPS  = 150,                     // bits per read (symbols*2)
+    parameter integer CODEBITS  = READ_BPS*2,              // 300 for SE150
     parameter integer SCORE_W   = 10,
     parameter integer POS_W     = 16,
-    // 【修改1】全局参数调整
-    parameter integer NUM_LC    = 50,      // 参考片段数量：50
-    parameter integer REF_LEN   = 1055,    // 每段参考长度：1055 bp
-    parameter integer STRIDE    = 805,     // 每段可滑动位置数：805
-    // 【修改2】结果宽度 = CODEBITS + POS_W + SCORE_W（region 信息已合并到 global_pos 中）
+    // 几何参数 (SE150 规范)
+    parameter integer NUM_LC    = 50,                      // 参考片段数 50
+    parameter integer REF_LEN   = 957,                     // 每段参考长度 957 bp
+    parameter integer STRIDE    = 807,                     // 每段可滑动位置 807
+    // 结果位宽 = CODEBITS + POS_W + SCORE_W (300 + 16 + 10 = 326)
     parameter integer RESULT_W  = CODEBITS + POS_W + SCORE_W,
     parameter integer BATCH     = 64
 )(
@@ -186,13 +186,7 @@ module Dna_accelerator_core_v1_0 #(
                 4'd6: next_in_buf[223:192] = S_AXIS_DATA_TDATA;
                 4'd7: next_in_buf[255:224] = S_AXIS_DATA_TDATA;
                 4'd8: next_in_buf[287:256] = S_AXIS_DATA_TDATA;
-                4'd9: next_in_buf[319:288] = S_AXIS_DATA_TDATA;
-                4'd10: next_in_buf[351:320] = S_AXIS_DATA_TDATA;
-                4'd11: next_in_buf[383:352] = S_AXIS_DATA_TDATA;
-                4'd12: next_in_buf[415:384] = S_AXIS_DATA_TDATA;
-                4'd13: next_in_buf[447:416] = S_AXIS_DATA_TDATA;
-                4'd14: next_in_buf[479:448] = S_AXIS_DATA_TDATA;
-                4'd15: next_in_buf[CODEBITS-1:480] = S_AXIS_DATA_TDATA[CODEBITS-480-1:0];
+                4'd9: next_in_buf[CODEBITS-1:288] = S_AXIS_DATA_TDATA[CODEBITS-288-1:0];
                 default: ;
             endcase
         end
@@ -207,7 +201,7 @@ module Dna_accelerator_core_v1_0 #(
             in_buf <= next_in_buf;
             in_wr  <= 1'b0; // default
             if (S_AXIS_DATA_TVALID && S_AXIS_DATA_TREADY && ~preload_mode_s) begin
-                if (in_cnt == 4'd15) begin
+                if (in_cnt == 4'd9) begin
                     in_cnt <= 4'd0;
                     in_wr  <= 1'b1; // Collected 10x32bit, write 1 read
                 end else begin
@@ -255,9 +249,9 @@ module Dna_accelerator_core_v1_0 #(
         end else if (preload_mode_s && S_AXIS_DATA_TVALID && S_AXIS_DATA_TREADY) begin
             wm_we    <= 1'b1;
             wm_wdata <= S_AXIS_DATA_TDATA[1:0];
-            // 【修复3】防溢出：写满 957 个 symbol 后自动归零
+            // 【修复3】防溢出：写满 957 个 symbol 后自动归零 (0~956)
             wm_waddr_q <= wm_waddr;   // [B25] 写地址必须与数据同拍，见下方注释
-            wm_waddr <= (wm_waddr == 11'd1054) ? 11'd0 : (wm_waddr + 11'd1);
+            wm_waddr <= (wm_waddr == 11'd956) ? 11'd0 : (wm_waddr + 11'd1);
         end
     end
 

@@ -35,7 +35,7 @@ module tb_differential_voter #(
 );
 
     // 黄金向量由 make_golden.py --limit 2048 生成：2,048 × (正向+反向互补)
-    localparam integer WORDS_PER_REC = 9;             // 每条记录 72 B (9 拍)
+    localparam integer WORDS_PER_REC = 6;             // 每条记录 48 B (6 拍)
     localparam integer IN_WORDS  = NUM_RECORDS * WORDS_PER_REC;
     localparam integer OUT_BEATS = 1266;              // ceil(81000/64)
     localparam integer OUT_BITS  = 81000;
@@ -129,7 +129,7 @@ module tb_differential_voter #(
                     r_idx    <= r_idx + 1;
                     r_left   <= r_left - 1;
                     // 每条记录必须恰好累计 9 拍（可跨多笔突发）
-                    if (rec_beats == 8) rec_beats <= 0;
+                    if (rec_beats == 5) rec_beats <= 0;
                     else                rec_beats <= rec_beats + 1;
                 end else begin
                     // 最后一个 beat 已被消费：必须撤下 RVALID/RLAST，
@@ -236,7 +236,7 @@ module tb_differential_voter #(
     //   第 1、2 轮 SCORE_MIN=67 → stage2_expect.hex（D1 阈值语义 + 清零复验）
     //   第 3 轮   SCORE_MIN=0  → stage2_rtl_expect.hex（复位默认，不过滤）
     // =========================================================
-    localparam integer SCORE_MIN_THR = 112;  // = int(0.45×250)，与 make_golden 一致
+    localparam integer SCORE_MIN_THR = 67;   // = int(0.45×150)，与 make_golden 一致
 
     integer errors, bit_errors, proto_errors;
     integer k, b, j, run, timeout, polls, score_min_run, run_limit;
@@ -272,9 +272,9 @@ module tb_differential_voter #(
         s_awvalid=0; s_wvalid=0; s_bready=0; s_arvalid=0; s_rready=1;
         s_awaddr=0; s_wdata=0; s_wstrb=0; s_araddr=0;
 
-        input_path = "tests/golden/se250/stage2_in.hex";
-        expect_path = "tests/golden/se250/stage2_rtl_expect.hex";
-        expect_thr_path = "tests/golden/se250/stage2_expect.hex";
+        input_path = "tests/golden/stage2_in.hex";
+        expect_path = "tests/golden/stage2_rtl_expect.hex";
+        expect_thr_path = "tests/golden/stage2_expect.hex";
         run_limit = RUNS;
         plusarg_result = $value$plusargs("input=%s", input_path);
         plusarg_result = $value$plusargs("expect=%s", expect_path);
