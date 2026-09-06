@@ -116,7 +116,9 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 | `docs/11-optimization-plan.md` | Stage1、数据、鲁棒性与上位机优化 |
 | `docs/12-stress-analysis.md` | 自动压测统计口径与后续改造 |
 | `docs/13-final-delivery-roadmap.md` | 从当前状态到最终交付的总收口计划与硬门禁 |
-| `docs/14-git-parallel-workflow.md` | 并行 Agent 的分支、独立 worktree、合并与强制回收规范 |
+| `docs/14-git-parallel-workflow.md` | 当前共享 main 的并行与回收规范（禁止 worktree） |
+| `docs/15-resume-and-parallel-plan.md` | 中断恢复与全流程并行计划 |
+| `docs/16-interrupted-work-audit-2026-09-06.md` | 本轮遗留物清点与 dump 复核 |
 | `docs/archive/history/2026/` | 历史交接、旧计划和旧状态全文，只用于追溯 |
 | `docs/reference/` | 数据集与历史审计参考 |
 

@@ -20,7 +20,7 @@ FASTQ → Stage1 水印滑窗比对 → Stage2 投票 → Stage3 反稀疏化 �
 
 ## 新会话阅读顺序
 
-只需按 [`docs/README.md`](docs/README.md) 阅读 `docs/01`～`docs/13`；历史完整快照位于 `docs/archive/history/2026/`，不要默认扫描。
+只需按 [`docs/README.md`](docs/README.md) 先读 `docs/03`、`docs/15`；再按任务补读其余文档。历史完整快照位于 `docs/archive/history/2026/`，不要默认扫描。
 
 ## 快速验证
 
@@ -40,6 +40,7 @@ bash tools/run_g3.sh --full --read-bps 250 --score-min 112 \
 ```
 
 完整构建与上板顺序见 [`docs/09-board-build-and-acceptance.md`](docs/09-board-build-and-acceptance.md)。从当前到最终交付的收口门禁见 [`docs/13-final-delivery-roadmap.md`](docs/13-final-delivery-roadmap.md)。
+中断恢复和并行监督提示词见 [`docs/prompts/main-resume-supervisor.md`](docs/prompts/main-resume-supervisor.md)。
 
 ## 目录
 
