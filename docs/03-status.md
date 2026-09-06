@@ -31,23 +31,22 @@
 
 ### P1 · Stage1 吞吐
 
-2-way 代码与制品已经落盘，但公平优化 C 单核/多核基准尚未成立。
-`tools/run_cpu_benchmark.py` 的 FPGA 延迟来自常量及除二推算、功耗来自估算；
-不得称为实测加速/能效优势。按文档 15 先修证据入口，再实测候选。
+W1-A 已重构 `tools/run_cpu_benchmark.py` 并通过单测（commit `f7c898d`）：建立 MEASURED / HISTORICAL / ESTIMATED 严格三级分型，功耗标记未测，彻底清除虚假 FPGA 常量与未实测能效比。
+现行生产线确认为 2-way（见 `docs/benchmarks/stage1-candidate-audit.md`），4-way 理论放得下（8 RAMB36，约 14.7k LUT）但存在单拍选优组合时序与 `< STRIDE` 边界缺陷。下一阶段需先完成公平优化 C 单核/多核基准与 4-way 修复。
 
 ### P2 · 多 payload 泛化
 
-已有独立 D1 数据生成器、manifest 和保存的板端 dump。高熵样本原始误码 2,671 bit，
-LDPC 50 轮失败，原因尚未确定；保留失败样本并做分级定位，不能宣布 G4 完成。
+W1-B 已重构 `tools/run_multi_payload_regression.py` 并通过单测（commit `73168c1`）：全量 64,800 字节合法性校验，8,100 字节固定 LSB-first 位序；复核磁盘 5 份 dump 保持已知 4 PASS + 1 FAIL 事实边界。
+高熵样本原始误码 2,671 bit，LDPC 50 轮失败已明确留存作为 W2-D 定位对象；不能宣布 G4 完成。
 
 ### P3 · 错误鲁棒性曲线
 
-已有软件扫描表，但其最佳方向选择、大数投票不等价于板端 both 独立投票。
-需修复原始结果留证、多种子、插删定义和板端语义一致性后，才可报告可靠曲线或 G5 完成。
+W1-B 已重构 `tools/run_robustness_scan.py` 并建立“板端等价模式”（both 双向独立过门限、逐票饱和截断 [-128, 127]；commit `73168c1`）。
+原最佳方向软件模式已隔离并标注不可作为硬件 G5 验收。下一阶段（W2-D）需开展多采样种子与板端等价深度扫描。
 
 ### P4 · 上位机可维护性
 
-Python 参考实现、C LDPC、协议会话、GUI 和结果验证仍需进一步模块化；上位机性能必须用 profiling 和逐位回归证明。
+W1 阶段已建立基准与回归单测契约。下一阶段（W2-H）针对流式解析、批量打包与 LDPC 开销开展无损优化，由 profiling 和逐位一致性驱动。
 
 ### P5 · 工程技术债
 
