@@ -4,25 +4,19 @@
 
 ```text
 docs/README.md
-→ 01-architecture.md
-→ 02-data-contract.md
 → 03-status.md
-→ 05-interfaces.md
-→ 08-verification-plan.md
-→ 09-board-build-and-acceptance.md
-→ 11-optimization-plan.md
-→ 12-stress-analysis.md
-→ 13-final-delivery-roadmap.md
+→ 15-resume-and-parallel-plan.md
+→ 按任务补读 01/02/05/08/09/11/12/13/14
 ```
 
 ## 当前主线
 
 1. 不改动真实数据集；
-2. 先完善压测分段计时和失败分类；
-3. 建立公平 CPU/FPGA 基准；
-4. 再做 Stage1 4 倍展开；
-5. 并行推进多 payload 与受控错误矩阵；
-6. 上位机保持 Python 参考实现，C/GUI 优化必须逐位回归。
+2. 保留已落盘脚本、数据和失败 dump，审计记录见 [16](16-interrupted-work-audit-2026-09-06.md)；
+3. 按 [15](15-resume-and-parallel-plan.md) 分波推进公平基准、板端等价模型、上位机 profiling；
+4. 4/8-way 保留候选资格，不依靠旧资源表封死，也不承诺线性提速；
+5. 构建和板卡独占，Git 主会话统一写入；共享 main 规则见 [14](14-git-parallel-workflow.md)；
+6. 给下一主会话的完整启动文本见 [监督提示词](prompts/main-resume-supervisor.md)。
 
 ## 历史资料
 
