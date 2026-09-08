@@ -1,0 +1,6 @@
+design   : dna_accel (方案c Performance_ExplorePostRoutePhysOpt)
+date     : 2026-09-09 01:05:11
+strategy : Performance_ExplorePostRoutePhysOpt  (原: Vivado Implementation Defaults)
+WNS      : 0.246 ns
+failing_endpoints : 0
+结论     : ✓ 100MHz 收敛，方案(c)成功，无需改 RTL/BD

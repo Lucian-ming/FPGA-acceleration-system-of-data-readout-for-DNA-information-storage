@@ -92,6 +92,35 @@ if {[file exists $xdc_file]} {
 launch_runs synth_1 -jobs 8
 wait_on_runs synth_1
 require_run_success synth_1
+
+# 【实现策略】必须固化，不要改回 "Vivado Implementation Defaults"。
+#
+# 原因（2026-09-09 实测，证据见 logs/vivado/recovery_20260909/findings.md）：
+#   4-way 加速核合入后，用默认实现策略构建的整机 **100MHz 时序不收敛**：
+#     WNS = -0.252 ns，TNS = -4.073 ns，43 个失败端点（估算上限仅 97.5 MHz）。
+#   失败路径与 4-way 选优树无关（全部 43 个端点枚举，Dna_accelerator_core/srpe_batch
+#   出现 0 次），而是 desparsification_dec -> AXI HP 写通道的 WVALID/WREADY
+#   未打拍组合握手链；该链在 2-way 基线时就已是关键路径，仅剩 +0.136 ns 裕量，
+#   4-way 只是把这点裕量吃光。
+#
+#   仅把实现策略换成 Performance_ExplorePostRoutePhysOpt（零 RTL / 零 BD 改动）后：
+#     WNS = +0.246 ns，TNS = 0，失败端点 0 —— 100MHz 收敛，
+#   且资源未变差（LUT 15499 -> 15483，RAMB36 44 不变）。
+#
+# 因此这不是"随手设的调优参数"：去掉它，整机会退回 WNS = -0.252 ns 的不收敛状态，
+# 从零重建将无法复现已交付的收敛结果（违反 docs/13 G7/G8 可复现门禁）。
+#
+# 注意：AXI 握手链本身**并未被修复**，只是靠实现策略赢回了裕量。
+# 后续若继续增加逻辑或提高频率目标，它仍会第一个失败；
+# 届时正解是给 ic_hp S04 口加 AXI Register Slice，或把 desparsification_dec 的
+# M00_AXI_WVALID 寄存输出，而不是继续寄望于实现策略。
+set impl_strategy "Performance_ExplorePostRoutePhysOpt"
+if {[info exists ::env(DNA_IMPL_STRATEGY)] && $::env(DNA_IMPL_STRATEGY) ne ""} {
+  set impl_strategy $::env(DNA_IMPL_STRATEGY)
+}
+set_property strategy $impl_strategy [get_runs impl_1]
+puts "===> impl 策略: [get_property STRATEGY [get_runs impl_1]]"
+
 launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_runs impl_1
 require_run_success impl_1

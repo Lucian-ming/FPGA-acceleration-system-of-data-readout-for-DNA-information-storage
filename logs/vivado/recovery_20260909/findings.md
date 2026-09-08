@@ -338,3 +338,62 @@ setup / hold / pulse-width 三项全部收敛，43 个失败端点**全部消除
 - 报告：`logs/vivado/recovery_20260909/physopt/{summary.log,timing.rpt,util.rpt,failing_endpoints_complete.tsv}`
 - 旧的**未收敛** impl 产物已备份至 `hw/build/impl1_backup_wns_neg252/`（routed dcp + bit + runme.log，**不入库**）
 - `hw/build/export_4way/` 仍是**旧的未收敛版本**，未被覆盖；如需导出收敛版应另行 export。
+
+---
+
+# 12. 策略固化与收敛版制品导出（2026-09-09 01:1x）
+
+## 12.1 `hw/scripts/build.tcl`：固化实现策略
+
+在 `launch_runs impl_1` 之前插入：
+
+```tcl
+set impl_strategy "Performance_ExplorePostRoutePhysOpt"
+if {[info exists ::env(DNA_IMPL_STRATEGY)] && $::env(DNA_IMPL_STRATEGY) ne ""} {
+  set impl_strategy $::env(DNA_IMPL_STRATEGY)
+}
+set_property strategy $impl_strategy [get_runs impl_1]
+```
+
+并附 22 行注释说明依据（WNS −0.252 → +0.246、43 端点归零、失败链与 4-way 无关、
+以及「握手链未修复，只是赢回裕量」的未关闭项），避免后人当作随手参数改回默认。
+保留 `DNA_IMPL_STRATEGY` 环境变量以便日后再做策略 A/B，不必改脚本。
+
+**必要性**：不固化则从零重建退回默认策略、复现 WNS = −0.252 ns 不收敛，
+已交付的收敛结果将不可复现（`docs/13` G7/G8 门禁）。
+
+## 12.2 收敛版制品：`hw/build/export_4way_physopt/`
+
+导出脚本 `export_physopt.tcl` 带三重硬校验，任一不满足即拒绝导出，
+防止把未收敛比特流误当制品发出：
+
+1. `impl_1 PROGRESS == 100%`
+2. `impl_1 STRATEGY == Performance_ExplorePostRoutePhysOpt`
+3. `WNS >= 0`
+
+实际校验输出：`===> 校验通过 strategy=Performance_ExplorePostRoutePhysOpt WNS=0.246`
+
+制品哈希（`SHA256SUMS`，`sha256sum -c` 全部 OK）：
+
+```
+7a9b367ea1679e736963a9791371e6757329dbe27ae356213fa53b7f34e23d89  top_bd_wrapper.bit
+b05e4f57f41ebb7b8c826912707a2c440cbb466393cfa89c89768a3b06eefe66  dna_accel.xsa
+85c838bfeb906eb7839835eec57aee5d41809bde724e506f7449c5ea43e62cc4  reports/summary.log
+e22b03b0ade9413c4516b4d724ef923d428b76b4952cf29a08fa056b194fa8fe  reports/timing.rpt
+5cfac50b43144c650a5836a9a72b4fb4c14f2e491e7e9af40491909f68051dd9  reports/util.rpt
+```
+
+**版本可鉴别性（重要，供板测方核对）**：
+
+| 制品 | bit SHA256 前 8 位 | WNS | 可否上板作为时序合格证据 |
+| --- | --- | --- | --- |
+| `export_4way_physopt/`（本次，收敛） | `7a9b367e` | **+0.246 ns** | ✓ |
+| `export_4way/`（旧，未收敛） | `b85770d7` | −0.252 ns | ✗ 等于超频运行 |
+| `export/`（2-way 基线） | — | +0.136 ns | ✓（但为 2-way） |
+
+`7a9b367e` 与 `hw/build/dna_accel.runs/impl_1/top_bd_wrapper.bit` **逐位相同**，
+证明导出的确为方案 (c) 收敛版，非旧产物。
+旧 `export_4way/` **未被触碰**（目录时间戳仍为 09-08 20:32），其报告仍是 §2~§5 的证据来源。
+
+`reports/summary.log` 内已写入告诫：
+**整机静态时序收敛 ≠ 板级实测证据，上板功能验证仍须单独进行。**
