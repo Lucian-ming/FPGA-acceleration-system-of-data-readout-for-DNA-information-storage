@@ -27,12 +27,25 @@ set repo_root [file normalize "$_here/../.."]
 set proj_wk    [file join $repo_root hw/build]
 set bd_script  [file join $repo_root hw/scripts/bd.tcl]
 set xdc_file   [file join $repo_root hw/constr/top.xdc]
-set xsa_out    [file join $proj_wk export ${proj_name}.xsa]
+# 导出与报告目录：默认沿用 hw/build/export 与 hw/build/reports（历史行为不变）。
+# 可用环境变量 DNA_EXPORT_DIR / DNA_REPORT_DIR 覆盖，避免新构建覆盖既有生产制品
+# （例如 4-way 构建导出到 hw/build/export_4way，保住 2-way 基线的 BOOT.bin/bit/xsa）。
+set export_dir [file join $proj_wk export]
+if {[info exists ::env(DNA_EXPORT_DIR)] && $::env(DNA_EXPORT_DIR) ne ""} {
+  set export_dir [file normalize $::env(DNA_EXPORT_DIR)]
+}
+set report_dir [file join $proj_wk reports]
+if {[info exists ::env(DNA_REPORT_DIR)] && $::env(DNA_REPORT_DIR) ne ""} {
+  set report_dir [file normalize $::env(DNA_REPORT_DIR)]
+}
+set xsa_out    [file join $export_dir ${proj_name}.xsa]
 set ip_repo    [file join $repo_root hw/ip]
 
 puts "===> Vivado [version -short]"
 puts "===> proj=$proj_name part=$part_name clk=${clk_mhz}MHz"
 puts "===> root=$repo_root"
+puts "===> export_dir=$export_dir"
+puts "===> report_dir=$report_dir"
 
 proc require_run_success {run_name} {
   set run [get_runs $run_name]
@@ -86,7 +99,7 @@ require_run_success impl_1
 # 收集报告（可选，失败不阻断）
 if {[file exists [file join $repo_root hw scripts collect_info.tcl]]} {
   open_run impl_1
-  set ::collect_info_outdir [file join $proj_wk reports]
+  set ::collect_info_outdir $report_dir
   set ::collect_info_design $proj_name
   catch {source [file join $repo_root hw scripts collect_info.tcl]}
   unset ::collect_info_outdir
@@ -97,7 +110,7 @@ if {[file exists [file join $repo_root hw scripts collect_info.tcl]]} {
 file mkdir [file dirname $xsa_out]
 write_hw_platform -fixed -include_bit -force -file $xsa_out
 puts "===> XSA: $xsa_out"
-set bit_out [file join $proj_wk export top_bd_wrapper.bit]
+set bit_out [file join $export_dir top_bd_wrapper.bit]
 if {[file exists "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit"]} {
   file copy -force "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit" $bit_out
   puts "===> BIT: $bit_out"

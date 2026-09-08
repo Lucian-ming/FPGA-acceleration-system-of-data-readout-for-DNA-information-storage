@@ -1,0 +1,3 @@
+failing_paths_total   : 200
+touching_accelerator  : 0
+elsewhere             : 200

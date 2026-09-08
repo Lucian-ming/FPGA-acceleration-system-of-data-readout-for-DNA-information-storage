@@ -10,6 +10,11 @@
   1. --mode golden (默认): 纯软件黄金模型流水线（秒级端到端自测，无需板卡）；
   2. --mode board --ip 192.168.1.10: 真实物理板卡交互测试；
   3. --mode check-dumps: 校验已保存在 tests/datasets/ 下的 board_output.bin 真实板测回传。
+
+数据集范围：
+  默认只跑已冻结的经典 5 大基准 (D0 + 4 个 D1)，与 test_payload_robustness_contract 保持兼容；
+  加 --extended 才纳入 D1_random_entropy@65 与 D2_controlled_noise@65。
+  两者产出的报告项数不同 (5 vs 7)，引用通过率时必须写明是哪一种范围。
 """
 
 from __future__ import annotations
@@ -557,7 +562,7 @@ class MultiPayloadRegression:
             notes="Live board execution",
         )
 
-    def generate_report(self, report_path: Path, run_id: str = "") -> Path:
+    def generate_report(self, report_path: Path, run_id: str = "", extended: bool = False) -> Path:
         """生成 Markdown 格式的完整泛化验证报告并落盘 JSON。"""
         lines = [
             "# 多 Payload 独立泛化回归测试报告",
@@ -565,7 +570,15 @@ class MultiPayloadRegression:
             f"> 运行标识 (run-id): `{run_id}`",
             f"> 生成时间: {time.strftime('%Y-%m-%d %H:%M:%S')} CST",
             "> 判定标准: LDPC 5/6 收敛且 SHA-256 与独立源文件逐位 100% 匹配",
-            "> 说明: 高熵随机样本保留出厂门限 60（留证历史未关闭项）并新增自适应门限 65；受控噪声样本 D2 门限为 65；其余基准为 67",
+            (
+                "> 数据集范围: **扩展集 (--extended)** —— 经典 5 大基准 + 自适应门限 "
+                "D1_random_entropy@65 + D2_controlled_noise@65"
+                if extended
+                else "> 数据集范围: **经典 5 大基准 (默认)** —— D0 + 4 个 D1；"
+                     "如需 D1_random_entropy@65 与 D2_controlled_noise@65 请加 --extended"
+            ),
+            "> 说明: 高熵随机样本保留出厂门限 60（留证历史未关闭项）；其余基准为 67"
+            + ("；自适应门限 65 与受控噪声样本 D2 门限为 65" if extended else ""),
             "",
             "## 1. 测试结果汇总",
             "",
@@ -653,6 +666,13 @@ def main():
         help="输出目录 (默认写入 logs/multi_payload/<run-id>/，严禁自动覆盖 docs/)",
     )
     parser.add_argument("--report", default=None, help="自定义报告输出文件路径")
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help="除已冻结的经典 5 大基准 (D0 + 4 个 D1) 外，额外纳入自适应门限 "
+             "D1_random_entropy@65 与 D2_controlled_noise@65 扩展配置。"
+             "docs/benchmarks/measured_board_multi_payload.md 的 7 项报告必须带本开关才能复现。",
+    )
     args = parser.parse_args()
 
     run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -667,7 +687,7 @@ def main():
         report_file = out_dir / "report.md"
 
     reg = MultiPayloadRegression(board_ip=args.ip, board_port=args.port)
-    configs = reg.get_dataset_configs()
+    configs = reg.get_dataset_configs(include_extended=args.extended)
 
     if args.dataset and args.dataset.strip().lower() != "all":
         targets = [t.strip().lower() for t in args.dataset.split(",") if t.strip()]
@@ -702,7 +722,7 @@ def main():
             res = reg.run_board_test(cfg)
             reg.results.append(res)
 
-    reg.generate_report(report_file, run_id=run_id)
+    reg.generate_report(report_file, run_id=run_id, extended=args.extended)
 
     all_passed = all(r.passed for r in reg.results)
     if all_passed:

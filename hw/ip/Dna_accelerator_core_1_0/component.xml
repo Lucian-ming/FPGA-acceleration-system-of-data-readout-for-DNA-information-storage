@@ -1107,13 +1107,11 @@
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>READ_BPS</spirit:name>
         <spirit:displayName>Read Bps</spirit:displayName>
-        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.READ_BPS">250</spirit:value>
         <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.READ_BPS">150</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>CODEBITS</spirit:name>
         <spirit:displayName>Codebits</spirit:displayName>
-        <spirit:value spirit:format="long" spirit:resolve="dependent" spirit:id="MODELPARAM_VALUE.CODEBITS" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.READ_BPS&apos;)) * 2)">500</spirit:value>
         <spirit:value spirit:format="long" spirit:resolve="dependent" spirit:id="MODELPARAM_VALUE.CODEBITS" spirit:dependency="(spirit:decode(id(&apos;MODELPARAM_VALUE.READ_BPS&apos;)) * 2)">300</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="integer">
@@ -1129,7 +1127,6 @@
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>RESULT_W</spirit:name>
         <spirit:displayName>Result W</spirit:displayName>
-        <spirit:value spirit:format="long" spirit:resolve="dependent" spirit:id="MODELPARAM_VALUE.RESULT_W" spirit:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.CODEBITS&apos;)) + spirit:decode(id(&apos;MODELPARAM_VALUE.POS_W&apos;))) + spirit:decode(id(&apos;MODELPARAM_VALUE.SCORE_W&apos;)))">526</spirit:value>
         <spirit:value spirit:format="long" spirit:resolve="dependent" spirit:id="MODELPARAM_VALUE.RESULT_W" spirit:dependency="((spirit:decode(id(&apos;MODELPARAM_VALUE.CODEBITS&apos;)) + spirit:decode(id(&apos;MODELPARAM_VALUE.POS_W&apos;))) + spirit:decode(id(&apos;MODELPARAM_VALUE.SCORE_W&apos;)))">326</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="integer">
@@ -1145,13 +1142,11 @@
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>STRIDE</spirit:name>
         <spirit:displayName>Stride</spirit:displayName>
-        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.STRIDE">805</spirit:value>
         <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.STRIDE">807</spirit:value>
       </spirit:modelParameter>
       <spirit:modelParameter spirit:dataType="integer">
         <spirit:name>REF_LEN</spirit:name>
         <spirit:displayName>Ref Len</spirit:displayName>
-        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.REF_LEN">1055</spirit:value>
         <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.REF_LEN">957</spirit:value>
       </spirit:modelParameter>
     </spirit:modelParameters>
@@ -1188,7 +1183,7 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/srpe_batch.v</spirit:name>
+        <spirit:name>hdl/srpe_batch_4way.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
@@ -1222,7 +1217,7 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
-        <spirit:name>hdl/srpe_batch.v</spirit:name>
+        <spirit:name>hdl/srpe_batch_4way.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
@@ -1326,13 +1321,11 @@
     <spirit:parameter>
       <spirit:name>READ_BPS</spirit:name>
       <spirit:displayName>Read Bps</spirit:displayName>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.READ_BPS">250</spirit:value>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.READ_BPS">150</spirit:value>
     </spirit:parameter>
     <spirit:parameter>
       <spirit:name>CODEBITS</spirit:name>
       <spirit:displayName>Codebits</spirit:displayName>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.CODEBITS">500</spirit:value>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.CODEBITS">300</spirit:value>
     </spirit:parameter>
     <spirit:parameter>
@@ -1348,7 +1341,6 @@
     <spirit:parameter>
       <spirit:name>RESULT_W</spirit:name>
       <spirit:displayName>Result W</spirit:displayName>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.RESULT_W">526</spirit:value>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.RESULT_W">326</spirit:value>
     </spirit:parameter>
     <spirit:parameter>
@@ -1364,13 +1356,11 @@
     <spirit:parameter>
       <spirit:name>STRIDE</spirit:name>
       <spirit:displayName>Stride</spirit:displayName>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.STRIDE">805</spirit:value>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.STRIDE">807</spirit:value>
     </spirit:parameter>
     <spirit:parameter>
       <spirit:name>REF_LEN</spirit:name>
       <spirit:displayName>Ref Len</spirit:displayName>
-      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.REF_LEN">1055</spirit:value>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.REF_LEN">957</spirit:value>
     </spirit:parameter>
   </spirit:parameters>
