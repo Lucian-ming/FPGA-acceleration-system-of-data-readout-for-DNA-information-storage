@@ -23,6 +23,7 @@
 | [15-resume-and-parallel-plan.md](15-resume-and-parallel-plan.md) | 当前执行入口：中断恢复、任务卡与 W0～W5 并行计划 |
 | [16-interrupted-work-audit-2026-09-06.md](16-interrupted-work-audit-2026-09-06.md) | 本轮遗留物清点、报告纠偏与 dump 复核证据 |
 | [17-competition-strategy.md](17-competition-strategy.md) | **参赛定位、性能天花板证伪、优先级重排与长期方向（最高依据）** |
+| [18-evidence-ledger.md](18-evidence-ledger.md) | **证据台账：每条可对外说的话 → 判据 / 证据路径 / 复现命令 / 边界，含「不能说的话」清单** |
 | [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词 |
 
 ## 参考资料

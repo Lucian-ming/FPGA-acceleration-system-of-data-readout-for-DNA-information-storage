@@ -48,4 +48,4 @@ CPU 必须使用同一输入、同一正反向规则、同一输出判据和同�
 - “支持任意 DNA 数据”；
 - “线性规模可无限扩展”。
 
-完整旧版测量、理论推导和历史口径位于 `docs/archive/history/2026/07-performance-before-2026-09-05.md`。
+完整旧版测量、理论推导和历史口径位于 `docs/archive/history/2026/performance-before-2026-09-05.md`。

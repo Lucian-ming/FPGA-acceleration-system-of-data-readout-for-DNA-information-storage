@@ -37,4 +37,4 @@ ldpc_s
 6. 接入错误/覆盖度矩阵；
 7. 输出恢复成功率、耗时和错误边界曲线。
 
-旧报告和完整分析保留在 `docs/archive/history/2026/27-stress-analysis-2026-09-05.md`。
+旧报告和完整分析保留在 `docs/archive/history/2026/stress-analysis-2026-09-05.md`。

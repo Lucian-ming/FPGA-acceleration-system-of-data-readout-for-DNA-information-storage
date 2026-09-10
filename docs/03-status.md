@@ -232,6 +232,10 @@ PASS  四级逐级取证        Result: 8100 bytes, 4.28s
 
 ## 4. 证据纪律
 
+> **对外表述前先查 [18 证据台账](18-evidence-ledger.md)**：它把每条可以说的话与其判据、
+> 证据路径、复现命令、边界钉在一起，并单列了一张**「不能说的话」**清单
+> （每条都有实测支撑其为假）。本文给结论，台账给复现路径，两者配套使用。
+
 1. 构建、仿真、包装和历史 XSA 都不能代替板端 G3。
 2. 最终图片哈希是端到端判据；中间级别必须同时记录适用范围。
 3. 修改 RTL/固件后必须重新构建整套制品并刷新 `SHA256SUMS`。
@@ -240,6 +244,6 @@ PASS  四级逐级取证        Result: 8100 bytes, 4.28s
 
 ## 5. 历史索引
 
-- 缺陷根因与完整时间线：`docs/archive/history/2026/03-status-before-2026-09-05.md`。
+- 缺陷根因与完整时间线：`docs/archive/history/2026/status-before-2026-09-05.md`。
 - M3/XSim 细节：`docs/08-verification-plan.md` 与 archive 中对应快照。
 - 板卡唯一配置：`docs/09-board-build-and-acceptance.md`。

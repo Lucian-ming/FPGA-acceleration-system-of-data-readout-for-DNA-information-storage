@@ -1,7 +1,7 @@
 # 06 · 实施入口与开发门禁
 
 本文是开发前的短版入口；旧版 550 行实施计划已归档至
-`docs/archive/history/2026/06-implementation-plan-before-2026-09-05.md`。
+`docs/archive/history/2026/implementation-plan-before-2026-09-05.md`。
 
 ## 开发顺序
 

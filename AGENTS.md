@@ -38,7 +38,7 @@
   **暂存区（索引）是整棵工作树共享的一份**，而 `git commit` 提交的是**索引的全部内容**，
   不是「你 add 的那些」。你 `git add` 之后、`git commit` 之前，索引会被别的会话改掉，
   两个方向都出过事（均为 2026-09-03/04 实况）：
-  - **别人的文件混进你的提交**：`7747e9e` 把 `docs/archive/history/2026/22-ps-refactor-plan.md` 和 `docs/README.md` 卷进了一个
+  - **别人的文件混进你的提交**：`7747e9e` 把 `docs/archive/history/2026/ps-refactor-plan.md` 和 `docs/README.md` 卷进了一个
     纯 RTL 提交。当事会话确实只 add 了三个 RTL 文件、提交前也复核过 `git status`。
   - **你自己的文件被踢出索引**：另一会话 add 完之后，`git diff --cached` 里多出了两个
     从没 add 过的 `tests/host/golden/*`，而自己的 `tools/run_g3.sh` 反而掉了出去。
@@ -101,6 +101,15 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   要么 `done` 掉它，不要视而不见。阈值可用 `AGENT_VIEW_STALE_HOURS` 调整。
 - `view.md` 与 `.agent_view/` 是本机实时看板，已在 `.gitignore` 中忽略，**不进 Git**。
   它不替代交接文档：结论、判据和证据仍然要写进 `docs/` 下对应文档并提交。
+
+## 文档编号约定
+
+**现用文档一律带序号**（`docs/01-…` ~ `docs/18-…`），**归档文档一律不带序号**
+（`docs/archive/history/2026/` 下全部为纯名字）。这样从文件名就能一眼看出
+一份文档是否还有效，也不必因为「历史文档占了号」而给新文档跳号。
+
+文档退役时：`git mv docs/NN-foo.md docs/archive/history/2026/foo.md`，
+并更新指向它的引用。归档内容只用于追溯，不能覆盖当前状态。
 
 ## 文档地图（改代码前先读）
 
@@ -206,7 +215,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   `dec_input` 照样译出 `fcd0cf90…f2c3`、与 `codeword_R083.txt` 的误码照样
   36/64,800。**唯一有鉴别力的是 `wm_regions.hex`**：SE250 应为 52,750 行 /
   `bf8795dd…`，一旦等于 SE150 的 `f352853912338cd0…` 就是该缺陷的特征签名。
-  故障注入实测见 docs/archive/history/2026/20-se250-study-2026-08-30.md §6「鉴别力实测」；`tools/make_golden.py` 已内置哨兵会红。
+  故障注入实测见 docs/archive/history/2026/se250-study-2026-08-30.md §6「鉴别力实测」；`tools/make_golden.py` 已内置哨兵会红。
   **注意这条实测的适用范围**：它测的是**主机侧黄金模型**
   （`tools/make_golden.py`）——那里几何只喂水印区域展开，Stage1 直接在整条 `ref`
   上滑窗，所以下游整条链路与几何无关。**板上不是这样**：`wm_regions` 预载进
