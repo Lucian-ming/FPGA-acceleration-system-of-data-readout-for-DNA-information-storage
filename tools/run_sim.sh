@@ -14,6 +14,9 @@ trap 'rm -rf "$BUILD"' EXIT
 PASS=0
 FAIL=0
 A1=hw/ip/Dna_accelerator_core_1_0/hdl
+# 2026-09-10 起 testbench 不再放在 IP 的 hdl/ 里（那是打包目录，决定综合工具
+# 看到什么），统一收到 hw/sim/ip_tb/。见 tools/check_ip_packaging.sh 第 1 项。
+IPTB=hw/sim/ip_tb
 
 run_case() {
     local name="$1"; shift
@@ -40,24 +43,36 @@ if [ ! -f tests/golden/sparse_ideal.hex ]; then
 fi
 
 WHICH="${1:-all}"
+
+# IP 打包卫生门禁：hdl/ 里不许有 testbench、同名模块不许被同时打包、
+# component.xml 引用的文件必须存在、不许有孤儿文件、打包变体须与清单一致。
+# 放在最前面：这些问题会让综合工具「看到的设计」与你以为的不是同一个，
+# 后面所有仿真判据都建立在错误前提上。
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ]; then
+    if bash tools/check_ip_packaging.sh; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+fi
 D=hw/ip/desparsification_decoder_1_0/hdl
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "datapath" ]; then
     # Stage3 数据通路：81,000 bit 稀疏流 -> 64,800 bit 码字（含随机背压）
-    run_case desparsify_datapath "$D/desparsify_datapath.v" "$D/tb_desparsify_datapath.v"
+    run_case desparsify_datapath "$D/desparsify_datapath.v" "$IPTB/tb_desparsify_datapath.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "axi" ]; then
     # Stage3 整核（AXI-Lite 配置 + AXI4 读写 DDR），从机取最严格设置：
     # B 零延迟、只允许 1 个未完成地址
     run_case desparsifier_axi "$D/desparsification_decoder_v1_0.v" \
-                              "$D/desparsify_datapath.v" "$D/tb_desparsifier.v"
+                              "$D/desparsify_datapath.v" "$IPTB/tb_desparsifier.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1" ]; then
     # Stage1 比对引擎：一批 64 条读段，pos/score 与黄金模型比对
     # （约 620 万周期，Icarus 上 1~3 分钟）
-    run_case srpe_batch "$A1/srpe_batch.v" "$A1/tb_srpe_batch.v"
+    run_case srpe_batch "$A1/srpe_batch.v" "$IPTB/tb_srpe_batch.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "ingress" ]; then
@@ -66,20 +81,20 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "ingress" ]; then
         "$A1/Dna_accelerator_core_v1_0.v" \
         "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
-        "$A1/srpe_batch.v" "$A1/tb_dna_ingress.v"
+        "$A1/srpe_batch.v" "$IPTB/tb_dna_ingress.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "dna_axil" ]; then
     # DNA AXI-Lite 控制口：AW/W 独立握手与字节写使能。
     run_case dna_axil "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
-                      "$A1/tb_dna_axil.v"
+                      "$IPTB/tb_dna_axil.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage2" ]; then
     # Stage2 投票核：4,096 条 Stage1 输出记录（正反两方向，与上位机一致）
     # → 81,000 bit 共识。连跑两轮，第二轮验证累加器重新清零。
     V=hw/ip/differential_voter_1_0/hdl
-    run_case differential_voter "$V/differential_voter_v1_0.v" "$V/tb_differential_voter.v"
+    run_case differential_voter "$V/differential_voter_v1_0.v" "$IPTB/tb_differential_voter.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
@@ -151,7 +166,11 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
     check differential_voter        hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v
     check desparsification_decoder  "$D/desparsification_decoder_v1_0.v" "$D/desparsify_datapath.v"
-    check five_to_four_decoder      "$D/five_to_four_decoder.v"
+    # five_to_four_decoder 已于 2026-09-10 移出 IP 打包目录到 hw/experimental/：
+    # AGENTS.md 早已记明它是「未被顶层引用的死文件」，权威实现是
+    # desparsification_decoder_v1_0.v / desparsify_datapath.v。
+    # 语法检查一个死文件没有意义，反而会让人误以为它还在生产路径上。
+    check five_to_four_decoder_dead "hw/experimental/unused_axi_wrappers/five_to_four_decoder.v"
 fi
 
 printf '\n==================================================\n'
