@@ -34,7 +34,33 @@
 W1-A 已重构 `tools/run_cpu_benchmark.py` 并通过单测（commit `f7c898d`）：建立 MEASURED / HISTORICAL / ESTIMATED 严格三级分型，功耗标记未测，彻底清除虚假 FPGA 常量与未实测能效比。
 W2-R 已完成 4-way 边界缺陷修复（`<= STRIDE`）与两拍流水化时序闭环（commit `5af3fa3`，详见 `docs/benchmarks/stage1-4way-timing-closure.md`）：全量 50 区域仿真相对 2-way 提速 1.929x 且 100% 逐位一致，Vivado OOC 实测 WNS @ 100MHz 达 **+2.197 ns**，RAMB36 保持为 8 块，LUT 仅占用 8,673（49.3%），证明 4-way 具备在 7010 芯片上的落地可行性。
 W3-A 现场物理板卡实测（commit `f0d6af0`，详见 `docs/benchmarks/measured_cpu_vs_fpga.md`）：真实物理板卡 2-way 100MHz 在 2,048/4,096/8,192 源读段 × 3 轮实测（9/9 轮哈希全 PASS）中，纯计算吞吐为 304～591 reads/s（拟合模型：$T \approx 4.25\text{s} + 0.58\text{ms} \times N_{\text{records}}$）；同期宿主 CPU (i5-13500H) C 优化单核吞吐为 1,364.9 reads/s，16 线程达 14,003.1 reads/s。**实测定论：现行 100MHz 2-way FPGA 纯计算吞吐尚未击败优化多核 CPU，严禁宣称加速优势；无外置功率计前功耗统一标记 UNMEASURED / N/A**。
-W4-B 4-Way 顶层 IP 核集成与端到端接口仿真（详见 `docs/benchmarks/stage1_4way_ip_integration.md`）：交付 `hw/ip/Dna_accelerator_core_1_0/hdl/Dna_accelerator_core_4way.v` 与测试平台 `hw/sim/tb_accelerator_core_4way.v`；在完整 AXI-Lite、S_AXIS_DATA（256 深度 FIFO）与 M_AXIS_RESULT（随机背压注入）总线下，顶层整机总周期由 438,785 降至 252,139（整机加速比 1.740x，比对核心加速比 1.929x），全量 64 条读段比对结果与 2-Way 100% 逐位全等，零丢拍、零悬挂。
+W4-B 4-Way 顶层 IP 核集成与端到端接口仿真（详见 `docs/benchmarks/stage1_4way_ip_integration.md`）：交付 `hw/ip/Dna_accelerator_core_1_0/hdl/Dna_accelerator_core_4way.v` 与测试平台 `hw/sim/tb_accelerator_core_4way.v`；在完整 AXI-Lite、S_AXIS_DATA（256 深度 FIFO）与 M_AXIS_RESULT（随机背压注入）总线下，全量 64 条读段比对结果与 2-Way 100% 逐位全等，零丢拍、零悬挂。
+
+W5-V 2026-09-09 main 复核，修正 W4-B 的三处口径（详见 `docs/benchmarks/stage1_4way_ip_integration.md` §6）：
+
+1. **顶层加速比 1.740x 是 `NUM_LC=6` 玩具配置的产物；生产几何（`NUM_LC=50`）实测为 1.929x**
+   （2-Way 3,229,621 周期 → 4-Way 1,674,217 周期，run-id `run_20260908_202106_4way_top_lc50`）。
+   比对工作量放大 8.33 倍后固定开销被摊薄，顶层加速比与纯核心加速比重合。
+2. **原 TB 载入黄金模型却从不比较**（`has_golden_exp` 只赋值不使用），且解析有三处错误
+   （未跳注释头、按两列读三列、pos/score 顺序颠倒）。原报告「100% 逐位一致」的真实含义
+   仅为 **4-Way 与 2-Way 自洽**，两核同时错成一样抓不出来。补上真实比对后暴露
+   2/64 位置分歧，追查确认**不是 RTL 缺陷**：`stage1_fwd_expect.txt` 的位置在同分并列时
+   由 FFT 浮点噪声决定（read 4 三个并列位置浮点值 59.0 / 59.000000000000014 / 59.0）。
+   已新增 `tools/make_stage1_tie_golden.py` 与 `hw/sim/golden/stage1_fwd_ties.txt`，
+   判据改为「分数严格相等 + 位置属于同分并列最大集」。前 64 条中 9 条（14.1%）存在并列。
+3. **整机时序**：4-way 整机 implementation 在默认策略下 **WNS = −0.252 ns，100 MHz 未收敛**；
+   改用 impl 策略 `Performance_ExplorePostRoutePhysOpt`（零 RTL / 零 BD 改动，复用同一份
+   synth_1 以保证单变量）后 **WNS = +0.246 ns，TNS = 0，失败端点 43 → 0，100 MHz 收敛**，
+   资源 LUT 15,483 / RAMB36 44 / DSP 3 均在门禁内。
+   注意 `docs/benchmarks/stage1_4way_ip_integration.md` §5 的 **OOC WNS = +2.197 ns 只是
+   比对核单模块**，本例即为「OOC 正裕量不蕴含整机收敛」的直接反证。
+   证据见 `logs/vivado/recovery_20260909/findings.md`。
+
+**W5-V 未关闭项**：整机收敛是靠实现策略赢回裕量，**`desparsifier → AXI HP 写握手链本身没有被修复**。
+routed DCP 全量枚举 43/43 失败端点显示瓶颈全部源自 `desparsification_dec_0/inst/u_dp/in_bits_reg[3]`，
+`Dna_accelerator_core` / `srpe_batch` 出现 0 次；2-way 基线在该路径上也只剩 +0.136 ns。
+**后续再加逻辑或提高频率目标，它仍会第一个失败**，届时需对 `M00_AXI_WVALID` 打拍或给
+`ic_hp` S04 口加 Register Slice。另：整机静态时序收敛 **不等于** 板级实测证据，上板前它仍只是实现结论。
 
 ### P2 · 多 payload 泛化
 
@@ -42,6 +68,14 @@ W1-B 已重构 `tools/run_multi_payload_regression.py` 并通过单测（commit 
 W2-D 已通过五级分级诊断（commit `5797a17`，`tools/debug_high_entropy.py`）定位高熵失败根因：彻底排除生成器缺陷与反稀疏化扩散，证实主因为高熵序列下水印伪互相关（期望 70.9 vs 伪相关 63.2）与门限（60）不适配，导致 82.1% 伪读段误入并稀释投票；在门限 65 下原始误码骤降至 236 bit 且 LDPC 成功收敛。
 W4-D 多 Seed 验证与首个 D2 数据集交付（commit `f0d6af0`，详见 `docs/benchmarks/entropy_and_d2_validation.md`）：跨 5 个独立随机种子（Seed 101～105）全面证实门限 65 下达成 100% 收敛（5/5 PASS，误码均值仅 179.4 bit，下降 92.3%），排除随机偶发；正式交付首个 D2 受控噪声数据集 `tests/datasets/D2_controlled_noise/`（有效突变率 1.3918%，4,096 源读段，端到端 2 轮收敛恢复，SHA256SUMS 6 项全 OK）。
 W4-P 多 Payload 独立泛化与 D2 受控噪声全流程验证（详见 `docs/benchmarks/measured_board_multi_payload.md`）：覆盖经典图像 (D0)、纯文本 (D1)、几何二值 (D1)、稀疏位流 (D1)、高熵随机 (D1 双门限) 及真实突变受控噪声 (D2)，6/7 项达成 100% 逐位恢复闭环；出厂门限 60 下高熵 2,671 bit 失败事实如实保留留证，自适应门限 65 下 34 轮无错恢复，D2 受控噪声 2 轮收敛恢复。
+
+W5-V 2026-09-09 main 复核该报告，结论成立但补三条边界：
+（a）7 项板端回传全部来自**同一次**板卡运行 `logs/multi_payload/run_20260906_232658/`
+（`notes` 均为 `Live board execution`），**不是 7 次独立重复，不构成成功率或重复性统计**；
+（b）LDPC 译码与哈希比对在主机侧完成，表中「误码/轮数/哈希」是对板端回传码字的主机侧复算；
+（c）修复了 `tools/run_multi_payload_regression.py` 的可复现性缺陷——`main()` 从未传
+`include_extended`，扩展集（D1@65 / D2）**无法从 CLI 到达**，提交版工具跑不出提交版报告的 7 项。
+现已新增 `--extended`：默认 4/5（经典 5 大基准），`--extended` 6/7，均与原 run 逐位一致。
 
 ### P3 · 错误鲁棒性曲线与 D3 真实数据调研
 

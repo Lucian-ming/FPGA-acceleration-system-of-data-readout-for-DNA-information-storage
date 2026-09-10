@@ -55,6 +55,13 @@ module tb_accelerator_core_4way;
     integer diff_sc_count  = 0;
     integer diff_pos_count = 0;
     integer diff_cw_count  = 0;
+    integer gold_sc_bad_2w = 0;
+    integer gold_pos_bad_2w = 0;
+    integer gold_sc_bad_4w = 0;
+    integer gold_pos_bad_4w = 0;
+    integer tie_diff_cnt   = 0;
+    integer hit_2w, hit_4w;
+    integer j;
 
     // =================================================
     // AXI-Lite 控制总线 (广播到 2-Way 与 4-Way)
@@ -206,11 +213,20 @@ module tb_accelerator_core_4way;
     integer exp_pos   [0:NREADS-1];
     reg     has_golden_exp = 1'b0;
 
+    // 同分并列集（hw/sim/golden/stage1_fwd_ties.txt，由 tools/make_stage1_tie_golden.py 生成）。
+    // 位置判据必须按「属于并列最大集」判定，不能按「等于黄金文件里那一个」判定，
+    // 原因见 load_golden 中的说明与该工具的文件头。
+    localparam integer MAX_TIES = 16;
+    integer tie_score [0:NREADS-1];
+    integer tie_n     [0:NREADS-1];
+    integer tie_pos   [0:NREADS*MAX_TIES-1];
+    reg     has_ties = 1'b0;
+
     task load_golden;
         integer fd, code, i;
         reg [CODEBITS-1:0] v;
         reg [31:0] s;
-        integer exp_s, exp_p;
+        integer exp_s, exp_p, exp_idx, j;
         begin
             fd = $fopen("tests/golden/reads_cw.hex", "r");
             if (fd == 0) begin
@@ -242,18 +258,64 @@ module tb_accelerator_core_4way;
             end
             $fclose(fd);
 
-            // 读取黄金比对模型 (若存在)
-            fd = $fopen("tests/golden/stage1_fwd_expect.txt", "r");
-            if (fd != 0) begin
-                has_golden_exp = 1'b1;
-                for (i = 0; i < NREADS; i = i + 1) begin
-                    code = $fscanf(fd, "%d %d", exp_s, exp_p);
-                    if (code == 2) begin
+            // 读取黄金比对模型。
+            // 判据边界：stage1_fwd_expect.txt 由 tools/make_golden.py 在**全量 50 区域
+            // 水印池**上生成，只有 NUM_LC==50 的生产几何才可与之比对；NUM_LC<50 时
+            // 搜索空间被截断，最优位置/分数本就不该相等，比对无意义。
+            // 文件格式为 "# idx pos score" 注释头 + 每行三列 (idx, pos, score)，
+            // 顺序是 pos 在前、score 在后，不可按两列或反序读取。
+            if (NUM_LC == 50) begin
+                fd = $fopen("tests/golden/stage1_fwd_expect.txt", "r");
+                if (fd != 0) begin
+                    // 跳过 '#' 注释头整行
+                    code = $fgetc(fd);
+                    while (code != "\n" && code != -1) code = $fgetc(fd);
+                    has_golden_exp = 1'b1;
+                    for (i = 0; i < NREADS; i = i + 1) begin
+                        code = $fscanf(fd, "%d %d %d\n", exp_idx, exp_p, exp_s);
+                        if (code != 3) begin
+                            $display("[TB 4-WAY TOP] FATAL: stage1_fwd_expect.txt 第 %0d 条读入失败 (返回 %0d 列)", i, code);
+                            $fatal(1); $finish;
+                        end
                         exp_score[i] = exp_s;
                         exp_pos[i]   = exp_p;
                     end
+                    $fclose(fd);
+                end else begin
+                    $display("[TB 4-WAY TOP] FATAL: NUM_LC=50 生产几何下必须存在 tests/golden/stage1_fwd_expect.txt");
+                    $fatal(1); $finish;
                 end
-                $fclose(fd);
+
+                // 载入同分并列集。stage1_fwd_expect.txt 里的位置在并列时由 FFT 浮点
+                // 噪声决定（实测 read 4 / read 30 的浮点值仅差 1e-14），不可作为位置判据。
+                fd = $fopen("hw/sim/golden/stage1_fwd_ties.txt", "r");
+                if (fd != 0) begin
+                    code = $fgetc(fd);
+                    while (code != "\n" && code != -1) code = $fgetc(fd);
+                    has_ties = 1'b1;
+                    for (i = 0; i < NREADS; i = i + 1) begin
+                        code = $fscanf(fd, "%d %d %d", exp_idx, exp_s, exp_p);
+                        if (code != 3) begin
+                            $display("[TB 4-WAY TOP] FATAL: stage1_fwd_ties.txt 第 %0d 条读入失败", i);
+                            $fatal(1); $finish;
+                        end
+                        tie_score[i] = exp_s;
+                        tie_n[i]     = exp_p;
+                        if (exp_p > MAX_TIES) begin
+                            $display("[TB 4-WAY TOP] FATAL: 第 %0d 条并列数 %0d 超过 MAX_TIES=%0d", i, exp_p, MAX_TIES);
+                            $fatal(1); $finish;
+                        end
+                        for (j = 0; j < exp_p; j = j + 1) begin
+                            code = $fscanf(fd, "%d", exp_idx);
+                            tie_pos[i*MAX_TIES + j] = exp_idx;
+                        end
+                    end
+                    $fclose(fd);
+                end else begin
+                    $display("[TB 4-WAY TOP] FATAL: NUM_LC=50 生产几何下必须存在 hw/sim/golden/stage1_fwd_ties.txt");
+                    $display("             生成命令: python3 tools/make_stage1_tie_golden.py");
+                    $fatal(1); $finish;
+                end
             end
 
             $display("[TB 4-WAY TOP] 黄金数据载入完成: %0d 条读段码字, %0d 个水印符号, 黄金预期: %s",
@@ -567,6 +629,45 @@ module tb_accelerator_core_4way;
         $display("  - 4-Way vs 2-Way 位置一致率: %0d / %0d (差异: %0d)", NREADS-diff_pos_count, NREADS, diff_pos_count);
         $display("  - 4-Way vs 2-Way 码字一致率: %0d / %0d (差异: %0d)", NREADS-diff_cw_count, NREADS, diff_cw_count);
 
+        // 8. 与独立黄金模型 (tools/make_golden.py) 逐条比对。
+        //    这是比「4-Way 与 2-Way 自洽」更强的判据：两核同时错成一样也会被抓出来。
+        //    仅在 NUM_LC==50 生产几何下成立，见 load_golden 中的判据边界说明。
+        if (has_golden_exp) begin
+            for (k = 0; k < NREADS; k = k + 1) begin
+                // 分数：与整数精确最大分严格相等，无并列问题，是硬判据。
+                if (sc_2w[k] !== tie_score[k]) gold_sc_bad_2w = gold_sc_bad_2w + 1;
+                if (sc_4w[k] !== tie_score[k]) gold_sc_bad_4w = gold_sc_bad_4w + 1;
+                // 位置：必须落在并列最大集内。同分并列时黄金文件里的单值由 FFT
+                // 浮点噪声决定，按单值比相等会把正确的 RTL 判成失败。
+                hit_2w = 0; hit_4w = 0;
+                for (j = 0; j < tie_n[k]; j = j + 1) begin
+                    if (pos_2w[k] === tie_pos[k*MAX_TIES + j]) hit_2w = 1;
+                    if (pos_4w[k] === tie_pos[k*MAX_TIES + j]) hit_4w = 1;
+                end
+                if (!hit_2w) gold_pos_bad_2w = gold_pos_bad_2w + 1;
+                if (!hit_4w) gold_pos_bad_4w = gold_pos_bad_4w + 1;
+                // 附带统计：RTL 位置与 stage1_fwd_expect.txt 单值不同、但仍是合法并列解的条数
+                if (hit_4w && (pos_4w[k] !== exp_pos[k])) tie_diff_cnt = tie_diff_cnt + 1;
+            end
+            $display("[TB 4-WAY TOP] 独立黄金模型比对 (NUM_LC=50 生产几何):");
+            $display("  - 判据: 分数须与整数精确最大分严格相等; 位置须属于同分并列最大集");
+            $display("  - 2-Way vs 黄金 分数一致: %0d / %0d (差异: %0d)", NREADS-gold_sc_bad_2w, NREADS, gold_sc_bad_2w);
+            $display("  - 2-Way vs 黄金 位置合法: %0d / %0d (越界: %0d)", NREADS-gold_pos_bad_2w, NREADS, gold_pos_bad_2w);
+            $display("  - 4-Way vs 黄金 分数一致: %0d / %0d (差异: %0d)", NREADS-gold_sc_bad_4w, NREADS, gold_sc_bad_4w);
+            $display("  - 4-Way vs 黄金 位置合法: %0d / %0d (越界: %0d)", NREADS-gold_pos_bad_4w, NREADS, gold_pos_bad_4w);
+            $display("  - 其中选了与 stage1_fwd_expect.txt 单值不同、但同样最优的并列解: %0d 条", tie_diff_cnt);
+        end else begin
+            $display("[TB 4-WAY TOP] 注意: NUM_LC=%0d 非生产几何，未做黄金模型比对；", NUM_LC);
+            $display("             本次结论仅为 4-Way 与 2-Way 自洽，不构成绝对正确性判据。");
+        end
+
+        if (has_golden_exp &&
+            (gold_sc_bad_2w != 0 || gold_pos_bad_2w != 0 ||
+             gold_sc_bad_4w != 0 || gold_pos_bad_4w != 0)) begin
+            errors = errors + 1;
+            $display("[TB 4-WAY TOP] FAIL: 与独立黄金模型不一致！");
+        end
+
         if (rec_cnt_4w != NREADS || rec_cnt_2w != NREADS) begin
             errors = errors + 1;
             $display("[TB 4-WAY TOP] FAIL: 记录条数不符！");
@@ -582,7 +683,10 @@ module tb_accelerator_core_4way;
 
         if (errors == 0) begin
             $display("================================================================");
-            $display("[TB 4-WAY TOP] PASS: 顶层 4-Way 与 2-Way 100%% 逐位全等，加速比 %0.3fx！", speedup);
+            if (has_golden_exp)
+                $display("[TB 4-WAY TOP] PASS: 顶层 4-Way/2-Way 与独立黄金模型 100%% 逐条一致，加速比 %0.3fx！", speedup);
+            else
+                $display("[TB 4-WAY TOP] PASS: 顶层 4-Way 与 2-Way 100%% 逐位全等 (未做黄金比对)，加速比 %0.3fx！", speedup);
             $display("================================================================");
             $finish;
         end else begin
