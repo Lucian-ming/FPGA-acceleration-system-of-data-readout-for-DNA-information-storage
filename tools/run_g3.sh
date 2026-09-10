@@ -27,6 +27,8 @@
 #   tools/run_g3.sh                                   # 复现 G3 闭环那组参数（2048 条源读段）
 #   tools/run_g3.sh --limit 4096                      # 分档测量：源读段数翻倍
 #   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
+#   tools/run_g3.sh --elf <path>                      # 换一份 PS 固件做对照实验；
+#                                                     # 同源性判据对该 ELF 不成立，会打告警
 #   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
 #   tools/run_g3.sh --runs 2                          # 同一次上电内连续跑两次任务（状态复位判据）
 #   tools/run_g3.sh --runs 2 --first-run-score-min 0  # 第一轮弄脏 Voter 累加器，第二轮才是判据
@@ -55,6 +57,9 @@ cd "$REPO"
 # 原样存下本次调用参数：下面的解析循环会 shift 掉 "$@"，
 # 而 summary.txt 是留证，必须记准「这一轮是怎么跑的」。
 INVOCATION="$*"
+
+# --elf 覆盖路径（空 = 用 hw/build/export/ 里的那份）
+ELF_OVERRIDE=""
 
 # ---------------------------------------------------------------------------
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/18 §2。
@@ -136,6 +141,7 @@ while [[ $# -gt 0 ]]; do
         --expect-sha)       EXPECT_SHA="$2"; shift 2 ;;
         --stage1-records)   STAGE1_DUMP_RECORDS="$2"; shift 2 ;;
         --skip-boot)        DO_BOOT=0; shift ;;
+        --elf)              ELF_OVERRIDE="$2"; shift 2 ;;
         --skip-dump)        DO_DUMP=0; shift ;;
         --no-uart)          DO_UART=0; shift ;;
         --uart-port)        UART_PORT="$2"; shift 2 ;;
@@ -157,6 +163,7 @@ step_skip() { STEP_NAMES+=("$1"); STEP_STATES+=("SKIP"); STEP_NOTES+=("${2:-}");
 say()  { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
 die()  { printf '\n\033[31mFATAL: %s\033[0m\n' "$*" >&2; exit 2; }
+warn() { printf '\033[33m    %s\033[0m\n' "$*" >&2; }
 
 # ---------------------------------------------------------------------------
 # 0. 参数推导
@@ -325,6 +332,18 @@ info "export/ 全部制品与 SHA256SUMS 相符"
 
 BIT_SRC="hw/build/export/top_bd_wrapper.bit"
 ELF_SRC="hw/build/export/dna_lwip_app_b27.elf"
+# --elf：用指定 ELF 替换 export/ 里那份，用于验证「只改了 PS 固件」的实验，
+# 免得为了跑一次实验就覆盖已知良好的基线制品（覆盖了就没有回退点了）。
+# 代价是**同源性判据被降级**：export/ 的 SHA256SUMS 校验对这份 ELF 不成立，
+# 所以这里必须打印醒目告警，并把该 ELF 的哈希记进 summary，
+# 否则日后没人分得清某次留证到底跑的是哪份固件。
+if [[ -n "$ELF_OVERRIDE" ]]; then
+    [[ -f "$ELF_OVERRIDE" ]] || die "--elf 指定的文件不存在：$ELF_OVERRIDE"
+    ELF_SRC="$ELF_OVERRIDE"
+    warn "⚠️ ELF 已被 --elf 覆盖为 $ELF_SRC"
+    warn "⚠️ 该 ELF 不在 export/SHA256SUMS 覆盖范围内，制品同源性判据对它不成立"
+    warn "⚠️ 本次留证仅可用于实验对照，不得当作发布基线"
+fi
 [[ -f "$BIT_SRC" ]] || die "缺少 $BIT_SRC"
 [[ -f "$ELF_SRC" ]] || die "缺少 $ELF_SRC"
 

@@ -76,6 +76,17 @@ typedef enum {
 
 static volatile proc_state_e g_proc_state = PROC_IDLE;
 
+/* 单次 poll 回调内最多推进多少个流水线状态。
+ * 取 64：整条流水线约 20 步（17 个 PIPE_* 状态 + PIPE_WM_TX 的 4 批），
+ * 64 足以一次跑完，留 3 倍余量以防未来加状态；同时它是一道保险——
+ * 万一某个状态因缺陷不推进，回调也会在 64 次内让出 CPU，
+ * 不至于饿死 lwIP 的 TCP 处理与重传定时器。 */
+#define PIPE_MAX_STEPS_PER_POLL  64U
+
+/* poll 回调次数，与 pipe_poll_steps（状态推进次数）分开统计：
+ * 改动生效后前者应降到个位数，后者基本不变。 */
+static u32 pipe_poll_cbs = 0;
+
 
 
 
@@ -246,23 +257,69 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
          * 下一个人就不必再靠分档拟合去反推常数项（docs/18 P1 第 3 项的教训：
          * 扣除法推断一旦进了表格就会被当成实测引用）。 */
         pipe_poll_steps = 0;
+        pipe_poll_cbs = 0;
         XTime_GetTime(&pipe_t_start);
         g_proc_state = PROC_RUNNING; break;
     case PROC_RUNNING: {
-        int st = run_processing_pipeline(conn);
-        pipe_poll_steps++;
-        if (pipe_state == PIPE_FAIL) g_proc_state = PROC_FAILED;
-        else if (pipe_state == PIPE_DONE_STAGE3 && st == XST_SUCCESS) {
-            XTime t_end;
-            XTime_GetTime(&t_end);
-            xil_printf("[PIPE] total %u poll steps, %u ms "
-                       "(WM preload: %u steps)\n\r",
-                       pipe_poll_steps,
-                       (u32)((t_end - pipe_t_start) /
-                             (XTime)(COUNTS_PER_SECOND / 1000U)),
-                       wm_poll_steps);
-            g_proc_state = PROC_DONE;
-        }
+        /* 【P0 固定开销】改之前：这里每次 poll 回调只推进**一个**流水线状态就 break，
+         * 于是每个状态都要白等一个 lwIP poll 周期。2026-09-10 用 XSDB 读
+         * pipe_poll_steps 实测：256 源读段的任务走了 20 步、t_result = 5.525 s，
+         * 即 276 ms/步 —— 这 5.5 s 里没有任何一毫秒是真实计算，硬件早算完了，
+         * PS 在等定时器。（也解释了历史文档那个 4.25 s 常数：17 个 PIPE_* 状态
+         * × 250 ms，量纲完全吻合。）
+         *
+         * 改之后：在**同一次回调内**连续推进，直到终态或用尽 guard 配额。
+         * 三条不能碰的约束：
+         *   1. 不改任何状态**内部**的寄存器写序列与其相对时序 —— 写序列本身就是
+         *      被测对象（B27 的教训：TB 里只写一次 START 根本测不出真实固件时序）；
+         *   2. 各状态原有的有界忙等（wm_wait_region_bd、各级 DONE 轮询）原样保留，
+         *      本改动只收掉「状态之间」的白等，不动「状态之内」的等待；
+         *   3. 必须有 guard 上限，否则单次回调可能长时间不返回，饿死 lwIP 的
+         *      TCP 收发与重传定时器，反而制造断连。
+         *
+         * 注意 do-while 里还有一处「必须让出」的判断，见循环末尾：
+         * 流式状态不能批量推进，否则会撑爆 BD 环。
+         *
+         * pipe_poll_steps 的语义随之变化：它现在计的是**状态推进次数**而不是
+         * poll 回调次数，所以不能再用「pipe_poll_steps x poll 间隔」估算耗时。
+         * 新增 pipe_poll_cbs 单独统计回调次数，两者一起打印才能看出改动是否生效。 */
+        int st = XST_SUCCESS;
+        u32 steps_this_cb = 0;
+
+        pipe_poll_cbs++;
+
+        do {
+            st = run_processing_pipeline(conn);
+            pipe_poll_steps++;
+            steps_this_cb++;
+
+            if (pipe_state == PIPE_FAIL) { g_proc_state = PROC_FAILED; break; }
+
+            if (pipe_state == PIPE_DONE_STAGE3 && st == XST_SUCCESS) {
+                XTime t_end;
+                XTime_GetTime(&t_end);
+                xil_printf("[PIPE] total %u steps in %u callbacks, %u ms "
+                           "(WM preload: %u steps)\n\r",
+                           pipe_poll_steps, pipe_poll_cbs,
+                           (u32)((t_end - pipe_t_start) /
+                                 (XTime)(COUNTS_PER_SECOND / 1000U)),
+                           wm_poll_steps);
+                g_proc_state = PROC_DONE;
+                break;
+            }
+            /* 【必须让出】PIPE_TX_STREAM / PIPE_PROGRESS 这两个状态**依赖 poll 节流**：
+             * 它们按 RX BD 环的剩余容量分批投递，靠「回到 lwIP 再等下一次 poll」
+             * 给 DMA 排空与 BD 回收留出时间。2026-09-10 实测过把它们也纳入批量推进
+             * 的后果：TX 64/64 帧一次投完但 TX BD 只完成 7/64，
+             * RX submitted=640 超过 ring free=512，Stage1 停顿 ~30 s 直接 FAIL
+             * （串口实录 g3_runs/20260910T113222Z/uart.log）。
+             * 也就是说原来那个「一次 poll 一步」不只是浪费，它同时是**节流机制**，
+             * 而 stage1_dna.c:178 的注释「原实现靠下一个 poll 才回收，天然有
+             * 250 ms 余量」早就写明了这一点。
+             * 所以这里只批量推进「配置/等待完成」类状态，一旦进入流式状态立刻让出。 */
+            if (pipe_state == PIPE_TX_STREAM || pipe_state == PIPE_PROGRESS) break;
+        } while (steps_this_cb < PIPE_MAX_STEPS_PER_POLL);
+
         break;
     }
     case PROC_DONE:
