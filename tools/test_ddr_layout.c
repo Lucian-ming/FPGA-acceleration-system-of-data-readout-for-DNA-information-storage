@@ -17,7 +17,7 @@
 #define BYTES_PER_READ    40UL
 #define BYTES_PER_RESULT  48UL
 #define FRAME_READS       64UL
-#define MAX_RECORDS       108000UL
+#define MAX_RECORDS       129600UL
 
 static int check(unsigned long records, int expect_rc)
 {
@@ -45,9 +45,14 @@ int main(void)
     fail += !check(0UL,       -1);  /* 空任务 */
     fail += !check(100UL,     -2);  /* 非 64 整数倍（C2） */
     fail += !check(103562UL,  -2);  /* 全量未补零的原始条数 */
-    fail += !check(108000UL,  -2);  /* 历史 TOTAL_READS 宏本身不是 64 的倍数
+    fail += !check(108000UL,  -2);  /* 旧 TOTAL_READS 值本身不是 64 的倍数
                                        （108000 = 64×1687 + 32），只当容量上限用 */
-    fail += !check(108032UL,  -3);  /* 64 对齐但超出预留容量（64×1688） */
+    /* 2026-09-10：容量改为 129600 = 64×2025，恰好 64 对齐，故它是**合法**任务大小。
+     * SE250 全量 (64,800 源读段 × 2 方向) 正好等于它——旧值 107,968 装不下。 */
+    fail += !check(129600UL,   0);  /* 新容量上限：64 对齐且不越界，应当通过 */
+    fail += !check(129664UL,  -3);  /* 再多一帧就超容量 */
+    fail += !check(108032UL,   0);  /* 64 对齐（64×1688）；2026-09-10 容量由 108000
+                                       提高到 129600 后，它已在容量内，应当通过 */
     fail += !check(135168UL,  -3);  /* 远超容量 */
 
     printf("== 字节数计算 ==\n");
