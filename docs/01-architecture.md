@@ -33,8 +33,14 @@ DNA 信息存储的**读出**（readout）环节：把测序仪产出的大量�
 | Stage 3 | `desparsification_decoder` (PL) | 81,000 bit | 64,800 bit | 5b→4b 反稀疏化，还原 LDPC 码字 |
 | Stage 4 | PC 端 EXE | 64,800 bit | 54,000 bit + JPEG | DVB-S2 R=5/6 LDPC 硬判决译码 |
 
-> **实现边界**：B3 已由 `sw/app/echo.c` 接入 PS 状态机，不是 PL IP；Stage2 已有黄金
-> 向量逐位判据，但 Stage2.5 的真实 DDR/cache 输入输出和整链仍待上板验收，不能由此宣称 G3 完成。
+> **实现边界**：B3（Stage 2.5）已由 `sw/app/echo.c` 接入 PS 状态机，**运行在 ARM 上而非 PL IP**。
+> 因此本系统**不是纯硬件三级流水**，对外材料（架构图、答辩稿）必须如实标注这一级在 PS 侧。
+>
+> ~~Stage2.5 的真实 DDR/cache 输入输出和整链仍待上板验收~~ —— **该边界已关闭**：
+> Stage 2.5 的板端输入输出由 `tools/board_stage_check.py` 的四级逐级取证覆盖
+> （「Stage2 输出 ⊕ 水印 vs `sparse_expect.hex`」一项即是它），
+> 2026-09-10 多轮 `tools/run_g3.sh` 均 PASS，端到端图片 SHA-256
+> `fcd0cf90…f2c3` 逐位相同。当前状态以 [03](03-status.md) 为准。
 
 ---
 
