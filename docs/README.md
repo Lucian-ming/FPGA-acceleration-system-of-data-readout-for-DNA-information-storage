@@ -1,7 +1,8 @@
 # 文档索引（精简版）
 
-新会话先读 03、15 和本索引，按任务补读其余文档；不要默认扫描历史归档。
-文档 13 是终态门禁，15 是当前执行队列，16 是本轮审计证据，互不替代。
+新会话先读 **17**、03、15 和本索引，按任务补读其余文档；不要默认扫描历史归档。
+文档 **17 是参赛定位与优先级的最高依据**，13 是终态门禁，15 是当前执行队列，
+16 是本轮审计证据，互不替代。凡 13/15/11/04 与 17 冲突之处，以 17 为准。
 
 | 文档 | 用途 |
 |---|---|
@@ -21,6 +22,7 @@
 | [14-git-parallel-workflow.md](14-git-parallel-workflow.md) | 当前有效的共享 main 并行与强制回收纪律 |
 | [15-resume-and-parallel-plan.md](15-resume-and-parallel-plan.md) | 当前执行入口：中断恢复、任务卡与 W0～W5 并行计划 |
 | [16-interrupted-work-audit-2026-09-06.md](16-interrupted-work-audit-2026-09-06.md) | 本轮遗留物清点、报告纠偏与 dump 复核证据 |
+| [17-competition-strategy.md](17-competition-strategy.md) | **参赛定位、性能天花板证伪、优先级重排与长期方向（最高依据）** |
 | [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词 |
 
 ## 参考资料
