@@ -734,14 +734,20 @@ def main():
 
     if args.dataset and args.dataset.strip().lower() != "all":
         targets = [t.strip().lower() for t in args.dataset.split(",") if t.strip()]
-        filtered = []
-        for c in configs:
-            cid = c["id"].lower()
-            ctid = c.get("test_id", "").lower()
-            cdisp = c.get("display_name", "").lower()
-            # 允许匹配 id, test_id, display_name
-            if any(t == cid or t == ctid or t == cdisp or t in ctid or t in cdisp for t in targets):
-                filtered.append(c)
+        # 先试精确匹配；只有一个都精确匹配不上时才退化为子串匹配。
+        # 否则 --dataset D1_random_entropy 会因子串规则同时命中
+        # D1_random_entropy_thr65（"d1_random_entropy" 是它的前缀），
+        # 想单独跑某一个门限的场景就做不到了。
+        def _keys(c):
+            return (c["id"].lower(), c.get("test_id", "").lower(),
+                    c.get("display_name", "").lower())
+
+        exact = [c for c in configs if any(t in _keys(c) for t in targets)]
+        if exact:
+            filtered = exact
+        else:
+            filtered = [c for c in configs
+                        if any(t in k for t in targets for k in _keys(c) if k)]
         if not filtered:
             print(f"[ERROR] 未匹配到任何指定数据集: {args.dataset}")
             print("支持的数据集包含:")
