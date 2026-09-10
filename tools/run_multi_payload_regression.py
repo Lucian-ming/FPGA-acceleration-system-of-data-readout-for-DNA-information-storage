@@ -458,14 +458,26 @@ class MultiPayloadRegression:
             notes="Offline dump check (Host LDPC decode only, live board time N/A)",
         )
 
-    def run_board_test(self, cfg: Dict[str, Any]) -> PayloadTestResult:
-        """执行物理板端交互读出。"""
+    def run_board_test(self, cfg: Dict[str, Any],
+                       dump_dir: Optional[Path] = None,
+                       rep: int = 0) -> PayloadTestResult:
+        """执行物理板端交互读出。
+
+        dump_dir 非空时，本次回传写到该目录而**不覆盖** tests/datasets/ 下
+        已提交的留证 dump。重复实验必须走这条路径：那些 dump 是
+        docs/benchmarks/measured_board_multi_payload.md 引用的原始证据，
+        被覆盖就等于毁证（AGENTS.md「不得静默删除证据」）。
+        """
         t0 = time.time()
         score_min = cfg.get("score_min", 67)
         display_name = cfg.get("display_name", cfg["id"])
-        print(f"\n--- [BOARD] 板级上板实测: {display_name} ({cfg['type']}) -> {self.ip}:{self.port} ---")
+        tag = f" 第{rep+1}次" if dump_dir is not None else ""
+        print(f"\n--- [BOARD] 板级上板实测: {display_name}{tag} ({cfg['type']}) -> {self.ip}:{self.port} ---")
 
-        out_dump = Path(cfg.get("dump_path") or (DATASETS_DIR / cfg["id"] / "board_output.bin"))
+        if dump_dir is not None:
+            out_dump = Path(dump_dir) / f"{cfg.get('test_id', cfg['id'])}_rep{rep+1}.bin"
+        else:
+            out_dump = Path(cfg.get("dump_path") or (DATASETS_DIR / cfg["id"] / "board_output.bin"))
         out_dump.parent.mkdir(parents=True, exist_ok=True)
 
         client_cfg = ClientConfig(
@@ -503,7 +515,7 @@ class MultiPayloadRegression:
                 notes=f"Communication error: {e}",
             )
 
-        if cfg.get("test_id") == "D1_random_entropy_thr60":
+        if dump_dir is None and cfg.get("test_id") == "D1_random_entropy_thr60":
             # 保持兼容，同步副本到历史 board_output.bin
             compat_dump = DATASETS_DIR / cfg["id"] / "board_output.bin"
             try:
@@ -603,6 +615,31 @@ class MultiPayloadRegression:
             )
 
         pass_rate = (total_pass / max(1, len(self.results))) * 100.0
+
+        # 按数据集汇总：重复实验的意义就在这张表。
+        # 单次成功不是成功率（docs/15 §8）——把每个数据集的 n 次结果并成
+        # 「k/n」才谈得上可靠性；分母必须留在报告里，失败样本不得从统计里消失。
+        by_ds: Dict[str, List[bool]] = {}
+        for r in self.results:
+            base = r.dataset_id.split(" #")[0]
+            by_ds.setdefault(base, []).append(r.passed)
+        if any(len(v) > 1 for v in by_ds.values()):
+            lines.extend([
+                "",
+                "### 1.1 按数据集汇总（重复实验）",
+                "",
+                "| 数据集 ID | 通过 / 总次数 | 通过率 | 结论 |",
+                "|---|:---:|:---:|:---:|",
+            ])
+            for ds, oks in by_ds.items():
+                k, n = sum(oks), len(oks)
+                verdict = ("✅ 全部通过" if k == n else
+                           "❌ 全部失败" if k == 0 else "⚠️ 不稳定")
+                lines.append(f"| `{ds}` | {k} / {n} | {100.0*k/n:.1f}% | {verdict} |")
+            lines.append("")
+            lines.append("> 「⚠️ 不稳定」意味着同一输入在同一制品上结果不可重复，"
+                         "属最高优先级缺陷，不得按「多数通过」计为通过。")
+
         lines.extend([
             "",
             f"**总计通过率**: {total_pass} / {len(self.results)} ({pass_rate:.1f}%)",
@@ -667,6 +704,12 @@ def main():
     )
     parser.add_argument("--report", default=None, help="自定义报告输出文件路径")
     parser.add_argument(
+        "--repeat", type=int, default=1,
+        help="每个数据集重复跑几次（仅 --mode board 有意义）。>1 时回传写入 "
+             "<out-dir>/dumps/ 而不覆盖 tests/datasets/ 下已提交的留证 dump，"
+             "并按数据集汇总通过率——单次结果不构成成功率（docs/15 §8）。",
+    )
+    parser.add_argument(
         "--extended",
         action="store_true",
         help="除已冻结的经典 5 大基准 (D0 + 4 个 D1) 外，额外纳入自适应门限 "
@@ -711,16 +754,31 @@ def main():
     print(f"  日志与报告输出目录: {out_dir}")
     print(f"  待测试项目数量: {len(configs)}")
 
+    reps = max(1, args.repeat)
+    if reps > 1 and args.mode != "board":
+        print(f"[WARN] --repeat 只对 --mode board 有意义，当前模式 {args.mode}，按 1 次处理")
+        reps = 1
+    dump_dir = (out_dir / "dumps") if reps > 1 else None
+    if dump_dir is not None:
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        print(f"  重复模式：每个数据集 {reps} 次，回传写入 {dump_dir}")
+        print("  （不覆盖 tests/datasets/ 下已提交的留证 dump）")
+
     for cfg in configs:
-        if args.mode == "golden":
-            res = reg.run_golden_mock(cfg)
+        for rep in range(reps):
+            if args.mode == "golden":
+                res = reg.run_golden_mock(cfg)
+            elif args.mode == "check-dumps":
+                res = reg.run_check_saved_dumps(cfg)
+            elif args.mode == "board":
+                res = reg.run_board_test(cfg, dump_dir=dump_dir, rep=rep)
+            else:
+                continue
+            if reps > 1:
+                res.dataset_id = f"{res.dataset_id} #{rep+1}"
             reg.results.append(res)
-        elif args.mode == "check-dumps":
-            res = reg.run_check_saved_dumps(cfg)
-            reg.results.append(res)
-        elif args.mode == "board":
-            res = reg.run_board_test(cfg)
-            reg.results.append(res)
+            if args.mode == "board":
+                time.sleep(1.5)   # 让板端单例 g_conn 彻底回收再发起下一次
 
     reg.generate_report(report_file, run_id=run_id, extended=args.extended)
 
