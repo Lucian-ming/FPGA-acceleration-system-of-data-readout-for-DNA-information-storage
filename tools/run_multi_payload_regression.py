@@ -48,6 +48,26 @@ from first import ClientConfig, run_client
 import readout as rd
 
 
+COMMON_DIR = DATASETS_DIR / "common"
+
+
+def resolve_watermark(dataset_dir: Path) -> Path:
+    """解析数据集应当使用的水印文件。
+
+    所有 D1/D2 合成数据集共用同一份水印，2026-09-10 起收敛到
+    tests/datasets/common/watermark.txt 一份，不再每个数据集各存一份副本
+    （6 份逐字节相同，真正的风险是将来改水印时漏改其中一份，
+    而各数据集的 SHA256SUMS 各自自洽、发现不了这种不一致）。
+
+    仍优先使用数据集目录下的同名文件：兼容历史数据集与外部投放的数据集，
+    它们可能带自己的水印。找不到才回落到共享副本。
+    """
+    local = Path(dataset_dir) / "watermark.txt"
+    if local.exists():
+        return local
+    return COMMON_DIR / "watermark.txt"
+
+
 def read_file_text(path: Path) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
@@ -156,7 +176,7 @@ class MultiPayloadRegression:
                 "tier": "D1",
                 "manifest": DATASETS_DIR / "D1_text_manifesto/manifest.json",
                 "fastq": DATASETS_DIR / "D1_text_manifesto/reads_se150.fastq",
-                "watermark": DATASETS_DIR / "D1_text_manifesto/watermark.txt",
+                "watermark": resolve_watermark(DATASETS_DIR / "D1_text_manifesto"),
                 "codeword": DATASETS_DIR / "D1_text_manifesto/codeword.txt",
                 "source_payload": DATASETS_DIR / "D1_text_manifesto/source_payload.bin",
                 "expected_sha256": "101d89599e84011f30816dea901c43d96bd2a1654a5252dbf47e9c0cc8601ccf",
@@ -172,7 +192,7 @@ class MultiPayloadRegression:
                 "tier": "D1",
                 "manifest": DATASETS_DIR / "D1_binary_pattern/manifest.json",
                 "fastq": DATASETS_DIR / "D1_binary_pattern/reads_se150.fastq",
-                "watermark": DATASETS_DIR / "D1_binary_pattern/watermark.txt",
+                "watermark": resolve_watermark(DATASETS_DIR / "D1_binary_pattern"),
                 "codeword": DATASETS_DIR / "D1_binary_pattern/codeword.txt",
                 "source_payload": DATASETS_DIR / "D1_binary_pattern/source_payload.bin",
                 "expected_sha256": "034adb3c5096819e35dde255bcad95377f31f3fdcc7e27083ffe1ef0cdbe0525",
@@ -188,7 +208,7 @@ class MultiPayloadRegression:
                 "tier": "D1",
                 "manifest": DATASETS_DIR / "D1_structured_sparse/manifest.json",
                 "fastq": DATASETS_DIR / "D1_structured_sparse/reads_se150.fastq",
-                "watermark": DATASETS_DIR / "D1_structured_sparse/watermark.txt",
+                "watermark": resolve_watermark(DATASETS_DIR / "D1_structured_sparse"),
                 "codeword": DATASETS_DIR / "D1_structured_sparse/codeword.txt",
                 "source_payload": DATASETS_DIR / "D1_structured_sparse/source_payload.bin",
                 "expected_sha256": "831b499c0bf4dfd1ca70e89edd3412669ade6e213fe60b2f55d034c2b246486c",
@@ -205,7 +225,7 @@ class MultiPayloadRegression:
                 "tier": "D1",
                 "manifest": DATASETS_DIR / "D1_random_entropy/manifest.json",
                 "fastq": DATASETS_DIR / "D1_random_entropy/reads_se150.fastq",
-                "watermark": DATASETS_DIR / "D1_random_entropy/watermark.txt",
+                "watermark": resolve_watermark(DATASETS_DIR / "D1_random_entropy"),
                 "codeword": DATASETS_DIR / "D1_random_entropy/codeword.txt",
                 "source_payload": DATASETS_DIR / "D1_random_entropy/source_payload.bin",
                 "expected_sha256": "d7cbdc06d173b6ec01b7fce8646249589e5f1611ca4fe0fedd25187af0cc7b5f",
@@ -227,7 +247,7 @@ class MultiPayloadRegression:
                     "tier": "D1",
                     "manifest": DATASETS_DIR / "D1_random_entropy/manifest.json",
                     "fastq": DATASETS_DIR / "D1_random_entropy/reads_se150.fastq",
-                    "watermark": DATASETS_DIR / "D1_random_entropy/watermark.txt",
+                    "watermark": resolve_watermark(DATASETS_DIR / "D1_random_entropy"),
                     "codeword": DATASETS_DIR / "D1_random_entropy/codeword.txt",
                     "source_payload": DATASETS_DIR / "D1_random_entropy/source_payload.bin",
                     "expected_sha256": "d7cbdc06d173b6ec01b7fce8646249589e5f1611ca4fe0fedd25187af0cc7b5f",
@@ -244,7 +264,7 @@ class MultiPayloadRegression:
                     "tier": "D2",
                     "manifest": DATASETS_DIR / "D2_controlled_noise/manifest.json",
                     "fastq": DATASETS_DIR / "D2_controlled_noise/reads_se150.fastq",
-                    "watermark": DATASETS_DIR / "D2_controlled_noise/watermark.txt",
+                    "watermark": resolve_watermark(DATASETS_DIR / "D2_controlled_noise"),
                     "codeword": DATASETS_DIR / "D2_controlled_noise/codeword.txt",
                     "source_payload": DATASETS_DIR / "D2_controlled_noise/source_payload.bin",
                     "expected_sha256": "101d89599e84011f30816dea901c43d96bd2a1654a5252dbf47e9c0cc8601ccf",

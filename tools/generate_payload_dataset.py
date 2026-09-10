@@ -484,8 +484,24 @@ def generate_dataset(
     ) - ord("0")
     if wm_bits.size != 81000:
         raise ValueError(f"水印比特长度应为 81000，实得 {wm_bits.size}")
-    watermark_file = output_dir / "watermark.txt"
-    watermark_file.write_text("".join(str(b) for b in wm_bits), encoding="utf-8")
+    # 水印已收敛到 tests/datasets/common/watermark.txt 一份（2026-09-10）：
+    # 所有 D1/D2 合成数据集共用同一份，此前每个数据集各存一份逐字节相同的副本，
+    # 将来改水印时漏改其中一份就是静默的数据不一致，而各数据集 SHA256SUMS
+    # 各自自洽、发现不了。详见 tests/datasets/common/README.md。
+    common_dir = output_dir.parent / "common"
+    common_dir.mkdir(parents=True, exist_ok=True)
+    watermark_file = common_dir / "watermark.txt"
+    wm_norm = "".join(str(b) for b in wm_bits)
+    if watermark_file.exists():
+        # 已存在就必须逐字节一致，否则说明这次生成用的水印与既有数据集不同源，
+        # 直接失败——静默覆盖会让已有数据集的 manifest 记录的哈希失效。
+        if watermark_file.read_text(encoding="utf-8") != wm_norm:
+            raise ValueError(
+                f"{watermark_file} 已存在且内容不同：本次生成使用的水印与既有共享副本"
+                f"不一致。若确要更换水印，须同时重生成全部数据集并刷新各自 manifest。"
+            )
+    else:
+        watermark_file.write_text(wm_norm, encoding="utf-8")
     watermark_sha = sha256_file(watermark_file)
 
     encoded_bits = sparse_stream ^ wm_bits

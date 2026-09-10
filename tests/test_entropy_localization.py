@@ -211,17 +211,38 @@ class TestEntropyLocalization(unittest.TestCase):
                 verify_readout=False,
             )
 
-            # 检查关键产物存在
+            # 检查关键产物存在。
+            # 注意 watermark.txt **不在**此列：2026-09-10 起水印收敛到
+            # <datasets>/common/watermark.txt 一份共享副本，不再每个数据集各存一份
+            # （详见 tests/datasets/common/README.md）。下面单独校验共享副本。
             for fname in [
                 "source_payload.bin",
                 "codeword.txt",
-                "watermark.txt",
                 "reference_sequence.txt",
                 "reads_se150.fastq",
                 "manifest.json",
                 "SHA256SUMS",
             ]:
                 self.assertTrue((out_path / fname).exists(), f"产物缺失: {fname}")
+
+            # 水印共享副本：必须存在，且 manifest 记录的哈希必须与它逐字节相符。
+            # 这比原来「数据集目录下有个 watermark.txt」更强——原断言只证明文件在，
+            # 证明不了它与 manifest 自洽；收敛之后如果哪次生成用了不同水印，
+            # 生成器会直接报错，而这条断言是第二道防线。
+            shared_wm = out_path.parent / "common" / "watermark.txt"
+            self.assertTrue(shared_wm.exists(), f"共享水印缺失: {shared_wm}")
+            import hashlib as _h
+            self.assertEqual(
+                _h.sha256(shared_wm.read_bytes()).hexdigest(),
+                manifest["watermark"]["sha256"],
+                "共享水印与 manifest 记录的哈希不符——水印被换过但数据集没重生成",
+            )
+            self.assertNotIn(
+                "watermark.txt",
+                [ln.split()[-1] for ln in
+                 (out_path / "SHA256SUMS").read_text(encoding="utf-8").split("\n") if ln.strip()],
+                "SHA256SUMS 不应再列数据集本地的 watermark.txt（已收敛到 common/）",
+            )
 
             # 检查 manifest 规范
             self.assertEqual(manifest["dataset_id"], "test_d2_entropy")

@@ -128,6 +128,17 @@ def load_watermark_symbols(path: Path) -> Tuple[np.ndarray, np.ndarray]:
 class HighEntropyDiagnostics:
     """高熵随机样本失败分级诊断器。"""
 
+
+    def _resolve_watermark(self):
+        """水印已收敛到 tests/datasets/common/ 一份；数据集自带的优先。
+
+        见 tests/datasets/common/README.md。
+        """
+        local = self.dataset_dir / "watermark.txt"
+        if local.exists():
+            return local
+        return self.dataset_dir.parent / "common" / "watermark.txt"
+
     def __init__(self, dataset_dir: Optional[Path] = None):
         if dataset_dir is None:
             self.dataset_dir = REPO_ROOT / "tests" / "datasets" / "D1_random_entropy"
@@ -148,7 +159,7 @@ class HighEntropyDiagnostics:
         source_bin_path = self.dataset_dir / "source_payload.bin"
         cw_txt_path = self.dataset_dir / "codeword.txt"
         ref_seq_path = self.dataset_dir / "reference_sequence.txt"
-        wm_txt_path = self.dataset_dir / "watermark.txt"
+        wm_txt_path = self._resolve_watermark()
 
         source_bytes = source_bin_path.read_bytes()
         info_bits = bytes_to_bits(source_bytes, target_len=K_INFO)
@@ -202,7 +213,7 @@ class HighEntropyDiagnostics:
     def run_level2_alignment_accuracy(self, num_threads: int = 8) -> Dict[str, Any]:
         """评估高熵序列下读段与水印滑窗比对的对齐准确率与伪相关分布。"""
         fastq_path = self.dataset_dir / "reads_se150.fastq"
-        wm_txt_path = self.dataset_dir / "watermark.txt"
+        wm_txt_path = self._resolve_watermark()
 
         ref_wm, wm_bits = load_watermark_symbols(wm_txt_path)
         L = ref_wm.size
@@ -312,7 +323,7 @@ class HighEntropyDiagnostics:
     ) -> Dict[str, Any]:
         """分析不同 score_min 下读段保留率、伪相关过滤率、信噪比及板端等价译码结果。"""
         fastq_path = self.dataset_dir / "reads_se150.fastq"
-        wm_txt_path = self.dataset_dir / "watermark.txt"
+        wm_txt_path = self._resolve_watermark()
         cw_txt_path = self.dataset_dir / "codeword.txt"
 
         ref_wm, wm_bits = load_watermark_symbols(wm_txt_path)
@@ -436,7 +447,7 @@ class HighEntropyDiagnostics:
     def run_level4_voter_saturation_analysis(self, num_threads: int = 8) -> Dict[str, Any]:
         """分析累加器饱和机制与高熵序列下的正负票分布、投票稀释及局部抵消。"""
         fastq_path = self.dataset_dir / "reads_se150.fastq"
-        wm_txt_path = self.dataset_dir / "watermark.txt"
+        wm_txt_path = self._resolve_watermark()
         cw_txt_path = self.dataset_dir / "codeword.txt"
 
         ref_wm, wm_bits = load_watermark_symbols(wm_txt_path)
