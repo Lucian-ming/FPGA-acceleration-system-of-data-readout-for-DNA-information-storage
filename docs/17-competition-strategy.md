@@ -138,6 +138,72 @@ physopt 后整机实测 **LUT 15,483 / 17,600 = 88.0%**
 全量 4-way 实测外推为 **1,368 reads/s，与单核 CPU 的 1,364.9 恰好打平（1.00x）**，
 比本文原先估的「慢 1.08 倍」更接近、但依然谈不上加速。
 
+### 3.0.1 ✅ 根因已定位：不是计算，是每步白等一个 lwIP poll 周期
+
+用 `tools/board/read_pipe_counters.tcl` 经 XSDB 直接读固件内的计数器
+（256 源读段 / 512 记录，`t_result = 5.525 s`）：
+
+```text
+PIPE_POLL_STEPS  20        <- 5.525 s / 20 = 276 ms/步
+WM_POLL_STEPS     4        <- 50 区域 / WM_REGIONS_PER_POLL(16) = 4 批
+```
+
+**机制**：`sw/app/echo.c::poll_callback` 中 `PROC_RUNNING` 分支每次回调只调用
+一次 `run_processing_pipeline()` 就 `break`，即**每次 lwIP poll 回调只推进一个
+流水线状态**。`sw/app/pipeline.h` 有 **17 个 PIPE_* 状态**，其中 `PIPE_WM_TX`
+按 `WM_REGIONS_PER_POLL=16` 分 4 批重复，合计约 20 步。
+而 `tcp_poll(newpcb, poll_callback, 1)` 的回调间隔实测 **276 ms**。
+
+```text
+20 步 x 276 ms = 5.52 s   ≈ 实测 t_result 5.525 s
+```
+
+**硬件早就算完了，PS 在等定时器。** 这 5.28 s 里没有任何一毫秒是真实计算。
+（顺带解释了文档那个 4.25 s：17 个状态 × 250 ms = 4.25 s，量纲完全吻合。）
+
+**⚠️ 撤回本文原先的首要怀疑对象**：§3.2 曾断言「首要怀疑对象是 Stage 2.5 的
+ARM 软件水印异或」。**该假设已被代码审查否证**——`stage2_voter.c::apply_watermark_differential`
+只是对 10,125 字节做一次 `u8` XOR，量级在毫秒以下，不可能是 5 s 级开销。
+
+**⚠️ 另一个必须记录的事实**：`poll_callback` 里**早就有**这行插桩
+`[PIPE] total %u poll steps, %u ms (WM preload: %u steps)`，
+且注释明确写着「固定开销的量纲就是『poll 步数 × 250~500 ms』」。
+但它走 `xil_printf` → UART，而板子的 CH340 串口线未接（Windows 侧只有 FTDI/JTAG），
+**这行信息从未被任何人读到过**，于是同一个问题被重新以「分档拟合反推常数项」的方式
+又查了一遍。教训：**留证通道断了，等于没有留证**。
+
+### 3.0.2 修复方案与预期收益
+
+**改法（低风险）**：把 `PROC_RUNNING` 分支改为在**同一次 poll 回调内循环推进**
+状态机，直到遇到真正需要等待硬件的状态或 `PIPE_DONE_STAGE3`：
+
+```c
+case PROC_RUNNING: {
+    int guard = 0;
+    do {
+        int st = run_processing_pipeline(conn);
+        pipe_poll_steps++;
+        ...
+    } while (pipe_state != PIPE_FAIL && pipe_state != PIPE_DONE_STAGE3
+             && ++guard < PIPE_MAX_STEPS_PER_POLL);
+    break;
+}
+```
+
+必须保留的约束：
+- **不得改动任何寄存器写序列的相对时序**（B27 的教训：写序列本身就是被测对象）；
+- 每个状态内部原有的有界忙等（`wm_wait_region_bd`、各级 DONE 轮询）保持不变；
+- 需要 `guard` 上限，避免单次回调占用过久饿死 lwIP 的 TCP 处理。
+
+**预期收益（按实测常数外推）**：固定开销 5.28 s → 约 0.1~0.3 s。
+
+| 场景 | 现在 | 修复后（预期） |
+|---|---:|---:|
+| 2,048 源读段（演示规模） | 7.40 s | **约 2.2 s（快 3.4x）** |
+| 51,781 源读段（全量） | 58.69 s | 约 53.6 s（快 1.1x） |
+
+与 §3.0 结论四一致：**这是演示体验的胜利，不改写全量性能结论。**
+
 ### 3.1 现状（2026-09-10 前的推测记录，保留以备追溯）
 
 固定开销在 2,048 读段任务中占 **63%** 的时间。
