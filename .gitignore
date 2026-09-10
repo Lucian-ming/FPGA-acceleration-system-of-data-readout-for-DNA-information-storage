@@ -21,9 +21,22 @@ sw/workspace/
 *.str
 *.pb
 *.wdb
+# 运行留证目录：默认不入库（体量大、每次运行都新建一个 run-id 子目录）。
+# 结论与判据写进 docs/，需要保留的**单份小证据**用 git add -f 显式入库
+# （例如 logs/vivado/.../physopt/summary.log、logs/multi_payload/repeat3_*/report.md）。
+# 2026-09-10：补齐本轮新增的 6 个目录——它们此前未被覆盖，
+# 一旦有人误用 git add -A 就会把几百 MB 的运行产物卷进仓库。
 logs/benchmarks/
 logs/multi_payload/
 logs/robustness/
+logs/demo/
+logs/overhead_sweep/
+logs/g3_2026/
+logs/iverilog/
+logs/d3_profile/
+logs/board_g3_stress/
+logs/vivado/*/
+!logs/vivado/recovery_20260909/
 
 # Python 缓存
 __pycache__/
