@@ -2,8 +2,7 @@
 
 > **建立日期**：2026-09-11（`035401d` 之后）
 > **性质**：可执行的清理计划，**不是**优化方向讨论。方向见 [17](17-competition-strategy.md)。
-> **执行者**：由 main 派发给专职 agent，提示词见
-> [prompts/slimming-and-code-quality.md](prompts/slimming-and-code-quality.md)。
+> **执行者**：由主会话 main 统一调度或派发专职子 agent（执行报告见 [slimming-report-2026-09-11.md](reference/slimming-report-2026-09-11.md)）。
 > **上位规则**：[AGENTS.md](../AGENTS.md)「代码卫生」八条 + `hw/experimental/README.md` 退休三条。
 > 本文只做两件事：**把那些规则落到具体文件上**，并**给每一项配一条会红的判据**。
 

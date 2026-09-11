@@ -40,7 +40,6 @@ bash tools/run_g3.sh --full --read-bps 250 --score-min 112 \
 ```
 
 完整构建与上板顺序见 [`docs/09-board-build-and-acceptance.md`](docs/09-board-build-and-acceptance.md)。从当前到最终交付的收口门禁见 [`docs/13-final-delivery-roadmap.md`](docs/13-final-delivery-roadmap.md)。
-中断恢复和并行监督提示词见 [`docs/prompts/main-resume-supervisor.md`](docs/prompts/main-resume-supervisor.md)。
 
 ## 目录
 

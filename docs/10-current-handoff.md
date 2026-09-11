@@ -16,7 +16,7 @@ docs/README.md
 3. 按 [15](15-resume-and-parallel-plan.md) 分波推进公平基准、板端等价模型、上位机 profiling；
 4. 4/8-way 保留候选资格，不依靠旧资源表封死，也不承诺线性提速；
 5. 构建和板卡独占，Git 主会话统一写入；共享 main 规则见 [14](14-git-parallel-workflow.md)；
-6. 给下一主会话的完整启动文本见 [监督提示词](prompts/main-resume-supervisor.md)。
+6. 工作规范见 [AGENTS.md](../AGENTS.md) 与 [14](14-git-parallel-workflow.md)。
 
 ## 历史资料
 

@@ -185,4 +185,4 @@ main 对照文档 13 的 G0～G8，一项项标注通过/失败/未测及证据�
 
 动态信息进看板，持久结论进本任务报告；失败和未完成也必须有负责人。
 交付必须同时完成 Git 同步、Agent 看板回收、资源释放和残留清点。
-给新主会话的可直接发送文本见 [监督提示词](prompts/main-resume-supervisor.md)。
+交接规范见 [10](10-current-handoff.md) 与 [14](14-git-parallel-workflow.md)。

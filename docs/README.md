@@ -25,9 +25,6 @@
 | [17-competition-strategy.md](17-competition-strategy.md) | **参赛定位、性能天花板证伪、优先级重排与长期方向（最高依据）** |
 | [18-evidence-ledger.md](18-evidence-ledger.md) | **证据台账：每条可对外说的话 → 判据 / 证据路径 / 复现命令 / 边界，含「不能说的话」清单** |
 | [19-slimming-and-code-quality-plan.md](19-slimming-and-code-quality-plan.md) | **项目瘦身与代码质量计划：冷/热清理分类、逐文件处置、红线与出口判据** |
-| [prompts/main-resume-supervisor.md](prompts/main-resume-supervisor.md) | 可复制给新主会话的监督提示词（通用版） |
-| [prompts/slimming-and-code-quality.md](prompts/slimming-and-code-quality.md) | 派发给清理 agent 的提示词（对应 19） |
-| [prompts/main-handoff-2026-09-11.md](prompts/main-handoff-2026-09-11.md) | 把 main 线程移交给新会话的提示词 |
 
 ## 参考资料
 
