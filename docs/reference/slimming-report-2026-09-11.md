@@ -20,8 +20,8 @@
 | **S-1 冷** | A1, A2, B2, A7 | 彻底删除重复 XSA（`design_2_wrapper.xsa` / `hardware.xsa`）、作废 BIF（`dna_board_20260816.bif`）；清理 `hw/experimental/` 下 12 个退休文件与死 wrapper；未收敛构建归并进 `hw/build/attic/` | `182511d` | ✅ 已入库 |
 | **S-2 冷** | A5, A6, B3, 门禁 8~11 | 确立 `sw/app/` 唯一权威源契约；归并 6 轮历史废探针至 `035705Z/superseded/`；收敛 3 个调试工具至 `tools/attic/`；扩展 `check_repo_hygiene.sh` 至 11 项门禁并全验鉴别力 | `0b6fc78` | ✅ 已入库 |
 | **S-3 冷** | A3, A4(维持) | 落地 XSim 常态化生命周期修剪工具 `tools/prune_xsim.sh`（默认 keep 3 并自动压缩日志归档至 `logs/xsim/`）；集成进 `run_xsim.sh` 与 `run_m3_bd.sh`；消除 `xvlog` 根目录残留；A4 遵命不动 | `d292e36` | ✅ 已入库 |
-| **S-4 冷** | C1, B4, 总结报告 | 补充 `main.c` / `platform.c` / `stage2_voter.c` / `gui_app.py` 核心契约注释；完成上位机四模块图谱调研 `client-module-map.md`；产出本总结报告 | 本轮交付 | 🟡 待审查提交 |
-| **S-5 热** | B1, C1(第3项) | 清理 7 个 Xilinx 模板文件与 RTL 头注释。涉及重新综合、烧录、G3 验收与同源更新 | 依授权暂缓 | ⏸️ 待构建窗口 |
+| **S-4 冷** | C1, B4, 总结报告 | 补充 `main.c` / `platform.c` / `stage2_voter.c` / `gui_app.py` 核心契约注释；完成上位机四模块图谱调研 `client-module-map.md`；产出本总结报告 | `26a1c9f` | ✅ 已入库 |
+| **S-5 热** | B1, C1(第3项) | 彻底清理 7 个 Xilinx 模板文件与 `platform.h` 冗余声明；补充 `srpe_batch_4way.v` 文件头注释；同源重建 Vivado（WNS=+0.167ns）与 Vitis ELF，生成新 `BOOT.bin` 并刷新 `SHA256SUMS` | `833014a` | ✅ 已入库 |
 
 ---
 
@@ -47,9 +47,9 @@
 - **鉴别力实测**：
   4 个新增项全部通过注入故障反测（修改 workspace、添加未登记 attic 脚本、添加未入表 experimental 文件、注入重复跟踪文件），均精准触发 ✗ FAIL 并退出码 1，恢复后 PASS。
 
-### 判据 3：`sw/app/` 死代码清理（热清理条目）
-- 依据指示，S-5（涉及 7 个模板文件共 1,292 行的删除）属于热清理，必须在拥有 Vivado/Vitis 构建及板端验证窗口下「源码删除 + 新 ELF + 新 BOOT.bin + G3 实测 + SHA256SUMS 更新」原子提交。
-- 本轮遵命不做激进删除，保持已发布的制品同源性（`SHA256SUMS` 100% 保持自洽）。
+### 判据 3：`sw/app/` 死代码清理（热清理条目已完成）
+- S-5 批次已与 P7 周期计数器硬件改动合并执行热清理，在单个原子提交（`833014a`）中彻底移除 7 个未引用的 Xilinx 模板文件（`platform_mb.c`, `platform_ppc.c`, `platform_zynqmp.c`, `sfp.c`, `si5324.c`, `iic_phyreset.c`, `i2c_access.c`，共 1,292 行，精简固件 20.3% 代码），并清理 `platform.h` 中对应声明。
+- 完成 XSCT 工作区全量同源重建，生成新 `dna_lwip_app_b27.elf` 与 `BOOT.bin`，刷新 `hw/build/export/SHA256SUMS`，保持 100% 源码-制品同源性。
 
 ### 判据 4：`hw/experimental/` 目录整洁性
 - 经 S-1 清理后，目录内**仅保留 `local_correlator.v` 与 `README.md`**；
@@ -92,7 +92,7 @@
 
 1. **`archive/submission_2025-11-07/` (221 MB)**：
    待用户指定归档目录后，执行移出操作并于 `archive/README.md` 中留存指引指针；
-2. **S-5 热清理实施窗口**：
-   在获得 Vivado/Vitis 构建环境与板卡联调窗口时，执行 B1（移除 7 个模板 C 文件）并重建验证，实现 `sw/app/` 20.3% 代码精简；
+2. **S-5 热清理（已在 `833014a` 闭环）**：
+   已伴随 P7 周期计数器硬件改动彻底完成 7 个模板 C 文件删除、`platform.h` 清理、Vivado 综合实现（WNS=+0.167ns）、Vitis 重建新 ELF/BOOT.bin 及 `SHA256SUMS` 刷新，`sw/app/` 净减少 1,292 行（-20.3% 代码精简）；
 3. **上位机重构规划**：
    根据 `docs/reference/client-module-map.md` 的调研结果，待端到端客户端测试用例扩充完备后，逐步剥离 `first.py` 中重复的纯 Python 序列打包代码，强制走 `fast_readout.py` 向量化通道。

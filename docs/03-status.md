@@ -439,6 +439,40 @@ G5 的出口门禁要一条「阈值 → 正确率/耗时/**误接受率**」曲
 **D0 是真实测序数据、FASTQ 无真值位置字段，因此 D0 上无法测 FAR**，这是方法边界。
 详见 `docs/benchmarks/measured_g5_false_accept.md`。
 
+### P7 (docs/17) · ✅ 三级独立硬件周期计数器闭环（2026-09-11）
+
+为了将占端到端耗时 62.9% 的非 Stage1 部分精确拆开，向 Voter 与 Decoder 增加了与 Stage1 同规格的独立硬件周期计数器：
+- **RTL 落地**：
+  * Differential Voter (`differential_voter_v1_0.v`)：增加 0x40~0x50 周期寄存器（`CYCLES_TOTAL`、`CYCLES_INIT`、`CYCLES_READ`、`CYCLES_VOTE`、`CYCLES_WRITE`），@100MHz 严格守恒；
+  * Desparsification Decoder (`desparsification_decoder_v1_0.v`)：增加 0x14/0x1C/0x20/0x24 周期寄存器（`CYCLES_TOTAL`、`CYCLES_RD_BUSY`、`CYCLES_WR_BUSY`、`CYCLES_RD_WAIT`）；
+- **仿真与集成验证**：
+  * IP 级 TB：`tb_differential_voter` 验证 3 轮多阈值测试，总周期与分段周期逐拍严格守恒（2,853,481 = 81,000 + 41,088 + 2,399,792 + 331,601）；`tb_desparsifier` 与 `tb_dec_ddr_restart` 验证 64,800 bit 逐位全等；
+  * BD 级集成：`tools/run_m3_bd.sh` 执行 BD-1（装配检查）、BD-2（PS7 VIP 控制面）、BD-3ext（零延迟与最坏背压数据面）共 10 项全绿；
+- **固件与接口**：
+  * `echo.h`、`stage2_voter.c`、`stage3_decoder.c` 支持硬件周期读取与串口仪表输出；
+  * `docs/05-interfaces.md` 完成 9 个新增寄存器契约文档化；
+- **构建收敛与同源制品**：
+  * Vivado 整机构建收敛：WNS = +0.167 ns @ 100 MHz（0 failing endpoint）；
+  * 同步更新 `BOOT.bin`、`dna_accel.xsa`、`dna_lwip_app_b27.elf`、`top_bd_wrapper.bit` 及 `SHA256SUMS`（commit `833014a`）；
+- **板级实测与耗时真相（2026-09-11 真实板卡实跑）**：
+  * G3 单轮与双轮（弄脏轮）测试全部 PASS（留证 `/mnt/d/dna_board_smoke/g3_runs/20260911T140942Z/` 与 `20260911T141049Z/`），图片哈希逐位一致，四级 DDR 取证 4/4 全绿；
+  * **Voter 硬件周期实测**：4,096 记录下 $\text{CYCLES\_TOTAL} = 2,962,679\ \text{cyc}$（29.626 ms），各分项（$\text{INIT}=81,000$, $\text{READ}=131,296$, $\text{VOTE}=2,399,792$, $\text{WRITE}=350,591$）严格守恒（误差 0 周期）；在 `score_min=0` 弄脏轮全票投票下，$\text{CYCLES\_TOTAL} = 5,490,151\ \text{cyc}$（54.901 ms，同样严格守恒）；
+  * **Decoder 硬件周期实测**：$\text{CYCLES\_TOTAL} = 2,238\ \text{cyc}$（0.022 ms），分项 $\text{rd\_busy}=2,220$, $\text{wr\_busy}=2,239$, $\text{rd\_wait}=115$；
+  * **62.9% 非 Stage1 耗时真相解密**：4,096 记录端到端总流水线 3,172 ms 中，PL 硬件核耗时极短（Voter 29.6 ms 占 0.93%，Decoder 0.02 ms 占 0.0007%，PL 总和 < 30 ms）；大头是 **lwIP poll 轮询空等 2,776 ms（87.5%）** 与 **PS 侧 Cache 维护 396 ms（12.5%）**；
+  * **战略决议**：证实 Voter/Decoder 硬件优化收益上限 < 1%，彻底关闭其微架构优化；后续优化焦点收敛至 PS 侧中断驱动与精细化 Cache 管理（详见 `docs/benchmarks/measured_p7_cycle_counters.md`）。
+
+### P9 (docs/19) · ✅ 项目瘦身与代码质量全批次闭环（2026-09-11）
+
+按 `docs/19` 执行全量治理，S-1 ~ S-5 全部完成（commit `182511d` ~ `833014a`）：
+- **体积与清理**：
+  * 删除重复 XSA、作废 BIF、退休 RTL，归并不收敛构建，净减 3,395 行（S-1）；
+  * 移除 7 个未引用的 Xilinx 模板文件（1,292 行，固件精简 20.3%）及对应头文件冗余声明（S-5）；
+  * 建立 XSim 仿真构建常态化保留窗口工具 `tools/prune_xsim.sh`，活跃工作树体积降至 586 MB ≤ 600 MB 目标（S-3）；
+- **门禁扩展与契约固化**：
+  * 确立 `sw/app/` 唯一权威源契约，扩展 `tools/check_repo_hygiene.sh` 至 11 项并全部通过注入反测鉴别力（S-2）；
+  * 补充核心契约注释，交付上位机架构图谱 `docs/reference/client-module-map.md` 与专项对账报告 `docs/reference/slimming-report-2026-09-11.md`（S-4）；
+  * 全量回归 16/16 PASS、卫生检查 11/11 PASS、IP 打包检查 14/14 PASS。
+
 ## 4. 证据纪律
 
 > **对外表述前先查 [18 证据台账](18-evidence-ledger.md)**：它把每条可以说的话与其判据、
