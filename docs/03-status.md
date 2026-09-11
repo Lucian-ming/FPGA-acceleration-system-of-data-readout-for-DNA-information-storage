@@ -83,7 +83,7 @@ poll 步数 × 250~500 ms」。但它走 `xil_printf` → UART，而 CH340 串�
 **⚠️ 第一版失败的教训（已写进 echo.c 注释与 [17](17-competition-strategy.md) §3.0.3）**：
 把流式状态也批量推进会撑爆 BD 环（`submitted=640 > ring free=512`，
 Stage1 停顿 ~30 s 直接 FAIL）。**「一次 poll 一步」不只是浪费，它同时是节流机制**；
-`stage1_dna.c:178` 的注释早已写明「原实现靠下一个 poll 才回收，天然有 250 ms 余量」。
+`stage1_dna.c` 的 `PIPE_WM_TX` 分支早已写明「原实现靠下一个 poll 才回收，天然有 250 ms 余量」。
 
 **✅ 分解已完成（2026-09-11）**：PS 按状态累计耗时实测——
 `[in-state] 378 ms`（10.4%）、`[waiting] 3276 ms`，后者约 2.1 s 是 PL 真在算、

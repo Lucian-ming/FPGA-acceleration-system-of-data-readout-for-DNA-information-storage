@@ -103,6 +103,57 @@ else
     ok "logs/ 子目录均已被 .gitignore 覆盖（或已刻意入库）"
 fi
 
+
+# --- 7. 现行文档与源码里的「文件:行号」引用不得悬空或越界 --------------------
+# 2026-09-11 新增。起因：sw/app/echo.c 的注释里写着 `stage1_dna.c:178`，而那一行
+# 在 WM 批量化补进注释后早已不是被引用的内容（真正的位置是 PIPE_WM_TX 分支里的
+# 第 205 行）。这条错误引用从源码注释扩散进了 5 份文档，**全程没有任何判据变红**。
+#
+# 同一次扫描还发现 docs/05-interfaces.md 指着 `echo.c:465-495`（那段代码早就拆到
+# stage1_dna.c，echo.c 现在只有 740 行），以及 4 处指向已被删除的 srpe_batch_2way.v。
+#
+# 能查与不能查，必须说清楚：
+#   能查——文件不存在（悬空）、行号超出文件总行数（越界）；
+#   **不能查——文件还在、行号也在范围内，但内容已经挪走**（上面那个 :178 就是这种）。
+# 后者只能靠纪律：**现行文档与新写的注释一律按标识符引用（函数名/状态名/模块名），
+# 不要写行号**。行号引用会静默过期，而过期的引用比没有引用更糟。
+#
+# docs/archive/ 整个排除：归档文档引用的是它写作当时的行号，那是正确的历史记录。
+STALE_REF=""
+while IFS= read -r hit; do
+    [[ -n "$hit" ]] || continue
+    src="${hit%%:*}"                       # 出处文件
+    ref="${hit##*:::}"                     # 被引用的 path:line
+    f="${ref%%:*}"; ln="${ref##*:}"
+    resolved=""
+    for pre in "" sw/app/ tools/ tools/board/ clients/python/ hw/scripts/ hw/sim/ hw/sim/ip_tb/ \
+               hw/experimental/ hw/experimental/unused_axi_wrappers/ sw/scripts/ \
+               hw/ip/Dna_accelerator_core_1_0/hdl/ hw/ip/differential_voter_1_0/hdl/ \
+               hw/ip/desparsification_decoder_1_0/hdl/; do
+        [[ -f "$pre$f" ]] && { resolved="$pre$f"; break; }
+    done
+    if [[ -z "$resolved" ]]; then
+        STALE_REF+=$'\n'"      悬空  $ref        （出自 $src）"
+    else
+        tot="$(wc -l < "$resolved")"
+        (( ln > tot )) && STALE_REF+=$'\n'"      越界  $ref  实际 $tot 行  （出自 $src）"
+    fi
+done < <(
+    grep -rn --include='*.md' -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' docs/ 2>/dev/null \
+        | grep -v '^docs/archive/' | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
+    grep -rn --include='*.c' --include='*.h' --include='*.v' --include='*.py' --include='*.sh' \
+        -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' \
+        sw/app/ hw/ip/ tools/ clients/python/ 2>/dev/null \
+        | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
+)
+if [[ -n "$STALE_REF" ]]; then
+    bad "现行文档/源码里有悬空或越界的「文件:行号」引用：$STALE_REF"
+    info "修法：改按标识符引用（函数名/状态名/模块名）。行号引用会静默过期，"
+    info "而**内容挪走但行号仍在范围内**的那种过期本检查查不出来——只能靠不写行号。"
+else
+    ok "现行文档/源码的「文件:行号」引用均可解析且在范围内"
+fi
+
 echo
 if (( FAIL )); then
     printf '\033[31m######## 仓库卫生检查 FAIL ########\033[0m\n'

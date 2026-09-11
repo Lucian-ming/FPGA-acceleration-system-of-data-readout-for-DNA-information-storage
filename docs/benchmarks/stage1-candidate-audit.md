@@ -7,6 +7,16 @@
 
 ---
 
+> ### ⚠️ 2026-09-11 引用更正：`srpe_batch_2way.v` 已不存在
+>
+> 本文写作时 `hw/ip/Dna_accelerator_core_1_0/hdl/` 下同时有 `srpe_batch.v` 与
+> `srpe_batch_2way.v`，**两者逐字节全等**（本文 §2 已给出同一个 SHA-256）。
+> 该重复副本此后已被删除，**本文全部 `srpe_batch_2way.v:NNN` 引用现在一律指
+> `srpe_batch.v` 的同一行号**——已逐条核对 `:163`（`pos_valid` 赋值）、
+> `:393`（2 选 1 比较）、`:422`（`pos_cnt + 2`）三处，行号未发生偏移。
+>
+> 本文其余内容保持原样，不追改历史结论。
+
 ## 1. 执行摘要 (Executive Summary)
 
 针对本项目长期存在的“4-way 消耗 54 BRAM 超限必然失败”、“4-way 无法塞入 XC7Z010”、“8-way 仅是不可编译的草稿”等重大分歧，本专员展开了深入代码级与工具级的只读审计。核心结论如下：
@@ -65,7 +75,7 @@
   ```verilog
   pos_cnt <= pos_cnt + 1'b1;  // 单步进，1 个位置跑 READ_BPS 拍
   ```
-- **2-way (`srpe_batch_2way.v:422`)**：
+- **2-way (`srpe_batch.v:422`)**：
   ```verilog
   pos_cnt <= pos_cnt + 2;     // 步进 2，pos_base 与 pos_base+1 并行比对
   ```
@@ -123,7 +133,7 @@
 | 候选变体 | 选优树结构 | 流水线拍数 | 并列决选规则 (Tie-Breaking) | 代码行号 |
 | :--- | :--- | :--- | :--- | :--- |
 | **1-way** | 直接比较 | 1 拍 | `score[t] > best_sc[t]`：严格大于才更新，保留先出现位置 | `srpe_batch_1way_baseline.v:397` |
-| **2-way** | 1 级 2 选 1 | 1 拍 | `score[0] >= score[1]`：相等取 0；与全局比用 `>` | `srpe_batch_2way.v:393, 402` |
+| **2-way** | 1 级 2 选 1 | 1 拍 | `score[0] >= score[1]`：相等取 0；与全局比用 `>` | `srpe_batch.v:393, 402` |
 | **4-way** | 2 级 4 选 1 (组合) | 1 拍 | `s01 >= s23` 且组内 `>=`：严格偏向低索引，与全局比用 `>` | `srpe_batch_4way.v:397-420` |
 | **8-way** | 2 级流水线树 (UPD1: 8选4; UPD2: 4选1) | 2 拍 | 全流程 `>=` 偏向低序号，与全局比用 `>` | `srpe_batch_8way_wip.v:398-461` |
 
@@ -294,7 +304,7 @@ DSP48E1:      80
      assign pos_valid[gv] = (pos_base + gv < STRIDE);
      ```
    - **错误根因**：此处使用了 `< STRIDE`，而合法有效位置索引范围是 `0 .. STRIDE`（共 `STRIDE + 1` 个位置，例如 SE150 下为 0~807）。这会导致最后一个合法位置 `STRIDE`（如 807）在 Way 3 甚至 Way 0 计算时被误判为无效！
-   - 作为对比，`srpe_batch_2way.v:163` 与 `srpe_batch_8way_wip.v:163` 均正确采用了：
+   - 作为对比，`srpe_batch.v:163` 与 `srpe_batch_8way_wip.v:163` 均正确采用了：
      ```verilog
      assign pos_valid[gv] = (pos_base + gv <= STRIDE);
      ```

@@ -16,18 +16,21 @@
    本提示词只是入口**。19 里的每个条目编号（A1/A2/…/C2）就是你的工作项；
 3. 跑门禁：
    ```bash
-   bash tools/verify_repo_binding.sh --remote     # 必须通过
-   git status --short                              # 记下当前未跟踪项，事后要能解释每一个
-   bash tools/run_sim.sh                           # 先确认清理之前是全绿的
+   bash tools/verify_repo_binding.sh --remote   # 必须 PASS 且 0 ahead / 0 behind
+   bash tools/run_sim.sh                        # 基线 16/16（2026-09-11 实跑）
+   bash tools/check_repo_hygiene.sh             # 基线 7 项全 PASS
+   bash tools/check_ip_packaging.sh             # 基线 14 条断言全 PASS（6 类检查 × 3 个 IP）
+   git status --porcelain | grep '^??'          # 未跟踪项，真值见 docs/19 §9 附录
    ```
-   **`run_sim.sh` 在你动手前就不绿的话，立刻停下来报告 main，不要开始清理**——
+   **上面任何一条在你动手前就不绿，立刻停下来报告 main，不要开始清理**——
    否则事后无法区分「本来就坏」与「你弄坏的」。
+   未跟踪项与 `docs/19` §9 的基线表对不上，也要先查清再动手。
 4. 登记看板：
    ```bash
    tools/agent_view.sh start --agent slim \
      --doing "执行 docs/19 的 S-1 批次（A1/A2/B2/A7）" \
-     --why "工作树1.7GB、sw/app 21.9%是模板死代码、hw/experimental 积压13个退休文件" \
-     --next "S-1 出口判据：run_sim.sh 全绿 + check_ip_packaging.sh 6项 PASS"
+     --why "工作树1.8GB、sw/app 20.3%是模板死代码、hw/experimental 积压13个退休文件" \
+     --next "S-1 出口判据：run_sim.sh 16/16 + check_ip_packaging.sh 全绿"
    ```
    换批次、启动长任务、受阻都要 `update` / `block`；收工 `done`。
 
@@ -72,7 +75,7 @@
 
 ## 3. 注释怎么写（这是本任务最容易做砸的部分）
 
-本项目的注释**已经是资产**：`sw/app/stage1_dna.c:178` 的一行注释省掉了一整轮板子，
+本项目的注释**已经是资产**：`sw/app/stage1_dna.c` 的 `PIPE_WM_TX` 分支里一句注释省掉了一整轮板子，
 `sw/app/echo.c` 里记着失败数字的那段注释防止了同一个错误被重犯。
 **风格是「记录为什么与踩过的坑」，不是「说明这行在做什么」。**
 
@@ -89,10 +92,14 @@
 
 ## 4. 你还要交付两样东西
 
-1. **新增四条可执行卫生判据**（`docs/19` §7），写进 `tools/check_repo_hygiene.sh`
-   并让 `tools/run_sim.sh` 带上它。**只写进文档的约定等于没有**——这是
-   `AGENTS.md` 代码卫生第 1 条。其中第 10 条（仓库内不得存在两份 SHA-256 相同的
-   已跟踪文件）价值最高，它能自动发现 A1 那一整类缺陷。
+1. **把 `tools/check_repo_hygiene.sh` 从 7 项扩到 11 项**（`docs/19` §7.2）。
+   **只写进文档的约定等于没有**——这是 `AGENTS.md` 代码卫生第 1 条。
+   其中第 11 条（仓库内不得存在两份 SHA-256 相同的已跟踪文件）价值最高，
+   它能自动发现 A1 那一整类缺陷。
+   **第 7 项已由 main 写好，照抄它的写法**：含「为什么要有这条」的注释、
+   明确说出**查得了什么 / 查不了什么**，并且**必须验鉴别力**
+   （故意注入一条坏数据，确认检查会红、退出码为 1，然后还原干净）。
+   一条恒绿的检查比没有检查更糟。
 2. **一份完成报告** `docs/benchmarks/` 之外的位置不合适，写成
    `docs/reference/slimming-report-<日期>.md`（归档类文档不带序号）：
    逐条对照 `docs/19` §8 的六条完成判据，**没做的要写明为什么没做**。

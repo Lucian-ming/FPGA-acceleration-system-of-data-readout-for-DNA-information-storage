@@ -383,8 +383,10 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
              * RX submitted=640 超过 ring free=512，Stage1 停顿 ~30 s 直接 FAIL
              * （串口实录 g3_runs/20260910T113222Z/uart.log）。
              * 也就是说原来那个「一次 poll 一步」不只是浪费，它同时是**节流机制**，
-             * 而 stage1_dna.c:178 的注释「原实现靠下一个 poll 才回收，天然有
-             * 250 ms 余量」早就写明了这一点。
+             * 而 stage1_dna.c 的 PIPE_WM_TX 分支里那句「原实现靠『下一个 poll 才
+             * 回收』天然有 250 ms 余量」早就写明了这一点。
+             * （2026-09-11：此处原写作 stage1_dna.c:178，该行号在 WM 批量化补进
+             *  注释后已失效——**行号引用会静默过期，一律改按标识符引用**。）
              * 所以这里只批量推进「配置/等待完成」类状态，一旦进入流式状态立刻让出。 */
             if (pipe_state == PIPE_TX_STREAM || pipe_state == PIPE_PROGRESS) break;
         } while (steps_this_cb < PIPE_MAX_STEPS_PER_POLL);
