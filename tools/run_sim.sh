@@ -55,6 +55,16 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ]; then
         FAIL=$((FAIL+1))
     fi
 fi
+
+# 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、logs 忽略覆盖。
+# 与打包门禁分开：那个管「综合工具看到什么」，这个管「仓库状态是否自洽」。
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "hygiene" ]; then
+    if bash tools/check_repo_hygiene.sh; then
+        PASS=$((PASS+1))
+    else
+        FAIL=$((FAIL+1))
+    fi
+fi
 D=hw/ip/desparsification_decoder_1_0/hdl
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "datapath" ]; then
@@ -73,6 +83,30 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1" ]; then
     # Stage1 比对引擎：一批 64 条读段，pos/score 与黄金模型比对
     # （约 620 万周期，Icarus 上 1~3 分钟）
     run_case srpe_batch "$A1/srpe_batch.v" "$IPTB/tb_srpe_batch.v"
+fi
+
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_4way" ]; then
+    # Stage1 4-way 比对引擎：**这才是 component.xml 当前打包、会进比特流的实现**
+    # （见 hw/ip/PACKAGED_VARIANTS.txt）。上面的 srpe_batch 用例测的是 2-way 参考实现。
+    # 2026-09-11 之前这两个 4-way TB 存在于 hw/sim/ 却没接进回归，
+    # 等于**回归验证的实现与综合出来的实现不是同一个**——这是本轮发现的最严重卫生问题。
+    run_case srpe_batch_4way \
+        -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way \
+        "$A1/srpe_batch.v" "$A1/srpe_batch_4way.v" hw/sim/tb_srpe_batch_4way.v
+fi
+
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "core_4way" ]; then
+    # 4-way 顶层整核：AXI-Lite + S_AXIS 输入 FIFO + M_AXIS 背压 + 与 2-way 同构对照。
+    # NUM_LC 默认 6（玩具配置，跑得快）；生产几何 NUM_LC=50 的黄金比对耗时约 20 分钟，
+    # 由 docs/benchmarks/stage1_4way_ip_integration.md §6.3 的命令按需单独跑。
+    run_case accelerator_core_4way \
+        -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way \
+        -I "$A1" \
+        "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
+        "$A1/srpe_batch.v" "$A1/srpe_batch_4way.v" \
+        "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$A1/Dna_accelerator_core_v1_0.v" "$A1/Dna_accelerator_core_4way.v" \
+        hw/sim/tb_accelerator_core_4way.v
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "ingress" ]; then

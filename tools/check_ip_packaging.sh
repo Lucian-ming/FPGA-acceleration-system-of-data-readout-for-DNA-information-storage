@@ -163,6 +163,29 @@ else
     ok "打包内容与 $MANIFEST 一致"
 fi
 
+# --- 6. 被打包的实现必须被回归覆盖 -----------------------------------------
+# 2026-09-11 发现：component.xml 打包的是 srpe_batch_4way.v，而 run_sim.sh 一直
+# 只跑 srpe_batch.v(2-way)——**回归验证的实现与综合出来的实现不是同一个**，
+# 而两个 4-way 的 TB 就躺在 hw/sim/ 里从没接进回归。
+# 这类缺陷不产生任何错误答案，所以整套验证金字塔对它失明，必须单独设门禁。
+SIM_ENTRY="tools/run_sim.sh"
+for cx in hw/ip/*/component.xml; do
+    ip="$(basename "$(dirname "$cx")")"
+    uncovered=""
+    while read -r rel; do
+        [[ -z "$rel" ]] && continue
+        bn="$(basename "$rel")"
+        grep -q "$bn" "$SIM_ENTRY" 2>/dev/null || uncovered+=" $bn"
+    done < <(grep -oE '<spirit:name>hdl/[^<]*\.v</spirit:name>' "$cx" \
+             | sed -E 's|</?spirit:name>||g' | sort -u)
+    if [[ -n "$uncovered" ]]; then
+        bad "$ip: 打包进比特流但**回归没覆盖**的文件：$uncovered"
+        info "测了不会进比特流的那份实现，等于没测。请在 $SIM_ENTRY 里加用例。"
+    else
+        ok "$ip: 打包的实现均被 $SIM_ENTRY 覆盖"
+    fi
+done
+
 echo
 if (( FAIL )); then
     printf '\033[31m######## IP 打包卫生检查 FAIL ########\033[0m\n'

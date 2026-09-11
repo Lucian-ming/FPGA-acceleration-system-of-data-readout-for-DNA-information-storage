@@ -99,7 +99,14 @@ static void t_caps(void)
     ok(c.num_lc==50,            "num_lc=50");
     ok(c.stride==807,           "stride=807");
     ok(c.max_symbols==40500u,   "max_symbols=40500 = 50*807+150");
-    ok(c.max_reads==107968u,    "max_reads=107968 = 64*1687（容量内最大 64 对齐条数）");
+    /* 2026-09-11：TOTAL_READS 由 108000 改回 129600 后，容量内最大 64 对齐条数
+     * 变为 129600 = 64*2025（恰好对齐，无损耗）。旧值 107968 = 64*1687 装不下
+     * SE250 全量所需的 129,600 条记录。
+     * **这里不写死数字，直接用宏算**——写死就会像上一版那样，改了 TOTAL_READS
+     * 却漏掉下游断言，让回归替你记住一个已经过时的容量。 */
+    ok(c.max_reads==TASK_MAX_READS,
+       "max_reads 等于 TASK_MAX_READS（容量内最大 64 对齐条数）");
+    ok(TASK_MAX_READS==129600u,  "TASK_MAX_READS=129600=64*2025，装得下 SE250 全量");
     ok(c.features==1u,          "features bit0=1（SCORE_MIN 可用）");
     ok(c.max_symbols == c.num_lc*c.stride + c.read_bps,
        "契约 L = num_lc*stride + read_bps 自洽");
@@ -175,7 +182,7 @@ static void t_batch(void)
     ok(conn.total_reads_received == 128u, "累计条数 = 128");
 
     /* 容量上限：TOTAL_READS = 108000 */
-    conn_fresh(&conn); conn_configure(&conn, 107968u, 0u);
+    conn_fresh(&conn); conn_configure(&conn, TASK_MAX_READS, 0u);
     conn.total_reads_received = TOTAL_READS - 1u;
     wr_u32_be(g_pkt, 2u);
     ok(process_batch(&conn, g_pkt, 4u + 2u*READ_SIZE_BYTES) == -1,

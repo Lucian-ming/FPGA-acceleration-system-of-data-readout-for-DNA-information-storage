@@ -26,17 +26,18 @@ sw/workspace/
 # （例如 logs/vivado/.../physopt/summary.log、logs/multi_payload/repeat3_*/report.md）。
 # 2026-09-10：补齐本轮新增的 6 个目录——它们此前未被覆盖，
 # 一旦有人误用 git add -A 就会把几百 MB 的运行产物卷进仓库。
-logs/benchmarks/
-logs/multi_payload/
-logs/robustness/
-logs/demo/
-logs/overhead_sweep/
-logs/g3_2026/
-logs/iverilog/
-logs/d3_profile/
-logs/board_g3_stress/
+# 2026-09-11：改为**整体忽略 logs/ 下的运行目录**，再用否定模式放行刻意入库的
+# 单份证据。此前是逐个目录列举，每新增一个日志目录就漏一个——tools/check_repo_hygiene.sh
+# 第一次运行就抓到 5 个漏网目录。默认忽略、例外放行，比逐个补要稳。
+logs/*/
+!logs/README.md
+# 以下是刻意入库的小份证据（体积小、被 docs 直接引用）
+!logs/vivado/
 logs/vivado/*/
 !logs/vivado/recovery_20260909/
+!logs/multi_payload/
+logs/multi_payload/*/
+!logs/multi_payload/repeat3_20260910T200339Z/
 
 # Python 缓存
 __pycache__/
