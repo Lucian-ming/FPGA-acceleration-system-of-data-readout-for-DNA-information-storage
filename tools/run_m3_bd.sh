@@ -20,7 +20,24 @@ VIVADO_ROOT=${VIVADO_ROOT:-/tools/Xilinx/Vivado/2022.2}
 VIVADO=${VIVADO:-$VIVADO_ROOT/bin/vivado}
 XSIM=${XSIM:-$VIVADO_ROOT/bin/xsim}
 PYTHON=${PYTHON:-python3}
-WHICH=${1:-all}
+KEEP=${KEEP:-3}
+NO_PRUNE=0
+WHICH="all"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --keep)
+            KEEP="$2"; shift 2 ;;
+        --keep=*)
+            KEEP="${1#*=}"; shift ;;
+        --no-prune)
+            NO_PRUNE=1; shift ;;
+        -*)
+            echo "Unknown option: $1" >&2; exit 2 ;;
+        *)
+            WHICH="$1"; shift ;;
+    esac
+done
 
 # 日志判据检索器：优先 ripgrep，缺失时回退 POSIX grep -E（模式均为 ERE）。
 RG=${RG:-}
@@ -58,7 +75,7 @@ FAIL=0
     printf 'repo: %s\n' "$REPO_ROOT"
     printf 'head: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
     printf 'git status: %s\n' "$(git -C "$REPO_ROOT" status --porcelain | wc -l) modified path(s)"
-    printf 'vivado: %s\n' "$("$VIVADO" -version 2>/dev/null | head -1)"
+    printf 'vivado: %s\n' "$("$VIVADO" -version -nolog -nojournal 2>/dev/null | head -1)"
     printf 'python: %s\n' "$($PYTHON --version 2>&1)"
     printf '\n'
 } > "$SUMMARY"
@@ -427,6 +444,10 @@ note "=================================================="
 note "通过 $PASS 项，失败 $FAIL 项"
 note "证据目录：$OUT_ROOT"
 note "=================================================="
+
+if (( ! NO_PRUNE )) && [[ -x "$REPO_ROOT/tools/prune_xsim.sh" ]]; then
+    "$REPO_ROOT/tools/prune_xsim.sh" --keep "$KEEP" >/dev/null 2>&1 || true
+fi
 
 if [[ "$FAIL" -ne 0 ]]; then
     echo "M3 FAIL" | tee -a "$SUMMARY"

@@ -18,7 +18,24 @@ else
     LOG_GREP=(grep -E)
 fi
 TIMEOUT_SEC=${XSIM_TIMEOUT_SEC:-900}
-WHICH=${1:-all}
+KEEP=${KEEP:-3}
+NO_PRUNE=0
+WHICH="all"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --keep)
+            KEEP="$2"; shift 2 ;;
+        --keep=*)
+            KEEP="${1#*=}"; shift ;;
+        --no-prune)
+            NO_PRUNE=1; shift ;;
+        -*)
+            echo "Unknown option: $1" >&2; exit 2 ;;
+        *)
+            WHICH="$1"; shift ;;
+    esac
+done
 
 if [[ ! -x "$XVLOG" || ! -x "$XELAB" || ! -x "$XSIM" ]]; then
     echo "FATAL: Vivado/XSim not found under $VIVADO_ROOT" >&2
@@ -35,7 +52,7 @@ printf 'XSim run: %s\n' "$RUN_ID" > "$OUT_ROOT/summary.txt"
 printf 'repo: %s\n' "$REPO_ROOT" >> "$OUT_ROOT/summary.txt"
 printf 'head: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)" >> "$OUT_ROOT/summary.txt"
 printf 'vivado: ' >> "$OUT_ROOT/summary.txt"
-"$XVLOG" -version 2>&1 | sed -n '1p' >> "$OUT_ROOT/summary.txt"
+(cd "$OUT_ROOT" && "$XVLOG" -version 2>&1 | sed -n '1p') >> "$OUT_ROOT/summary.txt"
 
 # ---------------------------------------------------------------------------
 # 编译 + elaborate。成功后 $OUT_ROOT/<name> 里留下可复跑的 snapshot <name>_sim。
@@ -129,17 +146,18 @@ run_case() {
 DNA=hw/ip/Dna_accelerator_core_1_0/hdl
 VOTER=hw/ip/differential_voter_1_0/hdl
 DEC=hw/ip/desparsification_decoder_1_0/hdl
+IPTB=hw/sim/ip_tb
 
 if [[ "$WHICH" == all || "$WHICH" == datapath ]]; then
     run_case desparsify_datapath tb_desparsify_datapath \
         "$REPO_ROOT/$DEC/desparsify_datapath.v" \
-        "$REPO_ROOT/$DEC/tb_desparsify_datapath.v"
+        "$REPO_ROOT/$IPTB/tb_desparsify_datapath.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == axi ]]; then
     run_case desparsifier_axi tb_desparsifier \
         "$REPO_ROOT/$DEC/desparsification_decoder_v1_0.v" \
         "$REPO_ROOT/$DEC/desparsify_datapath.v" \
-        "$REPO_ROOT/$DEC/tb_desparsifier.v"
+        "$REPO_ROOT/$IPTB/tb_desparsifier.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == dec_restart ]]; then
     # [B27] Stage3 Decoder 的「真实 DDR / 真实 AXI 主口 + 固件寄存器时序」判据。
@@ -185,7 +203,7 @@ if [[ "$WHICH" == all || "$WHICH" == ingress ]]; then
         "$REPO_ROOT/$DNA/fifo_sync_sdpram_b64.v" \
         "$REPO_ROOT/$DNA/s2mm_pack64.v" \
         "$REPO_ROOT/$DNA/srpe_batch.v" \
-        "$REPO_ROOT/$DNA/tb_dna_ingress.v"
+        "$REPO_ROOT/$IPTB/tb_dna_ingress.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == result_axis ]]; then
     # [B23/B24] DNA 核 M_AXIS_RESULT 输出级的逐拍判据。
@@ -215,20 +233,25 @@ fi
 if [[ "$WHICH" == all || "$WHICH" == dna_axil ]]; then
     run_case dna_axil tb_dna_axil \
         "$REPO_ROOT/$DNA/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
-        "$REPO_ROOT/$DNA/tb_dna_axil.v"
+        "$REPO_ROOT/$IPTB/tb_dna_axil.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == stage1 ]]; then
     run_case srpe_batch tb_srpe_batch \
         "$REPO_ROOT/$DNA/srpe_batch.v" \
-        "$REPO_ROOT/$DNA/tb_srpe_batch.v"
+        "$REPO_ROOT/$IPTB/tb_srpe_batch.v"
 fi
 if [[ "$WHICH" == all || "$WHICH" == stage2 ]]; then
     run_case differential_voter tb_differential_voter \
         "$REPO_ROOT/$VOTER/differential_voter_v1_0.v" \
-        "$REPO_ROOT/$VOTER/tb_differential_voter.v"
+        "$REPO_ROOT/$IPTB/tb_differential_voter.v"
 fi
 
 printf '\n通过 %d 项，失败 %d 项\n' "$PASS" "$FAIL"
 printf '通过 %d 项，失败 %d 项\n' "$PASS" "$FAIL" >> "$OUT_ROOT/summary.txt"
 printf '日志目录：%s\n' "$OUT_ROOT"
+
+if (( ! NO_PRUNE )) && [[ -x "$REPO_ROOT/tools/prune_xsim.sh" ]]; then
+    "$REPO_ROOT/tools/prune_xsim.sh" --keep "$KEEP" >/dev/null 2>&1 || true
+fi
+
 [[ "$FAIL" -eq 0 ]]

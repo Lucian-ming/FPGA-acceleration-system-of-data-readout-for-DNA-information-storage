@@ -88,6 +88,7 @@
 | --- | --- |
 | `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根） |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
+| `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/19 §A3，默认 keep 3 并归集日志） |
 | `switch_export.sh` | 切换 `hw/build/export/` 制品组 |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
 | `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
