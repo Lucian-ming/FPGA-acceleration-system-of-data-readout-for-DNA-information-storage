@@ -87,6 +87,43 @@ static volatile proc_state_e g_proc_state = PROC_IDLE;
  * 改动生效后前者应降到个位数，后者基本不变。 */
 static u32 pipe_poll_cbs = 0;
 
+/* 【P0 分解】按流水线状态累计耗时。
+ * 2026-09-10 已测出固定开销总量：修复前 5.284 s、修复后 1.505 s
+ * （tools/board/g3_overhead_sweep.py 七档拟合）。但「剩下这 1.5 s 花在哪个状态」
+ * 一直是空白——docs/17 §3 那一项因此还打着 ⬜。
+ *
+ * 做法：在 run_processing_pipeline() 前后取 XTime，把这段时间**记在进入该次调用
+ * 时所处的状态**头上。纯观测，不改任何控制流与寄存器写序列（B27 纪律）。
+ * PIPE_FAIL 是枚举最后一项，+1 即为状态总数。 */
+#define PIPE_STATE_COUNT   ((int)PIPE_FAIL + 1)
+static u64 pipe_state_cyc[PIPE_STATE_COUNT];
+static u32 pipe_state_hits[PIPE_STATE_COUNT];
+
+static const char *pipe_state_name(int st)
+{
+    switch (st) {
+    case PIPE_IDLE:          return "IDLE";
+    case PIPE_WM_PREP:       return "WM_PREP";
+    case PIPE_WM_TX:         return "WM_TX";
+    case PIPE_RX_PREP:       return "RX_PREP";
+    case PIPE_TX_PREFILL:    return "TX_PREFILL";
+    case PIPE_START_IP:      return "START_IP";
+    case PIPE_TX_STREAM:     return "TX_STREAM";
+    case PIPE_PROGRESS:      return "PROGRESS";
+    case PIPE_DONE_STAGE1:   return "DONE_STAGE1";
+    case PIPE_VOTER_PREP:    return "VOTER_PREP";
+    case PIPE_VOTER_START:   return "VOTER_START";
+    case PIPE_VOTER_WAIT:    return "VOTER_WAIT";
+    case PIPE_DONE_STAGE2:   return "DONE_STAGE2";
+    case PIPE_SEND_RESULT:   return "SEND_RESULT";
+    case PIPE_DECODER_PREP:  return "DECODER_PREP";
+    case PIPE_DECODER_START: return "DECODER_START";
+    case PIPE_DECODER_WAIT:  return "DECODER_WAIT";
+    case PIPE_DONE_STAGE3:   return "DONE_STAGE3";
+    default:                 return "FAIL";
+    }
+}
+
 
 
 
@@ -258,6 +295,9 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
          * 扣除法推断一旦进了表格就会被当成实测引用）。 */
         pipe_poll_steps = 0;
         pipe_poll_cbs = 0;
+        for (int _i = 0; _i < PIPE_STATE_COUNT; ++_i) {
+            pipe_state_cyc[_i] = 0; pipe_state_hits[_i] = 0;
+        }
         XTime_GetTime(&pipe_t_start);
         g_proc_state = PROC_RUNNING; break;
     case PROC_RUNNING: {
@@ -289,7 +329,15 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
         pipe_poll_cbs++;
 
         do {
+            int st_before = (int)pipe_state;
+            XTime t_a, t_b;
+            XTime_GetTime(&t_a);
             st = run_processing_pipeline(conn);
+            XTime_GetTime(&t_b);
+            if (st_before >= 0 && st_before < PIPE_STATE_COUNT) {
+                pipe_state_cyc[st_before]  += (u64)(t_b - t_a);
+                pipe_state_hits[st_before] += 1u;
+            }
             pipe_poll_steps++;
             steps_this_cb++;
 
@@ -304,6 +352,27 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
                            (u32)((t_end - pipe_t_start) /
                                  (XTime)(COUNTS_PER_SECOND / 1000U)),
                            wm_poll_steps);
+                /* 【P0 分解】只打印有耗时的状态，按 ms 给出。
+                 * 注意这里统计的是**状态内部**的执行时间，不含「回到 lwIP 等下一次
+                 * poll」的空等——那部分等于 (总墙钟 - 各状态之和)，正是需要区分的两件事：
+                 * 状态自己慢，还是在等定时器。末行把这个差额直接算出来。 */
+                {
+                    u64 sum = 0; int _i;
+                    const u32 per_ms = (u32)(COUNTS_PER_SECOND / 1000U);
+                    xil_printf("[PIPE-BREAKDOWN] state / hits / ms\n\r");
+                    for (_i = 0; _i < PIPE_STATE_COUNT; ++_i) {
+                        sum += pipe_state_cyc[_i];
+                        if (pipe_state_cyc[_i] == 0) continue;
+                        xil_printf("  %-14s %5u  %6u\n\r",
+                                   pipe_state_name(_i), pipe_state_hits[_i],
+                                   (u32)(pipe_state_cyc[_i] / per_ms));
+                    }
+                    xil_printf("  %-14s %5s  %6u\n\r", "[in-state]", "-",
+                               (u32)(sum / per_ms));
+                    xil_printf("  %-14s %5s  %6u  <- 回到 lwIP 等 poll 的空等\n\r",
+                               "[waiting]", "-",
+                               (u32)(((t_end - pipe_t_start) - sum) / per_ms));
+                }
                 g_proc_state = PROC_DONE;
                 break;
             }
