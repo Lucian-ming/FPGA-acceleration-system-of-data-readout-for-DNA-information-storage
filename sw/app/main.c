@@ -212,12 +212,28 @@ static void print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
 
 }
 
+/* ============================================================================
+ * 启动顺序契约与 lwIP 初始化流程（docs/19 §C1）
+ * ----------------------------------------------------------------------------
+ * 1. init_platform()：使能 I/D-Cache，初始化中断控制器 SCUGIC 与私有定时器 SCUTIMER。
+ * 2. lwip_init()：初始化协议栈内存池与数据结构。
+ * 3. reset_all_ip_cores()：强制复位 PL 端三大加速核，特别针对 Stage3 Decoder 执行
+ *    IDLE 状态恢复（force_decoder_to_idle），防止软重启或前次任务未完成导致状态机锁死。
+ * 4. xemac_add(...)：向 lwIP 注册 Xilinx EmacPs 网络接口结构体。
+ * 5. netif_set_default(echo_netif)：设置为默认路由接口。
+ * 6. platform_enable_interrupts()：使能 GIC CPU 中断，必须在 xemac_add 之后、netif_set_up 之前完成。
+ * 7. netif_set_up(echo_netif)：激活以太网链路（启动 PHY 自协商与 MAC 接收）。
+ * 8. dna_accelerator_init()：初始化 Stage1 DMA 描述符环与各 IP 寄存器初始基地址。
+ * 9. start_application()：绑定 TCP 端口 7，注册 accept 回调，进入就绪监听。
+ * 10. for(;;) 主轮询循环：高频 xemacif_input 灌包，并由硬件 ISR + 软件计数器双重驱动定时器。
+ * ============================================================================ */
 int main(void)
 {
     ip_addr_t ipaddr, netmask, gw;
 
     echo_netif = &server_netif;
 
+    /* 步骤 1: 硬件平台与 Cache 初始化 */
     init_platform();
 
 
@@ -228,8 +244,13 @@ int main(void)
 
     print_app_header();
 
+    /* 步骤 2: lwIP 协议栈全局初始化 */
     lwip_init();
+
+    /* 步骤 3: PL 端 IP 核复位（防止飞行数据与状态锁死） */
     reset_all_ip_cores();
+
+    /* 步骤 4: 添加 EmacPs 接口 */
     if (!xemac_add(echo_netif, &ipaddr, &netmask, &gw,
                    mac_ethernet_address, PLATFORM_EMAC_BASEADDR)) {
         xil_printf("ERROR: Error adding N/W interface\n\r");
@@ -238,9 +259,11 @@ int main(void)
 
     netif_set_default(echo_netif);
 
+    /* 步骤 6: 使能中断控制器与 CPU 全局中断（必须在 netif_set_up 前就绪） */
     xil_printf("[INIT] Enabling interrupts...\n\r");
     platform_enable_interrupts();
 
+    /* 步骤 7: 激活网络链路 */
     xil_printf("[INIT] Bringing up network interface...\n\r");
     netif_set_up(echo_netif);
 

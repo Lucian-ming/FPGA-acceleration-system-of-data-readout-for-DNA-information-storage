@@ -25,6 +25,20 @@
  * OF SUCH DAMAGE.
  *
  */
+
+/* ============================================================================
+ * 平台抽象架构契约说明（docs/19 §C1）
+ * ----------------------------------------------------------------------------
+ * 1. 本文件（platform.c）包含 MicroBlaze 与 PowerPC 平台的遗留实现，仅在对应
+ *    架构宏定义下参与编译。
+ * 2. 本项目目标硬件为 Zynq-7010 (Cortex-A9, ARMv7-A)，真实的平台初始化与中断处理
+ *    逻辑由 platform_zynq.c 提供（基于 SCUGIC 中断控制器与 SCUTIMER 私有定时器）。
+ * 3. 两个实现均通过 platform.h 导出统一接口：
+ *      - init_platform()：完成 I/D-Cache 使能与中断控制器/定时器基础配置；
+ *      - platform_enable_interrupts()：在网络接口（netif）配置完毕后使能 CPU 全局中断；
+ *      - cleanup_platform()：清理并禁用 Cache。
+ * ============================================================================ */
+
 #if __MICROBLAZE__ || __PPC__
 #include "arch/cc.h"
 #include "platform.h"
