@@ -46,7 +46,13 @@ tools/*.so
 
 # 本地导入的只读数据与历史归档。
 # 校验和、来源和使用约束记录在 docs/reference/；如需远端保存大文件，请另行使用 Git LFS 或制品库。
-data/
+# data/ 是 54 MB 实验原始数据，不入库；但清单必须入库，
+# 否则 clean checkout 既拿不到数据、也无从知道该拿什么（G7 独立复现的硬阻塞）。
+# 注意必须写 data/* 而不是 data/：忽略目录本身会让 git 不再下探，
+# 后面的 ! 否定规则就永远不生效。
+data/*
+!data/MANIFEST.md
+!data/MANIFEST.sh
 archive/
 
 # 板卡资料包（docs/board/）整体纳入版本管理，只排除体积过大的教学视频；
