@@ -119,6 +119,12 @@ G1 另一条门禁：**同一输入重复运行的计时波动可解释**。
 内存随规模增长但呈亚线性（规模 25x → RSS 2.1x），说明流式打包生效、
 没有把整个 FASTQ 读进内存。
 
+> **复现命令**：
+> ```bash
+> python3 tools/profile_host.py --reads 2048 --repeat 5 --json-out /tmp/profile_2048.json
+> python3 tools/profile_host.py --full --repeat 3 --json-out /tmp/profile_full.json
+> ```
+
 ## 5. 事实边界
 
 1. **PL 计算的 ~2.1 s 是按斜率 0.5157 ms/记录推算，不是直接测量**——

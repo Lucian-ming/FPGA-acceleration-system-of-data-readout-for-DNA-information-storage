@@ -154,6 +154,125 @@ else
     ok "现行文档/源码的「文件:行号」引用均可解析且在范围内"
 fi
 
+# --- 8. sw/app 与 sw/workspace 同名文件必须逐字节相同 -------------------------
+# 2026-09-11 新增（docs/19 §A5）。sw/app 是唯一权威源，sw/workspace 是其生成副本。
+WS_APP="sw/workspace/dna_lwip_app_b27/src"
+if [[ -d "$WS_APP" ]]; then
+    WS_DIFF=""
+    for app_f in sw/app/*; do
+        [[ -f "$app_f" ]] || continue
+        bn="$(basename "$app_f")"
+        ws_f="$WS_APP/$bn"
+        if [[ -f "$ws_f" ]]; then
+            if ! cmp -s "$app_f" "$ws_f"; then
+                WS_DIFF+=" $bn"
+            fi
+        fi
+    done
+    if [[ -n "$WS_DIFF" ]]; then
+        bad "sw/app/ 与 $WS_APP/ 存在不一致的文件：$WS_DIFF"
+        info "sw/app 是权威源，禁止直接编辑 workspace；重新同步或由 create_vitis.tcl 生成"
+    else
+        ok "sw/app/ 与 workspace 同名文件逐字节相同"
+    fi
+else
+    ok "sw/app/ 与 workspace 一致性检查：workspace 不存在，已跳过"
+fi
+
+# --- 9. tools/attic/ 下脚本必须登记进 tools/README.md -------------------------
+# 2026-09-11 新增（docs/19 §B3）。退役脚本也须在 README 单列一节说明原用途与归档原因。
+UNDOC_ATTIC=""
+if [[ -d "tools/attic" ]]; then
+    for f in tools/attic/*.py tools/attic/*.sh; do
+        [[ -f "$f" ]] || continue
+        bn="$(basename "$f")"
+        grep -q "$bn" tools/README.md 2>/dev/null || UNDOC_ATTIC+=" $bn"
+    done
+fi
+if [[ -n "$UNDOC_ATTIC" ]]; then
+    bad "未登记进 tools/README.md 的 attic 脚本：$UNDOC_ATTIC"
+    info "退役工具也须在 tools/README.md 单列一节说明原用途与为何归档"
+else
+    ok "tools/attic/ 下脚本均已登记进 README（或 attic 目录为空）"
+fi
+
+# --- 10. hw/experimental/README.md 当前内容表必须与目录实际文件一一对应 ------
+# 2026-09-11 新增（docs/19 §B2 / §7.2）。表与目录不一致本身就是一个新的卫生缺陷。
+EXP_TABLE_FILES=()
+EXP_ACTUAL_FILES=()
+EXP_MISMATCH=""
+
+if [[ -f "hw/experimental/README.md" ]]; then
+    while IFS= read -r f; do
+        [[ -n "$f" ]] && EXP_TABLE_FILES+=("$f")
+    done < <(awk '/^## 当前内容/{flag=1; next} /^## /{flag=0} flag' hw/experimental/README.md | grep -oE '`[^`]+`' | tr -d '`')
+fi
+
+for p in hw/experimental/*; do
+    [[ -e "$p" ]] || continue
+    bn="$(basename "$p")"
+    [[ "$bn" == "README.md" ]] && continue
+    EXP_ACTUAL_FILES+=("$bn")
+done
+
+for af in "${EXP_ACTUAL_FILES[@]}"; do
+    found=0
+    for tf in "${EXP_TABLE_FILES[@]}"; do
+        if [[ "$af" == "$tf" ]]; then found=1; break; fi
+    done
+    if (( ! found )); then
+        EXP_MISMATCH+=$'\n'"      目录有但表未记录：$af"
+    fi
+done
+
+for tf in "${EXP_TABLE_FILES[@]}"; do
+    found=0
+    for af in "${EXP_ACTUAL_FILES[@]}"; do
+        if [[ "$tf" == "$af" ]]; then found=1; break; fi
+    done
+    if (( ! found )); then
+        EXP_MISMATCH+=$'\n'"      表有但目录不存在：$tf"
+    fi
+done
+
+if [[ -n "$EXP_MISMATCH" ]]; then
+    bad "hw/experimental/ 实际文件与 README.md「当前内容」表不一致：$EXP_MISMATCH"
+    info "表与目录不一致本身就是卫生缺陷；增删实验文件须同步维护 README.md 表"
+else
+    ok "hw/experimental/README.md「当前内容」表与目录实际文件一致"
+fi
+
+# --- 11. 仓库内不得存在两份 SHA-256 相同的已跟踪文件 --------------------------
+# 2026-09-11 新增（docs/19 §A1 / §7.2，A1 那类重复文件的通用判据）。
+# 注意：测试数据集（tests/datasets/）、测试黄金向量（tests/golden/）、
+# 压测留证（tests/stress_results/）与图像验证留证（docs/images/）包含独立基准包
+# 或跨几何黄金断言，各自有独立 SHA256SUMS 清单或运行日志，予以排除。
+DUP_TRACKED="$(python3 -c "
+import subprocess, hashlib, os, sys
+files = subprocess.check_output(['git', 'ls-files']).decode().splitlines()
+hashes = {}
+for f in files:
+    if f.startswith(('tests/datasets/', 'tests/golden/', 'tests/stress_results/', 'docs/images/')):
+        continue
+    if os.path.isfile(f):
+        h = hashlib.sha256(open(f, 'rb').read()).hexdigest()
+        hashes.setdefault(h, []).append(f)
+dups = {h: flist for h, flist in hashes.items() if len(flist) > 1}
+if dups:
+    for h, flist in dups.items():
+        print(f'      SHA-256 {h}:')
+        for f in flist:
+            print(f'        {f}')
+    sys.exit(1)
+" 2>&1)"
+RC=$?
+if (( RC != 0 )); then
+    bad "仓库内存在相同 SHA-256 的已跟踪重复文件："$'\n'"$DUP_TRACKED"
+    info "见 docs/19 §A1 与 AGENTS.md 代码卫生 §5 第 2 条；消除冗余副本，保留单一权威源"
+else
+    ok "仓库内无重复 SHA-256 已跟踪文件（A1 通用判据）"
+fi
+
 echo
 if (( FAIL )); then
     printf '\033[31m######## 仓库卫生检查 FAIL ########\033[0m\n'

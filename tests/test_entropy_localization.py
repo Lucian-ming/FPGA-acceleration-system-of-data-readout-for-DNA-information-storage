@@ -26,11 +26,14 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLIENTS_PY = REPO_ROOT / "clients" / "python"
 TOOLS_DIR = REPO_ROOT / "tools"
+TOOLS_ATTIC = REPO_ROOT / "tools" / "attic"
 
 if str(CLIENTS_PY) not in sys.path:
     sys.path.insert(0, str(CLIENTS_PY))
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
+if str(TOOLS_ATTIC) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ATTIC))
 
 from debug_high_entropy import HighEntropyDiagnostics, unpack_dump_bytes
 from generate_payload_dataset import (

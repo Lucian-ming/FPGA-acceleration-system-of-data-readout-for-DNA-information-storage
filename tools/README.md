@@ -67,13 +67,20 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `debug_high_entropy.py` | 高熵样本失败五级分级诊断 |
-| `debug_vote_diff.py` | 重算板端语义票值，与 TB 的 `dut.bram` 转储 diff |
 | `vote_range.py` | 投票累加器运行中极值实测（回答是否会饱和溢出） |
-| `voter_page_split.py` | Voter 读突发 4 KB 跨页拆分参考表（B20） |
 | `board_stage_check.py` | 四级 DDR 取证比对（由 `run_g3.sh` 调用） |
 | `m2_chain.py` / `m3_mem.py` | M2/M3 仿真辅助 |
 | `extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC 缺失的 MinGW DLL（一次性历史工具） |
+
+## 退役与归档工具（tools/attic/）
+
+已确认其结论已被文档吸收或已完成历史定位使命的工具，保留在 `tools/attic/` 中供追溯：
+
+| 脚本 | 原用途 | 归档原因与结论出处 |
+| --- | --- | --- |
+| `debug_high_entropy.py` | 高熵样本失败五级分级诊断 | 结论已固化至 `docs/03-status.md` §W2-D 与 `docs/benchmarks/entropy_and_d2_validation.md` |
+| `debug_vote_diff.py` | 重算板端语义票值，与 TB 的 `dut.bram` 转储 diff | 历史定位 BRAM 投票差异的一次性调试脚本，结论已进文档 |
+| `voter_page_split.py` | Voter 读突发 4 KB 跨页拆分参考表（B20） | 结论已固化至 `docs/archive/history/2026/se250-study-2026-08-30.md` §V8 |
 
 ## 构建与制品
 

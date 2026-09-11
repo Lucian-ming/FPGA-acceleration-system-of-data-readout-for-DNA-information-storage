@@ -28,6 +28,8 @@
 > 浮点噪声决定（read 4 三个并列位置浮点值 `59.0 / 59.000000000000014 / 59.0`），
 > **不能按单值比相等**，否则会把正确的 RTL 判成失败。并列集由
 > `tools/make_stage1_tie_golden.py` 用整数精确滑窗生成。
+>
+> **G3 压测日志结构化**：多轮连续运行留证由 `tools/board/g3_runs_to_jsonl.py` 提取为逐轮机器可读的 JSONL（`tests/stress_results/*/continuous.jsonl`）。
 
 ---
 
