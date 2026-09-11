@@ -1,13 +1,16 @@
-# 2026-08-30 可上板交付制品（ZYNQ ECO R6，16 bit DDR + B20/B23/B24/B25/B26/B27 修复）
+# 可上板交付制品（ZYNQ ECO R6，16 bit DDR，4-way Stage1 + P7 周期计数器 + S-5 瘦身）
 
 本目录是与当前 `main` 的 RTL / PS 固件匹配、且**按目标板 ZYNQ ECO(R6) 实物 DDR 配置**
-重建的最小完整交付集。板级基准见 `docs/16-board-zynq-eco-7010.md`。
+重建的最小完整交付集。
 
-> **本次重建的原因**：2026-08-29 之前的制品是按 32 bit 双颗 `MT41J128M16` 的 DDR 配置
-> 生成的，而实物 ECO 板只有一颗 16 bit 的 `MT41J256M16HA-125`。板卡硬件规格说明书明确写着
-> 「配置 DDR3 必须是 16 位，默认配置 32 位，如果不更改不能运行」。
-> 追溯发现：`bd.tcl` 的 DDR 参数源自只读历史快照 `design_2_wrapper.xsa`，
-> 而该 XSA 自身就是 32 bit 双颗配置，**属于另一块板**。详见 `docs/16` §3。
+## 2026-09-11 重建：4-way Stage1 + P7 周期计数器 + S-5 热清理
+
+本次重建将 **4-way Stage1 比对加速核**、**P7 独立硬件周期计数器**（Voter 0x40~0x50、Decoder 0x14~0x24）与 **S-5 固件热清理**（清除 7 个模板文件）合并落地：
+
+- **实现收敛**：`Performance_ExplorePostRoutePhysOpt` 下 **WNS = +0.167 ns @ 100 MHz**，0 failing endpoint，0 error / 0 critical warning；
+- **资源利用**：Total LUTs 15,709 (89.2%)，FFs 17,198 (48.9%)，RAMB36 44 块，DSPs 3 块，安全适配 XC7Z010CLG400-1；
+- **固件瘦身**：移除 7 个未引用的 Xilinx 模板源文件（1,292 行，占 20.3%），ELF 机器码完全同源且大小自洽；
+- **仿真覆盖**：`tools/run_sim.sh` 16/16 全 PASS，TB 精确验证 Voter（2,853,481 周期，分项守恒等式成立）与 Decoder（2,053 周期）。
 
 ## 当前交付集
 

@@ -314,6 +314,14 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         /* 条件1: DONE标志位置位 */
         if (status & VOTER_STATUS_DONE) {
+            u32 cyc_tot  = read_reg32(VOTER_BASEADDR, VOTER_REG_CYCLES_TOTAL);
+            u32 cyc_init = read_reg32(VOTER_BASEADDR, VOTER_REG_CYCLES_INIT);
+            u32 cyc_rd   = read_reg32(VOTER_BASEADDR, VOTER_REG_CYCLES_READ);
+            u32 cyc_vote = read_reg32(VOTER_BASEADDR, VOTER_REG_CYCLES_VOTE);
+            u32 cyc_wr   = read_reg32(VOTER_BASEADDR, VOTER_REG_CYCLES_WRITE);
+            xil_printf("[HW-CYCLES] Stage2 Voter: total %u cyc (%u.%03u ms), init %u, read %u, vote %u, write %u\n\r",
+                       cyc_tot, cyc_tot / 100000U, (cyc_tot % 100000U) / 100U,
+                       cyc_init, cyc_rd, cyc_vote, cyc_wr);
             xil_printf("\n\r[STAGE2] ========================================\n\r");
             xil_printf("[STAGE2] ✓ DONE flag set after %u polls\n\r", poll_count);
             xil_printf("[STAGE2] ========================================\n\r");

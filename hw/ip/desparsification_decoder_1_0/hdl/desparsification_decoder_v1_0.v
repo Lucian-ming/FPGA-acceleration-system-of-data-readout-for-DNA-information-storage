@@ -108,6 +108,12 @@ module desparsification_decoder_v1_0 #
     wire        start_pulse_s, done_clr_s;
     reg         done_s, idle_s;
 
+    // P7: 硬件周期计数器
+    wire [31:0] dec_cycles_total;
+    wire [31:0] dec_cycles_rd_busy;
+    wire [31:0] dec_cycles_wr_busy;
+    wire [31:0] dec_cycles_rd_wait;
+
     axi_slave_decoder #(
         .C_S_AXI_DATA_WIDTH(C_S00_AXI_DATA_WIDTH),
         .C_S_AXI_ADDR_WIDTH(C_S00_AXI_ADDR_WIDTH)
@@ -126,7 +132,11 @@ module desparsification_decoder_v1_0 #
         .in_addr(in_addr_s), .in_beats(in_beats_s),
         .out_addr(out_addr_s), .out_beats(out_beats_s),
         .start_pulse(start_pulse_s), .done_clr(done_clr_s),
-        .done(done_s), .idle(idle_s)
+        .done(done_s), .idle(idle_s),
+        .cycles_total(dec_cycles_total),
+        .cycles_rd_busy(dec_cycles_rd_busy),
+        .cycles_wr_busy(dec_cycles_wr_busy),
+        .cycles_rd_wait(dec_cycles_rd_wait)
     );
 
     // ---- 配置值同步到 M00_AXI_ACLK 域 ----
@@ -372,6 +382,59 @@ module desparsification_decoder_v1_0 #
         end
     end
 
+    // =============================================================
+    // P7: 独立硬件周期计数器逻辑（M00_AXI_ACLK 域）
+    // =============================================================
+    reg [31:0] dec_cycles_total_r;
+    reg [31:0] dec_cycles_rd_busy_r;
+    reg [31:0] dec_cycles_wr_busy_r;
+    reg [31:0] dec_cycles_rd_wait_r;
+    reg        dec_running;
+
+    assign dec_cycles_total   = dec_cycles_total_r;
+    assign dec_cycles_rd_busy = dec_cycles_rd_busy_r;
+    assign dec_cycles_wr_busy = dec_cycles_wr_busy_r;
+    assign dec_cycles_rd_wait = dec_cycles_rd_wait_r;
+
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            dec_cycles_total_r   <= 32'd0;
+            dec_cycles_rd_busy_r  <= 32'd0;
+            dec_cycles_wr_busy_r  <= 32'd0;
+            dec_cycles_rd_wait_r  <= 32'd0;
+            dec_running           <= 1'b0;
+        end else if (start_eff_m) begin
+            dec_cycles_total_r   <= 32'd0;
+            dec_cycles_rd_busy_r  <= 32'd0;
+            dec_cycles_wr_busy_r  <= 32'd0;
+            dec_cycles_rd_wait_r  <= 32'd0;
+            dec_running           <= (out_beats != 0) || (in_beats != 0);
+        end else begin
+            if (dec_running) begin
+                if (busy && (wr_state == WR_RESP) && M00_AXI_BVALID && (w_left == 0))
+                    dec_running <= 1'b0;
+                else if (!(&dec_cycles_total_r))
+                    dec_cycles_total_r <= dec_cycles_total_r + 1'b1;
+            end
+
+            if (rd_state != RD_IDLE && rd_state != RD_DONE) begin
+                if (!(&dec_cycles_rd_busy_r))
+                    dec_cycles_rd_busy_r <= dec_cycles_rd_busy_r + 1'b1;
+            end
+
+            if (wr_state != WR_IDLE) begin
+                if (!(&dec_cycles_wr_busy_r))
+                    dec_cycles_wr_busy_r <= dec_cycles_wr_busy_r + 1'b1;
+            end
+
+            if ((rd_state == RD_ADDR && ar_valid_r && !M00_AXI_ARREADY) ||
+                (rd_state == RD_DATA && !M00_AXI_RVALID)) begin
+                if (!(&dec_cycles_rd_wait_r))
+                    dec_cycles_rd_wait_r <= dec_cycles_rd_wait_r + 1'b1;
+            end
+        end
+    end
+
     // ---- AXI 静态属性 ----
     assign M00_AXI_AWBURST = 2'b01;
     assign M00_AXI_ARBURST = 2'b01;
@@ -424,8 +487,14 @@ module axi_slave_decoder #
     output reg  [31:0]                      out_beats,
     output reg                               start_pulse,
     output reg                               done_clr,
-    input  wire                               done,
-    input  wire                               idle
+    input  wire                              done,
+    input  wire                              idle,
+
+    // P7: 硬件周期计数器
+    input  wire [31:0]                      cycles_total,
+    input  wire [31:0]                      cycles_rd_busy,
+    input  wire [31:0]                      cycles_wr_busy,
+    input  wire [31:0]                      cycles_rd_wait
 );
     reg [C_S_AXI_ADDR_WIDTH-1:0] awaddr_q;
     reg [C_S_AXI_DATA_WIDTH-1:0] wdata_q;
@@ -499,7 +568,11 @@ module axi_slave_decoder #
                     4'd1: S_AXI_RDATA <= in_beats;
                     4'd2: S_AXI_RDATA <= out_addr;
                     4'd3: S_AXI_RDATA <= out_beats;
-                    4'd6: S_AXI_RDATA <= {30'd0, done, idle};
+                    4'd5: S_AXI_RDATA <= cycles_total;    // 0x14
+                    4'd6: S_AXI_RDATA <= {30'd0, done, idle}; // 0x18
+                    4'd7: S_AXI_RDATA <= cycles_rd_busy;  // 0x1C
+                    4'd8: S_AXI_RDATA <= cycles_wr_busy;  // 0x20
+                    4'd9: S_AXI_RDATA <= cycles_rd_wait;  // 0x24
                     default: S_AXI_RDATA <= 32'd0;
                 endcase
                 S_AXI_RRESP <= 2'b00;

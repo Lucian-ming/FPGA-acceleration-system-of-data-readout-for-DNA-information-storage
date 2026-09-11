@@ -240,6 +240,19 @@ module tb_desparsifier;
         end
     endtask
 
+    task axil_read(input [5:0] addr, output [31:0] data);
+        begin
+            @(posedge clk);
+            s_araddr <= addr; s_arvalid <= 1'b1;
+            wait (s_arready);
+            @(posedge clk);
+            s_arvalid <= 1'b0;
+            wait (s_rvalid);
+            data = s_rdata;
+            @(posedge clk);
+        end
+    endtask
+
     // =========================================================
     // 主流程
     // =========================================================
@@ -248,6 +261,7 @@ module tb_desparsifier;
     integer k, b;
     reg [63:0] got, exp, mask;
     integer timeout;
+    reg [31:0] cyc_total, cyc_rd_busy, cyc_wr_busy, cyc_rd_wait;
     reg [8*256-1:0] input_path, expect_path, dump_stage3_path;
     integer plusarg_result;
     integer dump_stage3_en, dump_fd;
@@ -290,6 +304,18 @@ module tb_desparsifier;
             $fatal(1);
         end
         $display("[TB] 写出 %0d 拍（期望 %0d）", w_count, OUT_BEATS);
+
+        // P7: 硬件周期计数器读出与验证
+        axil_read(6'h14, cyc_total);
+        axil_read(6'h1C, cyc_rd_busy);
+        axil_read(6'h20, cyc_wr_busy);
+        axil_read(6'h24, cyc_rd_wait);
+        $display("[TB] 硬件周期：总计 %0d，读引擎活动 %0d，写引擎活动 %0d，读等待DDR %0d",
+                 cyc_total, cyc_rd_busy, cyc_wr_busy, cyc_rd_wait);
+        if (cyc_total == 0) begin
+            $display("[TB] ✗ CYCLES_TOTAL 未正确计数 (0)");
+            errors = errors + 1;
+        end
 
         for (k=0; k<OUT_BEATS; k=k+1) begin
             // 最后一拍只有 OUT_BITS-64*(OUT_BEATS-1) 位有效

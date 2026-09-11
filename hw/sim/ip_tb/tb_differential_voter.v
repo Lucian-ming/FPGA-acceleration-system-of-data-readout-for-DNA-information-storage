@@ -244,6 +244,7 @@ module tb_differential_voter #(
     reg [63:0] got, exp, mask;
     reg [7:0]  wstrb_got;
     reg [31:0] status, errflags, dbg;
+    reg [31:0] cyc_total, cyc_init, cyc_read, cyc_vote, cyc_write;
 
     reg [63:0] expect_thr  [0:OUT_BEATS-1];  // 阈值版（stage2_expect.hex）
     reg [63:0] exp_work    [0:OUT_BEATS-1];  // 本轮选用的期望
@@ -359,6 +360,20 @@ module tb_differential_voter #(
             axil_read(7'h2C, errflags);
             if (errflags != 32'd0) begin
                 $display("[TB] ✗ 第 %0d 轮 ERR_FLAGS=%h（期望 0）", run, errflags);
+                errors = errors + 1;
+            end
+
+            // P7: 硬件周期计数器读出与验证
+            axil_read(7'h40, cyc_total);
+            axil_read(7'h44, cyc_init);
+            axil_read(7'h48, cyc_read);
+            axil_read(7'h4C, cyc_vote);
+            axil_read(7'h50, cyc_write);
+            $display("[TB] 第 %0d 轮硬件周期：总计 %0d，BRAM清零 %0d，DDR读 %0d，投票流水 %0d，DDR写回 %0d",
+                     run, cyc_total, cyc_init, cyc_read, cyc_vote, cyc_write);
+            if (cyc_total == 0 || cyc_total != (cyc_init + cyc_read + cyc_vote + cyc_write)) begin
+                $display("[TB] ✗ 第 %0d 轮周期计数器守恒校验失败：total=%0d != init(%0d)+read(%0d)+vote(%0d)+write(%0d)",
+                         run, cyc_total, cyc_init, cyc_read, cyc_vote, cyc_write);
                 errors = errors + 1;
             end
 

@@ -248,6 +248,13 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
         /* 条件1（主判据）：DONE 标志置位 */
         if (status & DECODER_STATUS_DONE) {
+            u32 cyc_tot  = read_reg32(DECODER_BASEADDR, DECODER_REG_CYCLES_TOTAL);
+            u32 cyc_rd   = read_reg32(DECODER_BASEADDR, DECODER_REG_CYCLES_RD_BUSY);
+            u32 cyc_wr   = read_reg32(DECODER_BASEADDR, DECODER_REG_CYCLES_WR_BUSY);
+            u32 cyc_wait = read_reg32(DECODER_BASEADDR, DECODER_REG_CYCLES_RD_WAIT);
+            xil_printf("[HW-CYCLES] Stage3 Decoder: total %u cyc (%u.%03u ms), rd_busy %u, wr_busy %u, rd_wait %u\n\r",
+                       cyc_tot, cyc_tot / 100000U, (cyc_tot % 100000U) / 100U,
+                       cyc_rd, cyc_wr, cyc_wait);
             xil_printf("\n\r[STAGE3] ✓ DONE flag set after %u polls\n\r", poll_count);
             decoder_clear_start();
             poll_count = 0;

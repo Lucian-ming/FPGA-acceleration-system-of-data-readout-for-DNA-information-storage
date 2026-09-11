@@ -207,6 +207,12 @@
 #define VOTER_REG_OUT_BEATS         0x10U  /* 输出拍数 */
 #define VOTER_REG_TOTAL_READS       0x14U  /* 总读段数 */
 #define VOTER_REG_SCORE_MIN         0x30U  /* 【D1/D2】分数阈值 */
+/* 【P7】硬件独立周期计数器（基地址 0x43C2_0000，10 ns @ 100 MHz） */
+#define VOTER_REG_CYCLES_TOTAL      0x40U  /* Voter 总任务周期数 */
+#define VOTER_REG_CYCLES_INIT       0x44U  /* BRAM 清零周期数 */
+#define VOTER_REG_CYCLES_READ       0x48U  /* DDR 读周期数 */
+#define VOTER_REG_CYCLES_VOTE       0x4CU  /* 投票流水线周期数 */
+#define VOTER_REG_CYCLES_WRITE      0x50U  /* DDR 写回周期数 */
 
 /* 【P3】推荐阈值默认值（客户端参考）：固件不再固定使用，而是经 PKT_CONFIG
  * 的 score_min 字段运行时下发。67 = int(0.45 × READ_BPS)，与 tests/golden 的
@@ -231,7 +237,11 @@
  *   0x08: OUT_ADDR    - 输出DDR地址
  *   0x0C: OUT_BEATS   - 输出数据拍数 (1013)
  *   0x10: START       - 启动控制 (写1启动)
+ *   0x14: CYCLES_TOT  - 【P7】Decoder 总任务周期数
  *   0x18: STATUS      - 状态寄存器 (bit[0]=idle, bit[1]=done)
+ *   0x1C: CYCLES_RD   - 【P7】读引擎活动周期数
+ *   0x20: CYCLES_WR   - 【P7】写引擎活动周期数
+ *   0x24: CYCLES_WAIT - 【P7】读等待 DDR 延迟周期数
  *============================================================================*/
 #define DECODER_BASEADDR            XPAR_DESPARSIFICATION_DEC_0_S00_AXI_BASEADDR
 #define DECODER_REG_IN_ADDR         0x00U
@@ -239,7 +249,11 @@
 #define DECODER_REG_OUT_ADDR        0x08U
 #define DECODER_REG_OUT_BEATS       0x0CU
 #define DECODER_REG_START           0x10U
-#define DECODER_REG_STATUS          0x18U   /* ⚠️ 注意: 状态寄存器在0x18 */
+#define DECODER_REG_CYCLES_TOTAL    0x14U  /* 【P7】总周期数 */
+#define DECODER_REG_STATUS          0x18U  /* ⚠️ 注意: 状态寄存器在0x18 */
+#define DECODER_REG_CYCLES_RD_BUSY  0x1CU  /* 【P7】读引擎活动周期数 */
+#define DECODER_REG_CYCLES_WR_BUSY  0x20U  /* 【P7】写引擎活动周期数 */
+#define DECODER_REG_CYCLES_RD_WAIT  0x24U  /* 【P7】读等待 DDR 延迟周期数 */
 
 #define DECODER_STATUS_IDLE         (1U << 0)
 #define DECODER_STATUS_DONE         (1U << 1)

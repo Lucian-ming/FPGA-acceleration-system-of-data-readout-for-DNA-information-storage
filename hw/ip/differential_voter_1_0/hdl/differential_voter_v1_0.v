@@ -135,6 +135,15 @@ module differential_voter_v1_0 #
     // >>> 新增：读通道最后一次 RRESP 采样（[1:0]）
     reg [1:0]  last_rresp;
 
+    // =========================================================================
+    // P7: 独立硬件周期计数器（10 ns @ 100 MHz）
+    // =========================================================================
+    reg [31:0] cycles_total;
+    reg [31:0] cycles_init;
+    reg [31:0] cycles_read;
+    reg [31:0] cycles_vote;
+    reg [31:0] cycles_write;
+
     axi_slave_voter u_axil (
         .S_AXI_ACLK    (S00_AXI_ACLK),
         .S_AXI_ARESETN (S00_AXI_ARESETN),
@@ -176,8 +185,15 @@ module differential_voter_v1_0 #
         .debug_write_count     (debug_write_count),
         .debug_first_write_addr(debug_first_write_addr),
 
-        // >>> 新增映射：RRESP 只读视图
-        .last_rresp            (last_rresp)
+    // >>> 新增映射：RRESP 只读视图
+        .last_rresp            (last_rresp),
+
+        // >>> P7: 硬件周期计数器
+        .cycles_total          (cycles_total),
+        .cycles_init           (cycles_init),
+        .cycles_read           (cycles_read),
+        .cycles_vote           (cycles_vote),
+        .cycles_write          (cycles_write)
     );
 
     // ----------------- 跨时钟域同步到 M00_AXI_ACLK -----------------
@@ -862,6 +878,54 @@ module differential_voter_v1_0 #
         end
     end
 
+    // =========================================================================
+    // P7: 独立硬件周期计数器逻辑（M00_AXI_ACLK 时钟域）
+    // =========================================================================
+    always @(posedge M00_AXI_ACLK) begin
+        if (!M00_AXI_ARESETN) begin
+            cycles_total <= 32'd0;
+            cycles_init  <= 32'd0;
+            cycles_read  <= 32'd0;
+            cycles_vote  <= 32'd0;
+            cycles_write <= 32'd0;
+        end else if (start_latched_pulse) begin
+            cycles_total <= 32'd0;
+            cycles_init  <= 32'd0;
+            cycles_read  <= 32'd0;
+            cycles_vote  <= 32'd0;
+            cycles_write <= 32'd0;
+        end else begin
+            if (state != S_IDLE && state != S_DONE && state != S_ERROR) begin
+                if (!(&cycles_total))
+                    cycles_total <= cycles_total + 1'b1;
+            end
+
+            case (state)
+                S_INIT_BRAM: begin
+                    if (!(&cycles_init))
+                        cycles_init <= cycles_init + 1'b1;
+                end
+
+                S_READ_SETUP, S_READ_DATA: begin
+                    if (!(&cycles_read))
+                        cycles_read <= cycles_read + 1'b1;
+                end
+
+                S_PARSE_READ, S_CALC_ADDR, S_VOTE_READ, S_VOTE_WAIT, S_VOTE_UPDATE, S_NEXT_READ: begin
+                    if (!(&cycles_vote))
+                        cycles_vote <= cycles_vote + 1'b1;
+                end
+
+                S_OUTPUT_PREFETCH, S_OUTPUT_ADDR, S_OUTPUT_PACK, S_OUTPUT_SETUP, S_OUTPUT_WRITE, S_WAIT_BRESP: begin
+                    if (!(&cycles_write))
+                        cycles_write <= cycles_write + 1'b1;
+                end
+
+                default: ;
+            endcase
+        end
+    end
+
 endmodule
 
 
@@ -932,7 +996,14 @@ module axi_slave_voter #
     input  wire [31:0] debug_first_write_addr,
 
     // >>> 新增：暴露 last_rresp
-    input  wire [1:0]  last_rresp
+    input  wire [1:0]  last_rresp,
+
+    // >>> P7: 硬件周期计数器
+    input  wire [31:0] cycles_total,
+    input  wire [31:0] cycles_init,
+    input  wire [31:0] cycles_read,
+    input  wire [31:0] cycles_vote,
+    input  wire [31:0] cycles_write
 );
 
     reg [C_S_AXI_ADDR_WIDTH-1:0] awaddr_q;
@@ -1036,6 +1107,12 @@ module axi_slave_voter #
                     5'h0C: S_AXI_RDATA <= score_min_cfg;
                     // >>> 新增：0x38
                     5'h0E: S_AXI_RDATA <= {30'd0, last_rresp};
+                    // >>> P7: 硬件周期计数器（0x40~0x50）
+                    5'h10: S_AXI_RDATA <= cycles_total; // 0x40
+                    5'h11: S_AXI_RDATA <= cycles_init;  // 0x44
+                    5'h12: S_AXI_RDATA <= cycles_read;  // 0x48
+                    5'h13: S_AXI_RDATA <= cycles_vote;  // 0x4C
+                    5'h14: S_AXI_RDATA <= cycles_write; // 0x50
                     default: S_AXI_RDATA <= 32'd0;
                 endcase
                 S_AXI_RRESP  <= 2'b00;
