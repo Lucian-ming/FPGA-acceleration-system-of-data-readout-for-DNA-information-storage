@@ -37,6 +37,7 @@
 | `g3_wait_ready.py` | 应用层就绪探针（CAPS 握手） |
 | `g3_overhead_sweep.py` | 固定开销尺寸扫描与模型拟合。**必须 `post=True`**，`--no-post` 是「不发 POST 触发」，板子根本不算 |
 | `g3_recovery_probe.py` / `g3_netfault_probe.py` | 畸变包 / 断网注入恢复探针 |
+| `g3_config_guard_probe.py` | **配置/容量守卫故障注入**：手工拼 CONFIG 字节绕开客户端全部校验，直打固件守卫。2026-09-11 实测 **1/6**——板端 CONFIG 几乎不校验（超容量/非 64 对齐/零条数/read_bps=250 全被接受）。后置守卫尚未跑通，见工具内「已知局限」 |
 | `g3_runs_to_jsonl.py` | run 目录收敛成结构化 JSONL |
 | `read_pipe_counters.tcl` | **不依赖串口**、用 XSDB 读固件内 poll 计数器。串口没接时固件的 `xil_printf` 插桩等于不存在 |
 
