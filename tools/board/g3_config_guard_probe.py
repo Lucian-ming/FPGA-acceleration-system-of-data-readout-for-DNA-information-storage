@@ -55,7 +55,7 @@ if str(CLIENTS_PY) not in sys.path:
     sys.path.insert(0, str(CLIENTS_PY))
 
 import protocol as pr  # noqa: E402
-from task_protocol import TaskCaps  # noqa: E402
+from task_protocol import CONFIG_REJECT_REASONS, TaskCaps  # noqa: E402
 
 class _Stats:
     """protocol.recv_packet 会往 stats 上累加字节数，传 None 会 AttributeError。
@@ -124,11 +124,20 @@ def _try_config(ip: str, port: int, total_reads: int, read_bps: int = READ_BPS,
         payload = _raw_config_payload(read_bps=read_bps, total_reads=total_reads,
                                       score_min=score_min if score_min is not None else 67)
         sock.sendall(pr.make_packet(pr.PKT_CONFIG, payload))
-        t, _ = pr.recv_packet(sock, _Stats(), timeout=8.0)
+        t, resp = pr.recv_packet(sock, _Stats(), timeout=8.0)
         if t == pr.PKT_CONFIG_OK:
-            return True, "板端接受 CONFIG"
+            # 【关键】PKT_CONFIG_OK 只是「应答」，不是「接受」——
+            # payload 里的 u32 是**拒绝理由码，0 才表示接受**
+            # （proto.c::process_config：拒绝时同样发 PKT_CONFIG_OK 带 rc）。
+            # 2026-09-11 首版探针把所有 CONFIG_OK 当成接受，于是得出
+            # 「板端几乎不校验 1/6」这个**错误结论**，并一度写进了 03-status。
+            # 教训：读应答不能只看包类型，要看它的语义。
+            rc = int.from_bytes(resp[:4], "big") if len(resp) >= 4 else -1
+            if rc == 0:
+                return True, "板端接受 CONFIG (rc=0)"
+            return False, f"板端拒绝 (rc={rc}: {CONFIG_REJECT_REASONS.get(rc, '?')})"
         if t == pr.PKT_ERROR:
-            return False, "板端拒绝 (PKT_ERROR) ← 固件守卫生效"
+            return False, "板端拒绝 (PKT_ERROR)"
         return False, f"板端应答异常类型 0x{t:02X}"
     except socket.timeout:
         return False, "板端无应答(超时)"
@@ -185,8 +194,18 @@ def _probe_late_guard(ip: str, port: int, max_reads: int) -> dict:
         sock.sendall(pr.make_packet(pr.PKT_CONFIG,
                      _raw_config_payload(read_bps=READ_BPS, total_reads=over,
                                          score_min=67)))
-        t, _ = pr.recv_packet(sock, _Stats(), timeout=8.0)
-        out["config_accepted"] = (t == pr.PKT_CONFIG_OK)
+        t, resp = pr.recv_packet(sock, _Stats(), timeout=8.0)
+        rc = int.from_bytes(resp[:4], "big") if len(resp) >= 4 else -1
+        out["config_rc"] = rc
+        out["config_accepted"] = (t == pr.PKT_CONFIG_OK and rc == 0)
+        if not out["config_accepted"]:
+            # 前置校验已经拦住了，根本走不到后置守卫——这是**好结果**，
+            # 说明防线在更早的位置生效，本用例因此不适用（不是失败）。
+            out["verdict"] = True
+            out["note"] = (f"CONFIG 被前置拒绝 (rc={rc})，后置守卫无从触发；"
+                           "防线在更早位置生效，本用例不适用")
+            out["board_alive_after"] = _board_alive(ip, port)
+            return out
 
         # 2) 先送水印——固件的包序要求 CONFIG -> WM -> BATCH，
         #    跳过 WM 直接发 BATCH 会让板端不应答（首版探针在这里超时）。
