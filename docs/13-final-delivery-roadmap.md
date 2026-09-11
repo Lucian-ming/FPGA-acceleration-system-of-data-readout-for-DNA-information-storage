@@ -98,10 +98,15 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 
 **出口门禁**
 
-- `verify_repo_binding.sh --require-synced` PASS；
-- 当前板各 profile 至少一轮 G3 PASS；
-- 输入、制品、工具版本全部可追溯；
-- 任何后续版本都能与该基线直接比较。
+- ✅ `verify_repo_binding.sh --require-synced` PASS；
+- ⚠️ 当前板各 profile 至少一轮 G3 PASS —— **SE150 已 PASS（多轮）；
+  SE250 无法验证**：现有比特流仅支持 150 bp；
+- ✅ 输入、制品、工具版本全部可追溯 —— 制品同源性由符号级比对建立
+  （见 [03](03-status.md) P0b），D0 输入哈希见 `data/MANIFEST.md`；
+- ✅ 任何后续版本都能与该基线直接比较。
+
+> **2026-09-11：除 SE250 profile 外达成。** SE250 受限于比特流读长，
+> 不是流程问题——见 [03](03-status.md) 的事实边界。
 
 ### G1 · 计时和统计可信（3～7 天）
 
@@ -142,10 +147,17 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 
 **出口门禁**
 
-- SE150/SE250 G3 哈希不变；
-- 总耗时和固定开销有实际下降；
-- 主机峰值内存、CPU 占用和网络吞吐有记录；
-- 断连、超时、错误配置能给出明确错误。
+- ✅ SE150 G3 哈希不变（SE250 受比特流读长限制，无法验证）；
+- ✅ 总耗时和固定开销有实际下降 —— 固定开销 5.284 s → 1.505 s（3.5x），
+  演示规模 7.315 s → 4.123 s，见
+  [`measured_timing_accountability.md`](benchmarks/measured_timing_accountability.md)；
+- ✅ 主机峰值内存、CPU 占用和网络吞吐有记录 —— 2026-09-11 实测：
+  2,048 读段 RSS 33.6 MB / CPU 1.8%；全量 51,781 读段 RSS 71.3 MB / CPU **0.6%**；
+  网络 8 Mbps 量级。**上位机不是瓶颈**：全量任务中 99.4% 墙钟时间主机在等板子。
+  见 [`measured_timing_accountability.md`](benchmarks/measured_timing_accountability.md) §4；
+- ✅ 断连、超时、错误配置能给出明确错误 —— G6 的 20 类注入全部有明确错误码与恢复，
+  非法配置由固件 `rc=1..9` 精确区分，见
+  [`measured_g6_robustness_campaign.md`](benchmarks/measured_g6_robustness_campaign.md)。
 
 ### G3 · Stage1 并行化（2～4 周）
 
@@ -196,6 +208,13 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 **出口门禁**
 
 至少 5 个 payload（含 D0）通过；任何 payload 失败都要保留失败原因，不能只挑成功样本展示。
+
+> **✅ 2026-09-11 达成**：6 类异构 payload（经典图像 D0、纯文本、几何二值、稀疏位流、
+> 高熵随机、受控噪声 D2）板端 100% 逐位恢复；**21 次板端运行（每数据集 3 次）
+> 结果逐位可重复、零抖动**，见
+> [`measured_board_multi_payload.md`](benchmarks/measured_board_multi_payload.md) §6。
+> 失败样本完整保留：高熵 @出厂门限 60 稳定 0/3 失败（2,671 bit 误码，LDPC 50 轮未收敛），
+> 未从统计中剔除。
 
 ### G5 · 错误鲁棒性（2～4 周）
 
