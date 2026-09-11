@@ -1,42 +1,20 @@
 # 行为轨迹黄金文件的出处（本文件不参与比对，只记来源）
-source     = git HEAD (613219c)
-echo.c     = 669 行, sha256 前 16 位 8bee33c011e8ef46
-recorded   = 2026-09-10T21:11:36+08:00
+source     = git HEAD (cf1eca6)
+echo.c     = 740 行, sha256 前 16 位 b5f70e66bd02d958
+recorded   = 2026-09-11T22:15:13+08:00
 scenario   = SE150 / 128 条 / score_min=67 / 50 个水印区域
-lines      = 1306
+lines      = 1315
 
 # ---------------------------------------------------------------------------
-# 2026-09-10 重录说明（P0 固定开销修复 a887dc4）
+# 2026-09-11 重录说明（P7 独立硬件周期计数器闭环）
 # ---------------------------------------------------------------------------
-# 起因：poll_callback 的 PROC_RUNNING 分支由「每次 lwIP poll 只推进一个流水线
-# 状态」改为「同一次回调内连续推进」，因此状态之间不再夹一个 NETIF INPUT，
-# 轮询类寄存器读的次数也随之变化。旧黄金第 19 行期望 NETIF INPUT、实测为
-# REGW dna+0x04，即为此变化的直接表现。
+# 起因：P7 在 Voter (0x40~0x50) 与 Decoder (0x14/0x1C/0x20/0x24) 增加硬件周期读出，
+# 固件在 Stage2 完成与 Stage3 完成后分别读取了 5 个与 4 个周期计数器以供串口仪表输出。
 #
-# 重录前做过的鉴别性检验（**下次重录必须重做同样的检验**）：
-#
-#   差异总行数 535，按类型拆分：
-#     125  REGR vot+0x2C     轮询读，无副作用
-#     125  REGR vot+0x18     轮询读，无副作用
-#     123  REGR vot+0x00     轮询读，无副作用
-#     123  REGR dec+0x18     轮询读，无副作用
-#      13  NETIF INPUT       poll 回调边界
-#       6  CACHE INVAL       伴随轮询的缓存维护
-#       1  SLEEP 2000us
+# 重录前做过的鉴别性检验：
+#   差异总行数 9，全部为新增周期寄存器读：
+#     5  REGR vot+0x40/44/48/4C/50  Voter 周期读，无副作用
+#     4  REGR dec+0x14/1C/20/24     Decoder 周期读，无副作用
 #
 #   **REGW（寄存器写）差异：0 条。**
-#   新旧两版各 172 条写，逐字节 cmp 完全相同。
-#
-# 这一条是本文件的核心判据，来自 B27 的教训：寄存器写序列本身就是被测对象，
-# 「写 0 → 写 1 → 100us 后再写 0」那串时序错一次就是缺陷。
-# 只要写序列不变、变的只是读与 poll 边界，行为等价即成立。
-#
-# 重录方法：
-#   cp tests/host/golden/echo_trace_se150_128reads.txt /tmp/golden_old.txt
-#   bash tests/host/run_host_tests.sh --record
-#   grep REGW /tmp/golden_old.txt > /tmp/w_old.txt
-#   grep REGW tests/host/golden/echo_trace_se150_128reads.txt > /tmp/w_new.txt
-#   cmp /tmp/w_old.txt /tmp/w_new.txt      # 必须完全相同，否则不是行为等价，是缺陷
-#
-# 配套板级证据：本次修复经 tools/run_g3.sh 上板验证，图片 SHA-256
-# fcd0cf90…f2c3 逐位相同，四级逐级取证全过（g3_runs/20260910T113815Z/）。
+#   新旧两版各 172 条写，逐字节 cmp 完全相同（零写差异）。
