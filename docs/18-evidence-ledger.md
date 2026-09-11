@@ -38,6 +38,9 @@
 | G1 | 6 类异构 payload 板端 100% 逐位恢复 | 各自独立源文件的 SHA-256 | `docs/benchmarks/measured_board_multi_payload.md` §3 | `tools/run_multi_payload_regression.py --mode check-dumps --extended` |
 | G2 | **21 次板端运行，结果逐位可重复，零抖动** | 每数据集 3 次原始误码数完全相同 | `logs/multi_payload/repeat3_20260910T200339Z/` | `... --mode board --extended --repeat 3` |
 | G3 | 高熵失败是**确定性算法边界**，非随机故障 | @60 稳定 0/3 失败、@65 稳定 3/3 通过 | 同 G2 | 同 G2 |
+| G4 | **误接受率有定义且已测**：`score_min=67` 时干净数据 FAR **0.44%**、FRR 0% | 逐记录判真/诱饵/错位，FAR = 垃圾票占被接受记录的比例 | `docs/benchmarks/measured_g5_false_accept.md`、`logs/g5_matrix/run1/` | `python3 tools/g5_false_accept.py --dataset tests/datasets/D1_text_manifesto --limit 2048` |
+| G5 | **替换错误不影响误接受率，插删才是主因** | sub 0→4% 时 FAR@67 恒 ~0.5%；ins=del 0.1% 时升到 8.9%，且成因由「诱饵」变为「真错位」 | 同上，7 个噪声点 × 3 种子 | `bash tools/run_g5_matrix.sh` |
+| G6 | **阈值法在纯替换下的边界是 sub ≈ 4%** | 真记录最低分与诱饵最高分的间隔在 4% 处归零（+4.0 → ±0.0） | 同上 §3.1 | 同上 |
 
 **G2 的具体数字**（这是比「6/7 通过」更强的证据）：
 
@@ -66,10 +69,12 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 
 | 说法 | 为什么不能说 |
 |---|---|
-| 「比 CPU 快 / 加速 N 倍」 | 全量 4-way 外推 **1,368 reads/s**，与单核 CPU 1,364.9 **打平**；多核 14,003 快 10.2x |
+| 「比 CPU 快 / 加速 N 倍」 | 全量 4-way **板端实测外推 1,055 reads/s**，仍慢于单核 CPU 1,364.9（0.77x）、慢多核 13.3x。（此前写的「1,368 打平」基于 Stage1 占 81% 的错误假设，已作废） |
 | 「固定开销优化提升了吞吐」 | 只对小规模成立。全量占比仅 9%，修复后全量 58.7 s → 60.1 s **略差** |
 | 「纯硬件三级流水线」 | **Stage 2.5 跑在 ARM 上**（`apply_watermark_differential()`），见 `docs/01` |
 | 「低功耗 / 能效优势」 | **功耗一个数字都没测**，无功率计 |
+| 「误接受率低说明系统鲁棒」/「FAR 就是失败率」 | FAR 衡量的是**累加器污染程度**，不是任务成败：`D2_controlled_noise` 在板端 `score_min=65` 下 FAR **21.76%**，却 **3/3 逐位恢复** |
+| 「score_min=67 是最优阈值」 | 67 = `int(0.45×150)`，是设计时选的比例**不是测出来的**。纯替换场景实测 τ=70 才给 FAR=0%；但插删场景抬阈值换不来干净 |
 | 「8-way 还没做」 | 是**做不了**：4-way 已占 LUT 88.0%，8-way 外推 ~125% |
 | 「WNS +2.197 ns 说明整机时序好」 | 那是**单模块 OOC**；同一设计整机默认策略下是 **−0.252 ns 不收敛** |
 

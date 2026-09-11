@@ -201,6 +201,22 @@ hw/build/export/hardware.xsa      sha256 79c64736…e6eb33   692 KB  【已跟�
 | `local_correlator.v` | 零引用，但**不满足任何一条**——没有实测证伪它，也没有文件取代它 | **保留**，在 README 里补一行「保留原因：不满足退休三条中任何一条」 |
 | `unused_axi_wrappers/`（7 个） | 第 3 条成立：AXI 逻辑已内联进各 IP 顶层；`five_to_four_decoder.v` 更是 AGENTS.md 白纸黑字的死文件 | **可删** |
 
+> ### ⚠️ 删之前先看 `tools/run_sim.sh`——本条是 2026-09-11 回归实跑发现的
+>
+> `tools/run_sim.sh:207` 有一行：
+>
+> ```bash
+> check five_to_four_decoder_dead "hw/experimental/unused_axi_wrappers/five_to_four_decoder.v"
+> ```
+>
+> **`hw/experimental/` 下的文件不是全都没人引用**——这一个被回归的语法检查带着跑。
+> 直接 `git rm` 它会让 `run_sim.sh` 立刻失败。正确顺序是**先删 `run_sim.sh` 里那一行，
+> 再删文件，然后重跑回归**，两个改动放同一个提交。
+>
+> 更一般的规则：**删 `hw/experimental/` 下任何文件之前，先 `grep -n "<文件名>" tools/run_sim.sh
+> tools/run_xsim.sh tools/run_m2_full.sh tools/run_m3_bd.sh hw/ip/*/component.xml`。**
+> 本项目已经因为「移了 6 个 TB 却没重跑回归」把 `run_sim.sh` 弄坏过一次。
+
 **删除必须在 commit message 里逐个写明依据第几条**（AGENTS.md §5 明文要求）。
 删完把 `hw/experimental/README.md` 的「当前内容」表改写成实际剩余项——
 **表与目录不一致本身就是一个新的卫生缺陷**。
@@ -301,7 +317,7 @@ hw/build/export/hardware.xsa      sha256 79c64736…e6eb33   692 KB  【已跟�
 
 | 批次 | 内容 | 出口判据 |
 |---|---|---|
-| **S-1 冷** | A1、A2、B2（RTL 退休）、A7（归并） | `run_sim.sh` 全绿（含两个 check 脚本）；`check_ip_packaging.sh` 6 项 PASS |
+| **S-1 冷** | A1、A2、B2（RTL 退休）、A7（归并） | `run_sim.sh` **16 项全绿**（含两个 check 脚本）；`check_ip_packaging.sh` 6 项 PASS。基线：2026-09-11 在 `8e08dd3` 上实跑 16/16 |
 | **S-2 冷** | A5（workspace 一致性检查）、A6（废轮次归并）、B3（工具收敛） | `check_repo_hygiene.sh` 扩到 8 项后 PASS |
 | **S-3 冷** | A3（xsim 保留窗口）、A4（旧提交包外移，**需用户确认路径**） | `du -sh .` 降到 ≤ 600 MB；`run_xsim.sh --keep 3` 实跑一次验证不误删 |
 | **S-4 冷** | C1 注释（仅 `.c`/`.py`，不含 RTL）、B4 调查报告 | `run_sim.sh` 全绿；新增 `docs/reference/client-module-map.md` |

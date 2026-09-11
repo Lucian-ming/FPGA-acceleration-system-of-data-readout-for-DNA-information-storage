@@ -49,7 +49,9 @@
 | `mutate_reads.py` | D2 受控噪声 / D3 经验轮廓加噪 |
 | `extract_error_profile.py` | D3 真实测序经验误差轮廓提取 |
 | `run_multi_payload_regression.py` | 多 payload 泛化回归。`--repeat N` 做重复实验（写独立目录，**不覆盖已提交留证 dump**） |
-| `run_robustness_scan.py` | G5 抗噪边界扫描 |
+| `run_robustness_scan.py` | G5 抗噪边界扫描（错误率/覆盖度 → **恢复成功率**） |
+| `g5_false_accept.py` | G5「**误接受率**」的定义与测量：逐记录判定真/诱饵/错位，扫 `score_min` 出 FAR/FRR 曲线。**定义写在文件头，先读那里** |
+| `run_g5_matrix.sh` | 驱动上者跑 G5 受控误差矩阵（替换率 × 插删率 × 3 种子），产出 `summary.tsv` |
 | `stress_test_suite.py` | 长时压测 |
 
 ## 性能与基准
