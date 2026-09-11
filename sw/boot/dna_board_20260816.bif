@@ -1,6 +1,0 @@
-the_ROM_image:
-{
-  [bootloader] hw/build/export/fsbl.elf
-  hw/build/export/top_bd_wrapper.bit
-  hw/build/export/dna_lwip_app_board_20260816.elf
-}

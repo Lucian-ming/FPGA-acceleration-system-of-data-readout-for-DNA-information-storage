@@ -43,7 +43,7 @@
 │           ├── dvb_s2_r5_6.pchk (993,612) 【LDPC资源】外部解码器读取的 DVB-S2 R=5/6 校验矩阵数据。
 │           ├── permutation64800 (259,200) 【LDPC资源】外部解码器读取的长度 64,800 交织/置换表。
 │           └── readme.txt (412) 【LDPC资源】说明 EXE 的输入 `dec_input.txt`、硬判决 `H` 参数和输出文件名。
-├── design_2_wrapper.xsa (708,463) 【构建产物/XSA】含 bitstream、HWH、PS7 初始化和自定义 IP 驱动片段的硬件平台归档。
+├── design_2_wrapper.xsa (已删除，SHA-256 79c64736...e6eb33，依据代码卫生§5第2条与第3条，可由 git show HEAD^:design_2_wrapper.xsa 取回)
 ├── data/
 │   └── R0.83_data/ 【文档】从用户指定目录完整导入的 DNA R0.83 输入、参考输出和水印数据；校验和见 `DATASET.md`。
 │       ├── Sequencing data/
@@ -68,41 +68,35 @@
 │   │   ├── Dna_accelerator_core_1_0/
 │   │   │   ├── component.xml (65,861) 【PL硬件RTL/IP】`xilinx.com:user:Dna_accelerator_core:1.0` 的 IP-XACT 接口、参数和文件集描述。
 │   │   │   ├── hdl/
-│   │   │   │   ├── Dna_accelerator_core_v1_0.v (18,096) 【PL硬件RTL/IP】DNA 一级核顶层，连接 AXI-Lite、AXIS、输入/结果 FIFO 与 `srpe_batch`。
-│   │   │   │   ├── Dna_accelerator_core_v1_0_M_AXIS_RESULT.v (14,617) 【PL硬件RTL/IP】旧版/模板化 AXIS 主输出模块，未列入该 IP 当前综合文件集。
-│   │   │   │   ├── Dna_accelerator_core_v1_0_S_AXIS_DATA.v (679) 【PL硬件RTL/IP】空壳 AXIS 从输入模板，未列入当前综合文件集。
-│   │   │   │   ├── Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v (5,981) 【PL硬件RTL/IP】DNA 顶层使用的四寄存器 AXI4-Lite 从接口。
-│   │   │   │   ├── fifo.v (1,767) 【PL硬件RTL/IP】通用单时钟 FIFO 实现，当前顶层未实例化。
-│   │   │   │   ├── fifo_sync_sdpram.v (522) 【PL硬件RTL/IP】空的同步双口 RAM 模块壳，当前顶层未实例化。
-│   │   │   │   ├── fifo_sync_sdpram_b64.v (1,828) 【PL硬件RTL/IP】当前 DNA 顶层实际使用的同步 FIFO/RAM。
-│   │   │   │   ├── local_correlator.v (7,005) 【PL硬件RTL/IP】局部相关器实现，供旧 `srpe.v` 方案使用。
-│   │   │   │   ├── s2mm_pack64.v (3,046) 【PL硬件RTL/IP】将 DNA 结果打包为 64-bit AXIS 输出拍。
-│   │   │   │   ├── srpe.v (9,331) 【PL硬件RTL/IP】由多个 `local_correlator` 组成的旧版峰值搜索引擎。
-│   │   │   │   ├── srpe_batch.v (15,645) 【PL硬件RTL/IP】当前顶层使用的 64-read 批处理相关/峰值搜索引擎和水印 BRAM。
-│   │   │   │   ├── tb_dna_quick.v (12,609) 【PL硬件RTL/IP】仅覆盖 DNA 顶层的自生成数据 Testbench。
-│   │   │   │   └── vivado_quick_sim.tcl (4,429) 【构建脚本(Vivado/Vitis)】创建 DNA 快速仿真工程、添加波形并运行 xsim 的脚本。
+│   │   │   │   ├── Dna_accelerator_core_v1_0.v (21,339) 【PL硬件RTL/IP】DNA 一级核顶层，连接 AXI-Lite、AXIS、输入/结果 FIFO 与 `srpe_batch`。
+│   │   │   │   ├── Dna_accelerator_core_4way.v (16,513) 【PL硬件RTL/IP】4-way 并行 DNA 核顶层变体。
+│   │   │   │   ├── Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v (6,074) 【PL硬件RTL/IP】DNA 顶层使用的四寄存器 AXI4-Lite 从接口。
+│   │   │   │   ├── fifo_sync_sdpram_b64.v (1,924) 【PL硬件RTL/IP】当前 DNA 顶层实际使用的同步 FIFO/RAM。
+│   │   │   │   ├── s2mm_pack64.v (3,455) 【PL硬件RTL/IP】将 DNA 结果打包为 64-bit AXIS 输出拍。
+│   │   │   │   ├── srpe_batch.v (18,039) 【PL硬件RTL/IP】2-way 批处理相关/峰值搜索引擎。
+│   │   │   │   ├── srpe_batch_4way.v (20,385) 【PL硬件RTL/IP】当前打包进比特流的 4-way 批处理相关/峰值搜索引擎。
+│   │   │   │   └── vivado_quick_sim.tcl (4,469) 【构建脚本(Vivado/Vitis)】创建 DNA 快速仿真工程、添加波形并运行 xsim 的脚本。
 │   │   │   └── xgui/Dna_accelerator_core_v1_0.tcl (9,605) 【PL硬件RTL/IP】DNA IP 的 Vivado XGUI 参数页和参数传递过程。
 │   │   ├── desparsification_decoder_1_0/
 │   │   │   ├── component.xml (73,148) 【PL硬件RTL/IP】`xilinx.com:user:desparsification_decoder:1.0` 的 IP-XACT 接口、参数和文件集描述。
 │   │   │   ├── hdl/
 │   │   │   │   ├── desparsification_decoder_v1_0.v (23,490) 【PL硬件RTL/IP】三级 5b→4b 反稀疏化核顶层，含 AXI-Lite 控制与 AXI4 Master 读写状态机。
-│   │   │   │   ├── desparsification_decoder_v1_0_M00_AXI.v (8,733) 【PL硬件RTL/IP】AXI Master 模板模块，未列入该 IP 当前综合文件集。
-│   │   │   │   ├── desparsification_decoder_v1_0_S00_AXI.v (7,467) 【PL硬件RTL/IP】另一套 AXI-Lite 模板/旧控制映射，未列入当前综合文件集。
-│   │   │   │   └── five_to_four_decoder.v (920) 【PL硬件RTL/IP】独立 5-bit 到 4-bit 查表模块，当前顶层未实例化。
+│   │   │   │   └── desparsify_datapath.v (7,583) 【PL硬件RTL/IP】三级反稀疏化数据通路核心。
 │   │   │   └── xgui/desparsification_decoder_v1_0.tcl (4,808) 【PL硬件RTL/IP】反稀疏化 IP 的 XGUI 参数页和参数传递过程。
 │   │   └── differential_voter_1_0/
 │   │       ├── component.xml (76,176) 【PL硬件RTL/IP】`xilinx.com:user:differential_voter:1.0` 的 IP-XACT 接口、参数和文件集描述。
 │   │       ├── hdl/
-│   │       │   ├── differential_voter_v1_0.v (36,729) 【PL硬件RTL/IP】二级差分投票核顶层，含控制从接口、81,000-bit BRAM 累加和 AXI4 Master 访存 FSM。
-│   │       │   ├── differential_voter_v1_0_M00_AXI.v (61,876) 【PL硬件RTL/IP】AXI Master 模板实现，未列入该 IP 当前综合文件集。
-│   │       │   └── differential_voter_v1_0_S00_AXI.v (14,440) 【PL硬件RTL/IP】AXI-Lite 模板实现，未列入该 IP 当前综合文件集。
+│   │       │   └── differential_voter_v1_0.v (36,729) 【PL硬件RTL/IP】二级差分投票核顶层，含控制从接口、81,000-bit BRAM 累加和 AXI4 Master 访存 FSM。
 │   │       └── xgui/differential_voter_v1_0.tcl (7,981) 【PL硬件RTL/IP】差分投票 IP 的 XGUI 参数页和参数传递过程。
+│   ├── experimental/ 【PL硬件RTL/归档】退出打包目录的非综合 RTL；仅保留 local_correlator.v 与说明。
+│   │   ├── README.md 【文档】退休规则与历史退休记录。
+│   │   └── local_correlator.v (7,005) 【PL硬件RTL/实验】局部相关器实现，全库零引用但暂不满足退休三条。
 │   ├── scripts/
 │   │   ├── bd.tcl (7,600) 【构建脚本(Vivado/Vitis)】创建名为 `top_bd` 的 PS7、DMA、双 AXI interconnect 和三自研 IP Block Design。
 │   │   ├── build.tcl (1,832) 【构建脚本(Vivado/Vitis)】创建 Vivado 工程、调用 `bd.tcl`、综合/实现并导出含 bitstream 的 XSA。
 │   │   └── collect_info.tcl (0) 【构建脚本(Vivado/Vitis)】预留的信息收集脚本；当前为空。
 │   └── build/
-│       └── export/hardware.xsa (708,463) 【构建产物/XSA】与根目录 XSA 字节完全相同的重复硬件平台归档。
+│       └── export/hardware.xsa (已删除，与原根目录 XSA 相同，SHA-256 79c64736...e6eb33，可由 git 取回)
 └── sw/
     ├── app/ 【PS裸机软件】基于 Xilinx lwIP Echo 模板改写的 Cortex-A9 裸机 TCP 服务端及平台辅助代码。
     │   ├── README.txt (2,695) 【文档】遗留的通用 lwIP Echo Server 使用说明，并未描述实际自定义协议。

@@ -7,13 +7,22 @@
 
 ## 当前内容
 
-| 文件 | 为什么在这里 |
-| --- | --- |
-| `srpe_batch_8way_wip.v` | 8-way 半成品。该方向已被资源证伪（4-way 已占 LUT 88.0%，8-way 外推约 125%），见 `docs/17` §2.1 |
-| `srpe_batch_1way_baseline.v` | 1-way 基线，已被 2-way/4-way 取代 |
-| `srpe.v` / `fifo.v` / `fifo_sync_sdpram.v` | 被 `_b64` 版本取代的旧实现 |
-| `local_correlator.v` | 全库零引用。4-way 是扁平实现，不实例化任何子模块 |
-| `unused_axi_wrappers/` | 6 个零引用的 AXI wrapper（AXI 逻辑已内联进各 IP 顶层）+ `five_to_four_decoder.v`（`AGENTS.md` 早已记明是死文件） |
+| 文件 | 为什么在这里 | 保留原因 |
+| --- | --- | --- |
+| `local_correlator.v` | 全库零引用。4-way 是扁平实现，不实例化任何子模块 | **保留**：不满足退休三条中任何一条（无实测证伪，亦无直接替代文件覆盖其微结构） |
+
+## 历史退休记录（2026-09-11，docs/19 §B2）
+
+以下文件已于 2026-09-11 依据 AGENTS.md 代码卫生 §5 退休删除，历史可从 Git 取回：
+
+| 文件 | 退休规则 | 依据 |
+| --- | --- | --- |
+| `srpe_batch_8way_wip.v` | 第 1 条成立 | 方向已被资源证伪，结论在 `docs/17` §2.1 与 `docs/benchmarks/measured_4way_board.md` §4 |
+| `srpe_batch_1way_baseline.v` | 第 3 条成立 | 被 `srpe_batch.v` (2-way) / `srpe_batch_4way.v` 取代，受 `tools/run_sim.sh` 覆盖 |
+| `srpe.v` | 第 3 条成立 | 被 `srpe_batch.v` / `srpe_batch_4way.v` 取代 |
+| `fifo.v` | 第 3 条成立 | 被 `fifo_sync_sdpram_b64.v` 取代 |
+| `fifo_sync_sdpram.v` | 第 3 条成立 | 被 `fifo_sync_sdpram_b64.v` 取代 |
+| `unused_axi_wrappers/`（7 个） | 第 3 条成立 | AXI 逻辑已内联进各 IP 顶层；`five_to_four_decoder.v` 为死文件，功能由 `desparsification_decoder_v1_0.v` / `desparsify_datapath.v` 覆盖 |
 
 ## 退休规则（AGENTS.md「代码卫生」§5）
 

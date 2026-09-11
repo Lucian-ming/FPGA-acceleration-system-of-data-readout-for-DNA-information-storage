@@ -21,13 +21,13 @@
 | `reports/` | 完整实现及四个关键 RTL 核的时序、资源报告 |
 | `SHA256SUMS` | 上述文件的 SHA-256 清单 |
 
-`hardware.xsa` 是仓库原有历史 XSA，只为保留历史而存在，**不属于本次可上板构建对**，
-且其 DDR 配置与本板不符，禁止使用。
+`hardware.xsa`（与根目录原 `design_2_wrapper.xsa` 逐字节相同）已于 2026-09-11 依据代码卫生 §5 第 2 条（逐字节重复）与第 3 条（已被 `dna_accel.xsa` 取代）从本目录及根目录删除。其 DDR 配置与本板不符（32 bit 双颗），历史可由 Git 取回（SHA-256 `79c64736b081720c9de37e608ab930b879be93c4609f55ad729c010b42e6eb33`）。
 
 > 历史上按旧配置构建的 ELF（`dna_lwip_app_board_20260816.elf` 为 32 bit DDR 版、
 > `dna_lwip_app_ddr16.elf` 为 B20 修复前版、`dna_lwip_app_b20.elf`、`dna_lwip_app_b25.elf`）
 > 均已从本目录移除（Git 历史中仍可取回），以免误烧。
-> 对应的 `dna_board_20260816.bif` / `dna_board_ddr16.bif` / `dna_board_b25.bif` 同样作废，
+> 对应的 `dna_board_20260816.bif` 已于 2026-09-11 依据代码卫生 §5 第 3 条从 `sw/boot/` 删除（已被 `sw/boot/dna_board_b27.bif` 取代）；
+> `dna_board_ddr16.bif` / `dna_board_b25.bif` 同样作废，
 > **现用 `sw/boot/dna_board_b27.bif`**。
 
 ## 2026-08-30 重建：B26 + B27 修复，且**已上板闭环**

@@ -200,11 +200,6 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
     check differential_voter        hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v
     check desparsification_decoder  "$D/desparsification_decoder_v1_0.v" "$D/desparsify_datapath.v"
-    # five_to_four_decoder 已于 2026-09-10 移出 IP 打包目录到 hw/experimental/：
-    # AGENTS.md 早已记明它是「未被顶层引用的死文件」，权威实现是
-    # desparsification_decoder_v1_0.v / desparsify_datapath.v。
-    # 语法检查一个死文件没有意义，反而会让人误以为它还在生产路径上。
-    check five_to_four_decoder_dead "hw/experimental/unused_axi_wrappers/five_to_four_decoder.v"
 fi
 
 printf '\n==================================================\n'
