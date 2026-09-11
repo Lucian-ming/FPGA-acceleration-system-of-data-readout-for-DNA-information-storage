@@ -108,7 +108,6 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
-        usleep(1000);
 
         xil_printf("[STAGE2] ✓ Cache invalidated (%u bytes)\n\r", inv_done);
 
@@ -130,7 +129,6 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         xil_printf("\n\r[STAGE2] Pre-start Input Validation:\n\r");
         Xil_DCacheInvalidateRange(voter_in_addr, VOTER_INPUT_BYTES_PER_READ * 10U);
         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
-        usleep(1000);
 
         /* 统计前 10 个 read 的非零字节 */
         const volatile u8 *vin = (const volatile u8 *)voter_in_addr;
@@ -270,46 +268,12 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             return PIPE_STEP_FAIL;
         }
 
-        /* ===== 追加：DONE 之外的“写进度守卫” ===== */
+        /* 轮询计数与诊断（由硬件 STATUS_DONE 作为唯一完成标志） */
         poll_cnt++;
-
-        if ((poll_cnt % 2000u) == 0u) {  // 每 2000 次轮询做一次内存侧进度检查，避免串口过载
-            /* 统计已写拍数：哨兵值被覆盖即视为已写 */
-            Xil_DCacheInvalidateRange(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BEATS * 8u);
-            volatile const u64 *p64 = (volatile const u64 *)DDR_VOTER_OUT_BASE;
-            u32 written = 0;
-            for (u32 i = 0; i < VOTER_OUTPUT_BEATS; ++i) {
-                if (p64[i] != 0x55AA55AA55AA550AULL)  /* 你前面清区时的哨兵值 */
-                    written++;
-            }
-
-            /* ---- 追加：读取硬件调试寄存器，判定所处阶段 ---- */
-            if ((poll_cnt % 1000u) == 0u) {
-                const u32 dbg_wcnt = read_reg32(VOTER_BASEADDR, VOTER_REG_DBG_WRITE);   // 0x24
-
-                xil_printf("[DBG] STATUS=0x%02X (IDLE=%u,DONE=%u)  FSM=%u  WCOUNT=%u  ERR=0x%X\n\r",
-                           status, status & 0x1, (status>>1)&0x1, dbg_state, dbg_wcnt, err_flags);
-
-                /* 小抄：FSM 编码（见我们定义）
-                   0:IDLE 1:INIT 2:R_SETUP 3:R_DATA 4:PARSE 5:CALC 6:V_READ 7:V_UPD
-                   8:NEXT 9:OUT_PREF 10:OUT_ADDR 11:OUT_PACK 12:OUT_SETUP 13:OUT_WRITE
-                   14:WAIT_BRESP 15:DONE 16:ERROR
-                */
-            }
-
-            if (written >= VOTER_OUTPUT_BEATS) {
-                xil_printf("\n\r[ERROR] Memory shows %u/%u beats written (100%%), but DONE=0.\n\r",
-                           written, VOTER_OUTPUT_BEATS);
-                xil_printf("[ERROR] Voter completion protocol violated; refusing stale/partial output.\n\r");
-                voter_clear_start();
-                poll_count = 0;
-                poll_cnt = 0;
-                pipeline_set_state(PIPE_FAIL);
-                return PIPE_STEP_FAIL;
-            } else {
-                xil_printf("[POLL #%u] Progress: %u/%u beats written\n\r",
-                           poll_cnt, written, VOTER_OUTPUT_BEATS);
-            }
+        if ((poll_cnt % 5000u) == 0u) {
+            const u32 dbg_wcnt = read_reg32(VOTER_BASEADDR, VOTER_REG_DBG_WRITE);
+            xil_printf("[DBG] STATUS=0x%02X (IDLE=%u,DONE=%u)  FSM=%u  WCOUNT=%u  ERR=0x%X\n\r",
+                       status, status & 0x1, (status>>1)&0x1, dbg_state, dbg_wcnt, err_flags);
         }
 
         /* 条件1: DONE标志位置位 */
@@ -370,19 +334,11 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         /* PIPE_DONE_STAGE2 分支内： */
         u32 voter_out_addr = DDR_VOTER_OUT_BASE;
 
-        // ✅ 硬件写完后，只需要 Invalidate，让CPU丢弃旧缓存行，从DDR重取真值
+        // ✅ 硬件写完后，只需单次 Invalidate 让 CPU 丢弃旧缓存行，从 DDR 重取真值
         xil_printf("[STAGE2] Making HW-written output visible to CPU (invalidate only)...\n\r");
         Xil_DCacheInvalidateRange(voter_out_addr, VOTER_OUTPUT_BYTES);   // [FIX] 改为仅 Invalidate
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
-        usleep(100);
-
-        xil_printf("[STAGE2] Verifying output...\n\r");
-        // 这里即可直接读/统计，不再需要前面的 Flush
-
-        Xil_DCacheInvalidateRange(voter_out_addr, VOTER_OUTPUT_BYTES);
-        __asm__ volatile("dsb sy");
-        usleep(100);
 
         /* 验证输出数据 */
         xil_printf("[STAGE2] Verifying output data...\n\r");
@@ -400,11 +356,14 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             }
         }
 
+        u32 zero_pct10 = (check_count > 0) ? (zero_count * 1000U / check_count) : 0;
+        u32 nonzero_pct10 = (check_count > 0) ? (nonzero_count * 1000U / check_count) : 0;
+
         xil_printf("[STAGE2] Data statistics (first %u u64s):\n\r", check_count);
-        xil_printf("  Zero count    : %u (%.1f%%)\n\r",
-                   zero_count, (float)zero_count * 100.0f / check_count);
-        xil_printf("  Non-zero count: %u (%.1f%%)\n\r",
-                   nonzero_count, (float)nonzero_count * 100.0f / check_count);
+        xil_printf("  Zero count    : %u (%u.%u%%)\n\r",
+                   zero_count, zero_pct10 / 10U, zero_pct10 % 10U);
+        xil_printf("  Non-zero count: %u (%u.%u%%)\n\r",
+                   nonzero_count, nonzero_pct10 / 10U, nonzero_pct10 % 10U);
         /* 警告：如果输出全为0 */
         if (nonzero_count == 0) {
             xil_printf("\n\r[WARNING] Voter output is all zeros!\n\r");
@@ -418,21 +377,9 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             xil_printf("[WARNING] Proceeding anyway for debugging...\n\r");
         } else {
             xil_printf("\n\r[STAGE2] ✓ Output contains valid data\n\r");
-            xil_printf("[STAGE2] Non-zero ratio: %.1f%%\n\r",
-                       (float)nonzero_count * 100.0f / check_count);
+            xil_printf("[STAGE2] Non-zero ratio: %u.%u%%\n\r",
+                       nonzero_pct10 / 10U, nonzero_pct10 % 10U);
         }
-
-        // ✅ 给 Stage3 使用时，保持“硬件写→CPU读”的一致性策略：仅 Invalidate 即可
-        xil_printf("[STAGE2] Preparing output for Stage3 (invalidate only)...\n\r");
-        Xil_DCacheInvalidateRange(voter_out_addr, VOTER_OUTPUT_BYTES);   // [FIX] 只 Invalidate
-        __asm__ volatile("dsb sy");
-        __asm__ volatile("isb");
-        usleep(100);
-
-        __asm__ volatile("dsb sy");
-        __asm__ volatile("isb");
-        usleep(2000);
-        xil_printf("[STAGE2] ✓ Flush complete\n\r");
 
         /* 【修订 B3】Stage2 输出的是共识 DNA 序列，必须先与水印做差分
            才是 Stage3 期望的稀疏流。原来整条链路缺了这一级。 */

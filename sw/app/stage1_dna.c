@@ -68,21 +68,16 @@ static u32 rx_records_submitted = 0;   /* 已交给硬件的 BD（记录）条�
  *      既不看 ISR 脸色也不被它清零 → 另一个 >=500 ms 源。
  * 两个不同步的 ~500 ms 源叠加，有效间隔落在 250~500 ms。
  */
-static int  s1_last_tx_done = -1;
-static int  s1_last_rx_done = -1;
-static u32  s1_no_progress  = 0;
-/* 60 步完全无 BD 进展即判定卡死。按实测 ~280 ms/步折算 **≈ 17 s**，
- * 不是原注释写的「60 x 500 ms ≈ 30 s」—— 那是照错的 500 ms 算的，乐观了约 2 倍。
- * 触发得比宣称的更早，方向上是安全的（宁可早报也不要 83 分钟才报，那正是 B21 当年的坑），
- * 所以本轮**只改注释、不动数值**：改数值要重建 ELF 并刷新 SHA256SUMS，
- * 而 2026-08-30 全量 103,616 条实跑（132.67 s）下它一次都没误触发。 */
-#define S1_NO_PROGRESS_LIMIT  60U
+static int   s1_last_tx_done = -1;
+static int   s1_last_rx_done = -1;
+static XTime s1_last_progress_time = 0;
 
 void pipeline_reset_counters(void){
     wm_tx_expected=0; rx_expected=0; tx_expected=0; tx_done=0; rx_done=0;
     tx_frames_total=0; tx_frames_sent=0; tx_frames_done=0; wm_region=0;
     rx_records_total=0; rx_records_submitted=0;
-    s1_last_tx_done=-1; s1_last_rx_done=-1; s1_no_progress=0;
+    s1_last_tx_done=-1; s1_last_rx_done=-1;
+    XTime_GetTime(&s1_last_progress_time);
     wm_poll_steps=0; wm_t_start=0;
 }
 
@@ -315,25 +310,27 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
          * 处的说明：两个独立的 tcp_slowtmr 驱动源叠加，有效间隔 250~500 ms，不是 500 ms）；
          * 原来的 stuck_count>10000 需要约 83 分钟才会触发，等于永远打不出证据，
          * 这正是上一轮板上「IP core START 之后再无任何输出」的原因。 */
-        if (rx_done == s1_last_rx_done && tx_done == s1_last_tx_done) {
-            s1_no_progress++;
-        } else {
-            s1_no_progress = 0;
+        /* 【B21】基于 XTime 真实墙钟时间的无进展看门狗（30 秒）。
+         * 无论轮询频率多高，只在连续 30 秒没有任何 BD 进展时判定卡死。 */
+        if (rx_done != s1_last_rx_done || tx_done != s1_last_tx_done) {
             s1_last_rx_done = rx_done;
             s1_last_tx_done = tx_done;
-        }
-        if (s1_no_progress > S1_NO_PROGRESS_LIMIT) {
-            xil_printf("\n\r[ERROR] STAGE1 停滞 ~%u s 无任何 BD 进展\n\r",
-                       (unsigned)(S1_NO_PROGRESS_LIMIT / 2U));
-            xil_printf("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
-                       tx_frames_sent, tx_frames_total, tx_done, tx_expected);
-            xil_printf("  RX records done=%d/%d  submitted=%u  ring free=%d\n\r",
-                       rx_done, rx_expected, rx_records_submitted,
-                       (int)XAxiDma_BdRingGetFreeCnt(RxRingPtr));
-            dump_dma_regs("STAGE1 stall");
-            dump_dna_regs("STAGE1 stall");
-            pipeline_set_state(PIPE_FAIL);
-            return PIPE_STEP_FAIL;
+            XTime_GetTime(&s1_last_progress_time);
+        } else {
+            XTime t_now;
+            XTime_GetTime(&t_now);
+            if ((t_now - s1_last_progress_time) > (XTime)(COUNTS_PER_SECOND * 30U)) {
+                xil_printf("\n\r[ERROR] STAGE1 停滞 30 s 无任何 BD 进展\n\r");
+                xil_printf("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
+                           tx_frames_sent, tx_frames_total, tx_done, tx_expected);
+                xil_printf("  RX records done=%d/%d  submitted=%u  ring free=%d\n\r",
+                           rx_done, rx_expected, rx_records_submitted,
+                           (int)XAxiDma_BdRingGetFreeCnt(RxRingPtr));
+                dump_dma_regs("STAGE1 stall");
+                dump_dna_regs("STAGE1 stall");
+                pipeline_set_state(PIPE_FAIL);
+                return PIPE_STEP_FAIL;
+            }
         }
 
         if (tx_frames_sent >= tx_frames_total && tx_done >= tx_expected && rx_done >= rx_expected) {
@@ -355,17 +352,18 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         /* 【B21】收尾阶段同样要保证 RX ring 里始终有描述符 */
         if (submit_rx_records() < 0) { dump_dma_regs("PROGRESS RX resubmit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
 
-        static u32 wait_count = 0;
-        if (++wait_count >= 10) {
+        static XTime t_last_wait_print = 0;
+        XTime t_now_wait;
+        XTime_GetTime(&t_now_wait);
+        if ((t_now_wait - t_last_wait_print) >= (XTime)(COUNTS_PER_SECOND)) {
+            t_last_wait_print = t_now_wait;
             xil_printf("[STAGE1] WAIT tx=%u/%u rx=%d/%d (submitted=%u)\n\r",
                        tx_frames_done, tx_frames_total, rx_done, rx_expected,
                        rx_records_submitted);
-            wait_count = 0;
         }
 
         if (tx_frames_done >= tx_frames_total && rx_done >= rx_expected) {
             pipeline_set_state(PIPE_DONE_STAGE1);
-            wait_count = 0;
             return PIPE_STEP_PROGRESS;
         }
         return PIPE_STEP_PROGRESS;

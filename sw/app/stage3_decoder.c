@@ -88,29 +88,20 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         Xil_DCacheInvalidateRange(DEC_IN_ADDR, DEC_IN_BEATS * 8);
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
-        usleep(100);
         xil_printf("[STAGE3] ✓ Cache invalidated\n\r");
 
         /* 验证输入数据 */
         xil_printf("[STAGE3] Input Validation:\n\r");
         const u64 *in_data = (const u64*)DEC_IN_ADDR;
-        u32 nonzero_count = 0, bit_ones = 0, bit_zeros = 0;
+        u32 nonzero_count = 0;
 
         for (u32 i = 0; i < DEC_IN_BEATS; i++) {
-            u64 val = in_data[i];
-            if (val != 0) {
+            if (in_data[i] != 0ULL) {
                 nonzero_count++;
-                for (int b = 0; b < 64; b++) {
-                    (val & (1ULL << b)) ? bit_ones++ : bit_zeros++;
-                }
-            } else {
-                bit_zeros += 64;
             }
         }
 
-        xil_printf("  Non-zero u64s: %u/%u (%%)\n\r", nonzero_count, DEC_IN_BEATS);
-        xil_printf("  Bit ones:      %u (%%)\n\r", bit_ones);
-        xil_printf("  Bit zeros:     %u (%%)\n\r", bit_zeros);
+        xil_printf("  Non-zero u64s: %u/%u\n\r", nonzero_count, DEC_IN_BEATS);
 
         if (nonzero_count == 0) {
             xil_printf("[STAGE3] ❌ ERROR: Input is all zeros!\n\r");
@@ -262,7 +253,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
             return PIPE_STEP_PROGRESS;
         }
 
-        /* 条件2（旁证）：输出区哨兵是否已被全部覆盖。每 20 次轮询（~10 s）看一次 */
+        /* 条件2（旁证）：输出区哨兵是否已被全部覆盖。每 20 次轮询看一次 */
         if ((poll_count % 20u) == 0u) {
             Xil_DCacheInvalidateRange(DDR_DECODER_OUT_BASE, DECODER_OUTPUT_BEATS * 8);
             volatile const u64 *p_out = (volatile const u64 *)DDR_DECODER_OUT_BASE;
@@ -285,18 +276,9 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
             }
         }
 
-        /* 够得着的超时。原注释写「240 x 500 ms ≈ 120 s，仍在上位机 180 s 之内」，
-         * 但每步实测 ~280 ms，**实际预算只有 ≈ 67 s**，乐观了约 2 倍。
-         * 不是紧迫故障：Stage3 实测 < 500 ms 就 DONE（全量 103,616 条那轮也一样），
-         * 离 67 s 差着两个数量级。同样只改注释不动数值（改了要重建 ELF）。
-         * 记在这里是因为：下一个照「500 ms/步」去调这个常数的人一定会算错，
-         * 而「拿注释当实现」正是 B22 当年翻车的同一类错误。 */
-        if (poll_count > 240u) {
-            /* 注意：这句打印的「~120 s」是照错的 500 ms/步算出来的，实际约 67 s。
-             * 本轮**刻意不改这个字符串** —— 改了会让编译产物与
-             * hw/build/export/ 里已验证的 ELF 不同源，就得整套重建 + 重新上板复验，
-             * 而它只在一条从未触发过的失败路径上打印。下次因真实需求重建 ELF 时一并改掉。 */
-            xil_printf("\n\r[ERROR] STAGE3 等待 ~120 s 仍未完成\n\r");
+        /* 够得着的超时（10 万次轮询，在微秒级轮询下 ≈ 20~50 s） */
+        if (poll_count >= 100000u) {
+            xil_printf("\n\r[ERROR] STAGE3 等待超时仍未完成\n\r");
             xil_printf("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
                        status,
                        read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR),
@@ -325,10 +307,11 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         u32 final_written = 0;
         validate_decoder_written_beats(DEC_OUT_ADDR, DEC_OUT_BEATS, &final_written);
 
+        u32 written_pct10 = (DEC_OUT_BEATS > 0) ? (final_written * 1000U / DEC_OUT_BEATS) : 0;
         xil_printf("\n[STAGE3] Final Validation:\n\r");
-        xil_printf("  Written beats: %u/%u (%.1f%%)\n\r",
+        xil_printf("  Written beats: %u/%u (%u.%u%%)\n\r",
                    final_written, DEC_OUT_BEATS,
-                   (float)final_written * 100.0f / DEC_OUT_BEATS);
+                   written_pct10 / 10U, written_pct10 % 10U);
 
         if (final_written < DEC_OUT_BEATS / 2) {
             xil_printf("[STAGE3] ⚠️  WARNING: Less than 50%% written\n\r");

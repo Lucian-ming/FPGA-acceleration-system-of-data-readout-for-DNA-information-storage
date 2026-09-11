@@ -316,6 +316,8 @@ void send_result(dna_connection_t *conn);
 
 /* 流水线控制 */
 int  run_processing_pipeline(dna_connection_t *conn);
+int  echo_pipeline_is_running(void);
+void echo_pipeline_poll(void);
 
 /* 【P3】任务配置与能力查询（docs/05-interfaces.md 1.1~1.3 节） */
 void process_config(dna_connection_t *conn, u8 *data, u32 len);

@@ -403,6 +403,18 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
     return ERR_OK;
 }
 
+int echo_pipeline_is_running(void)
+{
+    return (g_proc_state != PROC_IDLE);
+}
+
+void echo_pipeline_poll(void)
+{
+    if (g_proc_state != PROC_IDLE && g_conn.tpcb != NULL) {
+        poll_callback(&g_conn, g_conn.tpcb);
+    }
+}
+
 static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
     if (err != ERR_OK || newpcb == NULL) return ERR_VAL;

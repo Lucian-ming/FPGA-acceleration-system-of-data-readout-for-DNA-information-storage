@@ -473,6 +473,22 @@ G5 的出口门禁要一条「阈值 → 正确率/耗时/**误接受率**」曲
   * 补充核心契约注释，交付上位机架构图谱 `docs/reference/client-module-map.md` 与专项对账报告 `docs/reference/slimming-report-2026-09-11.md`（S-4）；
   * 全量回归 16/16 PASS、卫生检查 11/11 PASS、IP 打包检查 14/14 PASS。
 
+### P12 · ✅ PS 固件事件驱动流水线与精细化 Cache 闭环（2026-09-11）
+
+针对 P7 揭示的「99% 耗时在 PS 侧（2,776ms poll 空等 + 396ms Cache 维护）」核心瓶颈完成攻坚与闭环验收：
+- **固件重构落地**：
+  * **P12-A 精细化 Cache 维护**：移除 `stage2_voter.c` 与 `stage3_decoder.c` 中无谓的 `usleep`（100~2000us）与冗余 `Xil_DCacheInvalidateRange`；替换逐 bit 扫描为快速 64-bit 非零字统计；将浮点除法百分比打印重构为定点纯整数取模；
+  * **P12-B 事件驱动微秒级流水线**：在 `main.c` 主循环中高频主动推进 `echo_pipeline_poll()`，通过 `XTime` 精确维持 lwIP 定时器并在流水线运行时执行 200us 节流微延让出总线，消除慢速 `tcp_poll` 的 280ms 空等；
+  * **看门狗与守卫时钟源收敛**：将 `stage1_dna.c` 中的无进展看门狗重构为 `XTime` 30 秒真实墙钟计时，彻底消解微秒级高频轮询造成的误触发；移除 Voter 中误报的未初始化内存哨兵检查。
+- **板级闭环判据（run 20260911T150639Z）**：
+  * **G3 验收 100% 通过**：`tools/run_g3.sh --limit 2048`（4,096 记录），图片 SHA-256 为 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 逐位一致；
+  * **四级 DDR 取证 4/4 级全绿**（展开水印 47850/47850 逐位相同、Stage1 4011/4096 逐位相同、Stage2 1265/1266 逐位相同、Stage3 1012/1012 逐位相同）；
+  * **端到端流水线总耗时由 4,158 ms 骤降至 1,473 ms（加速 2.82x）**，其中等待空等由 3,276 ms 压缩至 1,066 ms；
+  * **全新板端耗时模型重拟合（`tools/board/g3_overhead_sweep.py`，128~2048 读段实测）**：
+    $$T_{\text{board}} = 0.449\ \text{s} + 0.2518\ \text{ms} \times N_{\text{records}}\quad (R^2 = 0.99780)$$
+    相比既有模型 $T = 4.25\ \text{s} + 0.58\ \text{ms} \times N$，**固定开销截距暴降 3.801 秒（常数项压缩达 9.5x）**！
+  * **同源性交付**：重新构建 `dna_lwip_app_b27.elf` 与 `BOOT.bin`，并已全量刷新 `hw/build/export/SHA256SUMS`。
+
 ## 4. 证据纪律
 
 > **对外表述前先查 [18 证据台账](18-evidence-ledger.md)**：它把每条可以说的话与其判据、

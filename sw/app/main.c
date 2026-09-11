@@ -23,6 +23,7 @@
 /* 应用层 */
 #include "echo.h"
 #include "sleep.h"
+#include "xtime_l.h"
 
 /* 注意：standalone BSP 的 sleep.h 已经声明并实现了 `void sleep(u32)`。
    这里原本还定义了一个 `void sleep(unsigned int)` 的弱符号兜底，
@@ -285,14 +286,15 @@ int main(void)
 
     xil_printf("\n\r*** Waiting for connections ***\n\r");
 
-    /* 主循环:收包 + 推进流水 + 计时器 */
-    u32 soft_ms   = 0;
-    u32 fast_acc  = 0;
-    u32 slow_acc  = 0;
-    u32 heartbeat = 0;
+    /* 主循环: 收包 + 事件驱动流水线推进 + 精确硬件计时器 */
+    XTime t_last_fast = 0, t_last_slow = 0;
+    XTime_GetTime(&t_last_fast);
+    t_last_slow = t_last_fast;
+    const XTime fast_interval = (XTime)(COUNTS_PER_SECOND / 4U); /* 250ms */
+    const XTime slow_interval = (XTime)(COUNTS_PER_SECOND / 2U); /* 500ms */
 
     xil_printf("[INIT] System initialization complete\n\r");
-    xil_printf("[INIT] Ready to accept connections\n\r");
+    xil_printf("[INIT] Ready to accept connections (event-driven pipeline active)\n\r");
     xil_printf("\n\r");
     for (;;) {
         /* 1) 喂 lwIP 输入(高频) */
@@ -304,19 +306,26 @@ int main(void)
         if (TcpFastTmrFlag) { tcp_fasttmr(); TcpFastTmrFlag = 0; }
         if (TcpSlowTmrFlag) { tcp_slowtmr(); TcpSlowTmrFlag = 0; }
 
-        /* 软件兜底:每 1ms 一次,确保没有ISR也能触发 lwIP 定时器 */
-        usleep(1000);
-        soft_ms++;
-        fast_acc++;
-        slow_acc++;
+        /* 软件兜底: 按 XTime 硬件计数器精确触发 lwIP 定时器 */
+        XTime t_now;
+        XTime_GetTime(&t_now);
+        if (t_now - t_last_fast >= fast_interval) {
+            t_last_fast = t_now;
+            tcp_fasttmr();
+        }
+        if (t_now - t_last_slow >= slow_interval) {
+            t_last_slow = t_now;
+            tcp_slowtmr();
+        }
 
-        if (fast_acc >= 250) { fast_acc = 0; tcp_fasttmr(); }
-        if (slow_acc >= 500) { slow_acc = 0; tcp_slowtmr(); }
+        /* 3) 主动推进流水线 (P12-B 事件驱动，消除 poll 白等) */
+        echo_pipeline_poll();
 
-        /* 心跳:每 10s 打印一行,确认主循环在跑 */
-        if (++heartbeat >= 10000) {
-            heartbeat = 0;
-            //xil_printf("[HB] Main loop alive (runtime: %lu s)\n\r", (unsigned long)(soft_ms/1000));
+        /* 4) 节流休眠: 空闲时休眠 1ms 降低 CPU 功耗；运行中微延 200us 让出总线与 DMA */
+        if (echo_pipeline_is_running()) {
+            usleep(200);
+        } else {
+            usleep(1000);
         }
     }
 
