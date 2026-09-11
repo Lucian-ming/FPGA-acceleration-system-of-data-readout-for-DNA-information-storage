@@ -27,6 +27,7 @@
 #   tools/run_g3.sh                                   # 复现 G3 闭环那组参数（2048 条源读段）
 #   tools/run_g3.sh --limit 4096                      # 分档测量：源读段数翻倍
 #   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
+#   tools/run_g3.sh --bit <path>                      # 换一份比特流做对照实验（如 4-way）；
 #   tools/run_g3.sh --elf <path>                      # 换一份 PS 固件做对照实验；
 #                                                     # 同源性判据对该 ELF 不成立，会打告警
 #   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
@@ -58,8 +59,9 @@ cd "$REPO"
 # 而 summary.txt 是留证，必须记准「这一轮是怎么跑的」。
 INVOCATION="$*"
 
-# --elf 覆盖路径（空 = 用 hw/build/export/ 里的那份）
+# --elf / --bit 覆盖路径（空 = 用 hw/build/export/ 里的那份）
 ELF_OVERRIDE=""
+BIT_OVERRIDE=""
 
 # ---------------------------------------------------------------------------
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/18 §2。
@@ -142,6 +144,7 @@ while [[ $# -gt 0 ]]; do
         --stage1-records)   STAGE1_DUMP_RECORDS="$2"; shift 2 ;;
         --skip-boot)        DO_BOOT=0; shift ;;
         --elf)              ELF_OVERRIDE="$2"; shift 2 ;;
+        --bit)              BIT_OVERRIDE="$2"; shift 2 ;;
         --skip-dump)        DO_DUMP=0; shift ;;
         --no-uart)          DO_UART=0; shift ;;
         --uart-port)        UART_PORT="$2"; shift 2 ;;
@@ -337,6 +340,15 @@ ELF_SRC="hw/build/export/dna_lwip_app_b27.elf"
 # 代价是**同源性判据被降级**：export/ 的 SHA256SUMS 校验对这份 ELF 不成立，
 # 所以这里必须打印醒目告警，并把该 ELF 的哈希记进 summary，
 # 否则日后没人分得清某次留证到底跑的是哪份固件。
+# --bit：换比特流做对照实验（如 2-way 基线 vs 4-way 收敛版）。
+# 与 --elf 同规格：同源性判据对它不成立，故打醒目告警并把哈希记进 summary。
+if [[ -n "$BIT_OVERRIDE" ]]; then
+    [[ -f "$BIT_OVERRIDE" ]] || die "--bit 指定的文件不存在：$BIT_OVERRIDE"
+    BIT_SRC="$BIT_OVERRIDE"
+    warn "⚠️ bitstream 已被 --bit 覆盖为 $BIT_SRC"
+    warn "⚠️ 该 bit 不在 export/SHA256SUMS 覆盖范围内，制品同源性判据对它不成立"
+    warn "⚠️ 本次留证仅可用于实验对照，不得当作发布基线"
+fi
 if [[ -n "$ELF_OVERRIDE" ]]; then
     [[ -f "$ELF_OVERRIDE" ]] || die "--elf 指定的文件不存在：$ELF_OVERRIDE"
     ELF_SRC="$ELF_OVERRIDE"
