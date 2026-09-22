@@ -545,6 +545,14 @@ WNS +0.705 ns**；比对周期 3.30x；32 路放不下。估算整机约 64% LUT
 [stage1-pway-7020-probe.md](benchmarks/stage1-pway-7020-probe.md)。
 **下一步卡在选板**：须有具体 7020 板卡才能重建 BD/PS7 并上板。
 
+### P15 · ✅ 同片 ARM 纯软件基线：PL 快约 49 倍（2026-09-22 上板实测）
+
+同一颗 XC7Z010 上单核 Cortex-A9（裸机、-O3、NEON popcount）做与 `tools/align_omp.c` 同构的 Stage1 比对：
+**12.10 ms/记录**（256 / 1,024 条读段两档一致），结果与主机参考逐条相同（1,024/1,024）。
+PL 端到端 0.2451 ms/记录（P13）→ **约 49x**；SE150 全量 ARM 外推约 1,254 s，PL 实测 25.69 s。
+复现 `python3 tools/board/arm_baseline.py --reads 1024`；详见
+[measured_arm_baseline.md](benchmarks/measured_arm_baseline.md)。双核与功耗未测。
+
 ## 4. 证据纪律
 
 > **对外表述前先查 [18 证据台账](18-evidence-ledger.md)**：它把每条可以说的话与其判据、

@@ -1,0 +1,15 @@
+{
+  "run": "20260922T152135Z-n256",
+  "reads": 256,
+  "records": 512,
+  "rb": 150,
+  "cpu": "Cortex-A9 #0 (single core), bare-metal, -O3 NEON popcount",
+  "seconds": 6.195937008317827,
+  "ms_per_read": 24.202878938741513,
+  "ms_per_record": 12.101439469370757,
+  "reads_per_s": 41.317398749588484,
+  "prep_ms": 1.8709619457421036,
+  "mismatch": 0,
+  "first_mismatch": [],
+  "elf_sha256": "ce3787ec0859e934ee3c8b15163361f6750da6fbdecaeedd09627564f39bb5fe"
+}

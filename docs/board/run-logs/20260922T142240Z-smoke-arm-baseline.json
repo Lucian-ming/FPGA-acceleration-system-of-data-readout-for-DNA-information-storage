@@ -1,0 +1,15 @@
+{
+  "run": "20260922T142240Z-smoke",
+  "reads": 16,
+  "records": 32,
+  "rb": 150,
+  "cpu": "Cortex-A9 #0 (single core), bare-metal, -O3 NEON popcount",
+  "seconds": 0.38675002278424936,
+  "ms_per_read": 24.171876424015586,
+  "ms_per_record": 12.085938212007793,
+  "reads_per_s": 41.37039187435469,
+  "prep_ms": 1.8383489466878806,
+  "mismatch": 0,
+  "first_mismatch": [],
+  "elf_sha256": "ce3787ec0859e934ee3c8b15163361f6750da6fbdecaeedd09627564f39bb5fe"
+}

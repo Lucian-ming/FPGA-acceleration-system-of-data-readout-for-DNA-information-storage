@@ -62,6 +62,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 |---|---|---|---|
 | P1 | 板端耗时模型（当前固件，P13） | `T = 0.480 s + 0.2451 ms × N_records`，R²=0.9996；全量 SE150 中位 **25.69 s = 2,016 reads/s** | `docs/03` P13，`g3_runs/20260922T11*`、`20260922T12*`，18 点 |
 | P1a | 每记录成本≈Stage1 PL 理论周期 | 实测斜率 0.2451 vs 4-way 理论 0.2436 ms/记录（差 0.6%）；去掉运行期休眠 `[PIPE] total` 逐毫秒不变 | `docs/03` P13 |
+| P1c | **PL 比同片 ARM 快约 49x** | 单核 Cortex-A9（-O3 NEON）12.10 ms/记录 vs PL 0.2451 ms/记录；ARM 结果与主机参考 1,024/1,024 逐条一致 | `docs/benchmarks/measured_arm_baseline.md`，`arm_baseline/20260922T152202Z-n1024` |
 | P1b | 较早的 P0 修复后模型（已被 P12/P13 取代） | `T = 1.505 s + 0.5656 ms × N_records`，R²=0.986 | `logs/overhead_sweep/`，7 档 × 3 次 |
 | P2 | 修复前模型 | `T = 5.284 s + 0.5157 ms × N_records`，R²=0.996 | `logs/overhead_sweep/20260910T075540Z/` |
 | P3 | 板端固定开销压缩 **3.5x** | 5.284 s → 1.505 s | 同上两行对比 |
