@@ -10,6 +10,7 @@
 | 文件 | 为什么在这里 | 保留原因 |
 | --- | --- | --- |
 | `local_correlator.v` | 全库零引用。4-way 是扁平实现，不实例化任何子模块 | **保留**：不满足退休三条中任何一条（无实测证伪，亦无直接替代文件覆盖其微结构） |
+| `srpe_batch_pway.v` | 参数化 P 路 Stage1（由生产 4-way 机械推广），XC7Z020 迁移候选，**未打包** | **保留**：7020 摸底的被测对象；由 tools/run_sim.sh 的 stage1_pway 用例覆盖，结论见 docs/benchmarks/stage1-pway-7020-probe.md |
 
 ## 历史退休记录（2026-09-11，docs/19 §B2）
 

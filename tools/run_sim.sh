@@ -95,6 +95,18 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_4way" ]; then
         "$A1/srpe_batch.v" "$A1/srpe_batch_4way.v" hw/sim/tb_srpe_batch_4way.v
 fi
 
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
+    # 参数化 P 路 Stage1（hw/experimental/，未打包，7020 迁移候选）对照生产 4-way：
+    # P=4 须逐周期相同；P=16 + 选优树流水须逐位相同。NUM_LC=6 玩具配置，约 1 分钟。
+    # 生产几何 NUM_LC=50 的结果见 docs/benchmarks/stage1-pway-7020-probe.md。
+    run_case srpe_batch_pway_p4 \
+        -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=4 -DCFG_PIPE_TREE=0 \
+        "$A1/srpe_batch_4way.v" hw/experimental/srpe_batch_pway.v hw/sim/tb_srpe_batch_pway.v
+    run_case srpe_batch_pway_p16 \
+        -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=16 -DCFG_PIPE_TREE=1 \
+        "$A1/srpe_batch_4way.v" hw/experimental/srpe_batch_pway.v hw/sim/tb_srpe_batch_pway.v
+fi
+
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "core_4way" ]; then
     # 4-way 顶层整核：AXI-Lite + S_AXIS 输入 FIFO + M_AXIS 背压 + 与 2-way 同构对照。
     # NUM_LC 默认 6（玩具配置，跑得快）；生产几何 NUM_LC=50 的黄金比对耗时约 20 分钟，

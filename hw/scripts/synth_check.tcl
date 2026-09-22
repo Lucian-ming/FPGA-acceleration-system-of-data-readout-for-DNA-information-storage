@@ -8,9 +8,25 @@
 # 例：
 #   vivado -mode batch -source hw/scripts/synth_check.tcl -tclargs \
 #       srpe_batch 100 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch.v
+#
+# 可选环境变量（不设则与原行为相同）：
+#   SYNTH_PART=xc7z020clg400-1      换目标器件（默认 xc7z010clg400-1）
+#   SYNTH_GENERICS="P_WAYS=16 ..."  顶层参数覆盖，逐个传给 synth_design -generic
+#   SYNTH_TAG=z020_p16              报告目录后缀，避免多次摸底互相覆盖
+#   SYNTH_IMPL=1                    再跑 OOC 布局布线，给出布线后 WNS（综合后 WNS 偏乐观：
+#                                   4-way 综合后 +2.197 ns，整机布线后只剩约 +0.2 ns）
+# 例（7020 迁移摸底）：
+#   SYNTH_PART=xc7z020clg400-1 SYNTH_GENERICS="P_WAYS=16" SYNTH_TAG=z020_p16 \
+#     vivado -mode batch -source hw/scripts/synth_check.tcl -tclargs \
+#       srpe_batch_pway 100 hw/experimental/srpe_batch_pway.v
 # =============================================================
 
 set part_name "xc7z010clg400-1"
+if {[info exists ::env(SYNTH_PART)] && $::env(SYNTH_PART) ne ""} { set part_name $::env(SYNTH_PART) }
+set generics {}
+if {[info exists ::env(SYNTH_GENERICS)]} {
+    foreach g $::env(SYNTH_GENERICS) { lappend generics -generic $g }
+}
 
 if {[llength $argv] < 3} {
     puts "用法: -tclargs <top> <clk_mhz> <file.v> \[file.v ...\]"
@@ -22,9 +38,10 @@ set files   [lrange $argv 2 end]
 set period  [expr {1000.0 / $clk_mhz}]
 
 set outdir "hw/build/synth_$top"
+if {[info exists ::env(SYNTH_TAG)] && $::env(SYNTH_TAG) ne ""} { append outdir "_$::env(SYNTH_TAG)" }
 file mkdir $outdir
 
-puts "===> 综合 $top  器件 $part_name  时钟 ${clk_mhz}MHz (周期 ${period}ns)"
+puts "===> 综合 $top  器件 $part_name  时钟 ${clk_mhz}MHz (周期 ${period}ns)  参数 $generics"
 
 create_project -in_memory -part $part_name
 foreach f $files {
@@ -32,7 +49,10 @@ foreach f $files {
     read_verilog $f
 }
 
-synth_design -top $top -part $part_name -flatten_hierarchy rebuilt
+set do_impl [expr {[info exists ::env(SYNTH_IMPL)] && $::env(SYNTH_IMPL) eq "1"}]
+set ooc {}
+if {$do_impl} { set ooc {-mode out_of_context} }
+synth_design -top $top -part $part_name -flatten_hierarchy rebuilt {*}$ooc {*}$generics
 
 # 综合后再约束：自动给所有时钟端口（clk / *ACLK）建时钟
 set clk_ports [get_ports -quiet -filter {DIRECTION == IN} *]
@@ -47,9 +67,16 @@ foreach pt $clk_ports {
 }
 if {$n == 0} { puts "     ⚠️ 未找到时钟端口，时序报告无意义" }
 opt_design -quiet
+if {$do_impl} {
+    place_design
+    phys_opt_design
+    route_design
+    puts "     已完成 OOC 布局布线（下面的资源与 WNS 为布线后数据）"
+}
 
 puts "\n===== 资源占用 ($top) ====="
-report_utilization -hierarchical -file $outdir/util.rpt
+report_utilization -hierarchical -file $outdir/util_hier.rpt
+report_utilization -file $outdir/util.rpt
 set r [open $outdir/util.rpt r]
 set txt [read $r]; close $r
 foreach line [split $txt "\n"] {
