@@ -3,6 +3,13 @@
 本目录是与当前 `main` 的 RTL / PS 固件匹配、且**按目标板 ZYNQ ECO(R6) 实物 DDR 配置**
 重建的最小完整交付集。
 
+## 2026-09-22 固件重建：P13 Voter/Decoder 墙钟超时（全量回归修复）
+
+只换 `dna_lwip_app_b27.elf`（`58d84ad3…`）与 `BOOT.bin`（`2c2ca645…`）；bit / xsa / fsbl 不变。
+P12 版 ELF 跑 SE150 全量必然 `Voter timeout after 100000 polls`，本版修复。
+板端 `run_g3.sh --run-limits 2048,full` G3 PASS（run `20260922T120755Z-p13-release`，全量 26.52 s），
+详见 `docs/03-status.md` P13。
+
 ## 2026-09-11 重建：4-way Stage1 + P7 周期计数器 + S-5 热清理
 
 本次重建将 **4-way Stage1 比对加速核**、**P7 独立硬件周期计数器**（Voter 0x40~0x50、Decoder 0x14~0x24）与 **S-5 固件热清理**（清除 7 个模板文件）合并落地：

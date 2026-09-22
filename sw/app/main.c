@@ -25,6 +25,11 @@
 #include "sleep.h"
 #include "xtime_l.h"
 
+/* 流水线运行期主循环每圈的休眠（us），0 = 不休眠。可用 -DPIPE_RUN_SLEEP_US=N 覆盖做对照实验。 */
+#ifndef PIPE_RUN_SLEEP_US
+#define PIPE_RUN_SLEEP_US 200U
+#endif
+
 /* 注意：standalone BSP 的 sleep.h 已经声明并实现了 `void sleep(u32)`。
    这里原本还定义了一个 `void sleep(unsigned int)` 的弱符号兜底，
    与 BSP 原型冲突（u32 是 unsigned long），编译直接报
@@ -321,9 +326,13 @@ int main(void)
         /* 3) 主动推进流水线 (P12-B 事件驱动，消除 poll 白等) */
         echo_pipeline_poll();
 
-        /* 4) 节流休眠: 空闲时休眠 1ms 降低 CPU 功耗；运行中微延 200us 让出总线与 DMA */
+        /* 4) 节流休眠: 空闲时休眠 1ms 降低 CPU 功耗；运行中按 PIPE_RUN_SLEEP_US 微延
+         *    （0 = 不休眠）。2026-09-22 板测：运行期 [waiting] ≈ 主循环次数 × 200 us，
+         *    每条记录的斜率由这一行决定，见 docs/03 P13。 */
         if (echo_pipeline_is_running()) {
-            usleep(200);
+            if (PIPE_RUN_SLEEP_US > 0U) {
+                usleep(PIPE_RUN_SLEEP_US);
+            }
         } else {
             usleep(1000);
         }

@@ -11,6 +11,13 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
+#include "xtime_l.h"
+
+/* Voter 等待超时按 XTime 墙钟计，不按轮询次数计。
+ * 轮询间隔取决于主循环节拍：P12 删掉 usleep 后单次轮询约 4.4 us，
+ * 原来的「10 万次」只剩约 440 ms，而全量 103,616 条记录的 Voter 要约 650 ms，
+ * 于是全量任务必然误报超时（2026-09-22 板测第 10 轮）。 */
+#define VOTER_WAIT_TIMEOUT_S   30U
 
 /* ============================================================================
  * 投票语义、score_min 作用点与累加器鉴别力契约（docs/19 §C1）
@@ -248,6 +255,11 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
     case PIPE_VOTER_WAIT: {
         static u32 poll_count = 0;
         static u32 poll_cnt = 0;
+        static XTime t_wait_start = 0;
+
+        if (poll_count == 0) {
+            XTime_GetTime(&t_wait_start);
+        }
 
         /* 读取状态寄存器 */
         u32 status = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
@@ -302,10 +314,13 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             return PIPE_STEP_PROGRESS;
         }
 
-        /* 超时检查 */
+        /* 超时检查（墙钟，见 VOTER_WAIT_TIMEOUT_S） */
         poll_count++;
-        if (poll_count >= 100000) {  // 10万次轮询超时
-            xil_printf("\n\r[ERROR] Voter timeout after %u polls\n\r", poll_count);
+        XTime t_now;
+        XTime_GetTime(&t_now);
+        if ((t_now - t_wait_start) > (XTime)(COUNTS_PER_SECOND * VOTER_WAIT_TIMEOUT_S)) {
+            xil_printf("\n\r[ERROR] Voter timeout after %u s (%u polls)\n\r",
+                       VOTER_WAIT_TIMEOUT_S, poll_count);
             xil_printf("[ERROR] Final status: 0x%02X\n\r", status);
 
             /* ✓ 新增：输出详细诊断信息 */
