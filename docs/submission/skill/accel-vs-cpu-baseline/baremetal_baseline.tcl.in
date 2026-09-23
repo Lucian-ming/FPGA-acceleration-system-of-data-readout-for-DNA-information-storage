@@ -1,0 +1,52 @@
+# baremetal_baseline.tcl.in —— 在板上跑「纯软件基线」的 XSDB 模板
+#
+# 用法：把 @@...@@ 占位符替换成实际值后，用 xsdb 运行本脚本。
+#   @@OUT@@        主机与板子都能看到的工作目录（Windows 侧路径，如 D:/work/run1）
+#   @@N@@          本次处理的条数
+#   @@TIMEOUT@@    等待板端完成的秒数上限
+# 地址常量需与裸机程序里的定义一致（本模板用的是示例值）。
+#
+# 为什么这样写（三条都踩过）：
+#   1) 先 rst -system + ps7_init 再 dow -data：不初始化 DDR 控制器就往 DDR 写，静默失败；
+#   2) 轮询用 mrd -force，不要反复 stop/con —— stop 会暂停 CPU 但硬件计时器照跑，污染计时；
+#   3) 裸机程序写完结果必须 Xil_DCacheFlush()，否则这里读到的是 DDR 里的旧值。
+
+connect
+targets -set -nocase -filter {name =~ "APU*"}
+rst -system
+after 2000
+targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
+source @@OUT@@/ps7_init.tcl
+ps7_init
+ps7_post_config
+
+# 输入数据写进 DDR（地址须与裸机程序里的定义一致）
+dow -data @@OUT@@/ref.bin   0x08001000
+dow -data @@OUT@@/input.bin 0x08010000
+
+# 头部：magic + 条数；结果区的完成标志先清零
+mwr 0x08000000 0xAB5E0001
+mwr 0x08000004 @@N@@
+mwr 0x09F00000 0
+
+dow @@OUT@@/baseline.elf
+con
+puts "BASELINE> running"
+
+set t0 [clock seconds]
+set st 0
+while {[clock seconds] - $t0 < @@TIMEOUT@@} {
+    after 2000
+    if {[catch {set st [mrd -force -value 0x09F00000]} err]} {
+        puts "BASELINE> mrd err $err"
+        continue
+    }
+    if {$st == 0xAB5E00D0 || $st == 0xAB5E0BAD} break
+}
+stop
+puts [format "BASELINE> status 0x%08X after %d s" $st [expr {[clock seconds] - $t0}]]
+
+# 摘要（条数、耗时计数、计数器频率）与逐条结果都读回主机，由主机做逐条比对
+mrd -bin -file @@OUT@@/sum.bin    0x09F00000 8
+mrd -bin -file @@OUT@@/result.bin 0x09000000 [expr {@@N@@ * 4}]
+puts "BASELINE> dumped"
