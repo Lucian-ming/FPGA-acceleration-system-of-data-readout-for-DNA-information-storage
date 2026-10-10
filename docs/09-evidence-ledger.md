@@ -153,3 +153,5 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | 正式源/参数与实际catalog包装通过 | [集成摘要](benchmarks/stage1-16way-ip-integration.md)；logs/vivado/stage1_ip_catalog_20261010_2110 | 默认P4，BKB220 ready=0 |
 
 Icarus重复接口已在XSim正式通过后停止，不称Icarus接口PASS。起点重复附件告警及唯一源引用修复记录保留，边界见[整理记录](reference/workspace-cleanup-2026-10-10.md)。全项目门禁与当前Agent任务见05/07。
+
+2026-10-11 Agent承载通道补充：logs/agents/handoff-channel-20261011-a2/result.json、events.jsonl及final.md证明现有代理下gpt-5.6-luna/max的只读调用退出0、turn.completed与JSON哨兵通过；这是Agent运行环境证据，不是FPGA功能、时序或真板验收证据。用户目标gpt-6-luna按b3c70b3在当前CLI/账号组合尚未可用，升级后重验。

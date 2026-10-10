@@ -17,9 +17,9 @@
 
 ## 主对话、子Agent通道与启动前检查
 
-本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。遵循AGENTS/CLAUDE中的用户最新规则：子Agent统一使用Codex CLI，固定`-m gpt-5.6-luna -c model_reasoning_effort=max`，两项都显式传入；不用Claude Code内置Agent工具，也不自行换模型/强度。
+本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。遵循AGENTS/CLAUDE中的用户最新规则：子Agent统一使用Codex CLI。用户目标为gpt-6-luna；当前CLI0.147.0与账号组合的可执行值为gpt-5.6-luna/max，按b3c70b3使用显式`-m gpt-5.6-luna -c model_reasoning_effort=max`。不用Claude Code内置Agent工具，不自行换模型/强度；升级后是否能使用目标模型由main按实际版本/账号重新验证。
 
-2026-10-10的通道检查有401/403失败，属于当时本机状态；2026-10-11本文未重新验证鉴权。接管时先核实另一个配置修复会话的结果，在不输出密钥的前提下做只读小任务冒烟。失败时保留退出码和脱敏日志，停止CLI派发，由main继续可独立推进的工作；本项目不擅自修改凭据、代理或另一会话的配置。AGENTS记载的8项模型目录是当时CLI实测，不能外推到其他宿主或把旧鉴权失败当永久状态。
+2026-10-11 main已在WSL登录环境复验：本地host-proxy http://127.0.0.1:17897、gpt-5.6-luna/max、read-only/ephemeral，退出0、turn.completed且JSON哨兵一致，证据在logs/agents/handoff-channel-20261011-a2。第一次直接WSL调用未加载PATH、尚未启动CLI，其记录保留在不带a2目录；不能将它记为鉴权失败。AGENTS/CLAUDE的b3c70b3更新记录了gpt-6目标在该CLI/账号组合的拒绝与版本问题，不能将其外推到其他宿主。接管仍须核对代理监听、CLI实际路径/版本和只读冒烟；代理服务生命周期由其配置会话管理，不改凭据/代理配置、不关闭他人服务。模型缓存目录不能替代实际调用验证；失败保留日志、由main接管可推进项。
 
 ## 第一步：完整理解项目并形成可审阅计划
 
@@ -47,7 +47,7 @@ main先建立全新的`logs/agents/<run-id>/<role>/`，把完整角色提示词�
 ```bash
 repo=/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 run_dir="$repo/logs/agents/<run-id>/board-migrate"
-codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
+HTTPS_PROXY=http://127.0.0.1:17897 codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
   -C "$repo" --skip-git-repo-check --sandbox workspace-write \
   --json --output-last-message "$run_dir/final.md" - \
   < "$run_dir/input.md" > "$run_dir/events.jsonl" 2> "$run_dir/stderr.log"

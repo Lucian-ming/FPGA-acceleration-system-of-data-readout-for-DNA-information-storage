@@ -77,9 +77,9 @@ F2缺资料不会阻塞F0/F1、测试和文档准备；F3～F8真板部分按依
 
 ## 4. 子Agent分工、并发与监控
 
-最多main+三子Agent同时运行；后续交接按用户在3ad6fbd确定的通道：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent用Codex CLI非交互进程，显式固定`-m gpt-5.6-luna -c model_reasoning_effort=max`，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，启动模板在[main提示词](agent-prompts/main.md#cli派发模板)。
+最多main+三子Agent同时运行；后续交接按用户在3ad6fbd确定的通道：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent用Codex CLI非交互进程，用户目标gpt-6-luna，按b3c70b3当前可执行值显式固定`-m gpt-5.6-luna -c model_reasoning_effort=max`，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，启动模板在[main提示词](agent-prompts/main.md#cli派发模板)。
 
-先做只读通道冒烟，记录CLI版本/模型/强度/脱敏退出信息；2026-10-10曾出现401/403，2026-10-11本交接未重新验证鉴权。另一配置会话正在处理的凭据/代理不在FPGA任务范围，不能擅自修改。通道失败则main接管可推进项，不假称成功派发。原三实现子Agent额度中断后main已接管；本次gpt-6-luna原生审计助手是后来模型规则生效前的实际历史记录，未来派发统一使用上述CLI规则。
+main已于2026-10-11从WSL登录环境通过只读通道冒烟：经host-proxy http://127.0.0.1:17897，gpt-5.6-luna/max，退出0、turn.completed及JSON哨兵；日志在logs/agents/handoff-channel-20261011-a2。用户安排的通道更新已独立提交为b3c70b3。接管先核对实际CLI路径/版本、代理监听和冒烟；目标gpt-6-luna在此CLI/账号组合的可用性应在升级后重验，不凭缓存或别的宿主能力判断。凭据/代理服务由配置会话管理，本FPGA任务不擅改配置或关闭其服务。失败时main接管可推进项，不假称派发成功。原三实现子Agent额度中断后main已接管；本次gpt-6-luna原生审计助手是后来模型规则生效前的实际历史记录，未来派发统一使用上述CLI规则。
 
 | 角色/看板名 | 独占文件 | 输入、输出、依赖 |
 |---|---|---|

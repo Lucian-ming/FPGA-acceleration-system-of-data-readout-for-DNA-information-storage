@@ -23,6 +23,8 @@ main安排三个gpt-6-luna只读助手：docs-audit核对合并/编号/引用，
 
 最终复核：工作树固件2/2 PASS；旧发布五项SHA全部OK；重复附件收敛后仓库卫生11项PASS，门禁未放宽。最终日志在logs/host/g3-preflight-20261010/handoff-final-firmware.txt及handoff-final-hygiene.txt。
 
-2026-10-11交接规则同步：保留用户安排的独立提交3ad6fbd（仅AGENTS/CLAUDE）；当前main/origin均含该提交。主提示词和05计划已改为Claude Code主控、Codex CLI子Agent、固定gpt-5.6-luna/max，补齐CLI输入/JSONL/退出码/阶段停写监控。鉴权在本FPGA任务中未重新验证，不修改另一配置会话的凭据或代理。另六个C源码/测试的旧编号引用已逐项审阅，只有注释/测试展示文本变化，纳入本轮文档整理。
+2026-10-11交接规则同步：保留用户安排的独立提交3ad6fbd（仅AGENTS/CLAUDE）；当前main/origin均含该提交。主提示词和05计划已改为Claude Code主控、Codex CLI子Agent、固定gpt-5.6-luna/max，补齐CLI输入/JSONL/退出码/阶段停写监控。随后已完成下文CLI只读复验，不修改另一配置会话的凭据或代理。另六个C源码/测试的旧编号引用已逐项审阅，只有注释/测试展示文本变化，纳入本轮文档整理。
 
 2026-10-11提交前最后复核：47项G3主机用例、2项工作树固件行为回归、IP打包和11项仓库卫生检查再次通过，日志在logs/host/handoff-final-20261011。原20份归档与原文恢复点SHA、旧发布五项SHA及精确保留清单均核验通过。生成源码副本已一致，本次同步检查未再改动副本；未重建旧BSP/ELF。
+
+2026-10-11最终CLI复验：用户安排的另一会话已独立提交b3c70b3；main随后在WSL登录环境使用既有host-proxy http://127.0.0.1:17897，gpt-5.6-luna/max、read-only/ephemeral，退出0、turn.completed、{"channel":"codex","ok":true}全部一致。日志在logs/agents/handoff-channel-20261011-a2。首次直接调用未加载Codex PATH而未启动CLI，记录保留；没有读取项目或模型调用工具，没有修改凭据/代理配置。目标gpt-6-luna的当前CLI/账号拒绝按AGENTS注明范围；新板门禁仍未关闭。
