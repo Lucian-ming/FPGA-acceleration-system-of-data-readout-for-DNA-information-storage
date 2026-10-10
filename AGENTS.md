@@ -102,6 +102,42 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 - `view.md` 与 `.agent_view/` 是本机实时看板，已在 `.gitignore` 中忽略，**不进 Git**。
   它不替代交接文档：结论、判据和证据仍然要写进 `docs/` 下对应文档并提交。
 
+## 子 Agent 的承载通道与模型（2026-10-10 新增）
+
+**主对话与子 agent 用两套模型，由用户指定，不得自行更换。**
+
+- **主对话**：Claude Code 接 DeepSeek 的 Anthropic 兼容端点，负责**执行任务本身**，
+  并且是**唯一 Git 写入者**。配置在 `~/.claude/settings.json`（本机配置，不进仓库）：
+  `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`、`ANTHROPIC_MODEL=deepseek-flash[1m]`。
+- **子 agent**：**不使用 Claude Code 自带的 Agent 工具派生**。Agent 工具派生出的子会话会继承
+  `CLAUDE_CODE_SUBAGENT_MODEL`（本机当前为 `deepseek-flash`），拿不到用户指定的子 agent 模型。
+  子 agent 一律改用 **codex CLI 的非交互模式**承载：
+
+  ```bash
+  codex exec \
+    -m gpt-5.6-luna \
+    -c model_reasoning_effort=max \
+    -C <工作目录> \
+    --skip-git-repo-check \
+    "<子任务 prompt>"
+  ```
+
+- **`-m gpt-5.6-luna` 必须显式传**：`~/.codex/config.toml` 里的默认 `model` 写的是
+  `gpt-6-astra`，该名字**不在 codex 的模型目录里**，不显式指定就落不到 luna 上。
+- **`-c model_reasoning_effort=max` 也必须显式传**：luna 的默认强度是 `medium`。
+- 事实依据（2026-10-10 用 `codex debug models` 实测，codex CLI 0.147.0）：模型目录共 8 项——
+  `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-5.5`、`gpt-5.4`、`gpt-5.4-mini`、
+  `gpt-5.2`、`codex-auto-review`；其中 `gpt-5.6-luna` 支持
+  `low | medium | high | xhigh | max` 五档强度（`sol` / `terra` 另多一档 `ultra`），
+  故「luna + max」是目录内的合法组合。
+- 走 codex 的子 agent 仍受本文件其余门禁约束：按上一节用 `tools/agent_view.sh` 登记
+  （`--agent` 取任务短名，并行不重名），**不执行任何 Git 写操作**，产物交 main 审查后由 main 提交。
+- **通道可用性现状（2026-10-10 23:5x CST，实测未打通）**：`codex exec` 退出码 1，两条鉴权路径同时失败——
+  中转 `https://api.pinaic.com` 的 key 返回 `401 INVALID_API_KEY`；ChatGPT 登录态刷新返回
+  `403 unsupported_country_region_territory`（WSL 侧无代理变量，Windows 系统代理当前关闭，
+  `~/.local/bin/winproxy-env` 只输出 `unset`，`chatgpt.com` 直连不可达）。**解除前该通道不可用**：
+  修复中转 key、或打开 Windows 系统代理并让 `winproxy-env` 同步到 WSL，然后重跑上面的冒烟测试。
+
 ## 代码卫生（与证据纪律同级，2026-09-11 新增）
 
 ### 为什么要单列这一节

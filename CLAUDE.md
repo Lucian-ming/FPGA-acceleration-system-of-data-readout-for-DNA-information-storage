@@ -30,12 +30,33 @@ tools/agent_view.sh show                                                # 查看
 3. 换子任务、结论变化、启动长任务（综合/实现/XSim 长跑）之前，都要 `update`；
    受阻立刻 `block`，并把「在等用户回答什么」写进 `--next`。
 4. 三个字段都要写具体内容（带上关键文件名/脚本名），不要写「处理任务中」这类空话。
-5. **用 Agent 工具派生子 agent 时**，必须在给它的 prompt 里指定 `--agent` 名字，
-   并要求它按本节规则 `start` / `update` / `done`。
+5. **派生子 agent 时**，必须在给它的 prompt 里指定 `--agent` 名字，
+   并要求它按本节规则 `start` / `update` / `done`。承载通道见下一节。
 6. **禁止手工编辑 `view.md`**：它由脚本生成，手改会被下一次刷新覆盖。
    `view.md` 与 `.agent_view/` 不进 Git；结论与判据仍要写进 `docs/` 并提交。
 
 详细说明见 `AGENTS.md` 的「工作可见性：view.md 看板（强制）」一节。
+
+## 子 Agent 一律用 codex 承载（覆盖 Claude Code 默认行为）
+
+执行计划时**主对话就是本会话**：Claude Code 接 DeepSeek（`ANTHROPIC_MODEL=deepseek-flash[1m]`），
+负责执行任务本身，并且是唯一 Git 写入者。
+
+**派生任何子 agent 都不要用 Agent 工具**——Agent 工具的子会话跑在 `CLAUDE_CODE_SUBAGENT_MODEL`
+上，拿不到用户指定的子 agent 模型。改为用 Bash 调 codex CLI 非交互模式：
+
+```bash
+codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
+  -C <工作目录> --skip-git-repo-check "<子任务 prompt>"
+```
+
+模型固定 `gpt-5.6-luna`、思考强度固定 `max`，**两者都必须显式传**：codex 的默认 `model` 是
+`gpt-6-astra`（不在其模型目录里），luna 的默认强度只有 `medium`。
+给 codex 子 agent 的 prompt 里同样要写清它用哪个 `--agent` 名字、按上节规则登记看板、
+**不执行任何 Git 写操作**。
+
+通道自身的可用性、验证依据与当前阻塞项见 `AGENTS.md` 的
+「子 Agent 的承载通道与模型」一节。
 
 ## Git 提交（覆盖 Claude Code 默认行为）
 
