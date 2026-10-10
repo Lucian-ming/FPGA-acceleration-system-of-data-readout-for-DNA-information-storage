@@ -77,9 +77,9 @@ F2缺资料不会阻塞F0/F1、测试和文档准备；F3～F8真板部分按依
 
 ## 4. 子Agent分工、并发与监控
 
-最多main+三子Agent同时运行；后续交接按用户在3ad6fbd确定的通道：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent用Codex CLI非交互进程，用户目标gpt-6-luna，按b3c70b3当前可执行值显式固定`-m gpt-5.6-luna -c model_reasoning_effort=max`，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，启动模板在[main提示词](agent-prompts/main.md#cli派发模板)。
+最多main+三子Agent同时运行；后续交接按用户在3ad6fbd确定的通道：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent经用户级 codex-luna MCP 非交互进程（`codex_run`/`codex_status`）派发，固定 gpt-6-luna 与 model_reasoning_effort=max，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，启动模板在[main提示词](agent-prompts/main.md#cli派发模板)。
 
-main已于2026-10-11从WSL登录环境通过只读通道冒烟：经host-proxy http://127.0.0.1:17897，gpt-5.6-luna/max，退出0、turn.completed及JSON哨兵；日志在logs/agents/handoff-channel-20261011-a2。用户安排的通道更新已独立提交为b3c70b3。接管先核对实际CLI路径/版本、代理监听和冒烟；目标gpt-6-luna在此CLI/账号组合的可用性应在升级后重验，不凭缓存或别的宿主能力判断。凭据/代理服务由配置会话管理，本FPGA任务不擅改配置或关闭其服务。失败时main接管可推进项，不假称派发成功。原三实现子Agent额度中断后main已接管；本次gpt-6-luna原生审计助手是后来模型规则生效前的实际历史记录，未来派发统一使用上述CLI规则。
+main已于2026-10-11从WSL登录环境通过只读通道冒烟：经host-proxy http://127.0.0.1:17897，gpt-5.6-luna/max，退出0、turn.completed及JSON哨兵；日志在logs/agents/handoff-channel-20261011-a2。用户安排的通道更新已独立提交为b3c70b3。接管先核对实际CLI路径/版本、代理监听和冒烟；gpt-6-luna 的可用性已由 2026-10-11 00:40 的 codex-luna MCP 实测确认可用（客户端 0.162.0-alpha.17.2），旧的「此CLI/账号组合不支持」结论作废（更正提交25c3336）；不凭缓存或别的宿主能力判断。凭据/代理服务由配置会话管理，本FPGA任务不擅改配置或关闭其服务。失败时main接管可推进项，不假称派发成功。原三实现子Agent额度中断后main已接管；本次gpt-6-luna原生审计助手是后来模型规则生效前的实际历史记录，未来派发统一使用上述CLI规则。
 
 | 角色/看板名 | 独占文件 | 输入、输出、依赖 |
 |---|---|---|
@@ -173,4 +173,4 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 
 F0/F1审计与准备检查已执行：正式源SHA、fixture几何/内容、打包与47主机用例PASS。F2只做只读资料/设备与dry-run核查：bkb220 ready=0在create_project前拒绝，未创建工程；当前只有蓝牙COM，无FTDI/JTAG、无物理网口/对应原厂preset。资料搜索仅指定目录一层关键词及仓库文件名，不构成全磁盘不存在资料的证明。F3～F8真板依赖仍未关闭。
 
-后续资料/连接到位且CLI冒烟通过后，由main固定gpt-5.6-luna/max按角色提示词派发board-migrate/rtl-16way/verify-system；当前审计助手已停写。索引、静态盘点和短检查可优先派发；生产RTL、时序、PS7及真板结论必须main审查，不仅依据子Agent的摘要。
+后续资料/连接到位且CLI冒烟通过后，由main经 codex-luna MCP 固定 gpt-6-luna/max 按角色提示词派发board-migrate/rtl-16way/verify-system；当前审计助手已停写。索引、静态盘点和短检查可优先派发；生产RTL、时序、PS7及真板结论必须main审查，不仅依据子Agent的摘要。

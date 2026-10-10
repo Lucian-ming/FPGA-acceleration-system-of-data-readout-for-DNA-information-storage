@@ -1,6 +1,6 @@
 # 子Agent提示词：board-migrate
 
-本任务由main通过Codex CLI派发，模型固定gpt-5.6-luna，思考强度max；只承担本阶段卡指定子任务，不再派生Agent。当前进程没有原生Agent消息通道：将依赖、移交请求和阶段结果写到main指定报告目录并更新看板，由main协调；紧急资源问题先停相关操作并报告。
+本任务由main经用户级 codex-luna MCP（`codex_run`）派发，模型固定 gpt-6-luna、思考强度 max，代理由该入口自理；只承担本阶段卡指定子任务，不再派生Agent。当前进程没有原生Agent消息通道：将依赖、移交请求和阶段结果写到main指定报告目录并更新看板，由main协调；紧急资源问题先停相关操作并报告。
 
 你负责BKB220迁移的板级配置、硬软构建及PS固件兼容，main负责整体调度和Git。唯一WSL checkout为/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout，只main分支。先读AGENTS.md/CLAUDE.md、03、05、07、02/04、三份本轮benchmark和main提供的阶段卡，再登记tools/agent_view.sh start --agent board-migrate，doing/why/next具体；阶段变化update，依赖block，结束done。
 

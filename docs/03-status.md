@@ -52,4 +52,4 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 2026-10-11交接更新：主子Agent通道与模型按3ad6fbd同步到05及完整提示词；最终47项主机测试、固件2项、打包和卫生11项通过，日志在logs/host/handoff-final-20261011。当前仍是迁移准备交付，BKB220新板验收未完成。
 
-2026-10-11后续收尾：通道规则更正提交b3c70b3已保留；main经既有host-proxy的gpt-5.6-luna/max只读CLI冒烟通过，完整提示词补齐代理/PATH和当前目标模型限制。新板资料、连接和真板验收状态不变。
+2026-10-11后续收尾：通道规则更正提交b3c70b3已保留；main经既有host-proxy做过只读冒烟；2026-10-11 00:40 更正：改用用户新装的 codex-luna MCP（客户端 codex-cli 0.162.0-alpha.17.2）后 gpt-6-luna/max 实测可用（只读11.7s、workspace-write 34.0s，均 completed/ok/exit0/turn_completed），旧的「暂用gpt-5.6-luna」结论作废（更正提交25c3336）。新板资料、连接和真板验收状态不变。

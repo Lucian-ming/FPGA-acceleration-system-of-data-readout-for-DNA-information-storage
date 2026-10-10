@@ -154,4 +154,4 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 
 Icarus重复接口已在XSim正式通过后停止，不称Icarus接口PASS。起点重复附件告警及唯一源引用修复记录保留，边界见[整理记录](reference/workspace-cleanup-2026-10-10.md)。全项目门禁与当前Agent任务见05/07。
 
-2026-10-11 Agent承载通道补充：logs/agents/handoff-channel-20261011-a2/result.json、events.jsonl及final.md证明现有代理下gpt-5.6-luna/max的只读调用退出0、turn.completed与JSON哨兵通过；这是Agent运行环境证据，不是FPGA功能、时序或真板验收证据。用户目标gpt-6-luna按b3c70b3在当前CLI/账号组合尚未可用，升级后重验。
+2026-10-11 Agent承载通道补充：logs/agents/handoff-channel-20261011-a2/result.json、events.jsonl及final.md证明现有代理下gpt-5.6-luna/max的只读调用退出0、turn.completed与JSON哨兵通过；这是Agent运行环境证据，不是FPGA功能、时序或真板验收证据。用户目标gpt-6-luna 已由 2026-10-11 00:40 codex-luna MCP 的冒烟与真实派发实测可用（11.7s / 34.0s，均 completed/ok/exit0/turn_completed，更正提交25c3336）；b3c70b3 依据的旧 CLI 0.147.0 拒绝是客户端版本问题，不是账号权限。

@@ -1,6 +1,6 @@
 # Agent提示词索引
 
-完整计划和文件归属以[05执行计划](../05-implementation-plan.md)为准。主提示词面向Claude Code/DeepSeek主会话；三个角色通过Codex CLI派发，显式固定gpt-5.6-luna/max，启动/冒烟/进程监控方法见main.md。2026-10-11经现有host-proxy的只读CLI冒烟已通过；用户目标gpt-6-luna在当前CLI/账号组合未可用，执行值按b3c70b3为gpt-5.6-luna/max，接管仍须重核实际环境。
+完整计划和文件归属以[05执行计划](../05-implementation-plan.md)为准。主提示词面向Claude Code/DeepSeek主会话；三个角色经用户级 codex-luna MCP 派发，显式固定 gpt-6-luna/max，启动/冒烟/进程监控方法见main.md。2026-10-11 00:40 实测更正：gpt-6-luna/max 经该 MCP（客户端 codex-cli 0.162.0-alpha.17.2）已可用——只读冒烟与 workspace-write 真实派发均 completed/ok=true/exit_code=0/turn_completed；b3c70b3 依据的旧 CLI 0.147.0「账号不支持」是客户端版本问题，结论已作废（更正提交 25c3336）。接管仍须重核实际环境。
 
 | 提示词 | 使用方式 |
 |---|---|

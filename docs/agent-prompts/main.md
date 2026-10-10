@@ -17,9 +17,9 @@
 
 ## 主对话、子Agent通道与启动前检查
 
-本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。遵循AGENTS/CLAUDE中的用户最新规则：子Agent统一使用Codex CLI。用户目标为gpt-6-luna；当前CLI0.147.0与账号组合的可执行值为gpt-5.6-luna/max，按b3c70b3使用显式`-m gpt-5.6-luna -c model_reasoning_effort=max`。不用Claude Code内置Agent工具，不自行换模型/强度；升级后是否能使用目标模型由main按实际版本/账号重新验证。
+本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。遵循AGENTS/CLAUDE中的用户最新规则：子Agent统一走用户级 **codex-luna MCP**（`codex_run`/`codex_status`/`codex_cancel`/`codex_doctor`），固定官方ChatGPT登录与 `gpt-6-luna`、`model_reasoning_effort=max`，代理由入口自理。不用Claude Code内置Agent工具，不自行换模型/强度、不降级。2026-10-11 00:40 实测：gpt-6-luna/max 经该 MCP 可用（只读冒烟11.7s、workspace-write真实派发34.0s，均 completed/ok/exit0/turn_completed）；旧CLI0.147.0 的「账号不支持」是客户端版本问题，b3c70b3 中「暂用gpt-5.6-luna」的结论作废。
 
-2026-10-11 main已在WSL登录环境复验：本地host-proxy http://127.0.0.1:17897、gpt-5.6-luna/max、read-only/ephemeral，退出0、turn.completed且JSON哨兵一致，证据在logs/agents/handoff-channel-20261011-a2。第一次直接WSL调用未加载PATH、尚未启动CLI，其记录保留在不带a2目录；不能将它记为鉴权失败。AGENTS/CLAUDE的b3c70b3更新记录了gpt-6目标在该CLI/账号组合的拒绝与版本问题，不能将其外推到其他宿主。接管仍须核对代理监听、CLI实际路径/版本和只读冒烟；代理服务生命周期由其配置会话管理，不改凭据/代理配置、不关闭他人服务。模型缓存目录不能替代实际调用验证；失败保留日志、由main接管可推进项。
+2026-10-11 main已在WSL登录环境复验：本地host-proxy http://127.0.0.1:17897、gpt-5.6-luna/max、read-only/ephemeral，退出0、turn.completed且JSON哨兵一致，证据在logs/agents/handoff-channel-20261011-a2。第一次直接WSL调用未加载PATH、尚未启动CLI，其记录保留在不带a2目录；不能将它记为鉴权失败。AGENTS/CLAUDE的b3c70b3更新记录了gpt-6目标在该CLI/账号组合的拒绝与版本问题，不能将其外推到其他宿主。接管仍须核对代理监听、CLI实际路径/版本和只读冒烟；代理服务生命周期由其配置会话管理，不改凭据/代理配置、不关闭他人服务。模型缓存目录不能替代实际调用验证；失败保留日志、由main接管可推进项。2026-10-11 00:40 实测更正：同一账号与代理下改用 VS Code 扩展内置的 codex-cli 0.162.0-alpha.17.2（经 codex-luna MCP），gpt-6-luna/max 调用成功，故「gpt-6 在本CLI/账号组合不可用」的结论作废，执行值回到用户指定的 gpt-6-luna。
 
 ## 第一步：完整理解项目并形成可审阅计划
 
@@ -38,22 +38,27 @@
 - `rtl-16way`：正式IP RTL/元数据/XGUI/源清单/打包门禁、接口与时序诊断；不改board-migrate的BD/固件。
 - `verify-system`：独立oracle/TB、tests、G3完整包/串口门禁、性能/故障/泛化/长稳编排，必要客户端迁移修复；不改被测生产RTL/固件。
 
-所有后续子任务固定gpt-5.6-luna/max；索引、引用核对、静态盘点和短检查可先派发，PS7、生产RTL、时序与真板结论由main审查，不能只接受子Agent摘要。每个子Agent先读规范、登记唯一看板名，不执行任何Git写操作。共享路径必须先移交；大型EDA和真实板操作要先获得main资源分配。若容量只允许更少Agent，按依赖分wave复用，仍保持角色和独占路径。
+所有后续子任务经 codex-luna MCP 固定 gpt-6-luna/max；索引、引用核对、静态盘点和短检查可先派发，PS7、生产RTL、时序与真板结论由main审查，不能只接受子Agent摘要。每个子Agent先读规范、登记唯一看板名，不执行任何Git写操作。共享路径必须先移交；大型EDA和真实板操作要先获得main资源分配。若容量只允许更少Agent，按依赖分wave复用，仍保持角色和独占路径。
 
 ### CLI派发模板
 
 main先建立全新的`logs/agents/<run-id>/<role>/`，把完整角色提示词和本阶段卡合成该目录的input.md；阶段卡写明HEAD、独占路径、只读/可写范围、资源、设备、出口、报告目录。以下以board-migrate为例，路径需填为实际值：
 
+```text
+codex_run(cwd="$repo", sandbox="workspace-write", timeout_seconds=420, wait_seconds=30,
+          prompt=<input.md 全文>)          → 返回 job_id、evidence_directory
+codex_status(job_id, wait_seconds=30)       → 轮询至终态，核对 ok/exit_code/turn_completed
+```
+MCP 不可用时的 Bash 后备入口（等价，自动处理代理）：
 ```bash
 repo=/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 run_dir="$repo/logs/agents/<run-id>/board-migrate"
-HTTPS_PROXY=http://127.0.0.1:17897 codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
-  -C "$repo" --skip-git-repo-check --sandbox workspace-write \
-  --json --output-last-message "$run_dir/final.md" - \
-  < "$run_dir/input.md" > "$run_dir/events.jsonl" 2> "$run_dir/stderr.log"
+~/.local/bin/codex-subagent run --cwd "$repo" --sandbox workspace-write \
+  --prompt "$(cat "$run_dir/input.md")" --timeout 420 --wait 30 </dev/null \
+  > "$run_dir/events.jsonl" 2> "$run_dir/stderr.log"
 ```
 
-main通过宿主的后台进程/终端会话管理保持异步监控，登记PID/session、CLI版本、模型/强度、输入SHA、日志目录和实际退出码。只读冒烟用`--sandbox read-only`；实现用workspace-write，设备/EDA额外权限由main在具体操作时按授权处理，不预先全局绕过审批。stdout的JSONL事件和final.md分开保存；这与[官方非交互说明](https://learn.chatgpt.com/docs/non-interactive-mode)及本机CLI0.147.0的exec帮助一致。
+main以job_id轮询保持异步监控，登记job_id/evidence_directory、客户端版本、模型/强度、输入SHA、日志目录和实际退出码。只读冒烟用`read-only`；实现用workspace-write，设备/EDA额外权限由main在具体操作时按授权处理，不预先全局绕过审批。成功判据四项全中：`status=completed`、`ok=true`、`exit_code=0`、`turn_completed=true`。每个任务的原始JSONL与最终回答分开保存（`run.jsonl`、`answer.md`、`result.json`）；这与[官方非交互说明](https://learn.chatgpt.com/docs/non-interactive-mode)及官方非交互模式说明一致（客户端为 VS Code 扩展内置的 codex-cli 0.162.0-alpha.17.2，旧的 0.147.0 已不再使用）。
 
 CLI进程不是原生多Agent消息通道：正在运行时不要假设能用内置send_message给它改任务。动态依赖由main读取其报告/看板协调；需要调整时让该阶段结束停写，保存session和产物后以最新阶段卡发起下一轮。紧急中断仅针对核实的本任务PID树，确认所有子进程停写才移交路径。全部CLI子任务禁止再派生子Agent或执行Git写入。
 
