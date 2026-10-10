@@ -111,43 +111,44 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   `ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`、`ANTHROPIC_MODEL=deepseek-flash[1m]`。
 - **子 agent**：**不使用 Claude Code 自带的 Agent 工具派生**。Agent 工具派生出的子会话会继承
   `CLAUDE_CODE_SUBAGENT_MODEL`（本机当前为 `deepseek-flash`），拿不到用户指定的子 agent 模型。
-  子 agent 一律改用 **codex CLI 的非交互模式**承载：
+  子 agent 一律经**用户级 MCP `codex-luna`** 承载（首选入口）：
 
-  ```bash
-  # 代理是必需的：codex 用 ChatGPT 登录态时走 chatgpt.com 后端，WSL 直连不通
-  export HTTPS_PROXY=http://127.0.0.1:17897   # VSCode host-proxy，见下「通道前提」
-  codex exec \
-    -m gpt-5.6-luna \
-    -c model_reasoning_effort=max \
-    -C <工作目录> \
-    --skip-git-repo-check \
-    "<子任务 prompt>"
+  ```text
+  codex_run(cwd="<工作目录>", prompt="<子任务 prompt>",
+            sandbox="read-only" | "workspace-write",
+            timeout_seconds=420, wait_seconds=30)     → 返回 job_id
+  codex_status(job_id, wait_seconds=0..45)            → 轮询状态与结果
+  codex_cancel(job_id)   /   codex_doctor(network=…)  → 取消 / 查客户端·登录·代理
   ```
 
-- **用户指定的子 agent 模型是 `gpt-6-luna`，但本账号当前用不了**（2026-10-11 实测，
-  服务器原文）：``The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT
-  account.``；`gpt-6-sol` 同样被拒；`gpt-6-astra`（`~/.codex/config.toml` 里的默认 `model`）
-  报的是 ``requires a newer version of Codex``——即 codex CLI 0.147.0 太旧，
-  而 VSCode 里那个 `openai.chatgpt-26.1007` 扩展带的是新版 codex，所以它的模型目录里才有 gpt-6 系。
-  **在账号开通或 CLI 升级之前，可执行值是 `gpt-5.6-luna`**（实测通过），它同样支持 `max`。
-- **`-m` 与 `-c model_reasoning_effort=max` 两项都必须显式传**：`config.toml` 的默认
-  `model` 是 `gpt-6-astra`（当前必被拒），而 `gpt-5.6-luna` 的默认强度只有 `medium`。
-- **通道前提：必须有代理。** 不带代理时 `chatgpt.com` 在 WSL 内直连不可达
-  （`curl` 返回 000），`codex exec` 会在 `wss://chatgpt.com/backend-api/codex/responses`
-  上以 `Connection reset by peer` 反复重连后失败。本机可用的代理是 VSCode 的 host-proxy：
-  `~/.vscode-server/data/Machine/settings.json` 里 `http.proxy = http://127.0.0.1:17897`，
-  该端口在 WSL 侧 `127.0.0.1` 上监听，导出 `HTTPS_PROXY` 即可。Windows 系统代理本身是关闭的
-  （注册表 `ProxyEnable=0`），所以 `~/.local/bin/winproxy-env` 只输出 `unset`，别指望它。
-- **实测证据（2026-10-11 00:1x CST）**：带上述代理执行
-  `codex exec -m gpt-5.6-luna -c model_reasoning_effort=max -s read-only
-  --skip-git-repo-check --ephemeral --json` → **退出码 0、`turn.completed`**，
-  子 agent 回复 `{"channel":"codex","ok":true}`。同一条命令不加代理则退出码 1。
-- **判断模型有无要看活目录**：`~/.codex/models_cache.json`（新版 codex 刷新写入）共 10 项，
+- **入口固定官方 ChatGPT 登录 + `gpt-6-luna` + `model_reasoning_effort=max`**，自动处理代理；
+  客户端取自 VS Code `openai.chatgpt` 扩展内置的新版 codex（实测 `codex-cli 0.162.0-alpha.17.2`，
+  低于 0.162 会**明确失败而不是降级模型**）。成功判据四项全中：`status=completed`、`ok=true`、
+  `exit_code=0`、`turn_completed=true`——只看前三项不算通过。
+- **不要按旧结论降级到 `gpt-5.6-luna`。** 2026-10-11 用旧 CLI 0.147.0 时 `gpt-6-luna` 返回
+  ``The 'gpt-6-luna' model is not supported when using Codex with a ChatGPT account.``，
+  据此曾误判为「账号无权限」；**同一账号、同一代理下换成 0.162.0-alpha.17.2 后 GPT-6 Luna/max
+  调用成功**。那是客户端版本差异，不是账号权限问题，文档旧结论已作废。
+- **不要用裸 `codex exec`，也不要用旧的 shell codex 封装**：前者要手工导出代理，后者会把
+  已关闭的 Windows 系统代理重新同步进来、冲掉手工代理。MCP 不可用时用 Bash 后备入口
+  `~/.local/bin/codex-subagent run --cwd <目录> --prompt '...' --timeout 300 --wait 30 </dev/null`
+  （同族 `status <job_id>` / `cancel <job_id>`）。代理由这两个入口自己处理
+  （VS Code host-proxy `127.0.0.1:17897`）：WSL 直连 `chatgpt.com` 不可达（`curl` 返回 000），
+  Windows 系统代理本身是关的（`ProxyEnable=0`），别再手工 export 顶替。
+- **子 agent 没有原生消息通道**，拿不到主会话上下文：prompt 必须自带范围、产出路径、验收要求
+  与看板任务名，长任务用 job_id 轮询。每个任务的证据独立留在
+  `~/.local/state/codex-subagent/runs/<job_id>/`（`prompt.txt`、`run.jsonl`、`answer.md`、`result.json`）。
+- **判断模型有无要看活目录**：`~/.codex/models_cache.json`（新版客户端刷新写入）共 10 项，
   含 `gpt-6-luna`、`gpt-6-sol`、`gpt-6-astra`、`gpt-6.1-sol`、`gpt-5.6-luna`、`gpt-reserve` 等；
-  在 CLI 0.147.0 上跑 `codex debug models` 读到的 8 项**是陈旧快照**，照它判断会得出
-  「gpt-6 不存在」的错误结论（本文件 2026-10-10 那版就这么错过一次）。
+  旧 CLI 上跑 `codex debug models` 读到的 8 项是陈旧快照，据它判断会得出「gpt-6 不存在」的错误结论。
 - 走 codex 的子 agent 仍受本文件其余门禁约束：按上一节用 `tools/agent_view.sh` 登记
-  （`--agent` 取任务短名，并行不重名），**不执行任何 Git 写操作**，产物交 main 审查后由 main 提交。
+  （`--agent` 取任务短名，并行不重名），**不执行任何 Git 写操作**，产物交 main 审查后由 main 提交；
+  只读任务的看板由 main 登记。
+- **实测证据（2026-10-11 00:40 CST，MCP 入口）**：① 只读冒烟（`cwd=/tmp/codex_sa`）→
+  `completed / ok=true / exit_code=0 / turn_completed=true`，11.7 s，回
+  `{"channel":"codex-mcp","ok":true,"model":"GPT-6"}`；② 真实派发（`workspace-write`，cwd=本仓库）
+  让子 agent 自跑 `agent_view.sh start` → 读本节 → `done`，34.0 s 全绿，看板 00:40:47 起、
+  00:40:55 完成且零残留，工作树未被写脏。
 
 ## 代码卫生（与证据纪律同级，2026-09-11 新增）
 

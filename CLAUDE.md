@@ -43,26 +43,27 @@ tools/agent_view.sh show                                                # 查看
 负责执行任务本身，并且是唯一 Git 写入者。
 
 **派生任何子 agent 都不要用 Agent 工具**——Agent 工具的子会话跑在 `CLAUDE_CODE_SUBAGENT_MODEL`
-上，拿不到用户指定的子 agent 模型。改为用 Bash 调 codex CLI 非交互模式：
+上，拿不到用户指定的子 agent 模型。子 agent 一律走用户级 MCP `codex-luna`：
 
-```bash
-export HTTPS_PROXY=http://127.0.0.1:17897   # 必需，见下
-codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
-  -C <工作目录> --skip-git-repo-check "<子任务 prompt>"
+```text
+codex_run(cwd="<工作目录>", prompt="<子任务 prompt>",
+          sandbox="read-only" | "workspace-write",
+          timeout_seconds=420, wait_seconds=30)      → 返回 job_id
+codex_status(job_id, wait_seconds=0..45)             → 轮询状态与结果
 ```
 
-目标模型是用户指定的 `gpt-6-luna`，**但本账号当前被服务器拒绝**（原文：
-`not supported when using Codex with a ChatGPT account`；`gpt-6-sol` 同样被拒），
-所以先落可用的 `gpt-5.6-luna`——它同样支持 `max`。`-m` 与 `-c model_reasoning_effort=max`
-**两者都必须显式传**：`config.toml` 的默认 `model` 是 `gpt-6-astra`（当前也必被拒），
-而 luna 的默认强度只有 `medium`。
+该入口固定官方 ChatGPT 登录 + `gpt-6-luna` + `model_reasoning_effort=max`，自动处理代理，
+**不降级模型**；成功判据四项全中：`status=completed`、`ok=true`、`exit_code=0`、
+`turn_completed=true`。旧 CLI 0.147.0 对 `gpt-6-luna` 报的
+``not supported when using Codex with a ChatGPT account`` 是客户端版本问题，
+换 0.162+ 已实测通过，**不得据此降级到 `gpt-5.6-luna`**。
 
-**代理必需**：不带 `HTTPS_PROXY` 时 `chatgpt.com` 在 WSL 内直连不可达，codex 会反复重连失败。
-本机可用的是 VSCode host-proxy `http://127.0.0.1:17897`（来自
-`~/.vscode-server/data/Machine/settings.json` 的 `http.proxy`，该端口在 WSL 侧 127.0.0.1 监听）。
+MCP 不可用时用 Bash 后备入口 `~/.local/bin/codex-subagent run --cwd <目录>
+--prompt '...' --timeout 300 --wait 30 </dev/null`；**不要用裸 `codex exec`，
+也不要用旧的 shell codex 封装**（会把已关闭的 Windows 系统代理同步进来、冲掉手工代理）。
 
-给 codex 子 agent 的 prompt 里同样要写清它用哪个 `--agent` 名字、按上节规则登记看板、
-**不执行任何 Git 写操作**。
+子 agent 没有原生消息通道：prompt 里要写清范围、产出路径、验收要求，以及它用哪个 `--agent`
+看板任务名，并要求它按上节规则 `start` / `update` / `done`、**不执行任何 Git 写操作**。
 
 通道自身的可用性、验证依据与当前阻塞项见 `AGENTS.md` 的
 「子 Agent 的承载通道与模型」一节。
