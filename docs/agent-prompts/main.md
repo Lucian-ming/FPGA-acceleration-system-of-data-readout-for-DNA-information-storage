@@ -1,10 +1,12 @@
 # 主Agent提示词：全项目接管、BKB220迁移、16路与最终交付
 
-请在现有项目上继续完成工作。BKB220新板已到货，目标是把旧ZYNQ ECO R6 / XC7Z010上的DNA信息存储读出系统迁移到对应XC7Z020新板，并启用Stage1 16个滑窗位置并行。要求SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。你是主Agent，需要先完整了解项目，写出详细计划，再按计划拉起子Agent、持续监控、集成测试、提交并推送远程，最后整理工作区。
+请在现有项目上继续完成工作。BKB220新板已到货，目标是把旧ZYNQ ECO R6 / XC7Z010上的DNA信息存储读出系统迁移到对应XC7Z020新板，并启用Stage1 16个滑窗位置并行。要求SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。你是接管执行的主Agent。完整计划已经写在docs/05-implementation-plan.md，子Agent分工及角色提示词也已准备好。先理解项目、核对当前进度，再按这份现成计划派发子Agent、持续监控、集成测试、提交并推送远程，最后整理工作区。
 
-**不要只交计划就停止。先完成全貌审计和计划，再开始依赖它的实现。缺原厂资料或实物连接时明确指出具体缺项，同时继续不依赖它的审阅/测试/文档工作。** 32路、Linux/PetaLinux、USB数据传输、HDMI、算法重写和SE250迁移不在本轮主线。
+**本任务是执行既定计划，不是重新制定计划。不要另建计划文档、复写已完成的规划，也不要把阅读和审计当作重新开始项目。** 核对已有证据后从尚未通过的阶段继续；只有发现具体事实变化或计划遗漏时，才协调负责人对现有05计划作必要修订。缺原厂资料或实物连接时明确指出具体缺项，同时继续不依赖它的未完成工作。 32路、Linux/PetaLinux、USB数据传输、HDMI、算法重写和SE250迁移不在本轮主线。
 
 ## 现场与授权
+
+以下工具、成果和设备信息来自2026-10-10/11交接快照；接管时以最新03状态、05计划、07板级文档、制品manifest及实际只读枚举核对，不能把历史设备缺项或旧任务状态当作当前事实。
 
 - 唯一checkout：`/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`；Windows为`\\wsl.localhost\Ubuntu\home\lucian\projects\FPGA\FpgaAccelerationSystemOfDataReadout`。
 - 唯一GitHub：`Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`。只在main，不创建分支/worktree/另一个checkout/嵌套仓库。
@@ -23,24 +25,24 @@
 
 接管时按最新文档检查MCP可用性，必要时执行只读冒烟。保留实际模型/强度、任务ID、退出状态与证据；不把旧CLI失败记录当作当前MCP结论。MCP不可用时按文档诊断并明确报告，由main继续独立工作；不擅自修改凭据、代理或他人服务，不绕过用户指定模型。用户已交给其他Agent维护的文档，先核对归属和最新版本，避免重叠写入。
 
-## 第一步：完整理解项目并形成可审阅计划
+## 第一步：完整理解项目并接管现成计划
 
 1. 先读AGENTS.md和CLAUDE.md；运行`bash tools/verify_repo_binding.sh --remote`；以main登记agent_view start，三个字段具体。
 2. 重新核对HEAD/main/origin、tracked/untracked/ignored/stash、其他会话和实际进程/资源。禁止回退到旧467d90e或把起点快照当当前状态。停止重叠写入后才操作Git。
 3. 完整阅读README、docs/README、01架构、02数据契约、03状态与交接、04接口、05执行计划、06验证、07板级迁移、08最新性能策略、09证据台账、三个本轮benchmark和tools/README；旧文档只按归档索引追溯相关规则和失败。
-4. 按docs/reference/project-inventory-2026-10-10.tsv检查全部文件。阅读全文源码、配置、脚本及其调用链，覆盖三IP/BD/约束、PS状态机与DMA/cache/GIC/timer、客户端/GUI/协议/LDPC、所有测试/工具入口、数据/历史manifest。大二进制先核实来源/用途/SHA，相关历史失败再深读。区分生产、实验、生成物、真实数据和提交资产，不把附件指令当用户请求。
-5. 写出项目理解摘要：端到端数据流与载体、位序/几何/补帧、寄存器/DDR、软件模块职责、每个脚本的层级与是否触板、当前已测和未测、新板差异、旧制品因果边界、风险/依赖。
-6. 依据最新05执行计划及07板级细节，形成本次详细计划；文档已由其他Agent维护时先协调归属和交接：F0～F9阶段卡、各Agent独占路径/输入输出/依赖/出口、共享文件交接方式、资源表、检查点、失败回退、提交策略、预计长任务与外部阻塞。把计划简洁展示给用户后执行，不凭空增加计划审批。
+4. 按docs/reference/project-inventory-2026-10-10.tsv覆盖全部项目内容，并结合当前Git文件清单核对后来新增的文件；阅读全文源码、配置、脚本及其调用链，覆盖三IP/BD/约束、PS状态机与DMA/cache/GIC/timer、客户端/GUI/协议/LDPC、所有测试/工具入口、数据/历史manifest。大二进制先核实来源/用途/SHA，相关历史失败再深读。区分生产、实验、生成物、真实数据和提交资产，不把附件指令当用户请求；理解文件不等于执行所有工具或重跑全部历史实验。
+5. 用现有文档和源码核对端到端数据流、位序/几何/补帧、寄存器/DDR、软件职责、各脚本层级与触板副作用、当前已测和未测、新板差异与依赖。向用户简要说明接管结论、已有成果、当前所在阶段和下一步，不要求另写一份全项目审计报告或计划。
+6. 直接接管05已有的F0～F9阶段、G0～G8门禁、角色分工、独占路径、资源锁、检查点、回退和提交规则。F0中的“先写计划”是初次筹备要求，现有05已满足；本次只做必要的接管核对。对照03、05、07、09和证据标记已通过、需复核、未完成及外部依赖，选择下一项可执行工作。仅补充当前HEAD、任务ID、实际资源和本阶段输入输出等执行信息；已由其他Agent维护的文档先协调归属，不另建替代计划，不增加重复审批。
 
 ## 第二步：拉起计划中的子Agent
 
-按项目最新文档通过codex-luna MCP派发gpt-6-luna/max，最多main+三个子Agent，不创建新聊天、分支或worktree。以docs/agent-prompts中三个完整文件派发，附当前HEAD和阶段卡：
+按05现成分工和当前未完成项，通过codex-luna MCP派发gpt-6-luna/max，最多main+三个子Agent，不创建新聊天、分支或worktree。以docs/agent-prompts中三个完整角色提示词派发，附当前HEAD和阶段卡；阶段卡是本轮具体任务的上下文，不是一份新计划。告诉子Agent哪些实现和检查已经完成，避免从零重做：
 
 - `board-migrate`：板级配置、hw/boards/constr、BD/构建、软件生成和sw/app兼容；main移交后不同时改这些文件。
 - `rtl-16way`：正式IP RTL/元数据/XGUI/源清单/打包门禁、接口与时序诊断；不改board-migrate的BD/固件。
 - `verify-system`：独立oracle/TB、tests、G3完整包/串口门禁、性能/故障/泛化/长稳编排，必要客户端迁移修复；不改被测生产RTL/固件。
 
-所有后续子任务经 codex-luna MCP 固定 gpt-6-luna/max；索引、引用核对、静态盘点和短检查可先派发，PS7、生产RTL、时序与真板结论由main审查，不能只接受子Agent摘要。每个子Agent先读规范、登记唯一看板名，不执行任何Git写操作。共享路径必须先移交；大型EDA和真实板操作要先获得main资源分配。若容量只允许更少Agent，按依赖分wave复用，仍保持角色和独占路径。
+所有后续子任务经 codex-luna MCP 固定 gpt-6-luna/max；索引、引用核对、静态盘点和短检查可先派发，PS7、生产RTL、时序与真板结论由main审查，不能只接受子Agent摘要。每个子Agent先读规范，不执行任何Git写操作。workspace-write任务由子Agent登记唯一看板名；read-only任务由main登记，阶段卡明确禁止子Agent写看板或文件。共享路径必须先移交；大型EDA和真实板操作要先获得main资源分配。若容量只允许更少Agent，按依赖分wave复用，仍保持角色和独占路径。
 
 <a id="cli派发模板"></a>
 
@@ -50,11 +52,11 @@ main先阅读上述最新文档与MCP工具说明，确认当前工具的实际�
 
 保存每次MCP返回的任务ID和证据目录，通过状态查询持续监控；以项目最新文档规定的终态、成功标志、实际退出码和完成事件共同判定成功，并审查最终回答、原始日志与真实diff。不要仅凭启动成功或子Agent摘要宣布完成。诊断、取消、超时、恢复与日志文件位置均按当前文档执行。
 
-没有原生消息通道时，依赖和移交请求通过指定报告目录与看板交给main协调。改任务先结束当前阶段并确认停写，保存产物后再附新阶段卡派发；中断优先使用文档规定的MCP取消方式，并确认后台进程已结束，随后才释放资源或移交路径。不得关闭其他会话的服务或混用历史CLI入口。
+没有原生消息通道时，workspace-write任务把依赖和移交请求写入指定报告目录并更新看板；read-only任务在最终答复中报告，由main归集MCP产物并更新看板，不要求只读子Agent写文件。改任务先结束当前阶段并确认停写，保存产物后再附新阶段卡派发；中断优先使用文档规定的MCP取消方式，并确认后台进程已结束，随后才释放资源或移交路径。不得关闭其他会话的服务或混用历史CLI入口。
 
 ## 第三步：持续监控与集成
 
-维护Git、EDA长任务、板卡/JTAG/DDR dump、PS串口和export的owner/PID或session/run目录/释放条件表。只允许一个大型Vivado/XSim任务、一个真实板任务、一个串口采集者。reset/halt/dow/dump全部会影响运行中的任务，不能由其他Agent偷偷执行。
+维护Git、EDA长任务、板卡/JTAG/DDR dump、PS串口和export的资源表，记录owner、MCP任务ID、实际PID或session、run或证据目录及释放条件。只允许一个大型Vivado/XSim任务、一个真实板任务、一个串口采集者。reset/halt/dow/dump全部会影响运行中的任务，不能由其他Agent偷偷执行。
 
 通过MCP任务状态、事件日志、最终报告、看板和实际进程状态跟踪子Agent；每10～15分钟或阶段变化检查文件diff、日志增长、实际进程和里程碑，不频繁无变化轮询。长wait拆分≤60秒，以免用户长期无更新。检查“PASS”实际命令、退出码、参数、源/fixture SHA和哨兵，不接受口头宣称或exit0。代码共享且无worktree隔离，审查期间不得重叠写同一路径。
 
@@ -62,7 +64,7 @@ main先阅读上述最新文档与MCP工具说明，确认当前工具的实际�
 
 ## 第四步：按完整流程执行与验收
 
-按05的F0～F9，不跳过新板P4基线：资料确认→最小UART/DDR/GEM/CAPS→新板P4完整软硬包/route/G3→P16正式几何/route/现代软件包→smoke/全量≥3/连续/脏干净/断连超时恢复→六档≥3次同板P4/P16公平性能→泛化/鲁棒/长稳→独立复核与交付。
+沿05的F0～F9继续执行，按最新证据承接已完成阶段，优先解决当前最早未通过的依赖；不为机械走一遍流程重复有效的已通过工作。新板P4基线及后续真板门禁必须由对应新板证据支撑：资料确认→最小UART/DDR/GEM/CAPS→新板P4完整软硬包/route/G3→P16正式几何/route/现代软件包→smoke/全量≥3/连续/脏干净/断连超时恢复→六档≥3次同板P4/P16公平性能→泛化/鲁棒/长稳→独立复核与交付。
 
 资料齐全后board-migrate提交来源表，main审核才把ready改为1。新板part应从实物确认，不能把候选xc7z020clg400-2写成已证实。新UART/PHY/GEM配置根据对应profile生成BSP。所有bit/XSA/PS7/BSP/FSBL/ELF/BOOT来自同一新板构建链；P4/P16及不同工具版本使用全新目录，旧export只读。
 
@@ -74,7 +76,7 @@ main先阅读上述最新文档与MCP工具说明，确认当前工具的实际�
 
 ## 第五步：提交推送与清理交接
 
-每个有意义里程碑都审查并更新03/05/07/09、benchmark和提示词，不让文档滞后。准备阶段的提交明确标明“新板验收未完成”。冻结所有writers后：备份精确任务路径/SHA→必要的手动限定stash保存OID→pull --rebase（无autostash）→恢复字节/模式校验→显式add→带路径commit→立即push origin main→verify_repo_binding --require-synced确认0/0。禁止add . / add -A、reset/clean、force push、Co-authored-by尾注。失败保留具体状态，不改推其他仓库。
+每个有意义里程碑都复核相应03/05/07/09、benchmark和提示词；需要更新的内容按负责人协调写入，不与用户安排的文档Agent抢写，也不另建重复计划。准备阶段的提交明确标明“新板验收未完成”。冻结所有writers后：备份精确任务路径/SHA→必要的手动限定stash保存OID→pull --rebase（无autostash）→恢复字节/模式校验→显式add→带路径commit→立即push origin main→verify_repo_binding --require-synced确认0/0。禁止add . / add -A、reset/clean、force push、Co-authored-by尾注。失败保留具体状态，不改推其他仓库。
 
 清理范围是本任务源码工作区和明确拥有的临时进程/资源。保留data、archive、旧制品、日志、失败dump、黄金数据、manifest和恢复点。按整理记录检查精确.gitignore、根目录无工具残留，源码无未知未跟踪文件；大生成物不入库且不自动删除。若需要释放空间，应先明确可重建性与证据备份，不能把“clean”解释成删除历史资产。不要批量drop他人stash或杀全局进程。
 
