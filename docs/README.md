@@ -25,6 +25,7 @@
 | [17-competition-strategy.md](17-competition-strategy.md) | **参赛定位、性能天花板证伪、优先级重排与长期方向（最高依据）** |
 | [18-evidence-ledger.md](18-evidence-ledger.md) | **证据台账：每条可对外说的话 → 判据 / 证据路径 / 复现命令 / 边界，含「不能说的话」清单** |
 | [19-slimming-and-code-quality-plan.md](19-slimming-and-code-quality-plan.md) | **项目瘦身与代码质量计划：冷/热清理分类、逐文件处置、红线与出口判据** |
+| [20-bkb220-16way-migration-plan.md](20-bkb220-16way-migration-plan.md) | BKB220新板迁移、16路实施顺序、子Agent分工与真板验收门禁 |
 
 ## 参考资料
 
