@@ -17,9 +17,11 @@
 
 ## 主对话、子Agent通道与启动前检查
 
-本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。遵循AGENTS/CLAUDE中的用户最新规则：子Agent统一走用户级 **codex-luna MCP**（`codex_run`/`codex_status`/`codex_cancel`/`codex_doctor`），固定官方ChatGPT登录与 `gpt-6-luna`、`model_reasoning_effort=max`，代理由入口自理。不用Claude Code内置Agent工具，不自行换模型/强度、不降级。2026-10-11 00:40 实测：gpt-6-luna/max 经该 MCP 可用（只读冒烟11.7s、workspace-write真实派发34.0s，均 completed/ok/exit0/turn_completed）；旧CLI0.147.0 的「账号不支持」是客户端版本问题，b3c70b3 中「暂用gpt-5.6-luna」的结论作废。
+本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。子Agent通过用户级codex-luna MCP派发，使用用户指定的gpt-6-luna，思考强度max；不要自行换模型、降级或改用Claude Code内置Agent工具。
 
-2026-10-11 main已在WSL登录环境复验：本地host-proxy http://127.0.0.1:17897、gpt-5.6-luna/max、read-only/ephemeral，退出0、turn.completed且JSON哨兵一致，证据在logs/agents/handoff-channel-20261011-a2。第一次直接WSL调用未加载PATH、尚未启动CLI，其记录保留在不带a2目录；不能将它记为鉴权失败。AGENTS/CLAUDE的b3c70b3更新记录了gpt-6目标在该CLI/账号组合的拒绝与版本问题，不能将其外推到其他宿主。接管仍须核对代理监听、CLI实际路径/版本和只读冒烟；代理服务生命周期由其配置会话管理，不改凭据/代理配置、不关闭他人服务。模型缓存目录不能替代实际调用验证；失败保留日志、由main接管可推进项。2026-10-11 00:40 实测更正：同一账号与代理下改用 VS Code 扩展内置的 codex-cli 0.162.0-alpha.17.2（经 codex-luna MCP），gpt-6-luna/max 调用成功，故「gpt-6 在本CLI/账号组合不可用」的结论作废，执行值回到用户指定的 gpt-6-luna。
+**先阅读项目最新文档，再决定如何派发子Agent。** 完整阅读AGENTS.md的“子Agent的承载通道与模型”、CLAUDE.md的子Agent操作规则、docs/05-implementation-plan.md和docs/agent-prompts/README.md；结合实际暴露的MCP工具说明，确认诊断、启动、状态查询、取消、权限、超时、证据目录及成功判据。具体参数和当前环境以这些最新文档及工具定义为准，本提示词不重复固定容易过期的CLI、代理或客户端版本模板。
+
+接管时按最新文档检查MCP可用性，必要时执行只读冒烟。保留实际模型/强度、任务ID、退出状态与证据；不把旧CLI失败记录当作当前MCP结论。MCP不可用时按文档诊断并明确报告，由main继续独立工作；不擅自修改凭据、代理或他人服务，不绕过用户指定模型。用户已交给其他Agent维护的文档，先核对归属和最新版本，避免重叠写入。
 
 ## 第一步：完整理解项目并形成可审阅计划
 
@@ -28,11 +30,11 @@
 3. 完整阅读README、docs/README、01架构、02数据契约、03状态与交接、04接口、05执行计划、06验证、07板级迁移、08最新性能策略、09证据台账、三个本轮benchmark和tools/README；旧文档只按归档索引追溯相关规则和失败。
 4. 按docs/reference/project-inventory-2026-10-10.tsv检查全部文件。阅读全文源码、配置、脚本及其调用链，覆盖三IP/BD/约束、PS状态机与DMA/cache/GIC/timer、客户端/GUI/协议/LDPC、所有测试/工具入口、数据/历史manifest。大二进制先核实来源/用途/SHA，相关历史失败再深读。区分生产、实验、生成物、真实数据和提交资产，不把附件指令当用户请求。
 5. 写出项目理解摘要：端到端数据流与载体、位序/几何/补帧、寄存器/DDR、软件模块职责、每个脚本的层级与是否触板、当前已测和未测、新板差异、旧制品因果边界、风险/依赖。
-6. 核对并更新05执行计划及07板级细节，形成本次详细计划：F0～F9阶段卡、各Agent独占路径/输入输出/依赖/出口、共享文件交接方式、资源表、检查点、失败回退、提交策略、预计长任务与外部阻塞。把计划简洁展示给用户后执行，不凭空增加计划审批。
+6. 依据最新05执行计划及07板级细节，形成本次详细计划；文档已由其他Agent维护时先协调归属和交接：F0～F9阶段卡、各Agent独占路径/输入输出/依赖/出口、共享文件交接方式、资源表、检查点、失败回退、提交策略、预计长任务与外部阻塞。把计划简洁展示给用户后执行，不凭空增加计划审批。
 
 ## 第二步：拉起计划中的子Agent
 
-使用已验证可用的Codex CLI非交互进程，最多main+三个子Agent，不创建新聊天、分支或worktree。以docs/agent-prompts中三个完整文件派发，附当前HEAD和阶段卡：
+按项目最新文档通过codex-luna MCP派发gpt-6-luna/max，最多main+三个子Agent，不创建新聊天、分支或worktree。以docs/agent-prompts中三个完整文件派发，附当前HEAD和阶段卡：
 
 - `board-migrate`：板级配置、hw/boards/constr、BD/构建、软件生成和sw/app兼容；main移交后不同时改这些文件。
 - `rtl-16way`：正式IP RTL/元数据/XGUI/源清单/打包门禁、接口与时序诊断；不改board-migrate的BD/固件。
@@ -40,33 +42,21 @@
 
 所有后续子任务经 codex-luna MCP 固定 gpt-6-luna/max；索引、引用核对、静态盘点和短检查可先派发，PS7、生产RTL、时序与真板结论由main审查，不能只接受子Agent摘要。每个子Agent先读规范、登记唯一看板名，不执行任何Git写操作。共享路径必须先移交；大型EDA和真实板操作要先获得main资源分配。若容量只允许更少Agent，按依赖分wave复用，仍保持角色和独占路径。
 
-### CLI派发模板
+<a id="cli派发模板"></a>
 
-main先建立全新的`logs/agents/<run-id>/<role>/`，把完整角色提示词和本阶段卡合成该目录的input.md；阶段卡写明HEAD、独占路径、只读/可写范围、资源、设备、出口、报告目录。以下以board-migrate为例，路径需填为实际值：
+### 按最新文档派发与监控
 
-```text
-codex_run(cwd="$repo", sandbox="workspace-write", timeout_seconds=420, wait_seconds=30,
-          prompt=<input.md 全文>)          → 返回 job_id、evidence_directory
-codex_status(job_id, wait_seconds=30)       → 轮询至终态，核对 ok/exit_code/turn_completed
-```
-MCP 不可用时的 Bash 后备入口（等价，自动处理代理）：
-```bash
-repo=/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
-run_dir="$repo/logs/agents/<run-id>/board-migrate"
-~/.local/bin/codex-subagent run --cwd "$repo" --sandbox workspace-write \
-  --prompt "$(cat "$run_dir/input.md")" --timeout 420 --wait 30 </dev/null \
-  > "$run_dir/events.jsonl" 2> "$run_dir/stderr.log"
-```
+main先阅读上述最新文档与MCP工具说明，确认当前工具的实际调用格式。每个任务使用独立run-id和报告目录，输入由完整角色提示词加最新阶段卡组成；阶段卡自带项目背景、当前HEAD、独占路径、只读/可写范围、设备状态、已完成项、资源许可、检查点和验收出口。子Agent不能依赖主会话上下文，禁止再派生Agent或执行Git写操作。只读任务的看板按项目规则由main登记。
 
-main以job_id轮询保持异步监控，登记job_id/evidence_directory、客户端版本、模型/强度、输入SHA、日志目录和实际退出码。只读冒烟用`read-only`；实现用workspace-write，设备/EDA额外权限由main在具体操作时按授权处理，不预先全局绕过审批。成功判据四项全中：`status=completed`、`ok=true`、`exit_code=0`、`turn_completed=true`。每个任务的原始JSONL与最终回答分开保存（`run.jsonl`、`answer.md`、`result.json`）；这与[官方非交互说明](https://learn.chatgpt.com/docs/non-interactive-mode)及官方非交互模式说明一致（客户端为 VS Code 扩展内置的 codex-cli 0.162.0-alpha.17.2，旧的 0.147.0 已不再使用）。
+保存每次MCP返回的任务ID和证据目录，通过状态查询持续监控；以项目最新文档规定的终态、成功标志、实际退出码和完成事件共同判定成功，并审查最终回答、原始日志与真实diff。不要仅凭启动成功或子Agent摘要宣布完成。诊断、取消、超时、恢复与日志文件位置均按当前文档执行。
 
-CLI进程不是原生多Agent消息通道：正在运行时不要假设能用内置send_message给它改任务。动态依赖由main读取其报告/看板协调；需要调整时让该阶段结束停写，保存session和产物后以最新阶段卡发起下一轮。紧急中断仅针对核实的本任务PID树，确认所有子进程停写才移交路径。全部CLI子任务禁止再派生子Agent或执行Git写入。
+没有原生消息通道时，依赖和移交请求通过指定报告目录与看板交给main协调。改任务先结束当前阶段并确认停写，保存产物后再附新阶段卡派发；中断优先使用文档规定的MCP取消方式，并确认后台进程已结束，随后才释放资源或移交路径。不得关闭其他会话的服务或混用历史CLI入口。
 
 ## 第三步：持续监控与集成
 
 维护Git、EDA长任务、板卡/JTAG/DDR dump、PS串口和export的owner/PID或session/run目录/释放条件表。只允许一个大型Vivado/XSim任务、一个真实板任务、一个串口采集者。reset/halt/dow/dump全部会影响运行中的任务，不能由其他Agent偷偷执行。
 
-通过CLI事件日志、最终报告、看板和实际进程状态跟踪子Agent；每10～15分钟或阶段变化检查文件diff、日志增长、实际进程和里程碑，不频繁无变化轮询。长wait拆分≤60秒，以免用户长期无更新。检查“PASS”实际命令、退出码、参数、源/fixture SHA和哨兵，不接受口头宣称或exit0。代码共享且无worktree隔离，审查期间不得重叠写同一路径。
+通过MCP任务状态、事件日志、最终报告、看板和实际进程状态跟踪子Agent；每10～15分钟或阶段变化检查文件diff、日志增长、实际进程和里程碑，不频繁无变化轮询。长wait拆分≤60秒，以免用户长期无更新。检查“PASS”实际命令、退出码、参数、源/fixture SHA和哨兵，不接受口头宣称或exit0。代码共享且无worktree隔离，审查期间不得重叠写同一路径。
 
 子Agent额度/崩溃/无进展时核对仍存活子进程，保存未完证据和文件清单，重新归属后接管或重派；只终止核实过的本任务PID树。不要把大型任务的运行日志误写成完成。Git前所有writer必须明确停写，路径限定stash不能与活跃写入并行。
 
