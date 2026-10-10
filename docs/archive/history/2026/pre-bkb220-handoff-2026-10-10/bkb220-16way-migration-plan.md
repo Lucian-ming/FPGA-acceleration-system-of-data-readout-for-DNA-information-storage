@@ -2,6 +2,20 @@
 
 状态：2026-10-10 启动；先发布本计划，再开始实现。范围是 BKB220 的 XC7Z020 版本、SE150、PL 100 MHz、Stage1 16 个滑窗位置并行，帧大小仍为 64 记录。
 
+## 当前执行进度（2026-10-10）
+
+计划和索引已按用户授权提交并推送：`c4d7ad4`。用户已进一步明确授权提交并推送迁移准备源码与验证文档；main正在按路径限定完成本阶段提交。既有未跟踪生成目录、旧制品与真实数据均保留。
+
+| 工作 | 当前结果 | 证据/入口 |
+|---|---|---|
+| 可选生产 P4/P16 与 IP 参数/源集 | 已落地；打包和 Vivado2022.2 真实 catalog 检查 PASS | [集成摘要](../../../../benchmarks/stage1-16way-ip-integration.md) |
+| 独立算法及真实 AXI 包装接口 | LC6 三项 PASS；LC50 模块及真实包装接口均在 Windows2026.1 XSim PASS，Icarus LC50模块同周期 PASS | 上述摘要中的 run-id 和 Windows XSim 证据 |
+| G3 制品、路径、串口和性能编排 | 40+7=47 项主机测试 PASS | [主机验证摘要](../../../../benchmarks/bkb220-host-verification.md) |
+| Windows2026.1 完整软件入口 | 旧 ECO XSA 兼容探针 A14：BSP/应用/FSBL/BOOT/readback/六制品 SHA PASS；PS5 wrapper 三项 fixture PASS | [板级与工具核查](../../../../benchmarks/bkb220-toolchain-audit.md) |
+| BKB220 PS7/XDC、P4 基线、P16 整机与板测 | 等待实物连接和对应厂商资料；ready=0 明确拒绝构建 | S2～S4 仍未关闭 |
+
+三子 Agent 完成各自准备工作后因运行额度不足中断，main 已接管尚未完成的审查、测试和文档，并独占 `sw/app/` 的 SDT 兼容修改。分工表仍记录原归属；现在没有子 Agent 写入。新头文件只选择实际 BSP 的地址/查询/计时定义，旧 xparameters 快照保留但不再导入应用构建。30 秒超时采用 64 位秒到周期换算。完整软件探针只是兼容性验证，不能作为新板结果。
+
 ## 1. 已确认现状和依赖
 
 - 唯一 checkout `/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`，指定 GitHub 仓库，main/origin 0/0；起点 `467d90e`。没有 tracked 脏改动，既有未跟踪生成目录和证据不处理。

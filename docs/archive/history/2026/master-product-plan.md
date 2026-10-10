@@ -10,8 +10,8 @@
 
 ## 0. 规划基线与证据边界
 
-本规划以 `docs/01-architecture.md`、`docs/02-data-contract.md`、
-`docs/03-status.md`、`docs/05-interfaces.md`、`docs/16-board-zynq-eco-7010.md`、
+本规划以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、
+`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md`、`docs/16-board-zynq-eco-7010.md`、
 `docs/18-next-steps-2026-08-30.md`、`docs/20-se250-study-2026-08-30.md` 和
 `docs/23-next-phase-plan-2026-09-04.md` 为事实来源，并核对了
 `hw/ip/`、`sw/app/`、`clients/python/`、`tools/run_g3.sh` 和接口级仿真入口。
@@ -64,7 +64,7 @@ AXI 握手、FIFO 同步读延迟、缓存维护、BD 回收和 lwIP 事件泵�
 | 推荐 `score_min` | 67 | 112 |
 | Stage2/Stage3 输出 | 81,000 -> 64,800 bit | 相同 |
 
-SE150 的水印、位序、5b4b 表和 LDPC 等式以 `docs/02-data-contract.md` 为唯一
+SE150 的水印、位序、5b4b 表和 LDPC 等式以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 为唯一
 规范。SE250 主机黄金向量隔离在 `tests/golden/se250/`；两个几何最终都输出同一
 图片哈希，因此不能用图片哈希区分几何，必须同时检查 CAPS、几何 manifest、制品
 哈希和四级 DDR 快照。
@@ -365,7 +365,7 @@ DDR 均通过；重复三次无 0-byte 结果和无未解释重传增长。
 ```text
 你是 hw-timing，负责 B30 Voter RTL 无进展看门狗与接口级验证。
 仓库：/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
-先读 AGENTS.md、docs/03-status.md(B29/B30)、docs/20-se250-study-2026-08-30.md、
+先读 AGENTS.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md(B29/B30)、docs/20-se250-study-2026-08-30.md、
 docs/25-master-product-plan.md；执行 bash tools/verify_repo_binding.sh --remote。
 开工登记：
 tools/agent_view.sh start --agent hw-timing --doing "审阅并重构 Voter 无进展看门狗" \
@@ -391,8 +391,8 @@ tools/agent_view.sh done --agent hw-timing --doing "B30 RTL与仿真证据已交
 
 ```text
 你是 net-firmware，负责 B29 网络保活、Delivery Settled 和 B30 固件熔断。
-先读 AGENTS.md、docs/05-interfaces.md、docs/22-ps-refactor-plan.md、
-docs/03-status.md(B29/B30)、docs/25-master-product-plan.md；
+先读 AGENTS.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md、docs/22-ps-refactor-plan.md、
+docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md(B29/B30)、docs/25-master-product-plan.md；
 执行 verify_repo_binding --remote，并用 agent_view.sh start --agent net-firmware 登记。
 只允许写 sw/app、sw/scripts、tests/host；不改 hw/ip、clients/python、data。
 
@@ -438,7 +438,7 @@ tools/agent_view.sh done --agent board-verify --doing "板级证据已归档并�
 
 ```text
 你是 host-integration，负责双几何客户端、协议遥测和发布集成。
-先读 AGENTS.md、docs/02-data-contract.md、docs/05-interfaces.md、
+先读 AGENTS.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md、
 docs/20-se250-study-2026-08-30.md、docs/25-master-product-plan.md；
 执行 verify_repo_binding --remote 和 agent_view start --agent host-integration。
 只允许写 clients/python、tools/主机工具、主机测试；data 与 tests/golden 根目录只读。

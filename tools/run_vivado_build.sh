@@ -19,14 +19,31 @@ else
     exit 127
 fi
 
-if (($# != 0)); then
-    echo "用法：$0（如需额外 Tcl 参数，请直接维护 hw/scripts/build.tcl）" >&2
-    exit 2
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat <<'HELP'
+用法：tools/run_vivado_build.sh [key=value ...]
+参数：board=zynq_eco_7010|bkb220 part_name=... proj_name=... clk_mhz=100
+      build_dir=... export_dir=... report_dir=... jobs=8
+      stage1_p_ways=4|16 stage1_pipe_tree=0|1 dry_run=0|1
+新板资料未验证时必须失败；P4默认保持旧板；P16必须16/1并使用独立目录。
+配置预检可直接运行：tclsh hw/scripts/build.tcl board=... dry_run=1
+Windows2026.1请对只读源码快照调用vivado.bat，并使用Windows本地生成目录。
+HELP
+    exit 0
 fi
+for arg in "$@"; do
+    if [[ ! "$arg" =~ ^[a-z0-9_]+= ]]; then
+        printf '非法参数：%s（需要 key=value）\n' "$arg" >&2
+        exit 2
+    fi
+done
+
+cd "$RUN_DIR"
 
 printf 'Vivado: %s\n日志目录: %s\n' "$VIVADO_BIN" "$RUN_DIR"
 exec "$VIVADO_BIN" \
     -mode batch \
     -journal "$RUN_DIR/vivado.jou" \
     -log "$RUN_DIR/vivado.log" \
-    -source "$ROOT/hw/scripts/build.tcl"
+    -source "$ROOT/hw/scripts/build.tcl" \
+    -tclargs "$@"

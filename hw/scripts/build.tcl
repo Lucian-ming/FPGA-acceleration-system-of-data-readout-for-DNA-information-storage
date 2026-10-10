@@ -1,51 +1,67 @@
-# =========================================
-# build.tcl
-#   vivado -mode batch -source hw/scripts/build.tcl
-# 可选参数：
-#   -tclargs proj_name=dna_accel part=xc7z010clg400-1 clk_mhz=100
-#
-# 2026-08-16 修复 A2：
-#   - 仓库根路径改由「脚本自身位置」推导，不再依赖启动时的 pwd；
-#   - 注册 hw/ip 为 IP 仓库并 update_ip_catalog（否则找不到三个自研 IP）；
-#   - 把 hw/constr/top.xdc 加入 constrs_1（此前 XDC 完全不进构建流）。
-# =========================================
-
-# 默认
-set proj_name "dna_accel"
-set part_name "xc7z010clg400-1"
-set clk_mhz   100
-
-# 覆盖参数
-proc _arg {k def} {upvar $k v; if {![info exists v]} {set v $def}; foreach a $::argv {if {[string match "${k}=*" $a]} {set v [string range $a [expr {[string length "${k}="]}] end]}}}
-_arg proj_name $proj_name
-_arg part_name $part_name
-_arg clk_mhz   $clk_mhz
-
-# 路径：按脚本自身位置推导（可在任意目录启动）
-set _here     [file normalize [file dirname [info script]]]
-set repo_root [file normalize "$_here/../.."]
-set proj_wk    [file join $repo_root hw/build]
-set bd_script  [file join $repo_root hw/scripts/bd.tcl]
-set xdc_file   [file join $repo_root hw/constr/top.xdc]
-# 导出与报告目录：默认沿用 hw/build/export 与 hw/build/reports（历史行为不变）。
-# 可用环境变量 DNA_EXPORT_DIR / DNA_REPORT_DIR 覆盖，避免新构建覆盖既有生产制品
-# （例如 4-way 构建导出到 hw/build/export_4way，保住 2-way 基线的 BOOT.bin/bit/xsa）。
-set export_dir [file join $proj_wk export]
-if {[info exists ::env(DNA_EXPORT_DIR)] && $::env(DNA_EXPORT_DIR) ne ""} {
-  set export_dir [file normalize $::env(DNA_EXPORT_DIR)]
+# 可复现构建：tools/run_vivado_build.sh board=zynq_eco_7010 part_name=xc7z010clg400-1
+# 新板需明确 board、独立 build_dir/export_dir/report_dir；dry_run=1 只检查配置。
+# 与工具版本绑定的生成目录必须独立，不能覆盖旧发布制品。
+set _here [file normalize [file dirname [info script]]]
+set repo_root [file normalize [file join $_here ../..]]
+set opts [dict create proj_name dna_accel board zynq_eco_7010 part_name {} clk_mhz 100 \
+  build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 jobs 8 dry_run 0]
+foreach arg $::argv {
+  if {![regexp {^([a-z0-9_]+)=(.*)$} $arg -> key value] || ![dict exists $opts $key]} {
+    error "未知构建参数 '$arg'；器件参数应为 part_name，不是 part"
+  }
+  dict set opts $key $value
 }
-set report_dir [file join $proj_wk reports]
-if {[info exists ::env(DNA_REPORT_DIR)] && $::env(DNA_REPORT_DIR) ne ""} {
-  set report_dir [file normalize $::env(DNA_REPORT_DIR)]
+dict for {key value} $opts {set $key $value}
+if {![regexp {^[A-Za-z][A-Za-z0-9_]*$} $proj_name]} {error "非法 proj_name"}
+foreach key {stage1_p_ways stage1_pipe_tree jobs dry_run} {
+  if {![string is integer -strict [set $key]]} {error "$key 必须为整数"}
 }
-set xsa_out    [file join $export_dir ${proj_name}.xsa]
-set ip_repo    [file join $repo_root hw/ip]
-
+if {$stage1_p_ways ni {4 16} || $stage1_pipe_tree ni {0 1}} {error "本轮只支持 stage1_p_ways=4|16、stage1_pipe_tree=0|1"}
+if {$stage1_p_ways == 16 && $stage1_pipe_tree != 1} {error "P16 必须启用流水选优树 stage1_pipe_tree=1"}
+if {$stage1_p_ways == 4 && $stage1_pipe_tree != 0} {error "P4 基线必须使用 stage1_pipe_tree=0"}
+if {$jobs < 1 || $jobs > 64 || $dry_run ni {0 1}} {error "jobs/dry_run 超出合法范围"}
+if {![string is double -strict $clk_mhz] || $clk_mhz != 100} {error "本轮生产 PL 频率固定为100MHz"}
+source [file join $repo_root hw boards load_board.tcl]
+set ::dna_board_config [dna_load_board $repo_root $board]
+set expected_part [dict get $::dna_board_config part]
+if {$part_name eq ""} {set part_name $expected_part}
+if {$part_name ne $expected_part} {error "part_name=$part_name 与板配置 $board 的 $expected_part 不匹配"}
+if {$board eq "zynq_eco_7010" && $stage1_p_ways != 4} {error "7010基线只支持P4；P16请选择已验证的7020板配置"}
+if {$build_dir eq ""} {
+  if {$board ne "zynq_eco_7010"} {error "新板必须显式指定独立 build_dir"}
+  set build_dir [file join $repo_root hw build]
+}
+proc dna_build_path {repo_root path} {
+  if {[file pathtype $path] ne "absolute"} {set path [file join $repo_root $path]}
+  return [file normalize $path]
+}
+set proj_wk [dna_build_path $repo_root $build_dir]
+set bd_script [file join $repo_root hw scripts bd.tcl]
+set xdc_file [file normalize [file join $repo_root [dict get $::dna_board_config xdc]]]
+if {![file isfile $xdc_file]} {error "板配置XDC不存在：$xdc_file"}
+if {$export_dir eq ""} {set export_dir [file join $proj_wk export]}
+if {$report_dir eq ""} {set report_dir [file join $proj_wk reports]}
+# 历史环境变量仍支持，但显式 Tcl 参数优先。
+foreach pair {{export_dir DNA_EXPORT_DIR} {report_dir DNA_REPORT_DIR}} {
+  lassign $pair key env_key
+  if {[dict get $opts $key] eq "" && [info exists ::env($env_key)] && $::env($env_key) ne ""} {set $key $::env($env_key)}
+  set $key [dna_build_path $repo_root [set $key]]
+}
+if {$board ne "zynq_eco_7010" || $stage1_p_ways != 4} {
+  set old_build [file normalize [file join $repo_root hw build]]
+  if {$proj_wk eq $old_build || $export_dir eq [file join $old_build export] || $report_dir eq [file join $old_build reports]} {
+    error "新板/P16不能覆盖ECO发布目录；请指定独立输出目录"
+  }
+}
+set xsa_out [file join $export_dir ${proj_name}.xsa]
+set ip_repo [file join $repo_root hw ip]
+set ::dna_stage1_p_ways $stage1_p_ways
+set ::dna_stage1_pipe_tree $stage1_pipe_tree
+puts "===> board=$board part=$part_name clk=${clk_mhz}MHz Stage1=$stage1_p_ways/$stage1_pipe_tree"
+puts "===> root=$repo_root build_dir=$proj_wk export_dir=$export_dir report_dir=$report_dir"
+if {$dry_run} {puts "BUILD_CONFIG_PASS (仅配置检查，未构建)"; exit 0}
+if {![llength [info commands version]]} {error "真实构建必须在Vivado运行"}
 puts "===> Vivado [version -short]"
-puts "===> proj=$proj_name part=$part_name clk=${clk_mhz}MHz"
-puts "===> root=$repo_root"
-puts "===> export_dir=$export_dir"
-puts "===> report_dir=$report_dir"
 
 proc require_run_success {run_name} {
   set run [get_runs $run_name]
@@ -89,7 +105,7 @@ if {[file exists $xdc_file]} {
 }
 
 # 综合/实现/bit
-launch_runs synth_1 -jobs 8
+launch_runs synth_1 -jobs $jobs
 wait_on_runs synth_1
 require_run_success synth_1
 
@@ -108,7 +124,7 @@ require_run_success synth_1
 #   且资源未变差（LUT 15499 -> 15483，RAMB36 44 不变）。
 #
 # 因此这不是"随手设的调优参数"：去掉它，整机会退回 WNS = -0.252 ns 的不收敛状态，
-# 从零重建将无法复现已交付的收敛结果（违反 docs/13 G7/G8 可复现门禁）。
+# 从零重建将无法复现已交付的收敛结果（违反 docs/05 G7/G8 可复现门禁）。
 #
 # 注意：AXI 握手链本身**并未被修复**，只是靠实现策略赢回了裕量。
 # 后续若继续增加逻辑或提高频率目标，它仍会第一个失败；
@@ -121,7 +137,7 @@ if {[info exists ::env(DNA_IMPL_STRATEGY)] && $::env(DNA_IMPL_STRATEGY) ne ""} {
 set_property strategy $impl_strategy [get_runs impl_1]
 puts "===> impl 策略: [get_property STRATEGY [get_runs impl_1]]"
 
-launch_runs impl_1 -to_step write_bitstream -jobs 8
+launch_runs impl_1 -to_step write_bitstream -jobs $jobs
 wait_on_runs impl_1
 require_run_success impl_1
 
@@ -140,8 +156,25 @@ file mkdir [file dirname $xsa_out]
 write_hw_platform -fixed -include_bit -force -file $xsa_out
 puts "===> XSA: $xsa_out"
 set bit_out [file join $export_dir top_bd_wrapper.bit]
-if {[file exists "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit"]} {
-  file copy -force "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit" $bit_out
-  puts "===> BIT: $bit_out"
+set routed_bit "$proj_wk/$proj_name.runs/impl_1/top_bd_wrapper.bit"
+if {![file isfile $routed_bit] || [file size $routed_bit] == 0} {error "实现未生成非空bit：$routed_bit"}
+file copy -force $routed_bit $bit_out
+puts "===> BIT: $bit_out"
+foreach artifact [list $xsa_out $bit_out] {
+  if {![file isfile $artifact] || [file size $artifact] == 0} {error "导出产物缺失/为空：$artifact"}
 }
-puts "===> DONE."
+if {![info exists ::dna_stage1_actual]} {error "未取得实际生产IP几何/参数"}
+# 硬件摘要供统一发布manifest消费；不是完整发布制品manifest。
+set cfg [open [file join $export_dir hardware_build_config.txt] w]
+foreach pair [list [list board_id $board] [list part $part_name] [list tool_version [version -short]] \
+  [list C_STAGE1_P_WAYS [dict get $::dna_stage1_actual C_STAGE1_P_WAYS]] \
+  [list C_STAGE1_PIPE_TREE [dict get $::dna_stage1_actual C_STAGE1_PIPE_TREE]] \
+  [list READ_BPS [dict get $::dna_stage1_actual READ_BPS]] [list NUM_LC [dict get $::dna_stage1_actual NUM_LC]] \
+  [list STRIDE [dict get $::dna_stage1_actual STRIDE]] [list REF_LEN [dict get $::dna_stage1_actual REF_LEN]] \
+  [list BATCH [dict get $::dna_stage1_actual BATCH]] \
+  [list board_config [dict get $::dna_board_config config_path]] [list build_dir $proj_wk]] {
+  lassign $pair key value
+  puts $cfg "$key=$value"
+}
+close $cfg
+puts "===> HARDWARE_BUILD_DONE (需继续软件重建与整机时序/板测验收)"

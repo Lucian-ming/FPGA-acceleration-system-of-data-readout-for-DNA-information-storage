@@ -145,7 +145,7 @@ DNA 核 AXIS 结果输出级）。
 
 本次只保证制品与实物 DDR 配置一致。
 DDR 板级走线延迟（`PCW_UIPARAM_DDR_BOARD_DELAY*`）仍是从历史板卡继承的 `0.25`，
-ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此处（见 `docs/16` §5）。
+ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此处（见 `docs/09` §5）。
 
 最终验收仍是 FPGA 真实回传经 LDPC 后图片 SHA-256 等于
 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。

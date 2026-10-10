@@ -7,7 +7,7 @@
 「行为没变」**。第一波（`ps-refactor-net`）只交付判据，不动 `echo.c`；
 第二波（`ps-refactor`）按本文动刀。
 
-> **本文的前提**：`docs/21` §2 的冲突表、`docs/03-status.md` 的 B21/B22/B27 三条编年、
+> **本文的前提**：`docs/21` §2 的冲突表、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 的 B21/B22/B27 三条编年、
 > `AGENTS.md` 的判据纪律。**端到端唯一判据仍然是 `tools/run_g3.sh` 的图片 SHA-256
 > `fcd0cf90…f2c3`**；本文加的一切只是让「拆到一半出问题」能在主机上当场发现，
 > 而不是攒到上板才暴露 —— 那正是 B22/B27 的产生方式。
@@ -205,7 +205,7 @@ bash tools/run_sim.sh host                     # 6/6（含上位机与 LDPC）
 
 - **不许**把状态机改成「一个 poll 里跑到底」：`poll_callback` 长时间不返回会饿死 TCP。
 - **不许**照注释里的「500 ms/步」去折算超时常数 —— 三处注释都是错的，
-  实际约 280 ms，据此算的超时差一倍（`docs/03-status.md` 已记录，
+  实际约 280 ms，据此算的超时差一倍（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 已记录，
   当时**只改注释不改数值**，因为改数值要重建 ELF 并重新上板复验）。
   拆分**同样不许改这些数值**：`S1_NO_PROGRESS_LIMIT=60`、Stage3 的 `poll_count > 240`、
   Voter 的 `poll_count >= 100000` 原样搬过去。
@@ -284,7 +284,7 @@ S2 的正确做法：先按 `PIPE_START_IP` 的**实际**序列定义 `dna_start
 ### 5.5 `echo.h` 的对外接口本波不动
 
 `echo.h` 里的宏（DDR 地址、寄存器偏移、尺寸）与 `dna_connection_t` 是三方共享的契约
-（`docs/05-interfaces.md`）。拆分只动 `.c` 的组织方式；要改 `echo.h` 就是改契约，
+（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md`）。拆分只动 `.c` 的组织方式；要改 `echo.h` 就是改契约，
 按 `AGENTS.md` 得同步改文档并三方成对修改。
 
 ---

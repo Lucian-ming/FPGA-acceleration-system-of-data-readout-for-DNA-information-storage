@@ -1,6 +1,6 @@
 # =========================================
 # bd.tcl
-# 设备: xc7z010clg400-1
+# 设备/PS7: 由已验证的 hw/boards/<board>.tcl 显式选择
 # IP:
 #   - xilinx.com:user:Dna_accelerator_core:1.0
 #       IF: S_AXI_LITE_CTRL (AXI4-Lite), S_AXIS_DATA (AXIS in), M_AXIS_RESULT (AXIS out)
@@ -38,48 +38,14 @@ apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config { make_e
 #   - ⚠️ 历史 XSA 自身的 DDR 是 32 bit 双颗 MT41J128M16，属于**另一块板**；
 #     它不再是 DDR 配置的依据，禁止据其回退本节。
 #   - 历史 XSA 未声明 BOARD，不能套用其他开发板 preset。
-set_property -dict [list \
-  CONFIG.PCW_USE_M_AXI_GP0 {1} \
-  CONFIG.PCW_USE_S_AXI_HP0 {1} \
-  CONFIG.PCW_EN_CLK0_PORT {1} \
-  CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ {100} \
-  CONFIG.PCW_PRESET_BANK1_VOLTAGE {LVCMOS 1.8V} \
-  CONFIG.PCW_ENET0_PERIPHERAL_ENABLE {1} \
-  CONFIG.PCW_ENET0_ENET0_IO {MIO 16 .. 27} \
-  CONFIG.PCW_ENET0_GRP_MDIO_ENABLE {1} \
-  CONFIG.PCW_ENET0_GRP_MDIO_IO {MIO 52 .. 53} \
-  CONFIG.PCW_ENET0_PERIPHERAL_FREQMHZ {1000 Mbps} \
-  CONFIG.PCW_UART1_PERIPHERAL_ENABLE {1} \
-  CONFIG.PCW_UART1_UART1_IO {MIO 48 .. 49} \
-  CONFIG.PCW_UART1_BAUD_RATE {115200} \
-  CONFIG.PCW_UART_PERIPHERAL_FREQMHZ {100} \
-  CONFIG.PCW_UIPARAM_DDR_ENABLE {1} \
-  CONFIG.PCW_UIPARAM_DDR_MEMORY_TYPE {DDR 3} \
-  CONFIG.PCW_UIPARAM_DDR_BUS_WIDTH {16 Bit} \
-  CONFIG.PCW_UIPARAM_DDR_PARTNO {MT41J256M16 RE-125} \
-  CONFIG.PCW_UIPARAM_DDR_DRAM_WIDTH {16 Bits} \
-  CONFIG.PCW_UIPARAM_DDR_DEVICE_CAPACITY {4096 MBits} \
-  CONFIG.PCW_UIPARAM_DDR_SPEED_BIN {DDR3_1066F} \
-  CONFIG.PCW_UIPARAM_DDR_FREQ_MHZ {533.333333} \
-  CONFIG.PCW_UIPARAM_DDR_CL {7} \
-  CONFIG.PCW_UIPARAM_DDR_CWL {6} \
-  CONFIG.PCW_UIPARAM_DDR_T_RCD {7} \
-  CONFIG.PCW_UIPARAM_DDR_T_RP {7} \
-  CONFIG.PCW_UIPARAM_DDR_T_RC {48.91} \
-  CONFIG.PCW_UIPARAM_DDR_T_RAS_MIN {35.0} \
-  CONFIG.PCW_UIPARAM_DDR_T_FAW {40.0} \
-  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY0 {0.25} \
-  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY1 {0.25} \
-  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY2 {0.25} \
-  CONFIG.PCW_UIPARAM_DDR_BOARD_DELAY3 {0.25} \
-  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_0 {0.0} \
-  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_1 {0.0} \
-  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_2 {0.0} \
-  CONFIG.PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_3 {0.0} \
-  CONFIG.PCW_UIPARAM_DDR_TRAIN_WRITE_LEVEL {1} \
-  CONFIG.PCW_UIPARAM_DDR_TRAIN_READ_GATE {1} \
-  CONFIG.PCW_UIPARAM_DDR_TRAIN_DATA_EYE {1} \
-] [get_bd_cells ps_0]
+# build.tcl 传入已验证的显式配置；直接 source 时仅保留 ECO 历史默认。
+if {![info exists ::dna_board_config]} {
+  set _bd_here [file normalize [file dirname [info script]]]
+  set _bd_root [file normalize [file join $_bd_here ../..]]
+  source [file join $_bd_root hw boards load_board.tcl]
+  set ::dna_board_config [dna_load_board $_bd_root zynq_eco_7010]
+}
+set_property -dict [dict get $::dna_board_config ps7_properties] [get_bd_cells ps_0]
 
 # 时钟/复位
 set clk_wiz_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz clk_wiz_0]
@@ -132,6 +98,25 @@ connect_bd_net [get_bd_pins rst_ps/peripheral_aresetn] [get_bd_pins axi_dma_0/ax
 set ip1 [create_bd_cell -type ip -vlnv xilinx.com:user:Dna_accelerator_core:1.0       Dna_accelerator_core_0]
 set ip2 [create_bd_cell -type ip -vlnv xilinx.com:user:differential_voter:1.0          differential_voter_0]
 set ip3 [create_bd_cell -type ip -vlnv xilinx.com:user:desparsification_decoder:1.0    desparsification_dec_0]
+
+# Stage1 可选生产参数：默认保留 ECO P4/组合树；P16 必须显式选择。
+set stage1_p_ways 4
+set stage1_pipe_tree 0
+if {[info exists ::dna_stage1_p_ways]} {set stage1_p_ways $::dna_stage1_p_ways}
+if {[info exists ::dna_stage1_pipe_tree]} {set stage1_pipe_tree $::dna_stage1_pipe_tree}
+set_property -dict [list \
+  CONFIG.C_STAGE1_P_WAYS $stage1_p_ways \
+  CONFIG.C_STAGE1_PIPE_TREE $stage1_pipe_tree \
+  CONFIG.READ_BPS 150 CONFIG.NUM_LC 50 CONFIG.STRIDE 807 CONFIG.REF_LEN 957 CONFIG.BATCH 64] $ip1
+# 取实际 IP CONFIG 值；不能靠摘要中的硬编码证明几何正确。
+set ::dna_stage1_actual [dict create]
+foreach {key expected} [list C_STAGE1_P_WAYS $stage1_p_ways C_STAGE1_PIPE_TREE $stage1_pipe_tree \
+  READ_BPS 150 NUM_LC 50 STRIDE 807 REF_LEN 957 BATCH 64] {
+  set actual [get_property CONFIG.$key $ip1]
+  if {$actual ne "$expected"} {error "生产Stage1参数 $key=$actual，期望$expected"}
+  dict set ::dna_stage1_actual $key $actual
+}
+puts "===> Stage1 actual parameters: $::dna_stage1_actual"
 
 # ===== 时钟/复位到各IP =====
 # DNA (AXIS 两侧 + AXI-Lite)

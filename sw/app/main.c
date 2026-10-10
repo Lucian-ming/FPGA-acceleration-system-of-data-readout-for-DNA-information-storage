@@ -23,7 +23,7 @@
 /* 应用层 */
 #include "echo.h"
 #include "sleep.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 
 /* 流水线运行期主循环每圈的休眠（us），0 = 不休眠。可用 -DPIPE_RUN_SLEEP_US=N 覆盖做对照实验。 */
 #ifndef PIPE_RUN_SLEEP_US
@@ -219,7 +219,7 @@ static void print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
 }
 
 /* ============================================================================
- * 启动顺序契约与 lwIP 初始化流程（docs/19 §C1）
+ * 启动顺序契约与 lwIP 初始化流程（docs/05 §C1）
  * ----------------------------------------------------------------------------
  * 1. init_platform()：使能 I/D-Cache，初始化中断控制器 SCUGIC 与私有定时器 SCUTIMER。
  * 2. lwip_init()：初始化协议栈内存池与数据结构。

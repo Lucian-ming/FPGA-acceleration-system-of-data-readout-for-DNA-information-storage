@@ -186,6 +186,80 @@ for cx in hw/ip/*/component.xml; do
     fi
 done
 
+
+# --- 7. Stage1的可选生产架构必须贯通XML/HDL/GUI/回归 -----------------------
+# 两份源是不同模块名，静态generate只展开一个。仅检查文件名无法抓到
+# XML默认16、wrapper默认4或漏传REF_LEN等静默漂移，故检查参数与源集。
+if python3 - <<'PY'
+from pathlib import Path
+import re
+import xml.etree.ElementTree as ET
+
+base = Path("hw/ip/Dna_accelerator_core_1_0")
+ns = {"s": "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"}
+root = ET.parse(base / "component.xml").getroot()
+for file_node in root.findall("s:fileSets/s:fileSet/s:file", ns):
+    path = file_node.findtext("s:name", namespaces=ns)
+    assert path and (base / path).is_file(), f"Stage1 XML引用文件不存在: {path}"
+top = (base / "hdl/Dna_accelerator_core_v1_0.v").read_text()
+gui = (base / "xgui/Dna_accelerator_core_v1_0.tcl").read_text()
+runner = Path("tools/run_sim.sh").read_text()
+
+def params(path):
+    nodes = root.findall(path, ns)
+    names = [n.findtext("s:name", namespaces=ns) for n in nodes]
+    assert len(names) == len(set(names)), "参数重名"
+    return {n.findtext("s:name", namespaces=ns): n.findtext("s:value", namespaces=ns) for n in nodes}
+
+user = params("s:parameters/s:parameter")
+model = params("s:model/s:modelParameters/s:modelParameter")
+for name, default in {"C_STAGE1_P_WAYS": 4, "C_STAGE1_PIPE_TREE": 0}.items():
+    assert user.get(name) == str(default), f"{name}用户默认错误"
+    assert model.get(name) == str(default), f"{name}HDL默认错误"
+    assert re.search(r"parameter\s+integer\s+" + name + r"\s*=\s*" + str(default) + r"\s*,", top), f"{name}顶层未对齐"
+    for prefix in ["update_PARAM_VALUE.", "validate_PARAM_VALUE.", "update_MODELPARAM_VALUE."]:
+        assert "proc " + prefix + name in gui, f"GUI未贯通{prefix}{name}"
+    assert "ipgui::add_param $IPINST -name \"" + name + "\"" in gui, f"GUI不可选择{name}"
+
+expected = {"hdl/Dna_accelerator_core_v1_0.v", "hdl/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v",
+            "hdl/fifo_sync_sdpram_b64.v", "hdl/s2mm_pack64.v", "hdl/srpe_batch_4way.v", "hdl/srpe_batch_pway.v"}
+sets = []
+for fileset in root.findall("s:fileSets/s:fileSet", ns):
+    files = [f.findtext("s:name", namespaces=ns) for f in fileset.findall("s:file", ns)
+             if f.findtext("s:fileType", namespaces=ns) == "verilogSource"]
+    if files:
+        assert len(files) == len(set(files)), "同一fileset有重复HDL"
+        sets.append(set(files))
+assert len(sets) == 2 and all(f == expected for f in sets), "生产综合/仿真源集必须恰为P4/P16正式六文件"
+for gname, module in [("g_stage1_p4", "srpe_batch"), ("g_stage1_pway", "srpe_batch_pway")]:
+    start = top.index("begin: " + gname)
+    branch = top[start:top.index("end", start)]
+    assert module + " #(" in branch, f"{gname}选错模块"
+    for name in ["BATCH", "NUM_LC", "STRIDE", "REF_LEN", "READ_BPS", "SCORE_W", "POS_W"]:
+        assert re.search(r"\." + name + r"\s*\(\s*" + name + r"\s*\)", branch), f"{gname}漏传{name}"
+assert "STAGE1_CONFIGURATION_MUST_BE_P4_OR_P16_PIPELINED" in top, "非法配置缺少展开失败判据"
+assert "stage1_production_full" in runner and "tb_dna_stage1_p16_equivalence.v" in runner and "tb_dna_stage1_p16_interface.v" in runner, "真实生产回归入口缺失"
+
+# 本轮迁移只允许改变说明/SE150默认，算法体应与已验证P14候选相同。
+# 历史实验文件不参与生产回归；未来修改算法时需同时更新本门禁的迁移约定。
+production = (base / "hdl/srpe_batch_pway.v").read_text()
+historical = Path("hw/experimental/srpe_batch_pway.v").read_text()
+def algorithm(text):
+    text = re.sub(r"/\*.*?\*/|//[^\n]*", "", text, flags=re.S)
+    for name in ["STRIDE", "REF_LEN", "READ_BPS"]:
+        text = re.sub(r"(parameter\s+integer\s+" + name + r"\s*=)\s*\d+", r"\1 MIGRATION_DEFAULT", text)
+    return re.sub(r"\s+", "", text)
+assert algorithm(production) == algorithm(historical), "生产Pway算法与本轮P14机械迁移契约不符"
+for name, default in {"READ_BPS": 150, "REF_LEN": 957, "STRIDE": 807, "NUM_LC": 50, "BATCH": 64}.items():
+    assert re.search(r"parameter\s+integer\s+" + name + r"\s*=\s*" + str(default) + r"\s*,", production), f"Pway生产默认{name}错误"
+print("    Stage1: P4=4/0, P16=16/1；六文件源集与参数对齐；P14算法体等价")
+PY
+then
+    ok "Stage1生产参数、静态选择、源集与迁移算法契约一致"
+else
+    bad "Stage1生产参数/源集/迁移算法契约检查失败"
+fi
+
 echo
 if (( FAIL )); then
     printf '\033[31m######## IP 打包卫生检查 FAIL ########\033[0m\n'

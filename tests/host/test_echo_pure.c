@@ -7,7 +7,7 @@
  * 覆盖：
  *   A. parse_header        协议头解析：magic / 大端长度 / 失败时的副作用
  *   B. align_down/min_u32  BD 长度对齐的小工具
- *   C. board_caps          能力值必须与 docs/05-interfaces.md 1.3 节一致
+ *   C. board_caps          能力值必须与 docs/04-interfaces.md 1.3 节一致
  *   D. process_batch       条数/长度/容量/声明数的四类边界
  *   E. process_config      **连接层**的拒绝码 8/9（task_config.h 不判这两个）
  *   F. process_post        进流水线前的 DDR 布局校验拒绝
@@ -93,7 +93,7 @@ static void t_align(void)
 static void t_caps(void)
 {
     task_caps_t c = board_caps();
-    section("C. board_caps：必须与 docs/05-interfaces.md 1.3 节一致");
+    section("C. board_caps：必须与 docs/04-interfaces.md 1.3 节一致");
     ok(c.version==1,            "version=1");
     ok(c.read_bps==150,         "read_bps=150（SE150，SE250 不可混用）");
     ok(c.num_lc==50,            "num_lc=50");

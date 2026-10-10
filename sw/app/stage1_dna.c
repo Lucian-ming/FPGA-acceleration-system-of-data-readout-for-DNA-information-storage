@@ -14,7 +14,7 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 
 /* 第一级计数 */
 static int wm_tx_expected = 0;
@@ -30,7 +30,7 @@ static u32 wm_region = 0;      /* 预载到第几个区域（修订 B1） */
  * 改之前：PIPE_WM_TX 提交一个区域的 DMA 就 return，PIPE_WM_WAIT 在**下一个** poll
  * 里回收 BD。一个区域两个 poll 周期，50 个区域 ≈ 100 步；而 poll 有效间隔实测
  * 250~500 ms（见 S1_NO_PROGRESS_LIMIT 处的机理说明），于是白等出 ~29 s 的固定开销
- * ——与读段条数无关，任何规模都白等（docs/18 P1 第 3 项五档拟合的常数项）。
+ * ——与读段条数无关，任何规模都白等（docs/09 P1 第 3 项五档拟合的常数项）。
  *
  * 改之后：一次 poll 连续走 WM_REGIONS_PER_POLL 个区域，每个区域在**同一次调用内**
  * 有界忙等 BD 回收。50 个区域 = ceil(50/16) = 4 个 poll 步，加上 PIPE_WM_PREP 共 5 步。
@@ -319,7 +319,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         } else {
             XTime t_now;
             XTime_GetTime(&t_now);
-            if ((t_now - s1_last_progress_time) > (XTime)(COUNTS_PER_SECOND * 30U)) {
+            if ((t_now - s1_last_progress_time) > DNA_TIMEOUT_TICKS(30U)) {
                 xil_printf("\n\r[ERROR] STAGE1 停滞 30 s 无任何 BD 进展\n\r");
                 xil_printf("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
                            tx_frames_sent, tx_frames_total, tx_done, tx_expected);

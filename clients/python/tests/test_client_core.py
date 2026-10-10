@@ -205,7 +205,7 @@ class SE250GeometryTests(unittest.TestCase):
     """SE250（64,800 条 × 250 bp）的主机侧支持。
 
     判据纪律（AGENTS.md）：SE150 与 SE250 最终产出**同一个图片哈希**
-    `fcd0cf90…f2c3`（docs/20 §2 实跑证明），所以哈希分不出用的是哪套几何。
+    `fcd0cf90…f2c3`（docs/07 §2 实跑证明），所以哈希分不出用的是哪套几何。
     这里的判据全部盯在**几何本身**上——线上字节数、阈值、stride、能力协商——
     因为那才是两套路径唯一能被区分的地方。
     """
@@ -244,7 +244,7 @@ class SE250GeometryTests(unittest.TestCase):
         """「SE150 与 SE250 不可混用」在主机侧的闸门。
 
         板端的强制点是 PKT_CONFIG 拒绝码 2（`task_config.h:113-114`，至今未在
-        板上验证，见 docs/20 阶段 S5 的反向判据）。这条测的是客户端在连上去
+        板上验证，见 docs/07 阶段 S5 的反向判据）。这条测的是客户端在连上去
         之前就该拦住，免得把 64 B 记录喂给只认 40 B 的比特流。
         """
         se150_caps = TaskCaps(1, 150, 50, 807, 40_500, 107_968, 1)
@@ -321,7 +321,7 @@ class SE250GeometryTests(unittest.TestCase):
         self.assertEqual(rows, 50 * 1055)
 
     def test_se250_golden_is_not_the_se150_watermark_layout(self) -> None:
-        """撞上 SE150 那份就是「几何没生效」的特征签名（docs/20 §3.7 G1）。"""
+        """撞上 SE150 那份就是「几何没生效」的特征签名（docs/07 §3.7 G1）。"""
         se150 = (REPO / "tests" / "golden" / "wm_regions.hex").read_bytes()
         se250 = (self.GOLDEN_SE250 / "wm_regions.hex").read_bytes()
         self.assertNotEqual(

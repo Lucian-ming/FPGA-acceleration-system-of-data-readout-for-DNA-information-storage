@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tests/host/test_benchmark_contract.py —— 基准测试与计时契约单元测试
 
-落实 docs/15 §5 (任务 A) 要求：
+落实 docs/05 §5 (任务 A) 要求：
 1. 验证 CPU 优化 C 实现与 Python 参考模型在小型固定输入下返回完全相同的 best_pos, best_score 与 tie-break 规则；
 2. 验证分型契约：无物理板卡/无功率计接入时，杜绝伪造 FPGA 实测与 reads/(s·W) 能效比；
 3. 验证源读段 (N) 与板端记录数 (2N, orientation=both) 契约及延迟/吞吐换算；

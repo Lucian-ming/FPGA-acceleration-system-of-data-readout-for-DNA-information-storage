@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tools/debug_high_entropy.py —— 高熵随机样本 (D1_random_entropy) 失败分级诊断工具
 
-依据 docs/15 §6(D) 与项目数据契约要求：
+依据 docs/05 §6(D) 与项目数据契约要求：
 对 D1_random_entropy（2671 bit 误码，LDPC 50 轮失败）建立五级严密对比链条：
   级 1（编码器自检）：原始随机信息位 -> LDPC 编码 -> 稀疏化 -> 水印异或 -> 生成标准码字与 DNA 参考，
                      验证纯生成逻辑是否存在误码；调用 C LDPC 直接译码原始生成码字，确认 100% 收敛。

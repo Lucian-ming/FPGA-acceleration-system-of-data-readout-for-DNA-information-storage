@@ -3,7 +3,7 @@
 本文安排四条工作线并行推进：**风险验证、水印预载优化、SE250 扩展、PS 代码拆分解耦**，
 并给出可直接粘贴的会话提示词。
 
-排队与判据以 `docs/18` 为准，事实状态以 `docs/03-status.md` 为准，
+排队与判据以 `docs/18` 为准，事实状态以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 为准，
 SE250 的技术细节以 `docs/20` 为准。本文只解决「怎么并行、谁先拿资源、谁不许碰什么」。
 
 ---
@@ -106,7 +106,7 @@ SE250 的技术细节以 `docs/20` 为准。本文只解决「怎么并行、谁
 
 动手前按顺序读完：AGENTS.md（开发规范、事实边界、常见陷阱）、CLAUDE.md、
 docs/21-parallel-plan-2026-08-31.md（本次并行安排，尤其 §2 冲突表和 §3 板子令牌）、
-docs/03-status.md 的「二次任务 / 状态复位」一节、docs/18 P1 第 4 项。
+docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 的「二次任务 / 状态复位」一节、docs/18 P1 第 4 项。
 然后跑 bash tools/verify_repo_binding.sh --remote，不 PASS 就停下来问。
 
 在 view.md 上用 tools/agent_view.sh 以 --agent risk-verify 登记（规则见 CLAUDE.md）。
@@ -130,7 +130,7 @@ docs/03-status.md 的「二次任务 / 状态复位」一节、docs/18 P1 第 4 
 - 特别注意：连续任务如果每轮用同一份输入，「Voter 累加器没清零」是结构性不可观测的
   （票的更新 x <- clip(x±1) 对起始值单调不减，符号判决三种情况全不变，
   所以输出逐位相同 —— 逐位相同恰是该缺陷的必然输出，不是它不存在的证据）。
-  完整推导见 docs/03-status.md 的盲区小节。所以多轮测试**每轮必须换 score_min**，
+  完整推导见 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 的盲区小节。所以多轮测试**每轮必须换 score_min**，
   并且要像 run_g3.sh 现在那样做「鉴别力自证」：两轮 pre-LDPC 原始回传必须不同，
   相同即 FAIL。
 
@@ -138,7 +138,7 @@ docs/03-status.md 的「二次任务 / 状态复位」一节、docs/18 P1 第 4 
 不要改 sw/app/echo.c（第一波归 wm-preload 会话）、不要改任何 RTL、
 不要动 tests/golden/ 下任何现有文件。
 
-【交付】结论写进 docs/03-status.md 并更新 AGENTS.md 的「仍未验证」列表；
+【交付】结论写进 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 并更新 AGENTS.md 的「仍未验证」列表；
 留证（summary + UART 实录）放 docs/board/run-logs/。
 按文件显式 git add（禁止 git add -A，工作树里可能有别的会话的改动）、
 提交前 git pull --rebase、推到 origin/main。
@@ -185,7 +185,7 @@ docs/03-status.md 的「二次任务 / 状态复位」一节、docs/18 P1 第 4 
 不要改 RTL、不要改 tools/run_g3.sh（第一波归 risk-verify）、
 不要动 tests/golden/ 下任何现有文件。
 
-【交付】结论写进 docs/18 P2 第 6 项与 docs/03-status.md 的时长模型一节，
+【交付】结论写进 docs/18 P2 第 6 项与 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 的时长模型一节，
 把新的拟合式和对照数据一起写上。按文件显式 git add、git pull --rebase、推 origin/main。
 ```
 
@@ -284,7 +284,7 @@ SE150 的 tests/golden/SHA256SUMS 必须逐字节不变，它是其它所有判�
 /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 
 动手前按顺序读完：AGENTS.md、CLAUDE.md、docs/21-parallel-plan-2026-08-31.md（尤其
-§2 冲突表）、docs/18「技术债」第 1 条、docs/03-status.md 的缺陷编年
+§2 冲突表）、docs/18「技术债」第 1 条、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 的缺陷编年
 （B21/B22/B27 三条都源自 sw/app/echo.c）。
 然后跑 bash tools/verify_repo_binding.sh --remote。
 在 view.md 上以 --agent ps-refactor-net 登记。

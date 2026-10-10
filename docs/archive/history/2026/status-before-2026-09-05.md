@@ -1503,7 +1503,7 @@ B27 的教训正是：Decoder 喂 VIP 内存连**综合后网表**都 PASS，板
   （前 150 bit 属上层、后 150 bit 属下层）。
 
 **后果**：即使位置正确，每一位也会被投到错误的地址上。二者必须统一到
-`docs/02-data-contract.md` 第 2 节的位平面布局。
+`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 第 2 节的位平面布局。
 
 ### ~~B3 缺少「与水印做差分」这一整级功能~~ ✅ 已实现（2026-08-08）
 
@@ -1649,7 +1649,7 @@ Stage2 三轮 81,000 bit 与 Stage3 64,800 bit 黄金向量仍逐位相同。
 
 - `desparsification_decoder_v1_0.v:220-233` `conv40_32()` 用 `grp[4]`
   （码流里每组的**最后一个** bit）作取反标志，数据取前 4 bit；
-  契约要求用**第一个** bit 作标志、数据取后 4 bit（`docs/02-data-contract.md` 第 4 节，已由黄金数据证明）。
+  契约要求用**第一个** bit 作标志、数据取后 4 bit（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 第 4 节，已由黄金数据证明）。
 - `five_to_four_decoder.v` 是**未被综合引用的死文件**，其查找表另有 3 处错误
   （缺 `00100`/`10100`，多出汉明重量为 3 的 `01011`，`01000` 映射错），会误导后续开发。
 
@@ -1939,7 +1939,7 @@ python3 -c "import sys,tempfile,hashlib,pathlib,shutil;sys.path.insert(0,'client
 
 ## 已确认可信的部分
 
-- 算法链路（`docs/02-data-contract.md`）已被黄金数据逐位证明。
+- 算法链路（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`）已被黄金数据逐位证明。
 - Stage1 的滑窗几何 `NUM_LC=50, STRIDE=807, REF_LEN=957` 与 40,500 nt / 150 bp 完全自洽，
   覆盖 0..40,350 全部合法起点，设计意图正确。
 - Stage2 的投票机制（±1 饱和累加、`vote>0` 判决）与位平面地址计算逻辑正确，

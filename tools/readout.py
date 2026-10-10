@@ -6,7 +6,7 @@
 （`codeword_R083.txt` / `source_bit.txt` / `Milk coronet.jpg` / 编码序列），
 输出的 `dec_input.txt` 完全来自读段本身。这一点可以用 `--prove-inputs` 自证。
 
-它是 `docs/07-performance.md` 里 CPU 侧耗时的来源，也是板端结果的对照实现。
+它是 `docs/08-performance-and-strategy.md` 里 CPU 侧耗时的来源，也是板端结果的对照实现。
 LDPC 译码不在本脚本内，需另行调用 `R5_6_LDPC_hard_decoder.exe`。
 
     python3 tools/readout.py --reads r.fastq --watermark wm.txt --limit 2048 \

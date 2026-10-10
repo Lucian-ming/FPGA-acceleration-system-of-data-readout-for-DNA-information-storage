@@ -51,7 +51,7 @@ tools/agent_view.sh start --agent "<上表名字>" \
 | 读段下发 4,096 条 / 163,840 B | ✅ |
 | 仿真侧：Icarus 11/11、XSim 6/6、M2 完整串联、BD-1、BD-2、BD-3ext | ✅ |
 
-**缺陷 B21**（详见 `docs/03-status.md` 同名条目）：板端打印到
+**缺陷 B21**（详见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 同名条目）：板端打印到
 `[STAGE1] IP core START` 后再无输出，客户端 180 s 超时。XSDB 只读取证：
 
 - RX BD 环 Cmplt = **13 / 1024**（首个未完成 = 13）
@@ -134,13 +134,13 @@ BD-3ext 只覆盖了 Voter 与 Decoder。IP 级 `tb_dna_ingress` 只测了 FIFO 
 | BD 级判据「送入第 k 条读段 → 引擎第 k 个槽位 / 第 k 条结果的码字」 | ✅ `hw/sim/m3/tb_m3_bd3b_dma.sv` |
 | IP 级同一判据（秒级回归） | ✅ `tools/run_xsim.sh ingress_result` |
 | 结论写进 `docs/15` | ✅ 新增 §8 |
-| RTL 缺陷立条目 | ✅ `docs/03-status.md` B26 |
+| RTL 缺陷立条目 | ✅ `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` B26 |
 
 ### 交付（原始要求）
 
 - `tools/run_m3_bd.sh bd3b` 可一键复跑；
 - 结论写进 `docs/15-m3-bd-simulation-2026-08-29.md` 新增一节；
-- 若定位到 RTL 缺陷，按 B20 的方式在 `docs/03-status.md` 立条目（编号 B22 起）。
+- 若定位到 RTL 缺陷，按 B20 的方式在 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 立条目（编号 B22 起）。
 
 ---
 
@@ -195,7 +195,7 @@ BD-3ext 只覆盖了 Voter 与 Decoder。IP 级 `tb_dna_ingress` 只测了 FIFO 
 
 ### 交付
 
-- 诊断过程与结论写进 `docs/03-status.md` 的 B21 条目；
+- 诊断过程与结论写进 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 的 B21 条目；
 - 固件若有改动，同步更新 `hw/build/export/` 与其 `README.md`、`SHA256SUMS`。
 
 ---

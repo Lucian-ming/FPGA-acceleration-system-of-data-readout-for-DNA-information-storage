@@ -9,7 +9,7 @@
 #include "fw_log.h"
 #include "xil_printf.h"
 #include "xil_cache.h"
-#include "xparameters.h"
+#include "bsp_compat.h"
 #include "sleep.h"
 
 /*============================================================================
@@ -17,7 +17,7 @@
  *============================================================================*/
 int dna_accelerator_init(void)
 {
-    XAxiDma_Config *CfgPtr = XAxiDma_LookupConfig(XPAR_AXIDMA_0_DEVICE_ID);
+    XAxiDma_Config *CfgPtr = XAxiDma_LookupConfig(DNA_DMA_CONFIG_KEY);
     if (!CfgPtr) {
         xil_printf("[ERROR] DMA config lookup failed\n\r");
         return XST_FAILURE;

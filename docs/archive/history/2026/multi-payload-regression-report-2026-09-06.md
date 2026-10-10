@@ -1,5 +1,5 @@
 > **已归档（2026-09-10）**：本文是 2026-09-06 的一次性运行报告，曾以 `docs/multi_payload_regression_report.md` 散落在现用文档目录里，既不带序号也无人引用。
-> 当前有效结论见 `docs/benchmarks/measured_board_multi_payload.md`（含 2026-09-10 的 21 次重复实验），复现索引见 `docs/18-evidence-ledger.md`。
+> 当前有效结论见 `docs/benchmarks/measured_board_multi_payload.md`（含 2026-09-10 的 21 次重复实验），复现索引见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/evidence-ledger.md`。
 
 # 多 Payload 独立泛化回归测试报告
 

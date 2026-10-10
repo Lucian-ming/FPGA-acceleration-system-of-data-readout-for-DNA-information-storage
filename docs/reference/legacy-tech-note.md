@@ -1,5 +1,5 @@
 > **⚠️ 已过时**：本文是历史技术说明。其中的 IP 寄存器表是「示例模板」，与实际实现不符，
-> 已被 `docs/05-interfaces.md` 取代；架构描述以 `docs/01-architecture.md` 为准。保留仅作历史参考。
+> 已被 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` 取代；架构描述以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md` 为准。保留仅作历史参考。
 
 # 📘 Vitis DNA Accelerator — 技术文档
 

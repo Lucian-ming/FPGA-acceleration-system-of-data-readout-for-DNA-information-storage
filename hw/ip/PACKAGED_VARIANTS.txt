@@ -10,3 +10,4 @@ Dna_accelerator_core_1_0 hdl/Dna_accelerator_core_v1_0.v
 Dna_accelerator_core_1_0 hdl/fifo_sync_sdpram_b64.v
 Dna_accelerator_core_1_0 hdl/s2mm_pack64.v
 Dna_accelerator_core_1_0 hdl/srpe_batch_4way.v
+Dna_accelerator_core_1_0 hdl/srpe_batch_pway.v

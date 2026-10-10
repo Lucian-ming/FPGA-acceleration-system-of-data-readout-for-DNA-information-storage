@@ -11,7 +11,7 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 
 /* Voter 等待超时按 XTime 墙钟计，不按轮询次数计。
  * 轮询间隔取决于主循环节拍：P12 删掉 usleep 后单次轮询约 4.4 us，
@@ -20,7 +20,7 @@
 #define VOTER_WAIT_TIMEOUT_S   30U
 
 /* ============================================================================
- * 投票语义、score_min 作用点与累加器鉴别力契约（docs/19 §C1）
+ * 投票语义、score_min 作用点与累加器鉴别力契约（docs/05 §C1）
  * ----------------------------------------------------------------------------
  * 1. 投票语义：Stage2 Voter 硬件核通过 AXI4 Master 从 DDR（DDR_VOTER_IN_BASE）
  *    流式读入 Stage1 生成的 48 字节/读段结果（包含 score、position 与码字）。
@@ -318,7 +318,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         poll_count++;
         XTime t_now;
         XTime_GetTime(&t_now);
-        if ((t_now - t_wait_start) > (XTime)(COUNTS_PER_SECOND * VOTER_WAIT_TIMEOUT_S)) {
+        if ((t_now - t_wait_start) > DNA_TIMEOUT_TICKS(VOTER_WAIT_TIMEOUT_S)) {
             xil_printf("\n\r[ERROR] Voter timeout after %u s (%u polls)\n\r",
                        VOTER_WAIT_TIMEOUT_S, poll_count);
             xil_printf("[ERROR] Final status: 0x%02X\n\r", status);

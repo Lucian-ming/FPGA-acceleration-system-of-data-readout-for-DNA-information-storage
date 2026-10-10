@@ -2,7 +2,7 @@
 
 > **评测日期**：2026-09-11
 > **制品**：`hw/build/export/`（与源码同源，`SHA256SUMS` 5 项 OK）
-> **对照门禁**：[13](../13-final-delivery-roadmap.md) §4 G1
+> **对照门禁**：[13](../archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md) §4 G1
 > **留证**：`logs/g3_2026/g1_variance/sweep.json`、`logs/g3_2026/g6_*.log`、
 > 板端串口实录中的 `[PIPE-BREAKDOWN]` 段
 
@@ -49,7 +49,7 @@ DONE_STAGE1   1    59 ms
 
 **结论**：一半时间是 PL 在做有用功；**约 29% 是在等 lwIP 的 poll 定时器**，
 不是任何一级在算。这一项的压缩已尝试四次全部失败并放弃，
-见 [17](../17-competition-strategy.md) §3.0.6。
+见 [17](../archive/history/2026/pre-bkb220-handoff-2026-10-10/competition-strategy.md) §3.0.6。
 
 ---
 

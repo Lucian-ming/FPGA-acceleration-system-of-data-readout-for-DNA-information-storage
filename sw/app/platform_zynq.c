@@ -47,7 +47,7 @@
 
 #ifdef __arm__
 
-#include "xparameters.h"
+#include "bsp_compat.h"
 #include "xparameters_ps.h"	/* defines XPAR values */
 #include "xil_cache.h"
 #include "xscugic.h"
@@ -58,6 +58,9 @@
 #include "netif/xadapter.h"
 #ifdef PLATFORM_ZYNQ
 #include "xscutimer.h"
+#ifdef SDT
+#include "xinterrupt_wrap.h"
+#endif
 
 #define INTC_DEVICE_ID		XPAR_SCUGIC_SINGLE_DEVICE_ID
 #define TIMER_DEVICE_ID		XPAR_SCUTIMER_DEVICE_ID
@@ -71,6 +74,7 @@ void tcp_fasttmr(void);
 void tcp_slowtmr(void);
 
 static XScuTimer TimerInstance;
+static int DnaTimerReady = 0;
 
 #ifndef USE_SOFTETH_ON_ZYNQ
 static int ResetRxCntr = 0;
@@ -149,7 +153,12 @@ void platform_setup_timer(void)
 	XScuTimer_Config *ConfigPtr;
 	int TimerLoadValue = 0;
 
-	ConfigPtr = XScuTimer_LookupConfig(TIMER_DEVICE_ID);
+	DnaTimerReady = 0;
+	ConfigPtr = XScuTimer_LookupConfig(DNA_TIMER_CONFIG_KEY);
+	if (ConfigPtr == NULL) {
+		xil_printf("[ERROR] Scutimer config lookup failed\r\n");
+		return;
+	}
 	Status = XScuTimer_CfgInitialize(&TimerInstance, ConfigPtr,
 			ConfigPtr->BaseAddr);
 	if (Status != XST_SUCCESS) {
@@ -171,9 +180,10 @@ void platform_setup_timer(void)
 	/*
 	 * Set for 250 milli seconds timeout.
 	 */
-	TimerLoadValue = XPAR_CPU_CORTEXA9_0_CPU_CLK_FREQ_HZ / 8;
+	TimerLoadValue = DNA_CPU_CLOCK_HZ / 8;
 
 	XScuTimer_LoadTimer(&TimerInstance, TimerLoadValue);
+	DnaTimerReady = 1;
 	return;
 }
 
@@ -181,6 +191,17 @@ void platform_setup_interrupts(void)
 {
 	Xil_ExceptionInit();
 
+#ifdef SDT
+    /* Share the BSP controller instance with GEM/lwIP. The BSP wrapper
+     * decodes the SDT PPI ID; a second GIC instance would reset handlers. */
+    if (!DnaTimerReady || XSetupInterruptSystem(&TimerInstance,
+        (void *)timer_callback, XPAR_XSCUTIMER_0_INTERRUPTS,
+        XPAR_XSCUTIMER_0_INTERRUPT_PARENT, 0xA0U) != XST_SUCCESS) {
+        DnaTimerReady = 0;
+        xil_printf("[ERROR] SDT timer interrupt initialization failed\r\n");
+        return;
+    }
+#else
 	XScuGic_DeviceInitialize(INTC_DEVICE_ID);
 
 	/*
@@ -202,6 +223,7 @@ void platform_setup_interrupts(void)
 	 * Enable the interrupt for scu timer.
 	 */
 	XScuGic_EnableIntr(INTC_DIST_BASE_ADDR, TIMER_IRPT_INTR);
+#endif
 
 	return;
 }
@@ -212,6 +234,7 @@ void platform_enable_interrupts()
 	 * Enable non-critical exceptions.
 	 */
 	Xil_ExceptionEnableMask(XIL_EXCEPTION_IRQ);
+	if (!DnaTimerReady) return;
 	XScuTimer_EnableInterrupt(&TimerInstance);
 	XScuTimer_Start(&TimerInstance);
 	return;

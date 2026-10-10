@@ -15,6 +15,10 @@ module Dna_accelerator_core_v1_0 #(
     // ===== AXIS widths =====
     parameter integer C_S_AXIS_DATA_TDATA_WIDTH    = 32,
     parameter integer C_M_AXIS_RESULT_TDATA_WIDTH  = 64,
+    // ===== Stage1 production variants =====
+    // 4/0: 已验证4路基线；16/1: 7020用逐级流水选优树。
+    parameter integer C_STAGE1_P_WAYS    = 4,
+    parameter integer C_STAGE1_PIPE_TREE = 0,
     // ===== Algorithm/Data params =====
     parameter integer READ_BPS  = 150,                     // bits per read (symbols*2)
     parameter integer CODEBITS  = READ_BPS*2,              // 300 for SE150
@@ -364,32 +368,67 @@ module Dna_accelerator_core_v1_0 #(
     wire                  eng_res_wr;
     wire [RESULT_W-1:0]   eng_res_din;
 
-    // 【修改3】实例化 srpe_batch: .NUM_LC(50), .STRIDE(807), .REF_LEN(957) 
-    srpe_batch #(
-        .BATCH    (BATCH),
-        .NUM_LC   (NUM_LC),
-        .STRIDE   (STRIDE),
-        .REF_LEN  (REF_LEN),
-        .READ_BPS (READ_BPS),
-        .SCORE_W  (SCORE_W),
-        .POS_W    (POS_W)
-    ) u_srpe_batch (
-        .clk              (aclk),
-        .rst_n            (aresetn & ~soft_reset_s),
-        .start_batch      (arm_start),
-        .cw_req           (eng_cw_req),
-        .cw_valid         (eng_cw_vld),
-        .cw_data          (cw_hold),
-        .bram_write_en    (wm_we),
-        .bram_sel         (wm_sel_s),
-        .bram_write_addr  (wm_waddr_q),
-        .bram_write_data  (wm_wdata),
-        .res_wr           (eng_res_wr),
-        .res_din          (eng_res_din),
-        .res_full         (res_full),
-        .busy             (eng_busy),
-        .done             (eng_done)
-    );
+    // 静态选择生产变体。所有几何显式透传，实验250bp默认值不可进入生产。
+    generate
+        if (C_STAGE1_P_WAYS == 4 && C_STAGE1_PIPE_TREE == 0) begin: g_stage1_p4
+            srpe_batch #(
+            .BATCH    (BATCH),
+            .NUM_LC   (NUM_LC),
+            .STRIDE   (STRIDE),
+            .REF_LEN  (REF_LEN),
+            .READ_BPS (READ_BPS),
+            .SCORE_W  (SCORE_W),
+            .POS_W    (POS_W)
+            ) u_srpe (
+            .clk              (aclk),
+            .rst_n            (aresetn & ~soft_reset_s),
+            .start_batch      (arm_start),
+            .cw_req           (eng_cw_req),
+            .cw_valid         (eng_cw_vld),
+            .cw_data          (cw_hold),
+            .bram_write_en    (wm_we),
+            .bram_sel         (wm_sel_s),
+            .bram_write_addr  (wm_waddr_q),
+            .bram_write_data  (wm_wdata),
+            .res_wr           (eng_res_wr),
+            .res_din          (eng_res_din),
+            .res_full         (res_full),
+            .busy             (eng_busy),
+            .done             (eng_done)
+            );
+        end else if (C_STAGE1_P_WAYS == 16 && C_STAGE1_PIPE_TREE == 1) begin: g_stage1_pway
+            srpe_batch_pway #(
+            .P_WAYS   (C_STAGE1_P_WAYS),
+            .PIPE_TREE(C_STAGE1_PIPE_TREE),
+            .BATCH    (BATCH),
+            .NUM_LC   (NUM_LC),
+            .STRIDE   (STRIDE),
+            .REF_LEN  (REF_LEN),
+            .READ_BPS (READ_BPS),
+            .SCORE_W  (SCORE_W),
+            .POS_W    (POS_W)
+            ) u_srpe (
+            .clk              (aclk),
+            .rst_n            (aresetn & ~soft_reset_s),
+            .start_batch      (arm_start),
+            .cw_req           (eng_cw_req),
+            .cw_valid         (eng_cw_vld),
+            .cw_data          (cw_hold),
+            .bram_write_en    (wm_we),
+            .bram_sel         (wm_sel_s),
+            .bram_write_addr  (wm_waddr_q),
+            .bram_write_data  (wm_wdata),
+            .res_wr           (eng_res_wr),
+            .res_din          (eng_res_din),
+            .res_full         (res_full),
+            .busy             (eng_busy),
+            .done             (eng_done)
+            );
+        end else begin: g_stage1_invalid
+            // 非法组合在仿真/综合展开时必须失败，不能静默回退到4路。
+            STAGE1_CONFIGURATION_MUST_BE_P4_OR_P16_PIPELINED invalid_configuration ();
+        end
+    endgenerate
 
     // 【深度优化】输出 FIFO: 256 → 128
     fifo_sync_sdpram_b64 #(.WIDTH(RESULT_W), .DEPTH(64), .RAM_STYLE("distributed")) u_res_fifo (

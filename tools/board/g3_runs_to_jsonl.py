@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""把 run_g3.sh 的留证目录收敛成结构化 JSONL（docs/12 的统计口径）。
+"""把 run_g3.sh 的留证目录收敛成结构化 JSONL（docs/06 的统计口径）。
 
 为什么要单独一个提取器
 ----------------------
@@ -9,7 +9,7 @@
 
 诚实边界（重要）
 ----------------
-docs/12 列了 `dma_in_s / stage1_s / stage2_s / stage3_s / download_s`。这些在**上位机
+docs/06 列了 `dma_in_s / stage1_s / stage2_s / stage3_s / download_s`。这些在**上位机
 侧根本不可分辨**：first.py 只能看到一个合并的 `Result` 墙钟（下发 POST → 收全结果），
 板内四级流水与回传全在这一个数里。因此本脚本把它们输出为 `null`，并在
 `unobservable_note` 里写明原因，**绝不拆一个假的比例出来**。

@@ -3,7 +3,7 @@
 > **审计日期**：2026-09-06  
 > **审计专员**：`rtl-evidence` (W1 阶段 RTL 架构与资源证据审计专员)  
 > **审计对象**：`hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch*` 各候选变体、顶层引用关系、IP 打包清单及 XC7Z010 芯片资源硬边界  
-> **报告依据**：`AGENTS.md`、`docs/01-architecture.md`、`docs/02-data-contract.md`、`docs/15-resume-and-parallel-plan.md` §5 (任务 C) 与 §6 (R)
+> **报告依据**：`AGENTS.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §5 (任务 C) 与 §6 (R)
 
 ---
 

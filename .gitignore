@@ -79,3 +79,14 @@ tests/stress_results/**/dec_run_*.txt
 !docs/archive/history/
 !docs/archive/history/2026/
 !docs/archive/history/2026/**
+
+# 2026-10-10：已盘点的历史生成物/活证据原位保留，精确忽略以防误提交。
+# 已跟踪的小份报告继续跟踪；清单见docs/reference/workspace-cleanup-2026-10-10.md。
+/hw/build/attic/
+/hw/build/export_4way_physopt/
+/logs/multi_payload/repeat3_20260910T200339Z/dumps/
+/logs/vivado/recovery_20260909/failing_endpoints.tsv
+/logs/vivado/recovery_20260909/failing_paths_all.rpt
+/tests/stress_results/g6_config_guard_20260911T035705Z/
+/tests/stress_results/g6_continuous_20260908T121731Z/
+/tests/stress_results/g6_postfault_20260908T165423Z/

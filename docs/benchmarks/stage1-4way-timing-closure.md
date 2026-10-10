@@ -3,7 +3,7 @@
 > **交付日期**：2026-09-06  
 > **执行 Agent**：`stage1-4way-opt` (Stage1 4-Way 架构修复与时序闭环专员)  
 > **工作区状态**：共享 `main` checkout（严格无本地 git add/commit 操作）  
-> **报告依据**：`AGENTS.md`、`docs/01-architecture.md`、`docs/02-data-contract.md`、`docs/15-resume-and-parallel-plan.md` §6 (R) 与 `docs/benchmarks/stage1-candidate-audit.md`
+> **报告依据**：`AGENTS.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §6 (R) 与 `docs/benchmarks/stage1-candidate-audit.md`
 
 ---
 

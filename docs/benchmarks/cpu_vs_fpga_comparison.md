@@ -5,7 +5,7 @@
 > 数值含推导/预期，不能用于宣称加速、能效或功耗优势。保留原始表格用于追溯，待 W1
 > 重写生成器并完成板端复测后替换结论。
 
-> 重新测量的验收口径见 [07](../07-performance.md) 与 [15](../15-resume-and-parallel-plan.md)。
+> 重新测量的验收口径见 [07](../archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md) 与 [15](../archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md)。
 
 ## 1. 原始混合表（仅追溯，FPGA“实测”标签无效）
 

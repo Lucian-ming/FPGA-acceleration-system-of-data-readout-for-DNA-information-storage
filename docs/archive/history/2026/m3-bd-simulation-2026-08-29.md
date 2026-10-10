@@ -59,8 +59,8 @@ DUT 始终是 `bd.tcl` 生成的**实际** `top_bd_wrapper`：真实 PS7（仿�
   DNA `0x43C0_0000`、Decoder `0x43C1_0000`、Voter `0x43C2_0000`、AXI DMA `0x40400000`；
   DMA 的 MM2S/S2MM/SG 与 Voter/Decoder 的 M00_AXI 全部映射到
   `SEG_ps_0_HP0_DDR_LOWOCM` offset `0x00000000` range `0x20000000`（512 MB），
-  覆盖 `docs/05-interfaces.md` §4 的全部 DDR 区间。
-  > 顺带澄清 `docs/05-interfaces.md` §3.3 的一处历史存疑：那里提醒「`bd.tcl` 注释把
+  覆盖 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` §4 的全部 DDR 区间。
+  > 顺带澄清 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` §3.3 的一处历史存疑：那里提醒「`bd.tcl` 注释把
   > Voter 与 Decoder 的地址写反」。本次核查发现当前 `bd.tcl` 里并没有会写反地址的注释，
   > 且 `assign_bd_address` 生成的实际地址与 `xparameters.h` 完全一致，
   > 该提醒可视为已经不再适用。

@@ -8,11 +8,11 @@ SE250 全量约 217.47 s 也是旧配置记录，不外推为新版已测性能�
 
 `tools/run_cpu_benchmark.py` 保留了优化 C 单/多核测量入口，但 FPGA 基线来自固定常量，
 2-way 由基线除二、8-way 为预期值，功耗同样是估算。故
-[比较草稿](benchmarks/cpu_vs_fpga_comparison.md) 不是公平实测报告。
+[比较草稿](../../../../benchmarks/cpu_vs_fpga_comparison.md) 不是公平实测报告。
 撤回 2-way 已达到 0.470 ms/源读段、851.1 条/(s·W)、能效领先 4.4/7.1 倍等结论。
 保存的多 payload dump 可以重新验证正确性，不能独立恢复原运行耗时。
 
-下一步按 [15](15-resume-and-parallel-plan.md) W1-A 修生成器，再用原始板测文件复测。
+下一步按 [15](resume-and-parallel-plan.md) W1-A 修生成器，再用原始板测文件复测。
 
 ## 2. 计时口径
 

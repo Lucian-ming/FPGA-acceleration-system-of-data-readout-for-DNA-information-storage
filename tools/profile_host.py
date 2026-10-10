@@ -346,7 +346,7 @@ def estimate_hw_and_network(
 ) -> Dict[str, Any]:
     """估算板端硬件计算耗时与网络传输耗时。
 
-    硬件模型依据 docs/07-performance.md 与 first.py 实际板测事实：
+    硬件模型依据 docs/08-performance-and-strategy.md 与 first.py 实际板测事实：
       t_hw = 4.93s + 0.0009396s * records (SE150)
     网络带宽按 100 Mbps (约 11.5 MB/s 真实净荷吞吐) 测算。
     """

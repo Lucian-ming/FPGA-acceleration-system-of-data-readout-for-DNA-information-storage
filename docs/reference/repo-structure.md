@@ -1,4 +1,4 @@
-> **归档说明**：本文是 2026-08-05 的仓库结构快照。此后文档已重组到 `docs/`（原 `DATASET.md`→`docs/reference/dataset.md`，`MISSING.md`→`docs/reference/gap-audit.md`，`STRUCTURE.md`→本文，`SUBMISSION.md`→`docs/reference/submission-archive.md`，旧 `docs/README.md`→`docs/reference/legacy-tech-note.md`），并新增了 `docs/01`~`docs/05` 与 `tools/golden_model.py`。文件职责描述仍然有效，路径以当前仓库为准。
+> **归档说明**：本文是 2026-08-05 的仓库结构快照。此后文档已重组到 `docs/`（原 `DATASET.md`→`docs/reference/dataset.md`，`MISSING.md`→`docs/reference/gap-audit.md`，`STRUCTURE.md`→本文，`SUBMISSION.md`→`docs/reference/submission-archive.md`，旧 `docs/README.md`→`docs/reference/legacy-tech-note.md`），并新增了 `docs/01`~`docs/04` 与 `tools/golden_model.py`。文件职责描述仍然有效，路径以当前仓库为准。
 
 # 仓库结构审计
 

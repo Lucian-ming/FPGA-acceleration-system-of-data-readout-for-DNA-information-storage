@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tools/run_multi_payload_regression.py —— 多 Payload 独立泛化自动化回归测试套件
 
-对齐 docs/13-final-delivery-roadmap.md G4 门禁：
+对齐 docs/05-implementation-plan.md G4 门禁：
   证明系统支持多种独立数据特征（文本、二值几何、稀疏跳变、高熵随机），
   彻底打破“数据单一性、重复测同一张图”的质疑。
 
@@ -75,7 +75,7 @@ def read_file_text(path: Path) -> str:
 def unpack_dump_bytes(raw_bytes: bytes, bitorder: str = "little") -> np.ndarray:
     """严格全文件校验并解包 dump 字节流为 64,800 位 uint8 数组 (0 或 1)。
 
-    遵循 docs/02-data-contract.md 与 docs/15 §5 (任务 B) 规范：
+    遵循 docs/02-data-contract.md 与 docs/05 §5 (任务 B) 规范：
     1. 64,800 字节规格（未压缩）：
        - ASCII 格式：所有 64,800 字节均必须为 b'0' (48) 或 b'1' (49)。
        - 纯二进制位数组格式：所有 64,800 字节均必须为 0x00 或 0x01。
@@ -637,7 +637,7 @@ class MultiPayloadRegression:
         pass_rate = (total_pass / max(1, len(self.results))) * 100.0
 
         # 按数据集汇总：重复实验的意义就在这张表。
-        # 单次成功不是成功率（docs/15 §8）——把每个数据集的 n 次结果并成
+        # 单次成功不是成功率（docs/05 §8）——把每个数据集的 n 次结果并成
         # 「k/n」才谈得上可靠性；分母必须留在报告里，失败样本不得从统计里消失。
         by_ds: Dict[str, List[bool]] = {}
         for r in self.results:
@@ -727,7 +727,7 @@ def main():
         "--repeat", type=int, default=1,
         help="每个数据集重复跑几次（仅 --mode board 有意义）。>1 时回传写入 "
              "<out-dir>/dumps/ 而不覆盖 tests/datasets/ 下已提交的留证 dump，"
-             "并按数据集汇总通过率——单次结果不构成成功率（docs/15 §8）。",
+             "并按数据集汇总通过率——单次结果不构成成功率（docs/05 §8）。",
     )
     parser.add_argument(
         "--extended",

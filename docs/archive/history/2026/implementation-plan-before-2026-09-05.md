@@ -18,8 +18,8 @@
 截至 2026-08-16 已完成：
 
 - 算法链路已在软件上端到端验证：SE150 原始读段 → LDPC → 还原出的 JPEG 与原图
-  SHA-256 完全一致（`docs/03-status.md` D1）。
-- 数据契约已固化并可自动验证（`docs/02-data-contract.md` + `tools/golden_model.py`）。
+  SHA-256 完全一致（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` D1）。
+- 数据契约已固化并可自动验证（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` + `tools/golden_model.py`）。
 - 缺陷已定位到行号：算法缺口 D1/D2，实现缺陷 B1~B6 与 B10~B16，配置问题 C1~C4，工程问题 A1~A10；
 - B1（PS 水印区域展开）、B2/B4（位序/位平面）、B3（PS XOR）、B5--B9（Stage3）、
   B10--B12（Stage1 同步读流水线）和B13--B16/C4（Stage2 投票核，2026-08-16）已落地；
@@ -67,7 +67,7 @@ AXI-Lite 从机的 AW/W 独立握手、DNA 尾批超时计数器位宽；对应�
 | **P6** LDPC 上板 | **方向 B** | 20+ 人日 | P5 + P2 |
 | **P7** Stage1 架构改造 | 性能翻 100 倍以上，并顺带消掉 B1 与 G1 的大半难度 | 10~15 人日 | P2（需换 XC7Z020） |
 
-> ⚠️ 性能实测（`docs/07-performance.md`）表明：Stage1 占全部计算的 99.5% 以上，
+> ⚠️ 性能实测（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md`）表明：Stage1 占全部计算的 99.5% 以上，
 > 且当前 XC7Z010 实现比一台笔记本的单核 C 实现还慢约 9 倍。**P6 对系统性能毫无帮助**，
 > 优先级应低于 P4/P5。真正值得做的性能工作是 **P7**。
 
@@ -131,7 +131,7 @@ python3 tools/regression.py --stage all
 > ⚠️ **先排除一个看似聪明的错误方案。** 曾考虑让上位机用 k-mer 种子快速定向，
 > 但这在本任务中**根本不成立**：接收端只有水印，而读段是 `水印 ⊕ 稀疏数据` 的含噪副本，
 > 两者只有约 50% 的碱基相同。实测读段与水印的**最长连续精确匹配只有 5~7 nt**
-> （`docs/07-performance.md` 第 2 节），16-mer 精确命中概率约 1.5e-5。
+> （`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md` 第 2 节），16-mer 精确命中概率约 1.5e-5。
 > **所有基于精确种子的方法都失效**，定向只能通过相关运算得到。
 
 | 方案 | 做法 | 代价 | 结论 |
@@ -181,7 +181,7 @@ python3 tools/regression.py --stage all
 
 ### 位序统一决策（影响 P1 和 P2，越早定越好）
 
-现状是三种位序混用（`docs/02-data-contract.md` 第 6 节）。**建议统一为：**
+现状是三种位序混用（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 第 6 节）。**建议统一为：**
 
 > 所有比特流一律按「码流顺序 + 字节内 LSB-first」打包。
 
@@ -189,7 +189,7 @@ python3 tools/regression.py --stage all
 PS 做水印差分时可以直接逐字节 XOR。代价只是 `first.py` 改一行打包方式。
 反过来在 RTL 里做位反转要多一层组合逻辑，且极易出错。
 
-⚠️ 改完必须同步更新 `docs/02-data-contract.md` 第 6 节，并重新生成黄金向量。
+⚠️ 改完必须同步更新 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 第 6 节，并重新生成黄金向量。
 
 ### 验收判据
 
@@ -499,7 +499,7 @@ DDR 布局计算后各区间不重叠、不越界
 
 把「每周期 64 条读段 × 1 个碱基」改成「每周期 64 条 × 150 个碱基」——
 即在保留现有读段并行的同时，再吃下碱基维度的并行。完整设计、资源估算、
-预期提速和风险见 **`docs/07-performance.md` 第 4 节**。
+预期提速和风险见 **`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md` 第 4 节**。
 
 要点：
 
@@ -545,6 +545,6 @@ P2 的判据是"出正确图片"，P7 的判据是"与 v1 结果逐条一致但�
 
 1. **不得让 `data/`、`archive/` 里的参考结果进入生产路径**，只能被测试代码读取做显式比较；
 2. **不得静默截断或补默认值**——任何超限都必须返回可诊断的错误码；
-3. **改数据格式前先改 `docs/02-data-contract.md`**，再改三方代码，再重生成黄金向量；
-4. **每个缺陷修复都要有对应的自动化判据**，并在 `docs/03-status.md` 里划掉并记录结果；
+3. **改数据格式前先改 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`**，再改三方代码，再重生成黄金向量；
+4. **每个缺陷修复都要有对应的自动化判据**，并在 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 里划掉并记录结果；
 5. **不要把综合通过、仿真编译通过、界面成功当成功能正确**——判据只有一个：与黄金向量逐位一致。

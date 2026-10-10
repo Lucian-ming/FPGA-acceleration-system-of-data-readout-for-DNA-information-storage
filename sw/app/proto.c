@@ -53,7 +53,7 @@ int parse_header(u8 *buf, u16 *magic, u8 *pkt_type, u32 *payload_len)
 }
 
 /*============================================================================
- * 【P3】任务配置化：PKT_CONFIG / PKT_CAPS（docs/05-interfaces.md 1.1~1.3）
+ * 【P3】任务配置化：PKT_CONFIG / PKT_CAPS（docs/04-interfaces.md 1.1~1.3）
  * 语义：严格拒绝（无降级）、强制 CONFIG（WM/BATCH/POST 前必须配置）、
  *       v1 只支持 SE150。校验逻辑在 sw/app/task_config.h（主机可测）。
  *============================================================================*/

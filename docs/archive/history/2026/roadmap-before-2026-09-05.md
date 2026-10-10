@@ -4,7 +4,7 @@
 
 > **2026-08-30 更新**：板端闭环验收（G3）已完成——第五次上板回传经 LDPC 译码后图片
 > SHA-256 与判据逐位相同，四级 DDR 快照逐级比对全过。本节记录的是达成它所用的策略，
-> 保留下来作为方法论；下一阶段的重点见 `docs/03-status.md` 与本文末尾的排队项。
+> 保留下来作为方法论；下一阶段的重点见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 与本文末尾的排队项。
 > 闭环只在「2,048 条源读段 / `--orient both` / `score_min 67` / SE150」这组参数下成立。
 
 这个项目**曾经**最大的问题不是性能，而是尚未完成从板端 Stage1/Stage2/Stage3 到 LDPC 的闭环验收。
@@ -54,7 +54,7 @@ C1~C3 已落地并有离线判据；P5 纯 Python LDPC 在 Linux 完成黄金自
    - **判据**：读回水印 BRAM（或加一个 debug 寄存器）与黄金水印逐符号相同。
 
 2. **B4 + B2 位序统一**（✅ 已完成 RTL 黄金回归）
-   - 以 `docs/02-data-contract.md` 为准，让 `first.py`、`srpe_batch`、`voter` 三方一致；
+   - 以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 为准，让 `first.py`、`srpe_batch`、`voter` 三方一致；
    - 建议统一到**位平面**布局，因为 Voter 与客户端已经是它，只需改 `srpe_batch` 的
      `cw_data` 取位方式和 `cw_acc` 的拼装方式。
    - **判据**：给 Stage1 喂黄金读段，输出的 `pos` 与软件模型逐条一致（允许极少数并列峰差异）。
@@ -87,7 +87,7 @@ C1~C3 已落地并有离线判据；P5 纯 Python LDPC 在 Linux 完成黄金自
 - PS 校验这些值是否落在综合上限内（`NUM_LC_MAX`、`REF_LEN_MAX`、DDR 预算），
   超限返回明确错误码，**不得静默截断**；
 - PL 侧把 `NUM_LC / STRIDE / REF_LEN / CODEBITS` 从 `parameter` 改成寄存器可配，
-  并遵守 `docs/02-data-contract.md` 第 7 节的约束
+  并遵守 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 第 7 节的约束
   （`NUM_LC*STRIDE = L - READ_BPS`，`REF_LEN = STRIDE + READ_BPS`）；
 - `CODEBITS`（读段长度）会改变数据通路宽度，**无法完全运行时可变**；
   务实做法是综合时支持一组离散档位（如 150 / 250 bp），运行时选择档位并公开支持范围。
@@ -181,7 +181,7 @@ R5_6_LDPC_hard_decoder.exe dec_input.txt TestBitStream.txt image.jpg H
 实测结果：`--rc` 版本输出 `Decoding successful!`，`image.jpg` 的 SHA-256 与
 `Milk coronet.jpg` **完全相同**（`fcd0cf90...b6b1f2c3`）；不带 `--rc` 的版本
 `Decoding failed!`，图片是错的。**所需读段数只要约 1,080 条（≈4× 覆盖）**，
-详细曲线见 `docs/03-status.md` D1。
+详细曲线见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` D1。
 
 因此后续所有 RTL 修复的目标非常明确：**让硬件复现这份软件结果**，
 每一级都有可逐位比对的期望输出。
@@ -195,7 +195,7 @@ R5_6_LDPC_hard_decoder.exe dec_input.txt TestBitStream.txt image.jpg H
 
 ✅ 已修复（2026-08-13）：`ldpc_pipeline.py` 会把 EXE + `.pchk` + `permutation64800`
 和三个 DLL 一起拷进临时目录（缺失时警告并提示提取工具；运行后还有输出缺失检查兜底），
-判据见 `docs/03-status.md` A10。
+判据见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` A10。
 
 WSL 下可直接调用 Windows EXE（binfmt 互操作），但工作目录必须放在
 `/mnt/c/...` 等 Windows 可见路径上；放在 `\\wsl$` UNC 路径下会以错误码 53 失败。

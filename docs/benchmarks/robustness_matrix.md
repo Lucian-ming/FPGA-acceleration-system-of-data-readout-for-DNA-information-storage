@@ -4,7 +4,7 @@
 > 表格中的失败必须保留。“100%”旧标签仅指该次 payload 哈希匹配，不是统计成功率，
 > 也不是完整码字逐位核验。失败括号内 bit 数是译码前误码，不是译码后的剩余误码。
 
-> 依据 `docs/13-final-delivery-roadmap.md` §4 (G5 错误鲁棒性) 规范生成。
+> 依据 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md` §4 (G5 错误鲁棒性) 规范生成。
 > 评测基于 SE150 真实测序读段及全流水线黄金模型（Stage1 C多核滑窗 + Stage2 大数投票 + Stage3 反稀疏化 + C LDPC 译码）。
 
 ## 1. 实验 1：碱基替换错误率 (Substitution) 容错边界

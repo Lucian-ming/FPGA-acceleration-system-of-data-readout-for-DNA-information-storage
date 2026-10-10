@@ -31,7 +31,7 @@ def read_size_bytes(read_bps: int = READ_BASES) -> int:
         SE150  ceil(300/8) = 38 → **40**
         SE250  ceil(500/8) = 63 → **64**
     对齐这一步不能省成 63 —— 入口是按整拍收的，少一拍整条记录就错位
-    （docs/20 §1.4 与 §3.5 的 S2）。
+    （docs/02 的读段打包与 docs/04 的接口契约）。
     """
     return ((2 * read_bps + 31) // 32) * 4
 
@@ -40,7 +40,7 @@ def default_score_min(read_bps: int = READ_BASES) -> int:
     """比对分阈值 int(0.45*read_bps)：SE150 → 67，SE250 → 112。
 
     这个 0.45 必须和黄金向量同源（`make_golden.py --min-score 0.45`）。
-    docs/20 §2.2 的阈值扫描表明 0.45 对两个数据集都落在
+    历史阈值扫描（见 docs/08 的测量边界与对应归档）表明 0.45 对两个数据集都落在
     「真方向过阈 ~98 %、假方向 0 %」的平台区里。
     """
     return (SCORE_MIN_NUMERATOR * read_bps) // SCORE_MIN_DENOMINATOR

@@ -9,7 +9,7 @@
 #include "xil_printf.h"
 #include "xil_cache.h"
 #include "sleep.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 
 /* 与 stage2_voter.c 的 VOTER_WAIT_TIMEOUT_S 同理：超时按墙钟计，不随轮询节拍漂移。 */
 #define DECODER_WAIT_TIMEOUT_S 30U
@@ -287,7 +287,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         /* 够得着的超时（墙钟，见 DECODER_WAIT_TIMEOUT_S） */
         XTime t_now;
         XTime_GetTime(&t_now);
-        if ((t_now - t_wait_start) > (XTime)(COUNTS_PER_SECOND * DECODER_WAIT_TIMEOUT_S)) {
+        if ((t_now - t_wait_start) > DNA_TIMEOUT_TICKS(DECODER_WAIT_TIMEOUT_S)) {
             xil_printf("\n\r[ERROR] STAGE3 等待超时仍未完成\n\r");
             xil_printf("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
                        status,

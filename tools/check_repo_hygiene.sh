@@ -8,7 +8,7 @@
 # 答案错了就会红。但下面这些缺陷**不产生任何错误答案**，所以整套体系对它们失明：
 #
 #   - 零引用的脚本（bench_align.py 存着「种子法为何失效」的实证却无人可见，
-#     导致 docs/17 把被它推翻的方向列为第一优先级长期方向）；
+#     导致 docs/08 把被它推翻的方向列为第一优先级长期方向）；
 #   - 同一份数据存多份副本（6 份 watermark.txt 逐字节相同，各自校验和都自洽，
 #     发现不了彼此不一致）；
 #   - 根目录残留、新日志目录没进 .gitignore、散落的不带号文档。
@@ -109,7 +109,7 @@ fi
 # 在 WM 批量化补进注释后早已不是被引用的内容（真正的位置是 PIPE_WM_TX 分支里的
 # 第 205 行）。这条错误引用从源码注释扩散进了 5 份文档，**全程没有任何判据变红**。
 #
-# 同一次扫描还发现 docs/05-interfaces.md 指着 `echo.c:465-495`（那段代码早就拆到
+# 同一次扫描还发现 docs/04-interfaces.md 指着 `echo.c:465-495`（那段代码早就拆到
 # stage1_dna.c，echo.c 现在只有 740 行），以及 4 处指向已被删除的 srpe_batch_2way.v。
 #
 # 能查与不能查，必须说清楚：
@@ -155,7 +155,7 @@ else
 fi
 
 # --- 8. sw/app 与 sw/workspace 同名文件必须逐字节相同 -------------------------
-# 2026-09-11 新增（docs/19 §A5）。sw/app 是唯一权威源，sw/workspace 是其生成副本。
+# 2026-09-11 新增（docs/05 的清理分类与门禁）。sw/app 是唯一权威源，sw/workspace 是其生成副本。
 WS_APP="sw/workspace/dna_lwip_app_b27/src"
 if [[ -d "$WS_APP" ]]; then
     WS_DIFF=""
@@ -180,7 +180,7 @@ else
 fi
 
 # --- 9. tools/attic/ 下脚本必须登记进 tools/README.md -------------------------
-# 2026-09-11 新增（docs/19 §B3）。退役脚本也须在 README 单列一节说明原用途与归档原因。
+# 2026-09-11 新增（docs/05 的清理分类与门禁）。退役脚本也须在 README 单列一节说明原用途与归档原因。
 UNDOC_ATTIC=""
 if [[ -d "tools/attic" ]]; then
     for f in tools/attic/*.py tools/attic/*.sh; do
@@ -197,7 +197,7 @@ else
 fi
 
 # --- 10. hw/experimental/README.md 当前内容表必须与目录实际文件一一对应 ------
-# 2026-09-11 新增（docs/19 §B2 / §7.2）。表与目录不一致本身就是一个新的卫生缺陷。
+# 2026-09-11 新增（docs/05 的清理分类与门禁）。表与目录不一致本身就是一个新的卫生缺陷。
 EXP_TABLE_FILES=()
 EXP_ACTUAL_FILES=()
 EXP_MISMATCH=""
@@ -243,7 +243,7 @@ else
 fi
 
 # --- 11. 仓库内不得存在两份 SHA-256 相同的已跟踪文件 --------------------------
-# 2026-09-11 新增（docs/19 §A1 / §7.2，A1 那类重复文件的通用判据）。
+# 2026-09-11 新增（docs/05 的清理分类与门禁，A1 那类重复文件的通用判据）。
 # 注意：测试数据集（tests/datasets/）、测试黄金向量（tests/golden/）、
 # 压测留证（tests/stress_results/）与图像验证留证（docs/images/）包含独立基准包
 # 或跨几何黄金断言，各自有独立 SHA256SUMS 清单或运行日志，予以排除。
@@ -268,7 +268,7 @@ if dups:
 RC=$?
 if (( RC != 0 )); then
     bad "仓库内存在相同 SHA-256 的已跟踪重复文件："$'\n'"$DUP_TRACKED"
-    info "见 docs/19 §A1 与 AGENTS.md 代码卫生 §5 第 2 条；消除冗余副本，保留单一权威源"
+    info "见 docs/05 的清理分类与门禁 与 AGENTS.md 代码卫生 §5 第 2 条；消除冗余副本，保留单一权威源"
 else
     ok "仓库内无重复 SHA-256 已跟踪文件（A1 通用判据）"
 fi

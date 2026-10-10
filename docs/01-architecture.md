@@ -1,5 +1,7 @@
 # 01 · 系统架构与算法模型
 
+> 2026-10-10：算法/接口契约继续有效；文中的器件、DDR与地址拓扑是旧ECO基线，新板实际PS7/BSP/制品必须按[07](07-board-build-and-acceptance.md)核验。当前状态见[03](03-status.md)，执行与资源规则见[05](05-implementation-plan.md)。
+
 本文描述系统「应该是什么」。所有数值都已用 `data/R0.83_data/` 的黄金数据或 RTL 源码核对，
 凡是推测都显式标注。与本文冲突的历史文档（`docs/reference/legacy-tech-note.md`、
 2025-11 技术 PDF）以本文为准。
@@ -54,7 +56,7 @@ ARM Cortex-A9 (裸机 + lwIP)  ── GEM0 ── PHY
   ├─ Stage1 DNA core     0x43C0_0000   AXIS 进 / AXIS 出（走 DMA）
   ├─ Stage3 Desparsifier 0x43C1_0000   AXI-Lite 控制 + AXI4 Master 自取 DDR
   └─ Stage2 Voter        0x43C2_0000   AXI-Lite 控制 + AXI4 Master 自取 DDR
-DDR3 512MB：水印 / 读段 / 各级中间结果（地址表见 docs/05-interfaces.md）
+DDR3 512MB：水印 / 读段 / 各级中间结果（地址表见 docs/04-interfaces.md）
 ```
 
 地址来自 XSA 内 `design_1.hwh`，器件 `xc7z010clg400-1`，PL 100 MHz。

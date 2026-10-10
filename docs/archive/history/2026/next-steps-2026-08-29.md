@@ -5,7 +5,7 @@
 
 本文回答一个问题：**在当前这台机器、当前这个 checkout 上，接下来应该按什么顺序做什么。**
 它不重复 `docs/13-xsim-simulation-plan.md` 的 M3/M4 技术细节，而是给出优先级、判据和
-「谁被什么阻塞」。技术做法仍以 13 为准，事实状态仍以 `docs/03-status.md` 为准。
+「谁被什么阻塞」。技术做法仍以 13 为准，事实状态仍以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 为准。
 
 ---
 

@@ -52,7 +52,7 @@ L=40,500 时即 81,000 bit。`differential_voter_v1_0.v` 的 `calc_layer_positio
 ## 4. 稀疏码本与 5b→4b 反稀疏化
 
 稀疏流的每 5 bit 是一个码字，码本恰好是**全部汉明重量 ≤ 2 的 16 个 5-bit 字**
-（1 + 5 + 10 = 16）。在 R0.83 数据上这 16 个值全部出现且没有第 17 个值出现。
+（1 + 5 + 10 = 16）。在 R0.83 数据上这 16 个值全部出现且没有第 08 个值出现。
 
 反稀疏化规则（**用码流顺序表述，与端序无关**）：
 
@@ -119,5 +119,5 @@ desparsify( plane_bits(DNA-40.5Kb-MC (R=0.83).txt)  XOR  r0.83_watermark.txt )
 SE250（64,800 条 × 250 bp）需要 `NUM_LC=50, STRIDE=805, REF_LEN=1055, CODEBITS=500`，
 每条**线上 64 B**（有效 63 B + 1 B 对齐补零，同上一行的对齐规则），
 Stage1 结果 526 bit → 72 B。**现有比特流不支持 SE250。**
-主机侧与黄金向量已按这套几何落地（`tests/golden/se250/`，见 `docs/20` 阶段 S2）；
+主机侧与黄金向量已按这套几何落地（`tests/golden/se250/`的GEOMETRY/SHA清单，生成入口为tools/make_golden.py；几何鉴别力见AGENTS及06验证文档）；
 RTL / 固件仍是 SE150。

@@ -88,7 +88,7 @@ PASS  四级逐级取证
 对照 CPU（`measured_cpu_vs_fpga.md`）：单核 1,364.9 reads/s、16 线程 14,003.1。
 
 **4-way 上板后仍慢于单核 CPU（0.77x），慢于多核 13.3x。**
-这比 [17](../17-competition-strategy.md) §1 原先基于 1.929x 外推的「打平单核」
+这比 [17](../archive/history/2026/pre-bkb220-handoff-2026-10-10/competition-strategy.md) §1 原先基于 1.929x 外推的「打平单核」
 **更差**——因为那次外推同样用了 81% 的错误假设。
 
 ---
@@ -99,7 +99,7 @@ PASS  四级逐级取证
 2. **核心加速 1.929x 是真的，端到端只有 1.218x 也是真的**——两者不矛盾，
    差距完全由「Stage1 只占 37%」解释，Amdahl 算出的 1.22x 与实测吻合到小数点后两位；
 3. **要让 4-way 的收益兑现，必须先压缩那 62.9%**（DMA / Voter / poll），
-   而不是继续加宽 Stage1。这也再次说明 [17](../17-competition-strategy.md) §2.1
+   而不是继续加宽 Stage1。这也再次说明 [17](../archive/history/2026/pre-bkb220-handoff-2026-10-10/competition-strategy.md) §2.1
    关闭 8-way 是对的——**即使 8-way 放得下，端到端上限也只有 1.35x**
    （`1/(0.629 + 0.371/3.858)`）。
 

@@ -12,7 +12,7 @@
   构建和 Bootgen 制品复现均已通过。
 - ~~**项目仍未完成 G3 板端端到端验收。**~~ **G3 已于 2026-08-30 闭环**（第五次上板，
   图片 SHA-256 与判据逐位相同）。本文是 2026-08-21 的历史快照，其余内容按当时状态阅读，
-  **现状以 `docs/03-status.md` 为准**。
+  **现状以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 为准**。
 - 判据纪律仍然成立：构建成功、GUI 成功、TCP 返回结果、生成图片或程序正常退出，
   都不能证明结果正确。
 - 唯一最终判据：开发板真实回传的 64,800 bit 经 LDPC 后，重建 JPEG SHA-256 必须等于
@@ -149,7 +149,7 @@ SE150 FASTQ
 
 ## 5. 固定数据契约
 
-`docs/02-data-contract.md` 是唯一权威。当前比特流只支持 R0.83 SE150：
+`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 是唯一权威。当前比特流只支持 R0.83 SE150：
 
 | 参数 | 当前值 | 约束/用途 |
 | --- | ---: | --- |
@@ -163,7 +163,7 @@ SE150 FASTQ
 | 最大合法记录数 | 107,968 | 必须非零且为 64 的倍数 |
 
 三端统一使用位平面布局和字节内 LSB-first。禁止单独修改 Python、PS 或 RTL 中任意一端的
-打包规则；格式变化必须先更新 `docs/02-data-contract.md`，再成对修改并重生成黄金向量。
+打包规则；格式变化必须先更新 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`，再成对修改并重生成黄金向量。
 
 SE250 不是换一个常量：它需要 250 bp、500 bit 码字、63 B 输入、72 B Stage1 输出，以及
 `50/805/1055` 几何和更宽 RTL 数据通路。当前 CAPS 必须如实只报告 SE150。
@@ -172,7 +172,7 @@ SE250 不是换一个常量：它需要 250 bp、500 bit 码字、63 B 输入、
 
 | 范围 | 主要入口 | 修改前必读 |
 | --- | --- | --- |
-| 数据契约/算法 | `docs/02-data-contract.md`、`tools/golden_model.py` | `docs/01-architecture.md` |
+| 数据契约/算法 | `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`tools/golden_model.py` | `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md` |
 | 上位机任务编排 | `clients/python/first.py` | `task_protocol.py`、`protocol.py` |
 | 上位机 LDPC | `clients/python/native_ldpc.py`、`ldpc_pipeline.py` | `tools/ldpc_decode.py` |
 | PS 协议和流水线 | `sw/app/echo.c`、`echo.h` | `task_config.h`、`ddr_layout.h`、`wm_expand.h` |
@@ -202,7 +202,7 @@ DDR 关键区：水印 `0x1000_0000`，展开水印 `0x1004_0000`，读段 `0x10
 输出 `0x1060_0000`，Stage2 输出 `0x1100_0000`，Stage3 输出 `0x1110_0000`。实际 cache
 flush/invalidate 和 Voter 条数必须使用任务实收条数，不能恢复固定 `TOTAL_READS=108000`。
 
-完整包格式、错误码、寄存器偏移、DDR 区间和状态机顺序只看 `docs/05-interfaces.md`。
+完整包格式、错误码、寄存器偏移、DDR 区间和状态机顺序只看 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md`。
 
 ## 8. 离线复跑
 
@@ -302,7 +302,7 @@ sha256sum /tmp/fpga-decoded.jpg
 5. 只有哈希严格等于
    `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3` 才关闭 G3。
 6. 保存本次输入文件哈希、CONFIG/CAPS 内容、读段数、每级 DDR 中间输出、UART/TCP 日志、
-   回传 bitstream、LDPC 迭代结果和最终图片哈希，回填 `docs/03-status.md`。
+   回传 bitstream、LDPC 迭代结果和最终图片哈希，回填 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`。
 
 禁止从 `data/R0.83_data/` 或 `archive/` 复制 `dec_input.txt`、`decoded_bits.txt`、结果图片或
 `codeword_R083.txt` 进入生产路径。黄金文件只能在测试代码中作为显式比较对象。
@@ -341,12 +341,12 @@ sha256sum /tmp/fpga-decoded.jpg
 
 ## 13. 建议的接手顺序
 
-1. 阅读 `docs/02-data-contract.md`、`docs/03-status.md`、本文和 `docs/05-interfaces.md`。
+1. 阅读 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`、本文和 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md`。
 2. 复跑 `verify-code`、`run_sim.sh`、LDPC verify 和制品 SHA-256，建立本机可信基线。
 3. 不改代码，先完成一次 2,048 条读段的板端协议联调，采集每一级证据。
 4. 根据第一处实际不一致定位到 PC、PS、Stage1、Stage2、Stage2.5 或 Stage3；一次只替换一级，
    用对应黄金向量锁定边界。
 5. G3 哈希闭环后回填状态文档并提交；之后再讨论性能、SE250、LDPC 上板或代码重构。
 
-遇到冲突时，事实优先级是：真实文件/哈希和现场复跑结果 > `docs/02-data-contract.md`/
-`docs/05-interfaces.md` 当前规范 > 本交接 > 历史快照和旧技术说明。
+遇到冲突时，事实优先级是：真实文件/哈希和现场复跑结果 > `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`/
+`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` 当前规范 > 本交接 > 历史快照和旧技术说明。

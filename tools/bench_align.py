@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Stage1 比对的 CPU 侧性能基准，以及「种子法为何失效」的实证。
 
-产出 docs/07-performance.md 里的全部 CPU 数字。同时导出 ref.bin / reads.bin
+产出 docs/08-performance-and-strategy.md 里的全部 CPU 数字。同时导出 ref.bin / reads.bin
 供 tools/align.c 的 C 版本使用：
 
     python3 tools/bench_align.py --reads 2048

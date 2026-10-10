@@ -5,7 +5,7 @@
 #define __PIPELINE_H__
 
 #include "xil_types.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 #include "echo.h"
 
 #ifdef __cplusplus

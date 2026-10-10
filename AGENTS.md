@@ -22,7 +22,7 @@
 - **本轮并行执行约束**：主会话是唯一 Git 写入者，子 Agent 不 add/commit/pull/rebase/stash/
   reset/switch/clean/push；子任务交付由 main 审查后统一提交、立即推送。main 操作 Git 前须
   暂停写入并核对其他会话，不能在活跃子任务中触发 autostash。路径限定 commit 仍然必须使用。
-  当前不创建分支/worktree，独占路径、资源和中断回收按 `docs/14-git-parallel-workflow.md`。
+  当前不创建分支/worktree，独占路径、资源和中断回收按 `docs/05-implementation-plan.md`。
 - Vivado/XSim 大型生成目录不提交，但不得自动删除；必须提交可复现入口、源文件/黄金数据 manifest、
   结果摘要和结论边界。若 GitHub ruleset 阻止直接推送，立即报告，不得改推其他仓库规避。
 - 工具生成的 `*.log`、`*.jou`、`*.str`、`*.pb` 不得留在仓库根目录；Vivado 使用
@@ -151,7 +151,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 - 回归跑的是 `srpe_batch.v`(2-way)，而打包进比特流的是 `srpe_batch_4way.v`，
   **回归验证的实现与综合出来的实现不是同一个**；
 - `bench_align.py` 存着「精确种子法为何失效」的实测反证，却零引用、不在任何文档里，
-  导致 `docs/17` 把被它推翻的方向列为第一优先级长期方向。
+  导致 `docs/08` 把被它推翻的方向列为第一优先级长期方向。
 
 **共同点：这些缺陷都不产生错误答案，所以整套验证金字塔对它们失明。**
 
@@ -213,7 +213,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 
 ## 文档编号约定
 
-**现用文档一律带序号**（`docs/01-…` ~ `docs/18-…`），**归档文档一律不带序号**
+**现用文档一律带序号**（当前连续01～09，编号按阅读顺序排列），**归档文档一律不带序号**
 （`docs/archive/history/2026/` 下全部为纯名字）。这样从文件名就能一眼看出
 一份文档是否还有效，也不必因为「历史文档占了号」而给新文档跳号。
 
@@ -224,25 +224,15 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 
 | 文档 | 作用 |
 | --- | --- |
-| `docs/README.md` | 精简文档索引与阅读顺序 |
-| `docs/01-architecture.md` | 系统架构与算法模型 |
-| `docs/02-data-contract.md` | 数据格式唯一权威规范 |
-| `docs/03-status.md` | 当前闭环状态、未关闭问题与证据边界 |
-| `docs/04-roadmap.md` | 总体开发顺序与验收判据 |
-| `docs/05-interfaces.md` | TCP、寄存器、DMA、DDR 地址 |
-| `docs/06-implementation-plan.md` | 开发前检查、变更分类与提交门禁 |
-| `docs/07-performance.md` | CPU/FPGA 性能基线与瓶颈 |
-| `docs/08-verification-plan.md` | 仿真、接口、BD 与 G3 验证层级 |
-| `docs/09-board-build-and-acceptance.md` | 板级配置、构建与上板验收 |
-| `docs/10-current-handoff.md` | 当前接手顺序与主线 |
-| `docs/11-optimization-plan.md` | Stage1、数据、鲁棒性与上位机优化 |
-| `docs/12-stress-analysis.md` | 自动压测统计口径与后续改造 |
-| `docs/13-final-delivery-roadmap.md` | 从当前状态到最终交付的总收口计划与硬门禁 |
-| `docs/14-git-parallel-workflow.md` | 当前共享 main 的并行与回收规范（禁止 worktree） |
-| `docs/15-resume-and-parallel-plan.md` | 中断恢复与全流程并行计划 |
-| `docs/16-interrupted-work-audit-2026-09-06.md` | 本轮遗留物清点与 dump 复核 |
-| `docs/archive/history/2026/` | 历史交接、旧计划和旧状态全文，只用于追溯 |
-| `docs/reference/` | 数据集与历史审计参考 |
+| `docs/01-architecture.md` | 架构与载体 |
+| `docs/02-data-contract.md` | 唯一数据契约 |
+| `docs/03-status.md` | 当前状态与交接 |
+| `docs/04-interfaces.md` | 协议/寄存器/DMA/DDR接口 |
+| `docs/05-implementation-plan.md` | 完整F0-F9计划、Agent/监控/Git/清理规则 |
+| `docs/06-verification-plan.md` | 验证层级、故障/压力/统计 |
+| `docs/07-board-build-and-acceptance.md` | 旧板/BKB220配置、构建及迁移验收 |
+| `docs/08-performance-and-strategy.md` | 最新性能基线与策略边界 |
+| `docs/09-evidence-ledger.md` | 证据台账与历史审计索引 |
 
 改架构、协议或数据格式时**必须同步更新对应文档**；修好缺陷时在 `03-status.md` 里划掉并记录判据。
 
@@ -250,9 +240,9 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 
 当前有效事实只看 `docs/03-status.md`，不要从历史文档推断现状：
 
-- G3 已闭环：SE150/SE250 均有真实板端回传、LDPC 图片哈希和四级 DDR 证据；
+- 旧ECO指定SE150/历史SE250 profile有真实板端回传、LDPC哈希和四级DDR证据；当前发布SE150，不代表BKB220或SE250新制品已通过；
 - SE250 全量 129,600 条记录与连续任务已闭环；
-- 当前板级唯一配置见 `docs/09-board-build-and-acceptance.md` 与 `docs/board/zynq-eco-7010/`；
+- 旧板资料在 `docs/board/zynq-eco-7010/`，新板配置与验收见 `docs/07-board-build-and-acceptance.md`，BKB220未验证前ready=0；
 - 当前性能模型是板测事实，不等于 FPGA 已击败优化 CPU；公平基准和 Stage1 展开仍是下一阶段；
 - 多 payload 泛化、错误鲁棒性曲线、实测功耗和新板迁移没有证据前不得宣称完成；
 - 历史完整证据保留在 `docs/archive/history/2026/`，归档内容不能覆盖当前状态；

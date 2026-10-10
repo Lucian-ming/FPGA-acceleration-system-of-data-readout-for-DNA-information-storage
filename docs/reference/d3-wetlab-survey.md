@@ -3,7 +3,7 @@
 > **文档性质**：本文档为 DNA 存储外部湿实验高通量测序（NGS / Third-gen）公开数据集的技术调研、规范审计与系统兼容性评估报告。
 > **编制代号**：`d3-wetlab-survey`
 > **目标对准**：支撑 Roadmap G4（多 Payload 通用性）与 G5（真实错误鲁棒性）外部真实数据泛化储备，厘清算法约束与数据源边界。
-> **权威基准**：系统架构与数据契约严格对照 `docs/01-architecture.md` 与 `docs/02-data-contract.md`。
+> **权威基准**：系统架构与数据契约严格对照 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md` 与 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`。
 
 ---
 
@@ -112,7 +112,7 @@ $$P_{\text{error}}(c) \approx P_0 + \alpha \cdot e^{\beta \cdot c}, \quad c \in 
 
 ## 4. 本系统数据契约审计与外部数据集兼容性技术差距分析
 
-对照 `docs/01-architecture.md` 与 `docs/02-data-contract.md`，对本系统软硬件数据通路进行逐级兼容性穿透审计。
+对照 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md` 与 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`，对本系统软硬件数据通路进行逐级兼容性穿透审计。
 
 ### 4.1 核心约束对照矩阵
 
@@ -224,7 +224,7 @@ flowchart TD
 2. **严防读长截断导致的位序错位**：
    外部双端测序（PE）若包含 152 bp（如 Erlich 2017），裁剪为 150 bp 时必须统一从 3' 端去除多余的 2 bp，绝不可在 5' 端切除，否则会导致位平面与参考坐标整体发生位移。
 3. **双端读段方向性识别**：
-   Illumina PE 测序中，Read 1 与 Read 2 为反向互补配对（Inward-facing）。本系统目前硬件仅支持正向滑窗比对（见 `docs/01-architecture.md` §3），外部 PE 数据导入前必须进行方向归一化或单端（SE）模式筛选，反向互补读段需预先由前处理软件取 RC。
+   Illumina PE 测序中，Read 1 与 Read 2 为反向互补配对（Inward-facing）。本系统目前硬件仅支持正向滑窗比对（见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md` §3），外部 PE 数据导入前必须进行方向归一化或单端（SE）模式筛选，反向互补读段需预先由前处理软件取 RC。
 4. **Git 与存储管理纪律**：
    外部测序原始 FASTQ 动辄数 GB 至数十 GB，**严禁将大体积 FASTQ 直接提交入 Git 仓库**。应采用 `tools/fetch_d3_external.sh` 按需拉取并校验 SHA-256，仓库内仅保留 manifest、提取后的 JSON 轮廓模型及验证摘要。
 

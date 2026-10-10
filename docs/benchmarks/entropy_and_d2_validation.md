@@ -3,7 +3,7 @@
 > **报告日期**：2026-09-06  
 > **报告专员**：`entropy-validation`（W4 阶段高熵随机样本多 Seed 验证与 D2 噪声扩展专员）  
 > **执行环境**：统一 WSL 原生共享 main checkout (`Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`)  
-> **报告依据**：`AGENTS.md`、`docs/02-data-contract.md`、`docs/15-resume-and-parallel-plan.md` §8、`tools/generate_payload_dataset.py`、`tools/debug_high_entropy.py`
+> **报告依据**：`AGENTS.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §8、`tools/generate_payload_dataset.py`、`tools/debug_high_entropy.py`
 
 ---
 

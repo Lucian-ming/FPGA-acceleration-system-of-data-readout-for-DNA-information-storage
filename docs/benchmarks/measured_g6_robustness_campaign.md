@@ -3,7 +3,7 @@
 > **评测日期**：2026-09-11
 > **制品**：`hw/build/export/`（制品与源码同源，`SHA256SUMS` 5 项 OK；含 B29/B30、
 > P0 poll 批量化修复与 `TOTAL_READS=129600`）
-> **对照门禁**：[13](../13-final-delivery-roadmap.md) §4 G6
+> **对照门禁**：[13](../archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md) §4 G6
 > **留证**：`tests/stress_results/g6_campaign_20260911T040151Z/`、
 > `logs/g3_2026/g6_*.log`
 >
@@ -74,7 +74,7 @@ idle_outage · mid_task_outage_kill · mid_task_outage_kill_repeat
 
 全部注入后 `board_alive_after=true`，**板子没有挂死**。
 
-> 该项同时关闭 [13](../13-final-delivery-roadmap.md) §7.4 **G3**
+> 该项同时关闭 [13](../archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md) §7.4 **G3**
 > 「读长自动识别可靠，150/250 混用被明确拒绝」。
 
 ---

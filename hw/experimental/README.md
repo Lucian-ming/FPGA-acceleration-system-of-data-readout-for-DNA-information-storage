@@ -12,13 +12,13 @@
 | `local_correlator.v` | 全库零引用。4-way 是扁平实现，不实例化任何子模块 | **保留**：不满足退休三条中任何一条（无实测证伪，亦无直接替代文件覆盖其微结构） |
 | `srpe_batch_pway.v` | 参数化 P 路 Stage1（由生产 4-way 机械推广），XC7Z020 迁移候选，**未打包** | **保留**：7020 摸底的被测对象；由 tools/run_sim.sh 的 stage1_pway 用例覆盖，结论见 docs/benchmarks/stage1-pway-7020-probe.md |
 
-## 历史退休记录（2026-09-11，docs/19 §B2）
+## 历史退休记录（2026-09-11，docs/05 §B2）
 
 以下文件已于 2026-09-11 依据 AGENTS.md 代码卫生 §5 退休删除，历史可从 Git 取回：
 
 | 文件 | 退休规则 | 依据 |
 | --- | --- | --- |
-| `srpe_batch_8way_wip.v` | 第 1 条成立 | 方向已被资源证伪，结论在 `docs/17` §2.1 与 `docs/benchmarks/measured_4way_board.md` §4 |
+| `srpe_batch_8way_wip.v` | 第 1 条成立 | 方向已被资源证伪，结论在 `docs/08` §2.1 与 `docs/benchmarks/measured_4way_board.md` §4 |
 | `srpe_batch_1way_baseline.v` | 第 3 条成立 | 被 `srpe_batch.v` (2-way) / `srpe_batch_4way.v` 取代，受 `tools/run_sim.sh` 覆盖 |
 | `srpe.v` | 第 3 条成立 | 被 `srpe_batch.v` / `srpe_batch_4way.v` 取代 |
 | `fifo.v` | 第 3 条成立 | 被 `fifo_sync_sdpram_b64.v` 取代 |
@@ -38,7 +38,7 @@
 
 反过来，**不满足任何一条就不要删**——它可能还藏着没被记录的结论。
 `tools/bench_align.py` 是前车之鉴：它守着「精确种子法为何失效」的实证，
-却因零引用而事实上不存在，导致 `docs/17` 把被它推翻的方向列为第一优先级。
+却因零引用而事实上不存在，导致 `docs/08` 把被它推翻的方向列为第一优先级。
 
 ## 不要做的事
 

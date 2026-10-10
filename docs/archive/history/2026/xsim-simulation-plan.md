@@ -80,8 +80,8 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 
 强制要求：
 
-1. 开始前完整阅读 AGENTS.md、docs/README.md、docs/01-architecture.md、
-   docs/02-data-contract.md、docs/03-status.md、docs/05-interfaces.md、
+1. 开始前完整阅读 AGENTS.md、docs/README.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md、
+   docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md、docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md、
    docs/09-handoff-2026-08-16.md、docs/10-three-end-audit-2026-08-16.md 和本文。
 2. 开发必须位于用户指定的 WSL 原生文件系统 checkout；禁止 git init、嵌套仓库或在同一任务
    同时修改多个 checkout。只有用户明确要求新建独立 WSL 文件夹时才允许重新 clone。开始前必须运行
@@ -131,7 +131,7 @@ Vivado/XSim 验证体系。目标不是把现有 Icarus 命令机械地换成 XS
 | Stage3 整核 | `desparsification_decoder_v1_0.v` / `tb_desparsifier.v` | AXI-Lite + AXI4 内存模型、64,800 bit |
 
 - `tests/golden/` 已有受版本管理的激励和期望结果；权威生成器是
-  `tools/make_golden.py`，算法/位序权威是 `docs/02-data-contract.md`。
+  `tools/make_golden.py`，算法/位序权威是 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`。
 - Vivado 已能生成实际 BD、bitstream、XSA 和匹配 ELF，完整实现已在 100 MHz 收敛。
 
 ### 2.2 当前缺口
@@ -469,7 +469,7 @@ Testbench 应实例化当前生产 RTL，而不是复制其算法：
 4. 真实地址、突发长度、`TLAST/WLAST/WSTRB`、背压、响应码；
 5. 最小批次端到端数据搬运。
 
-至少测试零延迟和带背压两种内存行为。检查所有访问均落在 `docs/05-interfaces.md` / `echo.h`
+至少测试零延迟和带背压两种内存行为。检查所有访问均落在 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` / `echo.h`
 约定区间，越界、未对齐、错误响应或悬挂事务必须失败。
 
 ### 7.3 PS 软件边界
@@ -613,7 +613,7 @@ hw/build/xsim/<HEAD>/<timestamp>/<case>/
 5. 检查 AXI BFM 是否合规，特别是 VALID 不依赖 READY、AW/W 可独立、响应保持到握手。
 6. 从第一个失败 checkpoint 反查，不要从最终 LDPC 结果猜问题。
 7. 先验证 Testbench mutation 能抓住错误，再修改 DUT。
-8. 若确认为 RTL bug，做最小修复，同步更新 `docs/03-status.md`，复跑该层及所有低层回归。
+8. 若确认为 RTL bug，做最小修复，同步更新 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`，复跑该层及所有低层回归。
 
 任何时候都不得用历史 XSA/bitstream 来解释当前 RTL 的仿真结果。
 

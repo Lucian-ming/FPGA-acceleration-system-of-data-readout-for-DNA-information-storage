@@ -101,7 +101,7 @@ FPGA 慢的原因不是"FPGA 不行"，而是**当前这版 RTL 只用掉了它�
 | 合计 | ≈ 6,219,600 |
 
 @100 MHz → **62.2 ms / 64 条 = 0.97 ms/条（单方向）**。
-由于必须处理反向互补（`docs/03-status.md` D1），等效为 **1.94 ms/条**。
+由于必须处理反向互补（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` D1），等效为 **1.94 ms/条**。
 
 其余各级相比之下可以忽略：
 
@@ -305,7 +305,7 @@ XC7Z020（53,200 LUT / 106,400 FF）可以，且余量足够再翻一倍 BATCH�
 ## 6. 对实施计划的影响
 
 1. **不要为了性能去优化 Stage2/Stage3**——它们合计占不到 0.5%。
-2. **`docs/06-implementation-plan.md` P1 的「k-mer 粗定向」方案作废**（第 2 节已证明种子法失效）。
+2. **`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/implementation-plan.md` P1 的「k-mer 粗定向」方案作废**（第 2 节已证明种子法失效）。
    替代方案：上位机把每条读段的正反两个方向都发给板子，由 Stage1 分别打分，
    Voter 按 `score` 择优/加权（D2 的寄存器已经存在，只是没被使用）。
    读段数翻倍在这里代价很小——总共也只需要约 2,048 条。
@@ -335,7 +335,7 @@ XC7Z020（53,200 LUT / 106,400 FF）可以，且余量足够再翻一倍 BATCH�
 
 **这对硬件选型是个正面信号**：若未来支持 250 bp 档位，所需读段数和传输量都会下降。
 代价是数据通路宽度翻倍（`CODEBITS=500`），必须作为独立综合档位处理
-（见 `docs/06-implementation-plan.md` P3）。
+（见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/implementation-plan.md` P3）。
 
 ---
 

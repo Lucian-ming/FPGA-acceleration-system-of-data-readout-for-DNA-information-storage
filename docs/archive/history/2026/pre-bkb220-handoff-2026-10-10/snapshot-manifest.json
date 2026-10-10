@@ -1,0 +1,142 @@
+{
+  "docs/01-architecture.md": {
+    "current": "docs/01-architecture.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/architecture.md",
+    "original_sha256": "a023306a26a068737aed9f25def2b9bff51d198422f7cc59c4b88425cc1330d4",
+    "archive_sha256": "bc7ba39148bd0b5edc71a81081f5d7d384f4154fbbc8f95fa37d162bfba479c9",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/02-data-contract.md": {
+    "current": "docs/02-data-contract.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md",
+    "original_sha256": "c400b46cb1547539419154263d937206dee5c62977076e177a2c85445b7eb8e9",
+    "archive_sha256": "c400b46cb1547539419154263d937206dee5c62977076e177a2c85445b7eb8e9",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/03-status.md": {
+    "current": "docs/03-status.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md",
+    "original_sha256": "c3cd9c36e71bf45b68a59c858e854b7a912b8c78c574d0bf21fa8a49537eba72",
+    "archive_sha256": "6fd17dd6a73d2bdfb74eb50ccc74a8edf43c162dfcdf6b22537ce91755f55129",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/04-roadmap.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/roadmap.md",
+    "original_sha256": "5cbc8d7faadbd9e530d26af68cc5c3feb5044914b0ed3efcbdf07b62adcaa8bf",
+    "archive_sha256": "a4f2ea883232c87d2ba394bc7c4fe371cac448549687cad4f299c1675b080d87",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/05-interfaces.md": {
+    "current": "docs/04-interfaces.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md",
+    "original_sha256": "a11cda01ef18910b324e0780eca4dd794ee9baaa41131a28cc4d9333f28e8c05",
+    "archive_sha256": "a11cda01ef18910b324e0780eca4dd794ee9baaa41131a28cc4d9333f28e8c05",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/06-implementation-plan.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/implementation-plan.md",
+    "original_sha256": "96d45513613ac2e220fdceceb1705cd1b24bacd59c9ea612cc99efa8efb44cef",
+    "archive_sha256": "96d45513613ac2e220fdceceb1705cd1b24bacd59c9ea612cc99efa8efb44cef",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/07-performance.md": {
+    "current": "docs/08-performance-and-strategy.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md",
+    "original_sha256": "1742aed2bc60f05caf3bd77942ff6fa27d2bee7a1d6da2e86286382193987576",
+    "archive_sha256": "5ad6383233ef98035304a4975b479bbf14e2810715eee370016211e14057779a",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/08-verification-plan.md": {
+    "current": "docs/06-verification-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/verification-plan.md",
+    "original_sha256": "a78ec53e843c4e8847d1da59dd3c265a49652ff0fc4e5bf5ef992c957d8dc3f9",
+    "archive_sha256": "a78ec53e843c4e8847d1da59dd3c265a49652ff0fc4e5bf5ef992c957d8dc3f9",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/09-board-build-and-acceptance.md": {
+    "current": "docs/07-board-build-and-acceptance.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/board-build-and-acceptance.md",
+    "original_sha256": "e5a509db8fdfc0510acd494612e06a1551003f8a54293b4b1cd79356812c75ef",
+    "archive_sha256": "e5a509db8fdfc0510acd494612e06a1551003f8a54293b4b1cd79356812c75ef",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/10-current-handoff.md": {
+    "current": "docs/03-status.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/current-handoff.md",
+    "original_sha256": "a6a4fb920d416398af4193540adab685d5a6da98067a9c1fa75d06df21f2b9a8",
+    "archive_sha256": "99493dff7f9bcfa5f38d5497d4836e2bd4a19a08df12a2e2a1678439e6290942",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/11-optimization-plan.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/optimization-plan.md",
+    "original_sha256": "52bfd4898fbcc9ed9ad19312859e9e900fa7ced7a53bb98ff54b06b637881b1b",
+    "archive_sha256": "1732b2c043c2af0944ec0e10b681dcbd26895b1724b21c8e6f5e2b66fa8bb908",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/12-stress-analysis.md": {
+    "current": "docs/06-verification-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/stress-analysis.md",
+    "original_sha256": "e24a305692c1da34f3cc5597dc33f21078f1f23375cfc273e066e9d63b6667dc",
+    "archive_sha256": "e24a305692c1da34f3cc5597dc33f21078f1f23375cfc273e066e9d63b6667dc",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/13-final-delivery-roadmap.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md",
+    "original_sha256": "eb12638deba6f13a4c20441e12b23506ae7ae17b925b30b7d78468fc10effbac",
+    "archive_sha256": "1a9a7a61eac36d87f89cc33d8e3388d832ef15dcff5c181c2c5650a0290cae03",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/14-git-parallel-workflow.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/git-parallel-workflow.md",
+    "original_sha256": "58ea6680e9d38eb7f805b589b680bd1f2bc26a80d90ceac5eaedf4c649823a8a",
+    "archive_sha256": "58ea6680e9d38eb7f805b589b680bd1f2bc26a80d90ceac5eaedf4c649823a8a",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/15-resume-and-parallel-plan.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md",
+    "original_sha256": "02101ac65a3480dafc50645df969535363b14518bd79dbb736b2ee40dd5a8144",
+    "archive_sha256": "ac806c576bee431af3bd565704f7f90ba6f939c44c3a3b1f2d26b3f484dc732a",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/16-interrupted-work-audit-2026-09-06.md": {
+    "current": "docs/09-evidence-ledger.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interrupted-work-audit-2026-09-06.md",
+    "original_sha256": "a3dab524c2c0d03a47e174234601e9b8c3f2885b9201cd48e21949c46db79796",
+    "archive_sha256": "a3dab524c2c0d03a47e174234601e9b8c3f2885b9201cd48e21949c46db79796",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/17-competition-strategy.md": {
+    "current": "docs/08-performance-and-strategy.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/competition-strategy.md",
+    "original_sha256": "75512badcf9684748dd630f5c6d8ae2202a07b7aceddf04b65888fab03aba5c9",
+    "archive_sha256": "fa5041658dd9b261027ed9adcbf513f0c10d358c7e2ed355aa1dda8f96864653",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/18-evidence-ledger.md": {
+    "current": "docs/09-evidence-ledger.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/evidence-ledger.md",
+    "original_sha256": "68cd8442d8ce446665a7c3f292bc4ebe10c3c62086af81bf98ee6bb08053ea6e",
+    "archive_sha256": "c8fb857bf3d02b03d04a51da6488fb26f03c61b1f7355028673cf226b9cce5b2",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/19-slimming-and-code-quality-plan.md": {
+    "current": "docs/05-implementation-plan.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/slimming-and-code-quality-plan.md",
+    "original_sha256": "ad40b385473580de05e6d62fb267f019f118073321fbaf8a8135ac7d432f5d58",
+    "archive_sha256": "20056365f26da28e0a1fc053865f2d43028f7ebb8f09d1ae571935076482ce06",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  },
+  "docs/20-bkb220-16way-migration-plan.md": {
+    "current": "docs/07-board-build-and-acceptance.md",
+    "archive": "docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/bkb220-16way-migration-plan.md",
+    "original_sha256": "2acf0dfaa127310c063adb46dc0e371576f43d3aae0f272867aba26a8280491e",
+    "archive_sha256": "789308fa974432692814d41a6d6c363bc377210415ef043fc0f5d7c8436e1234",
+    "change": "Only relative Markdown links adjusted for archive relocation"
+  }
+}

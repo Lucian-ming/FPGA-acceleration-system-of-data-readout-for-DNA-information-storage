@@ -4,7 +4,7 @@
 > **工具**：`tools/g5_false_accept.py`（定义写在文件头）、`tools/run_g5_matrix.sh`
 > **留证**：`logs/g5_matrix/run1/`（`summary.tsv`、每点 JSON、`res_D2_at65/`；
 > 加噪数据可由 seed 复现，故不入库）
-> **对照门禁**：[13](../13-final-delivery-roadmap.md) §4 G5「阈值 → 正确率/耗时/**误接受率**」
+> **对照门禁**：[13](../archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md) §4 G5「阈值 → 正确率/耗时/**误接受率**」
 >
 > **这一条门禁此前挂着不是因为难测，是因为「误接受」从来没有定义。**
 > 本文先给定义，再给测量。
@@ -17,7 +17,7 @@
 
 上位机对每条源读段发**两份**记录：正向与反向互补，交织成 `[fwd0, rc0, fwd1, rc1, …]`
 （`clients/python/fast_readout.py::batch_seqs_to_records`）。板端对每条记录**独立比对、
-独立投票**，`score < SCORE_MIN` 的记录直接跳过不投票（`docs/05` 寄存器 0x30，固件固定 67）。
+独立投票**，`score < SCORE_MIN` 的记录直接跳过不投票（`docs/04` 寄存器 0x30，固件固定 67）。
 
 所以一条源读段贡献两条记录，**其中恰好一条方向正确**。
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tests/test_payload_robustness_contract.py —— Payload 与鲁棒性契约测试套件
 
-对齐 docs/15 §5 (任务 B) 门禁要求：
+对齐 docs/05 §5 (任务 B) 门禁要求：
 1. 测试 dump 校验函数：全文件合法性校验（全文件 64,800 字节检查，拒收非法字节与异常长度；明确 8,100 字节 LSB-first 解包）；
 2. 测试 check-dumps 逻辑对 tests/datasets/ 下五份真实保存 dump 的复核：精确得到 4 PASS + 1 FAIL，保留 D1 random 边界事实；
 3. 测试板端等价投票模式（双向独立过阈值 + 逐票饱和截断 [-128, 127]）与传统软件最佳方向模式的区别与自洽性。

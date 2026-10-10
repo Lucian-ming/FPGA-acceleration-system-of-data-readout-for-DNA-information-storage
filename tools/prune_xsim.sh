@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# tools/prune_xsim.sh —— XSim 历史生成物保留窗口与常态化修剪工具（docs/19 §A3）
+# tools/prune_xsim.sh —— XSim 历史生成物保留窗口与常态化修剪工具（docs/05 §A3）
 #
 # 用法：
 #   tools/prune_xsim.sh [--keep N] [--dry-run] [--no-archive]

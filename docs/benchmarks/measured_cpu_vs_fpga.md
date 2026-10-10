@@ -3,7 +3,7 @@
 > **报告版本**: 1.0.0  
 > **生成时间**: 2026-09-06  
 > **执行 Agent**: `bench-measure` (W3 阶段性能公平实测与多轮度量专员)  
-> **遵循规范**: `AGENTS.md`、`docs/07-performance.md`、`docs/15-resume-and-parallel-plan.md` §7  
+> **遵循规范**: `AGENTS.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §7
 > **数据分型状态**: `[MEASURED]` (现场实测) / `[ESTIMATED]` (理论流水线周期推导) / `[HISTORICAL]` (历史闭环留证)  
 > **功耗测量状态**: **UNMEASURED (N/A)** —— 未接入外置硬件功率仪，严禁伪造能效比除法  
 
@@ -30,7 +30,7 @@
 | **现场物理板卡** | Zynq-7000 XC7Z010-1CLG400C (ECO-7010) | PL: 100MHz, 2-way 并行滑窗; PS: ARM Cortex-A9 @ 667MHz | 现行位流 `top_bd_wrapper.bit`, 裸机 lwIP TCP 栈 | 静态 IP: `192.168.1.10:7` |
 
 ### 1.3 数据集契约与记录换算
-依据 `docs/02-data-contract.md` 契约规范：
+依据 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md` 契约规范：
 - **源读段 (Source Reads)**：测序 FASTQ 文件中的原始读段条数 $N_{\text{source}}$；
 - **评估记录 (Evaluated Records)**：由于测序读段方向随机，系统必须以正向与反向互补双向比对（`orientation = both`），实际进入流水线的记录数 $N_{\text{records}} = 2 \times N_{\text{source}}$（向上补零至 64 整数倍）；
 - 涉及吞吐率与延迟时，本报告**同时分列给出每源读段 (per source read) 与每记录 (per record)**。

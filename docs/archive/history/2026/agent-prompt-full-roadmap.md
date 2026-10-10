@@ -216,7 +216,7 @@ gantt
 
 【必须阅读文档】
 1. AGENTS.md（重点：GBK 文件修改规范、带路径 commit 纪律、仿真判据纪律）；
-2. docs/03-status.md（B30 缺陷详细说明与寄存器现场）；
+2. docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md（B30 缺陷详细说明与寄存器现场）；
 3. docs/20-se250-study-2026-08-30.md（时序路径与关键链消除）。
 
 【工作要求与步骤】
@@ -244,7 +244,7 @@ gantt
 
 【必须阅读文档】
 1. AGENTS.md、docs/22-ps-refactor-plan.md（行为轨迹保护网与重构纪律）；
-2. docs/03-status.md（B29 现场只读 DDR Dump 诊断数据）。
+2. docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md（B29 现场只读 DDR Dump 诊断数据）。
 
 【工作要求与步骤】
 1. 登记看板：tools/agent_view.sh start --agent net-firmware --doing "加固 lwIP 长计算保活与 B30 状态防御" ...
@@ -288,7 +288,7 @@ gantt
 5. 连续性与鉴别力回归：
    - 执行 --runs 2（第一轮弄脏），验证累加器清零与连续运行能力。
 6. 归档与交接：
-   - 将日志沉淀至 docs/board/run-logs/ 并更新 docs/03-status.md；
+   - 将日志沉淀至 docs/board/run-logs/ 并更新 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md；
    - 释放板卡令牌，收工登记：tools/agent_view.sh done --agent board-verify ...
 ```
 
@@ -299,8 +299,8 @@ gantt
 仓库：/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 
 【必须阅读文档】
-1. docs/02-data-contract.md（数据契约、二进制编码规范）；
-2. docs/05-interfaces.md（TCP 协议报文头结构与寄存器地址）。
+1. docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md（数据契约、二进制编码规范）；
+2. docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md（TCP 协议报文头结构与寄存器地址）。
 
 【工作要求与步骤】
 1. 登记看板：tools/agent_view.sh start --agent host-integration --doing "开发支持双几何动态识别的高性能 Python 交互套件" ...

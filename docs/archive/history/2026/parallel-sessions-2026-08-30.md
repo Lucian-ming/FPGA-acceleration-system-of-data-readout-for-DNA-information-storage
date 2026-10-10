@@ -3,13 +3,13 @@
 > ⚠️ **本文所描述的三个并行会话（`g3-scale` / `voter-ddr` / `se250-study`）已于
 > 2026-08-31 全部收工**，A~E 五个环节均已完成。本文保留作为历史记录与方法参考
 > （尤其 §3 记录了一个被实测推翻的结论及其成因）。
-> **当前状态请读 `docs/03-status.md`，接下来做什么请读 `docs/18`**，不要照本文的
+> **当前状态请读 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`，接下来做什么请读 `docs/18`**，不要照本文的
 > 提示词再开会话——里面的任务都已经做完了。
 
 本文供**多个并行会话冷启动**使用：先说清楚「离真正做完还差什么」，
 再给三段可直接粘贴的会话提示词与互斥约定。
 
-排队与判据以 `docs/18-next-steps-2026-08-30.md` 为准，事实状态以 `docs/03-status.md` 为准。
+排队与判据以 `docs/18-next-steps-2026-08-30.md` 为准，事实状态以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 为准。
 本文只解决「怎么把剩下的活并行分出去」。
 
 ---
@@ -63,7 +63,7 @@ C 的中等风险来自规模效应：RX BD 环回绕从 3 次变成 **101 次**
 
 **本节原写「全量必然撞穿 180 s 超时（≈800 s）」。这是错的。**
 实测：全量 103,616 条 **132.67 s**，没有撞穿 180 s；A/B/C/D 四个环节当天全部完成。
-完整结论见 `docs/03-status.md` 与 `docs/18` P1，本节只保留「错在哪」，供后来者引以为戒。
+完整结论见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 与 `docs/18` P1，本节只保留「错在哪」，供后来者引以为戒。
 
 **当时的推断链**：`[STAGE2] DONE after 0 polls` / `[STAGE3] DONE after 1 polls`（**直接测量，仍然成立**）
 → 扣除后 32.4 s 里约 97% 是 Stage1 → Stage1 线性 → 全量 25 倍 ≈ 800 s。
@@ -118,7 +118,7 @@ tools/agent_view.sh start --agent "<上表名字>" --doing "..." --why "..." --n
 - **`se250-study` 这一轮不许改任何 RTL**：`g3-scale` 可能重建 ELF，
   `voter-ddr` 在跑仿真，一改 RTL 就会污染他们的构建。这个坑本项目已经踩过一次
   （两个会话共享工作区，未提交的 RTL 被另一方烤进了 bitstream）。
-- 三方都会改 `docs/03-status.md`，**提交前务必 `git pull --rebase`**，
+- 三方都会改 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`，**提交前务必 `git pull --rebase`**，
   不要用 `git add -A`，按文件显式 `add`。
 - 机器 16 线程，避免同时启动两个大型综合；长任务启动前先 `agent_view.sh update`。
 
@@ -131,7 +131,7 @@ tools/agent_view.sh start --agent "<上表名字>" --doing "..." --why "..." --n
 ```
 接手 FPGA DNA 项目 /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout。
 先完整读 AGENTS.md、CLAUDE.md，再读 docs/19-parallel-sessions-2026-08-30.md（本简报）、
-docs/18-next-steps-2026-08-30.md（排队与判据）和 docs/03-status.md 的「第五次上板」一节。
+docs/18-next-steps-2026-08-30.md（排队与判据）和 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 的「第五次上板」一节。
 动手前跑 bash tools/verify_repo_binding.sh --remote 过门禁。
 view.md 登记名用 g3-scale。
 
@@ -188,7 +188,7 @@ XSDB 默认禁止访问 PL 地址（0x4000_0000+），所以只读 DDR 里的中
 本轮 7 个缺陷里有 5 个在所有仿真里都是绿的，只有上板才暴露。
 每次上板后跑 python3 tools/board_stage_check.py 做四级取证，
 它内置了 B23/B25/B26 的特征签名，同类问题回归能立刻认出来。
-结论写进 docs/03-status.md 与 docs/18；改动 RTL 或固件后必须整套重建
+结论写进 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 与 docs/18；改动 RTL 或固件后必须整套重建
 hw/build/export/ 并刷新 SHA256SUMS。
 提交前 git pull --rebase，不要用 git add -A，按文件显式 add，push 到 origin/main。
 ```
@@ -246,7 +246,7 @@ run_m3_bd.sh 的 bd3b）。**还剩最后一个已知缺口，就是你的任务
 
 判据纪律见 docs/13 §十：编译通过、跑完、有波形都不算 PASS；每个用例要有显式 PASS/FAIL、
 非零失败退出码、超时保护、逐位比较。不得为了变绿放宽判据或屏蔽 X/Z。
-结论写进 docs/03-status.md 并更新 docs/18 §5 的判据现状表。
+结论写进 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md 并更新 docs/18 §5 的判据现状表。
 提交前 git pull --rebase，不要用 git add -A，按文件显式 add，push 到 origin/main。
 ```
 
@@ -254,7 +254,7 @@ run_m3_bd.sh 的 bd3b）。**还剩最后一个已知缺口，就是你的任务
 
 ```
 接手 FPGA DNA 项目 /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout。
-先完整读 AGENTS.md、CLAUDE.md，再读 docs/02-data-contract.md（数据格式唯一权威）
+先完整读 AGENTS.md、CLAUDE.md，再读 docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md（数据格式唯一权威）
 和 docs/18-next-steps-2026-08-30.md 的 P2 第 5 项。
 动手前跑 bash tools/verify_repo_binding.sh --remote 过门禁。
 view.md 登记名用 se250-study。

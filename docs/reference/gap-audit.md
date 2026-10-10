@@ -1,4 +1,4 @@
-> **归档说明**：本文是 2026-08-05 的缺口审计，结论仍然有效。2026-08-06 的复审在此基础上定位了 6 个具体的算法实现缺陷，见 `docs/03-status.md`；文中提到的 `DATASET.md` 现为 `docs/reference/dataset.md`，`docs/README.md` 现为 `docs/reference/legacy-tech-note.md`。
+> **归档说明**：本文是 2026-08-05 的缺口审计，结论仍然有效。2026-08-06 的复审在此基础上定位了 6 个具体的算法实现缺陷，见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`；文中提到的 `DATASET.md` 现为 `docs/reference/dataset.md`，`docs/README.md` 现为 `docs/reference/legacy-tech-note.md`。
 
 # 复现与后续开发缺口清单
 

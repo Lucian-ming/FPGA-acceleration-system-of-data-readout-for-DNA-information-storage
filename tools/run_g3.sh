@@ -16,20 +16,22 @@
 # 唯一判据是板端真实回传经 tools/ldpc_decode.py 译码后重建的 JPEG 的 SHA-256。
 # 本脚本据此给出单一 PASS/FAIL 与非零退出码。
 #
-# 制品同源性
-# ----------
-# 烧进板子的 bitstream / ELF / ps7_init.tcl 全部取自 hw/build/export/，
-# 并先与该目录的 SHA256SUMS 逐一校验（ps7_init.tcl 从受版本管理的 dna_accel.xsa 里解出来）。
-# 校验不过直接停，绝不允许「源码是新的、板上跑的是旧制品」这种不同源的情况混过去。
+# 制品选择与证据边界
+# ------------------
+# 默认兼容旧 hw/build/export；新板必须 --artifact-dir 指定完整新包和manifest。
+# bit/XSA/ELF/FSBL/BOOT/manifest/source_manifest 均校验SHA，且核对XSA实际part、
+# 内置bit和HWH生产参数。ps7_init只从选中XSA提取，禁止新bit+旧PS7混搭。
+# 校验只证明包内一致；源码到制品的因果关系仍须审查源manifest和构建日志。
 #
 # 用法
 # ----
 #   tools/run_g3.sh                                   # 复现 G3 闭环那组参数（2048 条源读段）
 #   tools/run_g3.sh --limit 4096                      # 分档测量：源读段数翻倍
 #   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
-#   tools/run_g3.sh --bit <path>                      # 换一份比特流做对照实验（如 4-way）；
-#   tools/run_g3.sh --elf <path>                      # 换一份 PS 固件做对照实验；
-#                                                     # 同源性判据对该 ELF 不成立，会打告警
+#   tools/run_g3.sh --artifact-dir <export> --xsdb D:/xilinx/2026.1/Vitis/bin/xsdb.bat --device xc7z020 --uart-port COMx
+#   tools/run_g3.sh --win-root D:/dna_board_smoke
+#   tools/run_g3.sh --bit <path>                      # 仅兼容指定所选包内同一bit，禁止独立覆盖
+#   tools/run_g3.sh --elf <path>                      # 仅允许选中包内同一ELF；独立实验也要完整制品包
 #   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
 #   tools/run_g3.sh --runs 2                          # 同一次上电内连续跑两次任务（状态复位判据）
 #   tools/run_g3.sh --runs 2 --first-run-score-min 0  # 第一轮弄脏 Voter 累加器，第二轮才是判据
@@ -43,7 +45,7 @@
 #                                                     # 只打印逐轮计划，不碰板子（自查参数）
 #   tools/run_g3.sh --ready-deadline 150              # 板端就绪探针（CAPS 握手）多等一会儿
 #
-# 环境（docs/16、docs/19 已验证，勿重摸）
+# 环境（docs/09、docs/05 已验证，勿重摸）
 # --------------------------------------
 #   Windows 侧 D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat，从 WSL 用 cmd.exe /c 调用；
 #   工作目录 D:\dna_board_smoke\；JTAG Digilent 210251A08870，器件 xc7z010_1；
@@ -59,12 +61,14 @@ cd "$REPO"
 # 而 summary.txt 是留证，必须记准「这一轮是怎么跑的」。
 INVOCATION="$*"
 
-# --elf / --bit 覆盖路径（空 = 用 hw/build/export/ 里的那份）
+# --elf/--bit 仅允许指向完整选中制品包内同一文件，禁止独立覆盖混搭
 ELF_OVERRIDE=""
 BIT_OVERRIDE=""
+ARTIFACT_DIR="hw/build/export"
+ARTIFACT_EXPLICIT=0
 
 # ---------------------------------------------------------------------------
-# 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/18 §2。
+# 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/09 §2。
 # ---------------------------------------------------------------------------
 EXPECT_SHA="fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
 LIMIT=2048
@@ -107,10 +111,21 @@ PLAN_ONLY=0                  # 只打印逐轮计划就退出，不碰板子（�
 READS_FILE="data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM_FILE="data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 
-WIN_ROOT_UNIX="/mnt/d/dna_board_smoke"
-WIN_ROOT_WIN="D:/dna_board_smoke"
-XSDB_BAT="D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat"
-JTAG_DEVICE="xc7z010"
+WIN_ROOT_VALUE="${G3_WIN_ROOT:-D:/dna_board_smoke}"
+XSDB_VALUE="${G3_XSDB:-D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat}"
+JTAG_DEVICE="${G3_DEVICE:-}"
+
+# 使用同一转换函数，支持 Windows 盘符、反斜杠和 /mnt/<盘符>/，拒绝相对/UNC猜测。
+path_pair() {
+    python3 - "$1" <<'PY'
+import sys
+from tools.board.g3_artifacts import normalize_windows_path
+try:
+    print("\n".join(normalize_windows_path(sys.argv[1])))
+except ValueError as error:
+    print(error, file=sys.stderr); raise SystemExit(2)
+PY
+}
 
 usage() {
     # 头部注释块就是帮助正文。结束位置用 `set -uo pipefail` 那行现找，不再写死行号——
@@ -121,6 +136,10 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --artifact-dir)     ARTIFACT_DIR="$2"; ARTIFACT_EXPLICIT=1; shift 2 ;;
+        --xsdb)             XSDB_VALUE="$2"; shift 2 ;;
+        --device)           JTAG_DEVICE="$2"; shift 2 ;;
+        --win-root)         WIN_ROOT_VALUE="$2"; shift 2 ;;
         --limit)            LIMIT="$2"; shift 2 ;;
         --full)             LIMIT=""; shift ;;          # 不传 --limit 给 first.py = 全量
         --score-min)        SCORE_MIN="$2"; shift 2 ;;
@@ -171,6 +190,15 @@ warn() { printf '\033[33m    %s\033[0m\n' "$*" >&2; }
 # ---------------------------------------------------------------------------
 # 0. 参数推导
 # ---------------------------------------------------------------------------
+[[ "$RUNS" =~ ^[1-9][0-9]*$ ]] || die "--runs 必须为正整数"
+[[ "$TAG" =~ ^[A-Za-z0-9_.-]*$ ]] || die "--tag 只允许字母/数字/点/横线/下划线"
+[[ "$ORIENT" == "both" || "$ORIENT" == "fwd" || "$ORIENT" == "rev" ]] || die "未知 orient"
+PAIR="$(path_pair "$WIN_ROOT_VALUE")" || die "--win-root 路径转换失败"
+WIN_ROOT_WIN="$(printf '%s\n' "$PAIR" | head -1)"
+WIN_ROOT_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
+PAIR="$(path_pair "$XSDB_VALUE")" || die "--xsdb 路径转换失败"
+XSDB_BAT="$(printf '%s\n' "$PAIR" | head -1)"
+XSDB_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_NAME="$STAMP${TAG:+-$TAG}"
 RUN_DIR="$WIN_ROOT_UNIX/g3_runs/$RUN_NAME"
@@ -229,7 +257,12 @@ for (( r = 1; r <= RUNS; r++ )); do
     fi
     [[ $r -eq 1 && -n "$SCORE_MIN_RUN1" && $RUNS -gt 1 ]] && sm="$SCORE_MIN_RUN1"
 
-    if [[ -z "$lim" ]]; then sr="$(detect_reads)"; else sr="$lim"; fi
+    [[ -z "$lim" || "$lim" =~ ^[1-9][0-9]*$ ]] || die "第 $r 轮 limit 必须为正整数或 full"
+    [[ "$sm" =~ ^[0-9]+$ ]] && (( sm <= 511 )) || die "第 $r 轮 score_min 必须为0..511"
+    if [[ -z "$lim" ]]; then
+        [[ -f "$READS_FILE" ]] || die "全量计划缺少reads文件"
+        sr="$(detect_reads)"
+    else sr="$lim"; fi
     rec="$(records_of "$sr")"
     RUN_LIMIT+=("$lim"); RUN_SM+=("$sm"); RUN_SR+=("$sr")
     RUN_REC+=("$rec");  RUN_TO+=("$(timeout_of "$rec")")
@@ -299,8 +332,25 @@ for (( r = 2; r <= RUNS; r++ )); do
     fi
 done
 
+# 计划模式也运行只读制品/工具门禁，避免批准后才发现 XSA/PS7 混搭。
+ARTIFACT_ARGS=(--artifact-dir "$ARTIFACT_DIR" --read-bps "$READ_BPS")
+(( ARTIFACT_EXPLICIT )) || ARTIFACT_ARGS+=(--allow-legacy)
+[[ -n "$JTAG_DEVICE" ]] && ARTIFACT_ARGS+=(--device "$JTAG_DEVICE")
+[[ -n "$BIT_OVERRIDE" ]] && ARTIFACT_ARGS+=(--bit "$BIT_OVERRIDE")
+[[ -n "$ELF_OVERRIDE" ]] && ARTIFACT_ARGS+=(--elf "$ELF_OVERRIDE")
+SELECTION="$(python3 tools/board/g3_artifacts.py "${ARTIFACT_ARGS[@]}")" || die "完整制品选择门禁失败"
+JTAG_DEVICE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["device"])' <<< "$SELECTION")"
+info "制品包     : $ARTIFACT_DIR，目标 $JTAG_DEVICE"
+info "制品证据   : $SELECTION"
+if (( DO_BOOT || DO_DUMP )); then
+    [[ -f "$XSDB_UNIX" ]] || die "找不到 XSDB：$XSDB_BAT（WSL: $XSDB_UNIX）；请 --xsdb 指定本机安装"
+    command -v powershell.exe >/dev/null || die "调不到powershell.exe，无法驱动Windows工具"
+fi
+info "Windows留证根 : $WIN_ROOT_WIN（WSL: $WIN_ROOT_UNIX）"
+info "XSDB          : $XSDB_BAT"
 if (( PLAN_ONLY )); then
-    info "--plan-only：只打印逐轮计划，不碰板子"
+    info "--plan-only：只读制品/工具核验完成，不打开串口、不连接JTAG、不下发TCP、不创建run"
+    info "串口选择      : ${UART_PORT:-实际执行时只从唯一USB串口自动选择；多口必须显式 --uart-port}"
     exit 0
 fi
 
@@ -310,63 +360,19 @@ fi
 say "1/7 前置检查"
 
 for f in "$READS_FILE" "$WM_FILE" tools/ldpc_decode.py tools/board_stage_check.py \
-         clients/python/first.py tools/board/g3_wait_ready.py \
-         hw/build/export/SHA256SUMS; do
+         clients/python/first.py tools/board/g3_wait_ready.py tools/board/g3_xsdb.ps1 \
+         "$ARTIFACT_DIR/SHA256SUMS"; do
     [[ -e "$f" ]] || die "缺少 $f"
 done
 info "仓库内数据与脚本齐备"
 
 [[ -d "$WIN_ROOT_UNIX" ]] || die "看不到 $WIN_ROOT_UNIX（Windows 侧工作目录未挂载？）"
-XSDB_UNIX="/mnt/$(echo "${XSDB_BAT:0:1}" | tr 'A-Z' 'a-z')${XSDB_BAT:2}"
-[[ -f "$XSDB_UNIX" ]] || die "找不到 xsdb.bat：$XSDB_BAT（WSL 视角 $XSDB_UNIX）"
-command -v cmd.exe >/dev/null || die "调不到 cmd.exe，无法驱动 Windows 侧工具"
-info "Windows 侧工具可达（xsdb.bat / cmd.exe）"
-
+[[ ! -e "$RUN_DIR" ]] || die "本轮留证目录已存在，禁止覆盖：$RUN_DIR（换 --tag 或稍后重试）"
 mkdir -p "$RUN_DIR" || die "建不了留证目录 $RUN_DIR"
-
-# 制品同源性：先按 SHA256SUMS 校验 export/，再把校验过的副本放进本轮 run 目录。
-# 这样「板上跑的是哪一版」有据可查，也不会被 D:\dna_board_smoke\ 里的历史同名文件顶掉。
-if ! ( cd hw/build/export && sha256sum -c --quiet --ignore-missing SHA256SUMS ) 2>"$RUN_DIR/sha256sums.err"; then
-    cat "$RUN_DIR/sha256sums.err" >&2
-    die "hw/build/export/ 与 SHA256SUMS 不符 —— 制品与源码不同源，禁止上板"
-fi
-step_ok "制品同源性（hw/build/export/ vs SHA256SUMS）"
-info "export/ 全部制品与 SHA256SUMS 相符"
-
-BIT_SRC="hw/build/export/top_bd_wrapper.bit"
-ELF_SRC="hw/build/export/dna_lwip_app_b27.elf"
-# --elf：用指定 ELF 替换 export/ 里那份，用于验证「只改了 PS 固件」的实验，
-# 免得为了跑一次实验就覆盖已知良好的基线制品（覆盖了就没有回退点了）。
-# 代价是**同源性判据被降级**：export/ 的 SHA256SUMS 校验对这份 ELF 不成立，
-# 所以这里必须打印醒目告警，并把该 ELF 的哈希记进 summary，
-# 否则日后没人分得清某次留证到底跑的是哪份固件。
-# --bit：换比特流做对照实验（如 2-way 基线 vs 4-way 收敛版）。
-# 与 --elf 同规格：同源性判据对它不成立，故打醒目告警并把哈希记进 summary。
-if [[ -n "$BIT_OVERRIDE" ]]; then
-    [[ -f "$BIT_OVERRIDE" ]] || die "--bit 指定的文件不存在：$BIT_OVERRIDE"
-    BIT_SRC="$BIT_OVERRIDE"
-    warn "⚠️ bitstream 已被 --bit 覆盖为 $BIT_SRC"
-    warn "⚠️ 该 bit 不在 export/SHA256SUMS 覆盖范围内，制品同源性判据对它不成立"
-    warn "⚠️ 本次留证仅可用于实验对照，不得当作发布基线"
-fi
-if [[ -n "$ELF_OVERRIDE" ]]; then
-    [[ -f "$ELF_OVERRIDE" ]] || die "--elf 指定的文件不存在：$ELF_OVERRIDE"
-    ELF_SRC="$ELF_OVERRIDE"
-    warn "⚠️ ELF 已被 --elf 覆盖为 $ELF_SRC"
-    warn "⚠️ 该 ELF 不在 export/SHA256SUMS 覆盖范围内，制品同源性判据对它不成立"
-    warn "⚠️ 本次留证仅可用于实验对照，不得当作发布基线"
-fi
-[[ -f "$BIT_SRC" ]] || die "缺少 $BIT_SRC"
-[[ -f "$ELF_SRC" ]] || die "缺少 $ELF_SRC"
-
-cp -f "$BIT_SRC" "$RUN_DIR/top_bd_wrapper.bit"
-cp -f "$ELF_SRC" "$RUN_DIR/dna_lwip_app.elf"
-# ps7_init.tcl 只存在于 gitignore 掉的 sw/workspace/ 里，不可作为复现来源；
-# 改从受版本管理、且刚校验过哈希的 dna_accel.xsa（就是个 zip）里解出来。
-if ! unzip -o -q -j hw/build/export/dna_accel.xsa ps7_init.tcl -d "$RUN_DIR" 2>/dev/null; then
-    die "从 hw/build/export/dna_accel.xsa 里解不出 ps7_init.tcl"
-fi
-info "bit / elf / ps7_init.tcl 已从受版本管理的制品复制到 run 目录"
+python3 tools/board/g3_artifacts.py "${ARTIFACT_ARGS[@]}" --stage "$RUN_DIR" \
+    > "$RUN_DIR/artifact_selection.out" || die "制品复制前复核失败"
+step_ok "完整制品包一致性（所选SHA/XSA内bit/part/参数）" "$ARTIFACT_DIR"
+info "bit / elf / ps7_init 均来自所选同一XSA制品包；摘要见 artifact_selection.json"
 
 # ---------------------------------------------------------------------------
 # 2. 渲染板级脚本
@@ -388,6 +394,7 @@ else
 fi
 
 render() {
+    [[ "$RUN_DIR_WIN" != *'&'* && "$RUN_DIR_WIN" != *'#'* && "$RUN_DIR_WIN" != *'{'* && "$RUN_DIR_WIN" != *'}'* ]] || die "留证路径含Tcl/sed保留字符"
     sed -e "s#@@DEVICE@@#$JTAG_DEVICE#g" \
         -e "s#@@BITFILE@@#$RUN_DIR_WIN/top_bd_wrapper.bit#g" \
         -e "s#@@ELFFILE@@#$RUN_DIR_WIN/dna_lwip_app.elf#g" \
@@ -406,6 +413,7 @@ render() {
 render tools/board/g3_boot.tcl.in "$RUN_DIR/boot.tcl"
 render tools/board/g3_dump.tcl.in "$RUN_DIR/dump.tcl"
 cp -f tools/board/g3_uart_cap.ps1 "$RUN_DIR/uart_cap.ps1"
+cp -f tools/board/g3_xsdb.ps1 "$RUN_DIR/xsdb_run.ps1"
 info "boot.tcl / dump.tcl / uart_cap.ps1 已渲染到 run 目录（原样留证）"
 
 # ---------------------------------------------------------------------------
@@ -430,14 +438,17 @@ trap stop_uart EXIT INT TERM
 
 say "3/7 串口实录"
 if (( DO_UART )); then
-    if [[ -z "$UART_PORT" ]]; then
-        DETECTED_PORT="$(powershell.exe -NoProfile -Command "(Get-PnpDevice -PresentOnly | Where-Object { \$_.FriendlyName -match 'CH340.*COM' }).FriendlyName -replace '.*(COM[0-9]+).*', '\$1'" < /dev/null 2>/dev/null | tr -d '\r\n' || true)"
-        if [[ -n "$DETECTED_PORT" && "$DETECTED_PORT" =~ ^COM[0-9]+$ ]]; then
-            UART_PORT="$DETECTED_PORT"
-        else
-            UART_PORT="COM6"
-        fi
-    fi
+    # 只读枚举 USB/FTDI 串口。蓝牙COM和历史COM6均不作为兜底。
+    UART_DEVICES="$(powershell.exe -NoProfile -Command 'ConvertTo-Json -Compress -InputObject @(Get-PnpDevice -PresentOnly -Class Ports | Select-Object FriendlyName,InstanceId)' < /dev/null | tr -d '\r')" || die "枚举USB串口失败"
+    UART_PORT="$(python3 - "$UART_DEVICES" "$UART_PORT" <<'PY'
+import json,sys
+from tools.board.g3_artifacts import choose_uart
+try:
+    print(choose_uart(json.loads(sys.argv[1]), sys.argv[2] or None))
+except (ValueError,TypeError) as error:
+    print(error, file=sys.stderr); raise SystemExit(2)
+PY
+    )" || die "不能明确确定USB/PS串口，请 --uart-port COMx；不要选蓝牙COM"
     powershell.exe -NoProfile -ExecutionPolicy Bypass \
         -File "$(echo "$RUN_DIR_WIN/uart_cap.ps1" | tr '/' '\\')" \
         -LogPath "$(echo "$RUN_DIR_WIN/uart.log" | tr '/' '\\')" \
@@ -470,7 +481,9 @@ fi
 # ---------------------------------------------------------------------------
 say "4/7 烧录（rst -system → fpga → ps7_init → dow → con）"
 if (( DO_BOOT )); then
-    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/boot.tcl" | tr '/' '\\')" < /dev/null ) \
+    if powershell.exe -NoProfile -ExecutionPolicy Bypass \
+            -File "$RUN_DIR_WIN/xsdb_run.ps1" -XsdbPath "$XSDB_BAT" \
+            -TclPath "$RUN_DIR_WIN/boot.tcl" < /dev/null \
             > "$RUN_DIR/boot.out" 2>&1; then
         if grep -q "BOOT> running" "$RUN_DIR/boot.out"; then
             step_ok "烧录"
@@ -677,7 +690,9 @@ fi
 # ---------------------------------------------------------------------------
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
 if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
-    if ( cd "$WIN_ROOT_UNIX" && cmd.exe /c "$(echo "$XSDB_BAT" | tr '/' '\\') $(echo "$RUN_DIR_WIN/dump.tcl" | tr '/' '\\')" < /dev/null ) \
+    if powershell.exe -NoProfile -ExecutionPolicy Bypass \
+            -File "$RUN_DIR_WIN/xsdb_run.ps1" -XsdbPath "$XSDB_BAT" \
+            -TclPath "$RUN_DIR_WIN/dump.tcl" < /dev/null \
             > "$RUN_DIR/dump.out" 2>&1 && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
         info "四级快照已导出到 $RUN_DIR"
         if python3 tools/board_stage_check.py --dump-dir "$RUN_DIR" --reads "$STAGE1_DUMP_RECORDS" --read-bps "$READ_BPS" \
@@ -721,6 +736,11 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "四级取证按最后一轮算：Stage1 dump $STAGE1_DUMP_RECORDS 条记录"
     echo "bitstream   : $(sha256sum "$RUN_DIR/top_bd_wrapper.bit" | awk '{print $1}')"
     echo "ELF         : $(sha256sum "$RUN_DIR/dna_lwip_app.elf" | awk '{print $1}')"
+    echo "制品目录    : $ARTIFACT_DIR"
+    echo "目标器件    : $JTAG_DEVICE"
+    echo "XSDB        : $XSDB_BAT"
+    echo "串口        : ${UART_PORT:-未抓取}"
+    echo "制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）"
     echo "判据哈希    : $EXPECT_SHA"
     echo
     printf '%-6s  %s\n' "结果" "步骤"

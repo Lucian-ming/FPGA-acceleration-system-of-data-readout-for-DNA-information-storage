@@ -77,7 +77,7 @@ def mutate_read_sequence(
     rng: np.random.Generator,
     fixed_len: bool = True,
 ) -> tuple[str, str, int, int, int]:
-    """对单条读段注入替换 (sub)、缺失 (del)、插入 (ins) 错误，并做定长适配（docs/15 §8）。"""
+    """对单条读段注入替换 (sub)、缺失 (del)、插入 (ins) 错误，并做定长适配（docs/05 §8）。"""
     orig_len = len(seq)
     seq_chars = list(seq)
     qual_chars = list(qual)

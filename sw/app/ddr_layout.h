@@ -7,7 +7,7 @@
  * 单元测试（tools/test_ddr_layout.c）。地址与容量都以参数传入，避免与
  * echo.h 的宏形成两份常量。
  *
- * 校验内容（docs/05-interfaces.md 的 DDR 布局）：
+ * 校验内容（docs/04-interfaces.md 的 DDR 布局）：
  *   - 记录数非零，且为 FRAME_READS(64) 的整数倍（C2：尾批整帧，补零由
  *     上位机完成，补零记录经 Voter 的 SCORE_MIN 过滤，不参与投票）；
  *   - 记录数不超过预留容量 TOTAL_READS；

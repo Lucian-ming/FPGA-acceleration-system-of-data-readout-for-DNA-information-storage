@@ -21,7 +21,7 @@
 #include "xil_cache.h"
 #include "sleep.h"
 #include "xaxidma.h"
-#include "xtime_l.h"
+#include "dna_time.h"
 #include "netif/xadapter.h"
 
 #define BIT_SET(val, bit)    ((val) |= (1ULL << (bit)))
@@ -90,7 +90,7 @@ static u32 pipe_poll_cbs = 0;
 /* 【P0 分解】按流水线状态累计耗时。
  * 2026-09-10 已测出固定开销总量：修复前 5.284 s、修复后 1.505 s
  * （tools/board/g3_overhead_sweep.py 七档拟合）。但「剩下这 1.5 s 花在哪个状态」
- * 一直是空白——docs/17 §3 那一项因此还打着 ⬜。
+ * 一直是空白——docs/08 §3 那一项因此还打着 ⬜。
  *
  * 做法：在 run_processing_pipeline() 前后取 XTime，把这段时间**记在进入该次调用
  * 时所处的状态**头上。纯观测，不改任何控制流与寄存器写序列（B27 纪律）。
@@ -291,7 +291,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
         pipeline_reset_counters(); pipeline_set_state(PIPE_WM_PREP);
         /* 【WM 批量化·留证】整条流水线一共占了几个 poll 步、走了多少墙钟时间。
          * 固定开销的量纲就是「poll 步数 × 250~500 ms」，把步数直接打出来，
-         * 下一个人就不必再靠分档拟合去反推常数项（docs/18 P1 第 3 项的教训：
+         * 下一个人就不必再靠分档拟合去反推常数项（docs/09 P1 第 3 项的教训：
          * 扣除法推断一旦进了表格就会被当成实测引用）。 */
         pipe_poll_steps = 0;
         pipe_poll_cbs = 0;

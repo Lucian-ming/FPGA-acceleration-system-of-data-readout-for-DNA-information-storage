@@ -1,7 +1,7 @@
 # 上位机客户端模块关系与重构调查报告（Client Module Map）
 
 > **建立日期**：2026-09-11  
-> **依据**：`docs/19-slimming-and-code-quality-plan.md` §3 B4（热清理调查专项）  
+> **依据**：`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/slimming-and-code-quality-plan.md` §3 B4（热清理调查专项）
 > **性质**：架构调研与依赖图谱，**本轮只做调查、不改动上位机代码**。  
 > **约束**：上位机当前是驱动全链路闭环的唯一生产入口，在缺乏独立端到端自动化测试前严禁激进重构。
 

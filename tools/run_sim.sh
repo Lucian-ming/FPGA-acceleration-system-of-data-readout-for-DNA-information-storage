@@ -3,13 +3,27 @@
 #
 #   bash tools/run_sim.sh              # 跑全部
 #   bash tools/run_sim.sh datapath     # 只跑某一项
+#   bash tools/run_sim.sh stage1_production       # 正式P4/P16，LC6快速回归
+#   SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full # LC50生产长测
+#   SIM_LOG_DIR=logs/iverilog/<run-id> 可指定证据目录；退出不删除日志/fixture。
 #
 # 依赖 Icarus Verilog（iverilog / vvp）。黄金向量由 tools/make_golden.py 生成。
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
-BUILD=$(mktemp -d)
-trap 'rm -rf "$BUILD"' EXIT
+WHICH="${1:-all}"
+case "$WHICH" in
+    all|packaging|hygiene|datapath|axi|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
+    *) echo "未知仿真项: $WHICH" >&2; exit 2 ;;
+esac
+[[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
+VVP_ARGS=()
+# 每次运行保留编译、配置、源码hash和失败输出，不在退出时删除证据。
+BUILD="${SIM_LOG_DIR:-logs/iverilog/run_$(date +%Y%m%d_%H%M%S)_${BASHPID}_${WHICH}}"
+mkdir -p "$BUILD" || exit 1
+CASE_TIMEOUT="${SIM_CASE_TIMEOUT:-600}"
+echo "仿真入口: $WHICH；证据目录: $BUILD；每项超时: ${CASE_TIMEOUT}s"
+printf 'entry=%s\ntimeout_seconds=%s\n' "$WHICH" "$CASE_TIMEOUT" > "$BUILD/run-config.txt"
 
 PASS=0
 FAIL=0
@@ -23,11 +37,19 @@ run_case() {
     local log="$BUILD/$name.log"
     local status
     printf '\n=== %s ===\n' "$name"
-    if ! iverilog -g2005 -o "$BUILD/$name" "$@" 2>&1; then
+    printf '%q ' iverilog -g2005 -o "$BUILD/$name" "$@" > "$BUILD/$name.command.txt"
+    printf '\n' >> "$BUILD/$name.command.txt"
+    for source in "$@"; do
+        [[ "$source" == *.v && -f "$source" ]] && sha256sum "$source"
+    done > "$BUILD/$name.sources.sha256"
+    if ! iverilog -g2005 -o "$BUILD/$name" "$@" > "$BUILD/$name.compile.log" 2>&1; then
+        sed 's/^/  /' "$BUILD/$name.compile.log"
         echo "  ✗ 编译失败"
         FAIL=$((FAIL+1)); return
     fi
-    timeout 600 vvp "$BUILD/$name" >"$log" 2>&1
+    printf '%q ' timeout "$CASE_TIMEOUT" vvp "$BUILD/$name" "${VVP_ARGS[@]}" >> "$BUILD/$name.command.txt"
+    printf '\n' >> "$BUILD/$name.command.txt"
+    timeout "$CASE_TIMEOUT" vvp "$BUILD/$name" "${VVP_ARGS[@]}" >"$log" 2>&1
     status=$?
     sed 's/^/  /' "$log"
     if [ "$status" -eq 0 ] && ! grep -q 'FATAL:' "$log" && grep -q 'PASS' "$log"; then
@@ -37,21 +59,23 @@ run_case() {
     fi
 }
 
-if [ ! -f tests/golden/sparse_ideal.hex ]; then
+if [[ "$WHICH" != packaging && "$WHICH" != hygiene && "$WHICH" != syntax ]] \
+   && [ ! -f tests/golden/sparse_ideal.hex ]; then
     echo "缺少黄金向量，请先运行： python3 tools/make_golden.py"
     exit 1
 fi
-
-WHICH="${1:-all}"
 
 # IP 打包卫生门禁：hdl/ 里不许有 testbench、同名模块不许被同时打包、
 # component.xml 引用的文件必须存在、不许有孤儿文件、打包变体须与清单一致。
 # 放在最前面：这些问题会让综合工具「看到的设计」与你以为的不是同一个，
 # 后面所有仿真判据都建立在错误前提上。
-if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ]; then
-    if bash tools/check_ip_packaging.sh; then
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ] \
+   || [ "$WHICH" = "stage1_production" ] || [ "$WHICH" = "stage1_production_full" ]; then
+    if bash tools/check_ip_packaging.sh > "$BUILD/packaging.log" 2>&1; then
+        cat "$BUILD/packaging.log"
         PASS=$((PASS+1))
     else
+        cat "$BUILD/packaging.log"
         FAIL=$((FAIL+1))
     fi
 fi
@@ -96,15 +120,49 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_4way" ]; then
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
-    # 参数化 P 路 Stage1（hw/experimental/，未打包，7020 迁移候选）对照生产 4-way：
+    # 正式打包的参数化 P 路 Stage1 对照生产 4-way；历史实验源不参与生产回归：
     # P=4 须逐周期相同；P=16 + 选优树流水须逐位相同。NUM_LC=6 玩具配置，约 1 分钟。
     # 生产几何 NUM_LC=50 的结果见 docs/benchmarks/stage1-pway-7020-probe.md。
     run_case srpe_batch_pway_p4 \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=4 -DCFG_PIPE_TREE=0 \
-        "$A1/srpe_batch_4way.v" hw/experimental/srpe_batch_pway.v hw/sim/tb_srpe_batch_pway.v
+        "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
     run_case srpe_batch_pway_p16 \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=16 -DCFG_PIPE_TREE=1 \
-        "$A1/srpe_batch_4way.v" hw/experimental/srpe_batch_pway.v hw/sim/tb_srpe_batch_pway.v
+        "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
+fi
+
+# 真实生产P4/P16源集。stage1_production_full 显式启用LC50长测并建议
+# SIM_CASE_TIMEOUT=3600；默认 all 只跑 LC6 快速模块/接口测试。
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_production" ] \
+   || [ "$WHICH" = "stage1_production_full" ]; then
+    PROD_LC=6
+    [[ "$WHICH" == stage1_production_full ]] && PROD_LC=50
+    echo "生产配置: READ_BPS=150 NUM_LC=$PROD_LC STRIDE=807 REF_LEN=957 BATCH=64 P4=4/0 P16=16/1"
+    printf 'read_bps=150\nnum_lc=%s\nstride=807\nref_len=957\nbatch=64\np4=4/0\np16=16/1\n' \
+        "$PROD_LC" >> "$BUILD/run-config.txt"
+    FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
+    printf '%q ' python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
+        --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.command.txt"
+    printf '\n' >> "$BUILD/fixture-generation.command.txt"
+    if python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
+        --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
+        cat "$BUILD/fixture-generation.log"
+        sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
+        find "$FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
+        VVP_ARGS=("+fixture_dir=$FIXTURE_DIR")
+        run_case dna_stage1_p16_equivalence -DCFG_NUM_LC="$PROD_LC" \
+            "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
+            "$IPTB/tb_dna_stage1_p16_equivalence.v"
+        run_case dna_stage1_p16_interface -DCFG_NUM_LC="$PROD_LC" \
+            "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
+            "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
+            "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+            "$A1/Dna_accelerator_core_v1_0.v" "$IPTB/tb_dna_stage1_p16_interface.v"
+        VVP_ARGS=()
+    else
+        cat "$BUILD/fixture-generation.log"
+        echo "  ✗ Stage1独立fixture生成失败"; FAIL=$((FAIL+1))
+    fi
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "core_4way" ]; then
@@ -115,7 +173,7 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "core_4way" ]; then
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way \
         -I "$A1" \
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
-        "$A1/srpe_batch.v" "$A1/srpe_batch_4way.v" \
+        "$A1/srpe_batch.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
         "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
         "$A1/Dna_accelerator_core_v1_0.v" "$A1/Dna_accelerator_core_4way.v" \
         hw/sim/tb_accelerator_core_4way.v
@@ -127,7 +185,7 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "ingress" ]; then
         "$A1/Dna_accelerator_core_v1_0.v" \
         "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
-        "$A1/srpe_batch.v" "$IPTB/tb_dna_ingress.v"
+        "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" "$IPTB/tb_dna_ingress.v"
 fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "dna_axil" ]; then
@@ -201,15 +259,32 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
     check() {  # 名称 + 该顶层的完整文件集
         local label="$1"; shift
         if iverilog -g2005 -t null "$@" 2>/dev/null; then
-            echo "  ✓ $label"
+            echo "  ✓ $label"; PASS=$((PASS+1))
         else
             echo "  ✗ $label"; FAIL=$((FAIL+1))
         fi
     }
     check Dna_accelerator_core \
-        "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch.v" \
+        "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
         "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
+    check Dna_accelerator_core_P16 -s Dna_accelerator_core_v1_0 \
+        -P Dna_accelerator_core_v1_0.C_STAGE1_P_WAYS=16 \
+        -P Dna_accelerator_core_v1_0.C_STAGE1_PIPE_TREE=1 \
+        "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
+        "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
+    if iverilog -g2005 -t null -s Dna_accelerator_core_v1_0 \
+        -P Dna_accelerator_core_v1_0.C_STAGE1_P_WAYS=16 \
+        -P Dna_accelerator_core_v1_0.C_STAGE1_PIPE_TREE=0 \
+        "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
+        "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
+        "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
+        > "$BUILD/invalid-stage1.compile.log" 2>&1; then
+        echo "  ✗ 非法16/0组合未被拒绝"; FAIL=$((FAIL+1))
+    else
+        echo "  ✓ 非法16/0组合在展开时被拒绝"; PASS=$((PASS+1))
+    fi
     check differential_voter        hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v
     check desparsification_decoder  "$D/desparsification_decoder_v1_0.v" "$D/desparsify_datapath.v"
 fi

@@ -2,6 +2,7 @@
 # create_vitis.tcl
 # 用法（仓库根目录）：
 #   xsct sw/scripts/create_vitis.tcl
+# 此入口仅用于仍支持XSCT的旧版Vitis。2026.1 XSCT已disabled，使用create_vitis_modern.py。
 # 可选参数（-tclargs 覆盖）：
 #   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1
 # =========================================
@@ -35,6 +36,7 @@ set xsa  ""
 set ip   "192.168.1.10"
 set mask "255.255.255.0"
 set gw   "192.168.1.1"
+set uart "ps7_uart_1"
 
 # ---------- 解析 -tclargs ----------
 proc _arg {name default} {
@@ -54,6 +56,11 @@ _arg xsa  $xsa
 _arg ip   $ip
 _arg mask $mask
 _arg gw   $gw
+_arg uart $uart
+if {$uart ni {ps7_uart_0 ps7_uart_1}} {error "uart必须为本板PS UART实例名"}
+foreach command {setws platform domain app bsp importsources} {
+  if {![llength [info commands $command]]} {error "当前工具不提供XSCT命令$command；Vitis2026.1请使用Python入口"}
+}
 
 if {$xsa eq ""} { set xsa [_find_xsa] }
 if {$xsa eq ""} {
@@ -108,7 +115,7 @@ foreach name {lwip213 lwip211 lwip210} {
   if {![catch {bsp setlib -name $name} _]} { set lwip_lib $name; break }
 }
 if {$lwip_lib eq ""} {
-  puts "WARN: lwIP library not found in this Vitis version. Continuing without lwIP setlib."
+  error "本工具未提供受支持lwIP；不能继续生成网络固件"
 } else {
   puts "===> Using lwIP library: $lwip_lib"
   # 常用选项（按需调整）
@@ -118,9 +125,9 @@ if {$lwip_lib eq ""} {
   catch { bsp config lwip_pbuf_pool_size 256 } _
 }
 
-# 标准 I/O 走 UART1（常见默认；你的板若为 UART0 可改）
-catch { bsp config stdin ps7_uart_1 } _
-catch { bsp config stdout ps7_uart_1 } _
+# 默认保留旧板UART1；新板须按对应XSA显式选择uart。
+bsp config stdin $uart
+bsp config stdout $uart
 
 platform write
 platform generate
@@ -142,6 +149,10 @@ if {!$exists} {
 catch { app config -name $app -removeSrc all } _
 if {[file exists $app_src]} {
   importsources -name $app -path $app_src
+  # sw/app/xparameters.h is a historical generated snapshot. The selected
+  # XSA's BSP owns these values; exclude the copied snapshot in this app only.
+  set copied_xparameters [file join $ws $app src xparameters.h]
+  if {[file isfile $copied_xparameters]} {file delete $copied_xparameters}
   puts "===> Imported sources from $app_src"
 } else {
   puts "WARN: Source dir not found: $app_src"

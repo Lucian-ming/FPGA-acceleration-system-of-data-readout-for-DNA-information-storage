@@ -1,7 +1,7 @@
 # 18 · 下一步行动计划（2026-08-30，G3 闭环之后）
 
 本文回答：**G3 闭环之后，接下来按什么顺序做什么。**
-事实状态仍以 `docs/03-status.md` 为准，技术做法以 `docs/13` 为准。
+事实状态仍以 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 为准，技术做法以 `docs/13` 为准。
 本文取代 `docs/14-next-steps-2026-08-29.md`（那份是闭环前的排序）。
 
 ---
@@ -189,7 +189,7 @@
 
    ⚠️ **但这一轮覆盖不了第四个雷区（Voter 累加器复位）**，而且不是「测得不够细」——
    同一份输入下它**结构性不可观测**：逐位相同恰是该缺陷的必然输出。
-   证明见 `docs/03-status.md` 的盲区小节（累加器更新 `x ← clip(x ± 1)` 对起始值单调不减）。
+   证明见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 的盲区小节（累加器更新 `x ← clip(x ± 1)` 对起始值单调不减）。
 
    **第十一次上板才把它补上**（`0ecab9a`，`run_g3.sh --runs 2 --first-run-score-min 0`）：
 
@@ -431,7 +431,7 @@ Stage3 实测 < 500 ms 就 DONE，离 67 s 差两个数量级）。
 
 ~~**仍未覆盖**：Voter 的 AXI 读通路走真实 DDR~~ ✅ **已补齐（2026-08-30，`voter-ddr` 会话）**：
 `run_xsim.sh vot_ddr` / `hw/sim/vot/tb_vot_ddr_bitexact.v`，判据与故障注入结果见
-`docs/03-status.md`「接口判据补齐 · Voter 的 AXI 读通路走真实 DDR」一节。
+`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`「接口判据补齐 · Voter 的 AXI 读通路走真实 DDR」一节。
 注意结论边界：从机是行为模型，不是实际 PS7 的 AFI/DDR 控制器。
 
 **仍未覆盖**：长时间连续运行、三轮以上或跨参数的连续任务。
@@ -446,7 +446,7 @@ Stage3 实测 < 500 ms 就 DONE，离 67 s 差两个数量级）。
 
 ⚠️ 这里**不要**用「票数整体翻倍所以符号不变」来解释：撞上饱和后「翻倍」这个描述
 本身就不成立，拿它去论证饱和区没问题是循环论证。完整推导、穷举复核与这段弯路
-见 `docs/03-status.md` 同名小节。
+见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 同名小节。
 
 **推论：换任何输入规模、多跑几轮都没用**——要覆盖累加器复位，
 第二次任务必须换参数（换 `score_min` 或换读段子集）。

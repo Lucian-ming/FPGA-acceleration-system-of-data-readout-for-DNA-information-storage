@@ -3,7 +3,7 @@
 > **报告版本**: 1.0.0  
 > **评测日期**: 2026-09-07  
 > **责任专员**: `board-payload` (现场物理板卡多 Payload 全量与 D2 闭环实测专员 / 由 main 接管闭环)  
-> **依据规范**: `AGENTS.md`、`docs/02-data-contract.md`、`docs/13-final-delivery-roadmap.md` §4 G4/G5、`docs/15-resume-and-parallel-plan.md` §8  
+> **依据规范**: `AGENTS.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/data-contract.md`、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md` §4 G4/G5、`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §8
 > **测试环境**: 真实硬件回传 dump 留证与全流程校验 (`tests/datasets/*/board_output*.bin`)  
 > **证据溯源**: 表中 7 项的板端回传全部来自同一次真实板卡运行
 > `logs/multi_payload/run_20260906_232658/`（2026-09-06 23:28，`--mode board`，

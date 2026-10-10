@@ -34,7 +34,7 @@ bash tests/host/run_host_tests.sh --record     # 重录行为轨迹黄金文件
 
 **1. 纯逻辑单元测试**（`test_echo_pure.c`，约 50 条）
 `parse_header` 的大端长度与 magic 边界、`align_down`、`board_caps` 对
-`docs/05-interfaces.md` 1.3 节、`process_batch` 的四类边界、`process_config`
+`docs/04-interfaces.md` 1.3 节、`process_batch` 的四类边界、`process_config`
 的连接层拒绝码 8/9、`process_post` 的布局校验、
 `expand_watermark_regions` 对 `tests/golden/wm_regions.hex` 的 **47,850 个符号逐个比对**、
 `apply_watermark_differential` 的范围与幂等、`validate_decoder_written_beats` 的哨兵计数、
@@ -60,7 +60,7 @@ NETIF INPUT                    keep_tcp_alive 的位置
 
 ## 判据的鉴别力（`--selftest`）
 
-一条不会失败的判据，通过了也没有信息量（`docs/21` §5）。
+一条不会失败的判据，通过了也没有信息量（`docs/05` §5）。
 `tests/host/inject.py` 对 `echo.c` 的**临时副本**做四种「拆分时顺手整理掉」的改动，
 每一种都必须让轨迹判据变红（注入点找不到会直接报错，不会悄悄变成空操作）：
 

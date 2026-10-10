@@ -362,7 +362,7 @@ def iter_reads(
 
     `orient="both"` 时每条源读段发两份：正向 + 反向互补。
     板端 Stage1 会分别给两份打分，Voter 按分数丢掉方向错的那份
-    （docs/06-implementation-plan.md P1）。这是必需的：测序数据里约一半读段
+    （docs/05-implementation-plan.md P1）。这是必需的：测序数据里约一半读段
     是反向互补的，不发的话即使用满全部读段也无法译码。
     """
     if orient not in {"both", "forward"}:

@@ -12,7 +12,7 @@
 #ifndef __ECHO_H__
 #define __ECHO_H__
 
-#include "xparameters.h"
+#include "bsp_compat.h"
 #include "xil_types.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
@@ -91,7 +91,7 @@
 #define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 211,000 B */
 
 /*=============================================================================
- * DDR 地址映射 (SE250 全量布局，扩充读段区至 8.38MB，docs/20 §5.3)
+ * DDR 地址映射 (SE250 全量布局，扩充读段区至 8.38MB，docs/07 §5.3)
  *
  * 内存布局:
  * 0x10000000 - 0x10002800  : 水印数据 (~10KB)
@@ -175,7 +175,7 @@
  *============================================================================*/
 
 /* ========= 第一个IP核: DNA Accelerator ========= */
-#define DNA_ACCELERATOR_BASEADDR    XPAR_DNA_ACCELERATOR_CORE_0_S_AXI_LITE_CTRL_BASEADDR
+#define DNA_ACCELERATOR_BASEADDR    DNA_STAGE1_BASEADDR
 #define DNA_ACC_REG0_CTRL           0x00U
 #define DNA_ACC_CTRL_BIT_START      (1U << 0)
 #define DNA_ACC_CTRL_BIT_PRELOAD    (1U << 1)
@@ -199,7 +199,7 @@
  *                       06-implementation-plan 里写的 0x18 已被 DBG_STATE 占用。
  *   （0x18/0x1C/0x20/0x24/0x28/0x2C/0x38 为只读调试寄存器）
  *============================================================================*/
-#define VOTER_BASEADDR              XPAR_DIFFERENTIAL_VOTER_0_S00_AXI_BASEADDR
+#define VOTER_BASEADDR              DNA_VOTER_BASEADDR
 #define VOTER_REG_CTRL_STATUS       0x00U  /* START/STATUS合一 */
 #define VOTER_REG_IN_ADDR           0x04U  /* 输入地址 */
 #define VOTER_REG_IN_BEATS          0x08U  /* 输入拍数 */
@@ -243,7 +243,7 @@
  *   0x20: CYCLES_WR   - 【P7】写引擎活动周期数
  *   0x24: CYCLES_WAIT - 【P7】读等待 DDR 延迟周期数
  *============================================================================*/
-#define DECODER_BASEADDR            XPAR_DESPARSIFICATION_DEC_0_S00_AXI_BASEADDR
+#define DECODER_BASEADDR            DNA_DECODER_BASEADDR
 #define DECODER_REG_IN_ADDR         0x00U
 #define DECODER_REG_IN_BEATS        0x04U
 #define DECODER_REG_OUT_ADDR        0x08U
@@ -319,7 +319,7 @@ int  run_processing_pipeline(dna_connection_t *conn);
 int  echo_pipeline_is_running(void);
 void echo_pipeline_poll(void);
 
-/* 【P3】任务配置与能力查询（docs/05-interfaces.md 1.1~1.3 节） */
+/* 【P3】任务配置与能力查询（docs/04-interfaces.md 1.1~1.3 节） */
 void process_config(dna_connection_t *conn, u8 *data, u32 len);
 void process_caps(dna_connection_t *conn);
 

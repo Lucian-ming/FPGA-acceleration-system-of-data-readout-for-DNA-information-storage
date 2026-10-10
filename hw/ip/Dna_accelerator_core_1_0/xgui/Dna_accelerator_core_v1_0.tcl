@@ -1,6 +1,9 @@
 # Definitional proc to organize widgets for parameters.
 proc init_gui { IPINST } {
   ipgui::add_param $IPINST -name "Component_Name"
+  set Stage1 [ipgui::add_page $IPINST -name "Stage1"]
+  ipgui::add_param $IPINST -name "C_STAGE1_P_WAYS" -parent $Stage1 -widget comboBox
+  ipgui::add_param $IPINST -name "C_STAGE1_PIPE_TREE" -parent $Stage1 -widget comboBox
   #Adding Page
   set Page_0 [ipgui::add_page $IPINST -name "Page 0"]
   ipgui::add_param $IPINST -name "C_S_AXI_LITE_CTRL_DATA_WIDTH" -parent ${Page_0} -widget comboBox
@@ -212,3 +215,22 @@ proc update_MODELPARAM_VALUE.REF_LEN { MODELPARAM_VALUE.REF_LEN PARAM_VALUE.REF_
 	set_property value [get_property value ${PARAM_VALUE.REF_LEN}] ${MODELPARAM_VALUE.REF_LEN}
 }
 
+
+# 生产配置只有4/0与16/1；不允许16路组合树静默进入100MHz工程。
+proc update_PARAM_VALUE.C_STAGE1_P_WAYS { PARAM_VALUE.C_STAGE1_P_WAYS } {}
+proc validate_PARAM_VALUE.C_STAGE1_P_WAYS { PARAM_VALUE.C_STAGE1_P_WAYS } {
+    set ways [get_property value ${PARAM_VALUE.C_STAGE1_P_WAYS}]
+    return [expr {$ways == 4 || $ways == 16}]
+}
+proc update_PARAM_VALUE.C_STAGE1_PIPE_TREE { PARAM_VALUE.C_STAGE1_PIPE_TREE } {}
+proc validate_PARAM_VALUE.C_STAGE1_PIPE_TREE { PARAM_VALUE.C_STAGE1_PIPE_TREE PARAM_VALUE.C_STAGE1_P_WAYS } {
+    set ways [get_property value ${PARAM_VALUE.C_STAGE1_P_WAYS}]
+    set pipe [get_property value ${PARAM_VALUE.C_STAGE1_PIPE_TREE}]
+    return [expr {($ways == 4 && $pipe == 0) || ($ways == 16 && $pipe == 1)}]
+}
+proc update_MODELPARAM_VALUE.C_STAGE1_P_WAYS { MODELPARAM_VALUE.C_STAGE1_P_WAYS PARAM_VALUE.C_STAGE1_P_WAYS } {
+    set_property value [get_property value ${PARAM_VALUE.C_STAGE1_P_WAYS}] ${MODELPARAM_VALUE.C_STAGE1_P_WAYS}
+}
+proc update_MODELPARAM_VALUE.C_STAGE1_PIPE_TREE { MODELPARAM_VALUE.C_STAGE1_PIPE_TREE PARAM_VALUE.C_STAGE1_PIPE_TREE } {
+    set_property value [get_property value ${PARAM_VALUE.C_STAGE1_PIPE_TREE}] ${MODELPARAM_VALUE.C_STAGE1_PIPE_TREE}
+}

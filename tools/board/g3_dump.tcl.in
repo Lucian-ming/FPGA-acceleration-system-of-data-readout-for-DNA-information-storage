@@ -5,17 +5,18 @@
 # mrd 的长度单位是 32 bit 字，不是字节；各区间长度由 run_g3.sh 按本次条数算好填入。
 # XSDB 默认禁止访问 PL 地址（0x4000_0000+），所以这里只读 DDR 里的中间结果。
 connect
+targets -set -nocase -filter {name =~ "@@DEVICE@@*"}
 targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
 puts "DUMP> target selected (no reset)"
 # 展开后的 50 个水印区域：50 x 957 x 4 B = 191400 B
-mrd -bin -file @@OUTDIR@@/dump_wm_regions.bin 0x10040000 @@WM_WORDS@@
+mrd -bin -file {@@OUTDIR@@/dump_wm_regions.bin} 0x10040000 @@WM_WORDS@@
 puts "DUMP> wm_regions done"
 # Stage1 输出：@@STAGE1_RECORDS@@ x 48 B (或 72 B)
-mrd -bin -file @@OUTDIR@@/dump_stage1.bin @@STAGE1_ADDR@@ @@STAGE1_WORDS@@
+mrd -bin -file {@@OUTDIR@@/dump_stage1.bin} @@STAGE1_ADDR@@ @@STAGE1_WORDS@@
 puts "DUMP> stage1 done"
 # Stage2 输出（已就地异或水印）：1266 x 8 B = 10128 B
-mrd -bin -file @@OUTDIR@@/dump_stage2.bin @@STAGE2_ADDR@@ @@STAGE2_WORDS@@
+mrd -bin -file {@@OUTDIR@@/dump_stage2.bin} @@STAGE2_ADDR@@ @@STAGE2_WORDS@@
 puts "DUMP> stage2 done"
 # Stage3 输出：1013 x 8 B = 8104 B
-mrd -bin -file @@OUTDIR@@/dump_stage3.bin @@STAGE3_ADDR@@ @@STAGE3_WORDS@@
+mrd -bin -file {@@OUTDIR@@/dump_stage3.bin} @@STAGE3_ADDR@@ @@STAGE3_WORDS@@
 puts "DUMP> stage3 done"

@@ -2,13 +2,13 @@
 
 > 版本：2026-09-05。本文不是愿望清单，而是从当前 checkout 出发到“可以交付、可以答辩、可以复现”的终态门禁。任何未通过的阶段都不能在宣传中写成已完成。
 
-> 2026-09-06 执行更新：现状以 [03](03-status.md) 为准；中断遗留物审计见
-> [16](16-interrupted-work-audit-2026-09-06.md)，当前并行队列见
-> [15](15-resume-and-parallel-plan.md)。本文保留最终门禁和探索池，不作为最新完成进度。
+> 2026-09-06 执行更新：现状以 [03](status.md) 为准；中断遗留物审计见
+> [16](interrupted-work-audit-2026-09-06.md)，当前并行队列见
+> [15](resume-and-parallel-plan.md)。本文保留最终门禁和探索池，不作为最新完成进度。
 >
 > **⚠️ 2026-09-10 定位修订：本文的候选池已部分证伪，优先级以
-> [17](17-competition-strategy.md) 为准。** 具体：G3 的 64×8/128×4 关闭、
-> §7.1 的 H1/H2/H3 判定证伪、§7.5 的对外口径改按 [17](17-competition-strategy.md) §4。
+> [17](competition-strategy.md) 为准。** 具体：G3 的 64×8/128×4 关闭、
+> §7.1 的 H1/H2/H3 判定证伪、§7.5 的对外口径改按 [17](competition-strategy.md) §4。
 > 凡本文与 17 冲突之处，以 17 为准。
 
 ## 1. 最终目标
@@ -102,7 +102,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 
 **当前真正的硬阻塞只有两个**，且都不是工程问题：
 
-1. **无功率计** → G6 的能耗门禁、以及 [17](17-competition-strategy.md) §5.3
+1. **无功率计** → G6 的能耗门禁、以及 [17](competition-strategy.md) §5.3
    唯一可能翻盘的能效叙事，全部卡在这里；
 2. **比特流仅支持 150 bp** → G0 的 SE250 profile 与 SE250 端到端验证。
 
@@ -126,11 +126,11 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 - ⚠️ 当前板各 profile 至少一轮 G3 PASS —— **SE150 已 PASS（多轮）；
   SE250 无法验证**：现有比特流仅支持 150 bp；
 - ✅ 输入、制品、工具版本全部可追溯 —— 制品同源性由符号级比对建立
-  （见 [03](03-status.md) P0b），D0 输入哈希见 `data/MANIFEST.md`；
+  （见 [03](status.md) P0b），D0 输入哈希见 `data/MANIFEST.md`；
 - ✅ 任何后续版本都能与该基线直接比较。
 
 > **2026-09-11：除 SE250 profile 外达成。** SE250 受限于比特流读长，
-> 不是流程问题——见 [03](03-status.md) 的事实边界。
+> 不是流程问题——见 [03](status.md) 的事实边界。
 
 ### G1 · 计时和统计可信（3～7 天）
 
@@ -150,7 +150,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 - ✅ 工具失败不会被误报成硬件失败。
 
 > **2026-09-11 四条全部达成**，依据见
-> [`docs/benchmarks/measured_timing_accountability.md`](benchmarks/measured_timing_accountability.md)。
+> [`docs/benchmarks/measured_timing_accountability.md`](../../../../benchmarks/measured_timing_accountability.md)。
 > 两条关键结论：
 > （a）时间构成——PL 真实计算约 50%、**poll 定时器空等约 29%**、PS 固件执行 9.1%、
 > 通信与主机侧合计不到 10%；
@@ -174,14 +174,14 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 - ✅ SE150 G3 哈希不变（SE250 受比特流读长限制，无法验证）；
 - ✅ 总耗时和固定开销有实际下降 —— 固定开销 5.284 s → 1.505 s（3.5x），
   演示规模 7.315 s → 4.123 s，见
-  [`measured_timing_accountability.md`](benchmarks/measured_timing_accountability.md)；
+  [`measured_timing_accountability.md`](../../../../benchmarks/measured_timing_accountability.md)；
 - ✅ 主机峰值内存、CPU 占用和网络吞吐有记录 —— 2026-09-11 实测：
   2,048 读段 RSS 33.6 MB / CPU 1.8%；全量 51,781 读段 RSS 71.3 MB / CPU **0.6%**；
   网络 8 Mbps 量级。**上位机不是瓶颈**：全量任务中 99.4% 墙钟时间主机在等板子。
-  见 [`measured_timing_accountability.md`](benchmarks/measured_timing_accountability.md) §4；
+  见 [`measured_timing_accountability.md`](../../../../benchmarks/measured_timing_accountability.md) §4；
 - ✅ 断连、超时、错误配置能给出明确错误 —— G6 的 20 类注入全部有明确错误码与恢复，
   非法配置由固件 `rc=1..9` 精确区分，见
-  [`measured_g6_robustness_campaign.md`](benchmarks/measured_g6_robustness_campaign.md)。
+  [`measured_g6_robustness_campaign.md`](../../../../benchmarks/measured_g6_robustness_campaign.md)。
 
 ### G3 · Stage1 并行化（2～4 周）
 
@@ -197,8 +197,8 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 > **64×8 与 128×4 已因器件资源证伪并关闭**：4-way 整机实测 LUT 15,483/17,600
 > = 88.0%，8-way 按 ~1,634 LUT/路外推需约 22,000 LUT（超出 25%）。
 > 保留为负结果留证（§8.2），**不再排期**。
-> 另按 [17](17-competition-strategy.md) §1，端到端已被 4.25 s 固定开销封顶，
-> 本阶段后续投入应转向该固定开销（[17](17-competition-strategy.md) §3）。
+> 另按 [17](competition-strategy.md) §1，端到端已被 4.25 s 固定开销封顶，
+> 本阶段后续投入应转向该固定开销（[17](competition-strategy.md) §3）。
 
 每一档都完成：
 
@@ -222,7 +222,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
   板端每记录成本比仅 **1.218x**（核心加速 1.929x）。
   原因是 **Stage1 只占每记录成本的 37.1%**（板端两条斜率反解），
   而非文档此前假定的 81%。Amdahl 上限 1.22x 与实测吻合。
-  详见 [`measured_4way_board.md`](benchmarks/measured_4way_board.md)。
+  详见 [`measured_4way_board.md`](../../../../benchmarks/measured_4way_board.md)。
   **「若没有收益，必须保留失败实验和原因，不得强行宣传」——本条据此执行**：
   4-way 正确性成立、时序收敛、资源合格，但端到端收益 1.218x 不足以支撑任何加速宣传。
 
@@ -243,7 +243,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 > **✅ 2026-09-11 达成**：6 类异构 payload（经典图像 D0、纯文本、几何二值、稀疏位流、
 > 高熵随机、受控噪声 D2）板端 100% 逐位恢复；**21 次板端运行（每数据集 3 次）
 > 结果逐位可重复、零抖动**，见
-> [`measured_board_multi_payload.md`](benchmarks/measured_board_multi_payload.md) §6。
+> [`measured_board_multi_payload.md`](../../../../benchmarks/measured_board_multi_payload.md) §6。
 > 失败样本完整保留：高熵 @出厂门限 60 稳定 0/3 失败（2,671 bit 误码，LDPC 50 轮未收敛），
 > 未从统计中剔除。
 
@@ -301,7 +301,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 - ✅ 任何异常都能定位到协议、固件、RTL 或数据层。
 
 > **2026-09-11 实测状态：除功耗外全部达成，故 G6 仍不能写成通过。**
-> 依据见 [`docs/benchmarks/measured_g6_robustness_campaign.md`](benchmarks/measured_g6_robustness_campaign.md)：
+> 依据见 [`docs/benchmarks/measured_g6_robustness_campaign.md`](../../../../benchmarks/measured_g6_robustness_campaign.md)：
 > 跨规模连续四轮（含全量弄脏轮，鉴别力自证 1,500/64,800 bit）、
 > 故障注入 20 类全部恢复（畸变包 10/10、断网 3/3、非法配置 7/7），
 > **且每类注入后都补跑判据轮**，哈希 `fcd0cf90…f2c3` 逐位相同、四级取证全过。
@@ -380,7 +380,7 @@ G3、G4、G5 可以并行准备数据，但不能跳过 G0/G1。没有可比基�
 
 | 假设 | 尝试方法 | 首轮成本 | 成功信号 |
 |---|---|---:|---|
-| ~~H1：碱基维度 4/8 路展开有效~~ | **部分成立后关闭**：4 路已实测 1.929x 并收敛；**8 路证伪**（LUT 外推 125%） | — | ❌ 不再投入，见 [17](17-competition-strategy.md) §2.1 |
+| ~~H1：碱基维度 4/8 路展开有效~~ | **部分成立后关闭**：4 路已实测 1.929x 并收敛；**8 路证伪**（LUT 外推 125%） | — | ❌ 不再投入，见 [17](competition-strategy.md) §2.1 |
 | ~~H2：读段维度扩大更划算~~ | **降级**：batch 扩大同样受 4.25 s 固定开销封顶 | — | ⏸ 排在 P0 之后 |
 | ~~H3：二维展开可组合~~ | **证伪**：128×4 在 XC7Z010 上放不下 | — | ❌ 关闭 |
 | **H0（新增，最高优先级）：4.25 s 固定开销可大幅压缩** | PS 侧分阶段插桩，定位 Stage 2.5 软件异或等热点 | 低 | 固定开销 → 1 s 时全量 4-way 达约 2,000 reads/s，首次超单核 CPU |

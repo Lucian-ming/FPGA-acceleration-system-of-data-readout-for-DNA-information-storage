@@ -189,7 +189,7 @@ WREADY 再组合地绕回来驱动 upsizer 数据寄存器的 CE。全程未打�
   失败路径位于 `desparsification_dec` → AXI HP 写握手链（既有瓶颈），
   与 4-way 选优树无关。」
 - ⛔ `hw/build/export_4way/*.bit` / `*.xsa` **不入库**：一个 100 MHz 未收敛的比特流
-  一旦进仓会成为事实基线，后患大。按 `docs/13` §8.2「失败也算产出」，
+  一旦进仓会成为事实基线，后患大。按 `docs/05` §8.2「失败也算产出」，
   留**证据**（本 findings + 报告摘要）而非**产物**。
   同理，基于该 bit 的任何板测结果都**不能**作为时序合格证据——它等于超频运行。
 
@@ -360,7 +360,7 @@ set_property strategy $impl_strategy [get_runs impl_1]
 保留 `DNA_IMPL_STRATEGY` 环境变量以便日后再做策略 A/B，不必改脚本。
 
 **必要性**：不固化则从零重建退回默认策略、复现 WNS = −0.252 ns 不收敛，
-已交付的收敛结果将不可复现（`docs/13` G7/G8 门禁）。
+已交付的收敛结果将不可复现（`docs/05` G7/G8 门禁）。
 
 ## 12.2 收敛版制品：`hw/build/export_4way_physopt/`
 

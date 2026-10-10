@@ -1,7 +1,7 @@
 /* =============================================================
  * test_task_config.c — task_config.h 的主机单元测试（P3 判据）
  *
- * 与固件共用 sw/app/task_config.h。协议黄金值来自 docs/05-interfaces.md：
+ * 与固件共用 sw/app/task_config.h。协议黄金值来自 docs/04-interfaces.md：
  *   CRC-32/IEEE 与 zlib.crc32 一致（独立交叉验证）：
  *     "123456789" -> 0xCBF43926
  *     黄金 config(v1/150/50/807/40500/4096/67) 前 40 B -> 0xD5BC6633
@@ -13,7 +13,7 @@
 #include <string.h>
 #include "task_config.h"
 
-/* 与 echo.h / docs/05-interfaces.md 1.3 节一致的黄金能力值 */
+/* 与 echo.h / docs/04-interfaces.md 1.3 节一致的黄金能力值 */
 #define CAPS_V      1
 #define CAPS_BPS    150
 #define CAPS_NUMLC  50

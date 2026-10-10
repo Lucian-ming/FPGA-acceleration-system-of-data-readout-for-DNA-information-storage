@@ -6,7 +6,7 @@
 1. 利用 numpy 向量化与查表 (LUT) 消除 Python 解释器层面的逐字节与逐位循环；
 2. 消除反向互补链的冗余字符串创建与重复编码（通过位平面逆序与翻转 `hi_rc = hi[::-1]`, `lo_rc = lo[::-1] ^ 1`）；
 3. 预分配整批 DMA / 网络传输缓冲区，避免大量小对象的内存重分配与复制；
-4. 严格遵守 docs/02-data-contract.md 与 docs/05-interfaces.md 的数据契约与位序 (LSB-first)；
+4. 严格遵守 docs/02-data-contract.md 与 docs/04-interfaces.md 的数据契约与位序 (LSB-first)；
 5. 提供与 first.py 逐位等价的高性能实现与流式生成器。
 """
 

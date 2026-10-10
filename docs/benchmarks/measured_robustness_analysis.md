@@ -10,7 +10,7 @@
 
 ## 1. 评测背景与契约规范
 
-依据系统终态验收规范（`docs/13-final-delivery-roadmap.md` §4 G5 错误鲁棒性）及执行计划（`docs/15-resume-and-parallel-plan.md` §8），本评测对 DNA 存储数据读出通路建立真实、可复现、硬件行为等价的多维抗噪能力边界。
+依据系统终态验收规范（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/final-delivery-roadmap.md` §4 G5 错误鲁棒性）及执行计划（`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/resume-and-parallel-plan.md` §8），本评测对 DNA 存储数据读出通路建立真实、可复现、硬件行为等价的多维抗噪能力边界。
 
 ### 1.1 硬件等价模式 (`board_equivalent`) 契约
 在 Zynq-7010 板级实际运行中：

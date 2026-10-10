@@ -1,5 +1,5 @@
 // 位平面 + popcount 的暴力滑窗比对基准：与 FPGA srpe_batch 完全相同的算法。
-// 用来回答「同样的暴力算法，一个 CPU 核到底能跑多快」，是 docs/07-performance.md 的实测来源。
+// 用来回答「同样的暴力算法，一个 CPU 核到底能跑多快」，是 docs/08-performance-and-strategy.md 的实测来源。
 // 读段长度由 -DRB= 指定（默认 150）；每条读段同时比对正向与反向互补，取分高者。
 //
 //   python3 tools/bench_align.py                        # 生成 ref.bin / reads.bin

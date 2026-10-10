@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tools/run_cpu_benchmark.py —— CPU vs FPGA 严格公平基准测试与计时契约评测
 
-落实 docs/15 §5 (任务 A) 与 docs/26:
+落实 docs/05 §5 (任务 A) 与 docs/26:
 1. 建立明确分型体系：
    - [MEASURED]  : 当前宿主机现场运行实测数据（CPU 单核/多核 OpenMP 实测，Python 抽样外推）；
    - [HISTORICAL]: 真实历史板测数据（严格关联 board log / run-id / bitstream 证据，无证据不呈现）；
@@ -707,7 +707,7 @@ def run_benchmark_suite(
     md_lines = [
         f"# CPU vs FPGA 公平基准与计时契约评测报告 ({run_id})",
         "",
-        "> 依据 `docs/15 §5 (任务 A)` 规范生成。严格杜绝稻草人对比与虚假加速比。",
+        "> 依据 `docs/05 §5 (任务 A)` 规范生成。严格杜绝稻草人对比与虚假加速比。",
         "",
         "## 1. 评测环境与契约说明",
         f"- **测试时间**: {output_json['timestamp']}",

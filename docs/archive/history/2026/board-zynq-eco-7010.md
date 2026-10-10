@@ -100,7 +100,7 @@ PCW_UIPARAM_DDR_DEVICE_CAPACITY  2048 MBits
 
 ### 3.4 影响面（很窄）
 
-- **DDR 总容量不变**，仍为 512 MiB。`docs/05-interfaces.md` §4 的 DDR 布局
+- **DDR 总容量不变**，仍为 512 MiB。`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/interfaces.md` §4 的 DDR 布局
   （`0x1000_0000`–`0x1190_0000`）**无需改动**，最高用到约 294 MiB，远在容量内。
 - **PL 侧完全不受影响**：本设计不引出任何 PL 外部引脚，也不使用板载 50 MHz 时钟
   （PL 时钟来自 PS 的 FCLK0），因此 RTL、三个 IP、`hw/constr/top.xdc` 与时序结论都不动。

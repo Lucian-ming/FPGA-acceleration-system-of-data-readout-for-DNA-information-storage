@@ -475,7 +475,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>15371d8a</spirit:value>
+            <spirit:value>1f6e7b8a</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -494,7 +494,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>15371d8a</spirit:value>
+            <spirit:value>1f6e7b8a</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -508,21 +508,7 @@
         <spirit:parameters>
           <spirit:parameter>
             <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>5f8c598e</spirit:value>
-          </spirit:parameter>
-        </spirit:parameters>
-      </spirit:view>
-      <spirit:view>
-        <spirit:name>bd_tcl</spirit:name>
-        <spirit:displayName>Block Diagram</spirit:displayName>
-        <spirit:envIdentifier>:vivado.xilinx.com:block.diagram</spirit:envIdentifier>
-        <spirit:fileSetRef>
-          <spirit:localName>bd_tcl_view_fileset</spirit:localName>
-        </spirit:fileSetRef>
-        <spirit:parameters>
-          <spirit:parameter>
-            <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>16328387</spirit:value>
+            <spirit:value>4b0273c9</spirit:value>
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
@@ -1149,6 +1135,16 @@
         <spirit:displayName>Ref Len</spirit:displayName>
         <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.REF_LEN">957</spirit:value>
       </spirit:modelParameter>
+      <spirit:modelParameter spirit:dataType="integer">
+        <spirit:name>C_STAGE1_P_WAYS</spirit:name>
+        <spirit:displayName>Stage1 Parallel Positions</spirit:displayName>
+        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_STAGE1_P_WAYS">4</spirit:value>
+      </spirit:modelParameter>
+      <spirit:modelParameter spirit:dataType="integer">
+        <spirit:name>C_STAGE1_PIPE_TREE</spirit:name>
+        <spirit:displayName>Stage1 Pipelined Selection Tree</spirit:displayName>
+        <spirit:value spirit:format="long" spirit:resolve="generated" spirit:id="MODELPARAM_VALUE.C_STAGE1_PIPE_TREE">0</spirit:value>
+      </spirit:modelParameter>
     </spirit:modelParameters>
   </spirit:model>
   <spirit:choices>
@@ -1157,9 +1153,19 @@
       <spirit:enumeration>32</spirit:enumeration>
     </spirit:choice>
     <spirit:choice>
+      <spirit:name>choice_list_8af5a703</spirit:name>
+      <spirit:enumeration>0</spirit:enumeration>
+      <spirit:enumeration>1</spirit:enumeration>
+    </spirit:choice>
+    <spirit:choice>
       <spirit:name>choice_list_9d8b0d81</spirit:name>
       <spirit:enumeration>ACTIVE_HIGH</spirit:enumeration>
       <spirit:enumeration>ACTIVE_LOW</spirit:enumeration>
+    </spirit:choice>
+    <spirit:choice>
+      <spirit:name>choice_list_c4814aef</spirit:name>
+      <spirit:enumeration>4</spirit:enumeration>
+      <spirit:enumeration>16</spirit:enumeration>
     </spirit:choice>
     <spirit:choice>
       <spirit:name>choice_pairs_ce1226b1</spirit:name>
@@ -1187,9 +1193,13 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
+        <spirit:name>hdl/srpe_batch_pway.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
         <spirit:name>hdl/Dna_accelerator_core_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
-        <spirit:userFileType>CHECKSUM_31547cc7</spirit:userFileType>
+        <spirit:userFileType>CHECKSUM_29c44ec4</spirit:userFileType>
       </spirit:file>
     </spirit:fileSet>
     <spirit:fileSet>
@@ -1221,6 +1231,10 @@
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
       <spirit:file>
+        <spirit:name>hdl/srpe_batch_pway.v</spirit:name>
+        <spirit:fileType>verilogSource</spirit:fileType>
+      </spirit:file>
+      <spirit:file>
         <spirit:name>hdl/Dna_accelerator_core_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
@@ -1242,13 +1256,6 @@
         <spirit:fileType>tclSource</spirit:fileType>
         <spirit:userFileType>CHECKSUM_5f8c598e</spirit:userFileType>
         <spirit:userFileType>XGUI_VERSION_2</spirit:userFileType>
-      </spirit:file>
-    </spirit:fileSet>
-    <spirit:fileSet>
-      <spirit:name>bd_tcl_view_fileset</spirit:name>
-      <spirit:file>
-        <spirit:name>bd/bd.tcl</spirit:name>
-        <spirit:fileType>tclSource</spirit:fileType>
       </spirit:file>
     </spirit:fileSet>
   </spirit:fileSets>
@@ -1363,6 +1370,16 @@
       <spirit:displayName>Ref Len</spirit:displayName>
       <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.REF_LEN">957</spirit:value>
     </spirit:parameter>
+    <spirit:parameter>
+      <spirit:name>C_STAGE1_P_WAYS</spirit:name>
+      <spirit:displayName>Stage1 Parallel Positions</spirit:displayName>
+      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.C_STAGE1_P_WAYS" spirit:choiceRef="choice_list_c4814aef">4</spirit:value>
+    </spirit:parameter>
+    <spirit:parameter>
+      <spirit:name>C_STAGE1_PIPE_TREE</spirit:name>
+      <spirit:displayName>Stage1 Pipelined Selection Tree</spirit:displayName>
+      <spirit:value spirit:format="long" spirit:resolve="user" spirit:id="PARAM_VALUE.C_STAGE1_PIPE_TREE" spirit:choiceRef="choice_list_8af5a703">0</spirit:value>
+    </spirit:parameter>
   </spirit:parameters>
   <spirit:vendorExtensions>
     <xilinx:coreExtensions>
@@ -1374,16 +1391,16 @@
       </xilinx:taxonomies>
       <xilinx:displayName>Dna_accelerator_core_v1.0</xilinx:displayName>
       <xilinx:coreRevision>111</xilinx:coreRevision>
-      <xilinx:coreCreationDateTime>2025-10-31T10:47:22Z</xilinx:coreCreationDateTime>
+      <xilinx:coreCreationDateTime>2026-10-10T13:06:32Z</xilinx:coreCreationDateTime>
     </xilinx:coreExtensions>
     <xilinx:packagingInfo>
       <xilinx:xilinxVersion>2022.2</xilinx:xilinxVersion>
       <xilinx:checksum xilinx:scope="busInterfaces" xilinx:value="f59ce4c4"/>
       <xilinx:checksum xilinx:scope="memoryMaps" xilinx:value="32ce1a94"/>
-      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="c4278256"/>
+      <xilinx:checksum xilinx:scope="fileGroups" xilinx:value="74ca4d6b"/>
       <xilinx:checksum xilinx:scope="ports" xilinx:value="aaea2119"/>
-      <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="1ac2fdf4"/>
-      <xilinx:checksum xilinx:scope="parameters" xilinx:value="cb54b81f"/>
+      <xilinx:checksum xilinx:scope="hdlParameters" xilinx:value="fa837282"/>
+      <xilinx:checksum xilinx:scope="parameters" xilinx:value="c37cd27a"/>
     </xilinx:packagingInfo>
   </spirit:vendorExtensions>
 </spirit:component>

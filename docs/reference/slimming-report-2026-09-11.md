@@ -3,7 +3,7 @@
 > **日期**：2026-09-11  
 > **执行 Agent**：`slim`  
 > **审查与提交**：主会话 `main`  
-> **依据文件**：`docs/19-slimming-and-code-quality-plan.md`  
+> **依据文件**：`docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/slimming-and-code-quality-plan.md`
 > **上位准则**：`AGENTS.md`「代码卫生」8 条 + 证据纪律  
 
 ---
@@ -61,7 +61,7 @@
   * 新增 `prune_xsim.sh` 登记；
   * 新增 `## 退役与归档工具（tools/attic/）` 专门小节，登记 `debug_high_entropy.py`、`debug_vote_diff.py`、`voter_page_split.py` 的归档原因与结论出处；
   * 补齐了 `docs/benchmarks/measured_timing_accountability.md` 中 `tools/profile_host.py` 的复现命令；
-  * 补齐了 `docs/18-evidence-ledger.md` 中 `tools/board/g3_runs_to_jsonl.py` 的结构化留证说明；
+  * 补齐了 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/evidence-ledger.md` 中 `tools/board/g3_runs_to_jsonl.py` 的结构化留证说明；
   * 彻底消灭全库零引用工具。
 
 ---
