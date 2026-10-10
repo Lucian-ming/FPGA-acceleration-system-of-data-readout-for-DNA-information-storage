@@ -46,12 +46,21 @@ tools/agent_view.sh show                                                # 查看
 上，拿不到用户指定的子 agent 模型。改为用 Bash 调 codex CLI 非交互模式：
 
 ```bash
+export HTTPS_PROXY=http://127.0.0.1:17897   # 必需，见下
 codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
   -C <工作目录> --skip-git-repo-check "<子任务 prompt>"
 ```
 
-模型固定 `gpt-5.6-luna`、思考强度固定 `max`，**两者都必须显式传**：codex 的默认 `model` 是
-`gpt-6-astra`（不在其模型目录里），luna 的默认强度只有 `medium`。
+目标模型是用户指定的 `gpt-6-luna`，**但本账号当前被服务器拒绝**（原文：
+`not supported when using Codex with a ChatGPT account`；`gpt-6-sol` 同样被拒），
+所以先落可用的 `gpt-5.6-luna`——它同样支持 `max`。`-m` 与 `-c model_reasoning_effort=max`
+**两者都必须显式传**：`config.toml` 的默认 `model` 是 `gpt-6-astra`（当前也必被拒），
+而 luna 的默认强度只有 `medium`。
+
+**代理必需**：不带 `HTTPS_PROXY` 时 `chatgpt.com` 在 WSL 内直连不可达，codex 会反复重连失败。
+本机可用的是 VSCode host-proxy `http://127.0.0.1:17897`（来自
+`~/.vscode-server/data/Machine/settings.json` 的 `http.proxy`，该端口在 WSL 侧 127.0.0.1 监听）。
+
 给 codex 子 agent 的 prompt 里同样要写清它用哪个 `--agent` 名字、按上节规则登记看板、
 **不执行任何 Git 写操作**。
 
