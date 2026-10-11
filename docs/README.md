@@ -19,6 +19,7 @@
 ## 提示词与脚本
 
 - [Agent提示词索引](agent-prompts/README.md)：主Agent及board-migrate、rtl-16way、verify-system完整提示词。
+- [BKB220板级资料](board/bkb220/README.md)：用户提供的v1.1产品手册及SHA校验。
 - [工具索引](../tools/README.md)：全部工具类别与入口。
 - [逐文件清单](reference/project-inventory-2026-10-10.tsv)：源码、脚本、配置、测试、文档与资产职责。
 - [工作区整理记录](reference/workspace-cleanup-2026-10-10.md)：精确忽略/原位保留范围与已知卫生告警。

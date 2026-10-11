@@ -12,7 +12,7 @@
 | 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | 尚无新板完整包、整机时序、真实G3或性能结果 |
 | 连接 | 历史板测设备路径不能直接沿用 | 最近无FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4，需实际供电/USB调试/网线 |
 
-产品手册持久副本：`E:/WeChatRecord/xwechat_files/wxid_ferqcd0b3stq22_d21b/msg/file/2026-10/BKB220产品手册v1.1.pdf`。需要用户提供对应原厂原理图/board_files/PS7 preset/例程的真实目录并确认实物，不把手册示例当实际参数或操作授权。
+产品手册已收录：[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)，[资料来源与SHA校验](board/bkb220/README.md)。2026-10-11按用户提供文件原样复制；对应原厂原理图/board_files/PS7 preset/例程及实物仍需确认，不把手册示例当实际参数或操作授权。
 
 ## 2. 配置与构建门禁
 
