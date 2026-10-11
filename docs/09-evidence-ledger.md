@@ -143,7 +143,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
    才回收，天然有 250 ms 余量」——这句话同时解释了开销**和**节流机制，
    只读出前半句就会拆掉后半句（F3）。
 
-## 7. 2026-10-10 迁移准备证据
+## 7. 2026-10-10/11 迁移准备证据
 
 | 可以说的话 | 判据/原始证据 | 边界 |
 |---|---|---|
@@ -151,6 +151,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | 47项主机门禁通过 | [主机摘要](benchmarks/bkb220-host-verification.md)；logs/host/g3-preflight-20261010/all_host_tests.txt | fixture/替身，不是板测 |
 | 现代软件入口实际完整构建核验 | [工具摘要](benchmarks/bkb220-toolchain-audit.md)；D:/Agent/outputs/bkb220-vitis26/logs-a14/vitis.log与export-a14/software_build_config.json | 旧ECO XSA兼容探针，不是新板包 |
 | 正式源/参数与实际catalog包装通过 | [集成摘要](benchmarks/stage1-16way-ip-integration.md)；logs/vivado/stage1_ip_catalog_20261010_2110 | 默认P4，BKB220 ready=0 |
+| 2026-10-11用户提供的BKB220 v1.1产品手册已随仓库收录，副本与原件字节一致 | [资料索引](board/bkb220/README.md)、[PDF](board/bkb220/BKB220产品手册v1.1.pdf)及[SHA256SUMS](board/bkb220/SHA256SUMS.txt)；SHA `40b50e66…c8cd086`；在docs/board/bkb220运行`sha256sum -c SHA256SUMS.txt` | 只证明所收录文档一致；不证明实物型号、PS7配置或新板验收；缺项见03/07 |
 
 Icarus重复接口已在XSim正式通过后停止，不称Icarus接口PASS。起点重复附件告警及唯一源引用修复记录保留，边界见[整理记录](reference/workspace-cleanup-2026-10-10.md)。全项目门禁与当前Agent任务见05/07。
 

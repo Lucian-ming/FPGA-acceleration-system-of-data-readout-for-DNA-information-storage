@@ -38,6 +38,8 @@
 
 Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日志标记INTERRUPTED_DUPLICATE_AFTER_XSIM_PRODUCTION_PASS；不是Icarus接口PASS。旧BSP下13个C文件编译通过，但临时旧链接探针因Newlib/VFP ABI失败，不能称旧工具链完整重建。起点参赛agent_view.sh重复附件已改为引用tools唯一源码解决，旧失败日志及附件Git历史保留，未放宽门禁。
 
+2026-10-11已把用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)收录至仓库，原件与副本SHA一致；[资料索引及校验](board/bkb220/README.md)是接管入口。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`，再核对对应PCB/实物及原厂配置；引用手册规格时注明页码。产品手册已具备，后续只按实际缺项补齐原理图/preset/例程，不重新制定计划。
+
 硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。接管时重新核对资料和设备，资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
 
 ## 3. 全流程计划与出口门禁
@@ -46,7 +48,7 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 |---|---|---|
 | F0 接管既有计划与现场核对 | main读取本计划、清单及当前文档，核对仓库/HEAD/脏文件/工具/设备和已有证据；按需分配子任务 | 确认已完成/需复核/未完成阶段、具体依赖、路径归属和资源；现成计划直接执行，仅因事实变化修订，不重写计划 |
 | F1 已有成果确认 | main对照07和三个benchmark；子Agent复核源集、API/制品、测试边界 | 必要短检查通过；已有长测来源可验证，不无故重跑；已知失败和阻塞有记录 |
-| F2 新板配置落实 | board收集实物/原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1 |
+| F2 新板配置落实 | main/board先校验并阅读仓库内v1.1手册；board对照实物收集缺少的原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1 |
 | F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统 |
 | F4 新板P4基线 | board完整生成SE150/P4/100MHz整机和现代软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线 |
 | F5 P16整机候选 | rtl审查正式P16依赖和关键路径，board按同板profile生成独立目录；改动按层级回归 | 150/50/807/957/64及16/1贯通；LC50真实接口PASS；WNS/WHS≥0、TNS/THS=0、失败端点0、DRC和路由合法、100MHz；完整新XSA软硬包 |
@@ -84,7 +86,7 @@ F2缺资料不会阻塞F0/F1、测试和文档准备；F3～F8真板部分按依
 | 角色/看板名 | 独占文件 | 输入、输出、依赖 |
 |---|---|---|
 | main | README、docs根目录/索引/证据/交接、agent-prompts、.gitignore；唯一Git写入 | 接管摘要、现有计划进度和必要修订、派发/监控/审查、资源调度、真板操作、远程交付 |
-| board-migrate | hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker；独占板级摘要 | 当前板级入口/旧ECO配置、原厂资料；输出可审计profile、同XSA完整制品、SDT/旧BSP兼容和软件测试报告 |
+| board-migrate | hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker；独占板级摘要 | 当前板级入口、仓库内BKB220手册/校验、旧ECO配置及对应PCB原厂资料；输出带资料路径/手册页码的来源表、可审计profile、同XSA完整制品、SDT/旧BSP兼容和软件测试报告 |
 | rtl-16way | 三IP的相关RTL/component.xml/XGUI及PACKAGED_VARIANTS.txt、tools/check_ip_packaging.sh；独占RTL摘要 | 正式P4/P16代码和独立TB接口；输出源集一致性、参数、修复及综合/时序诊断。大型任务须main授权资源 |
 | verify-system | hw/sim、tests、tools/board、run_sim.sh/run_xsim.sh/run_m2*/run_m3*、run_g3.sh、性能/泛化/故障/压测入口；clients/python仅必要迁移测试修复；独占验证摘要 | 生产参数/寄存器契约、板级完整包；输出独立判据、负用例、板测和矩阵报告，明确测试层级 |
 

@@ -4,6 +4,8 @@
 
 你负责BKB220迁移的板级配置、硬软构建及PS固件兼容，main负责整体调度和Git。唯一WSL checkout为/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout，只main分支。先读AGENTS.md/CLAUDE.md、03、05、07、02/04、三份本轮benchmark和main提供的阶段卡，workspace-write时再登记tools/agent_view.sh start --agent board-migrate，doing/why/next具体；阶段变化update，依赖block，结束done。read-only时以上登记由main代执行。
 
+先完整阅读[仓库内BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)和docs/board/bkb220/README.md，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。该手册已入库，不再依赖微信目录或把产品手册本身列为缺项。来源表注明资料路径、手册页码和对应PCB/实物，分别记录已知规格与仍缺少的原理图/PS7 preset/board_files/例程；手册示例不能替代实际配置证据，也不能授权触板操作。
+
 独占hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker和你的板级摘要。不得改其他角色独占文件；涉及共享字段/寄存器/端口先通知main和消费者，不自己扩权。不要Git add/commit/pull/rebase/stash/reset/clean/push，不建分支/worktree。main明确移交sw/app后才写；保持GBK遗留源码字节，ASCII小补丁/临时文件原子替换，不整体转码。
 
 目标SE150、100MHz、64记录/帧、几何150/50/807/957/64；P4=4/0、P16=16/1。默认P4保留，BKB220 ready=0直至可靠资料确认。旧7010 profile保留已知PS7配置；未知DDR/MIO/PHY/PS时钟不能从手册示例猜。不要修改data/archive/旧export或覆盖已有run目录。

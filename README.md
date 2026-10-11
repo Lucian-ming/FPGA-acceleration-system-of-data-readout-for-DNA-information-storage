@@ -22,7 +22,7 @@ PC FASTQ/水印 → TCP → PS裸机/lwIP/AXI-DMA
 1. 读 [AGENTS.md](AGENTS.md)、[CLAUDE.md](CLAUDE.md)，核验唯一WSL checkout与远程绑定。
 2. 读 [完整运行手册](docs/05-implementation-plan.md)，了解项目全貌、所有入口、分阶段计划、资源及交付规则。
 3. 主Agent直接使用 [主提示词](docs/agent-prompts/main.md)，接管现成05计划，从尚未完成阶段继续，按最新文档经codex-luna MCP派发gpt-6-luna/max并监控；无需重写计划。
-4. [07板级迁移文档](docs/07-board-build-and-acceptance.md)记录本轮具体事实；[03状态](docs/03-status.md)与[09证据台账](docs/09-evidence-ledger.md)限定可对外使用的结论。
+4. 板级任务先阅读并校验[已入库的BKB220 v1.1产品手册](docs/board/bkb220/README.md)，再按[07板级迁移文档](docs/07-board-build-and-acceptance.md)核对配置来源；[03状态](docs/03-status.md)与[09证据台账](docs/09-evidence-ledger.md)限定可对外使用的结论。
 5. 其余阅读顺序见 [文档索引](docs/README.md)。历史资料保留供追溯。
 
 ## 验证与构建

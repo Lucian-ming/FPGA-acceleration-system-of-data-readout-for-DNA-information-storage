@@ -34,7 +34,9 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 ## 4. 未关闭的依赖与后续顺序
 
-最近设备核查没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4；厂商对应PCB原理图、PS7 preset/board_files/原厂例程、实物完整料号及PS时钟/DDR/UART MIO/PHY仍待确认。`hw/boards/bkb220.tcl`保持ready=0，未猜参数。
+2026-10-11资料更新：用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)已随仓库收录；原件与副本SHA-256一致，来源、校验命令见[资料索引](board/bkb220/README.md)。main和board-migrate先阅读并校验仓库内手册，使用手册页码注明规格来源，不再把产品手册列为缺项或依赖微信目录。
+
+2026-10-10/11设备核查快照没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4；厂商对应PCB原理图、PS7 preset/board_files/原厂例程、实物完整料号及PS时钟/DDR/UART MIO/PHY仍待确认。接管时重新核对这些资料与实际设备；手册收录不改变`hw/boards/bkb220.tcl`的ready=0，也不代表新板配置或真板验收通过。
 
 按05的F2～F9继续：可靠配置→最小UART/DDR/GEM/CAPS→新板P4基线→P16完整route和同XSA软件包→全量/连续/恢复→同板性能及相关泛化/长稳→独立交付。功耗需仪器；SE250另profile；D0不默认分发。没有新板实测就不能宣布迁移完成。
 
