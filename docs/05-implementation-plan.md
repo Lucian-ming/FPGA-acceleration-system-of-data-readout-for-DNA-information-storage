@@ -42,6 +42,8 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 
 硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。接管时重新核对资料和设备，资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
 
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+
 ## 3. 全流程计划与出口门禁
 
 | 阶段 | 工作、负责者和输入 | 交付与出口门禁 |
@@ -50,12 +52,12 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 | F1 已有成果确认 | main对照07和三个benchmark；子Agent复核源集、API/制品、测试边界 | 必要短检查通过；已有长测来源可验证，不无故重跑；已知失败和阻塞有记录 |
 | F2 新板配置落实 | main/board先校验并阅读仓库内v1.1手册；board对照实物收集缺少的原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1 |
 | F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统 |
-| F4 新板P4基线 | board完整生成SE150/P4/100MHz整机和现代软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线 |
+| F4 新板P4基线 | board以WSL22完整生成SE150/P4/100MHz整机和同XSA软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线 |
 | F5 P16整机候选 | rtl审查正式P16依赖和关键路径，board按同板profile生成独立目录；改动按层级回归 | 150/50/807/957/64及16/1贯通；LC50真实接口PASS；WNS/WHS≥0、TNS/THS=0、失败端点0、DRC和路由合法、100MHz；完整新XSA软硬包 |
 | F6 P16正确性与工程回归 | main持板卡/串口，verify编排；先smoke再全量，再连续和故障恢复 | 全量≥3次哈希相同；full→2048→full及脏轮→干净轮通过；配置拒绝/断连/超时→正常任务恢复；不只靠一次下载PASS |
 | F7 性能与泛化复核 | verify同板P4/P16六档≥3次矩阵；board提供合法完整包；main审核公平口径 | 128/512/2048/8192/32768/full输入一致、补帧记录数明确；中位数/离散程度/斜率/截距；全量LDPC和SHA必须PASS；至少5独立payload复核与受控噪声边界，旧结果注明旧板 |
 | F8 长稳与剩余终态门禁 | verify逐项重核本计划的G0～G8；main安排可用设备 | 建议先2小时新板连续观察，稳定后8小时长稳；异常分类/恢复证据；有功率计才测闲置/任务功率与能耗；无仪器写未测。SE250另制品/另几何，本次16路SE150不能冒充支持 |
-| F9 独立复核与最终交付 | main冻结代码和制品；verify独立重跑复现入口；所有Agent交接后停止写入 | 完整BKB220/P16新板验收摘要、源码/参数/版本/制品/SHA链、可复现命令、限制、03/05/07/09更新、提示词同步；按路径commit后立即push、0/0、源码工作区干净 |
+| F9 最后26开发复核与交付 | 22主线稳定后main冻结输入；board在独立Windows2026.1目录重建完整硬软包，rtl审查route，verify按07比较并独立复现；全部停写后交付 | 26同源包、100MHz合法route、功能/G3/恢复/性能及长稳比较记录；明确PASS/FAIL/未测和发布工具链。完整新板摘要、来源/制品/SHA链、复现命令、03/05/07/09与提示词同步；路径commit后立即push、0/0、源码工作区干净 |
 
 F2缺资料不会阻塞F0/F1、测试和文档准备；F3～F8真板部分按依赖等待。当前已完成的是F1的一批准备检查和本轮整理交付，F2～F8不因写好脚本而关闭。若P16无法合法100MHz，保留失败报告并从实际路径修改或回到已验P4，不用无依据false path或降低频率宣布目标达成。
 
@@ -112,15 +114,15 @@ main的监控循环：派发时附完整角色提示词、独占路径、已完�
 | 主机门禁 | `python3 -m unittest discover -s tests/host -p 'test_g3_*.py' -v` | 缺manifest/错part/错几何/SHA/版本、串口歧义、矩阵失败保留等负用例 |
 | Stage1短/正式 | run_sim.sh stage1_production / stage1_production_full、run_stage1_xsim.ps1 | LC6排错；LC50生产；独立oracle+P4/P16两轮、末组/并列/补帧/反向、AXI真实包装 |
 | 三级/BD | run_xsim.sh all、run_m2_full.sh、run_m3_bd.sh | 源码修改涉及接口时跑受影响层级；黄金几何/当前源集一致 |
-| 构建 | run_vivado_build.sh、现代Vitis入口 | 完整route/DRC/约束，实际XSA/BSP/ELF/FSBL/BOOT，成功哨兵+六制品SHA |
+| 构建 | run_vivado_build.sh、WSL22软件链；最后26现代Vitis入口 | 完整route/DRC/约束，实际XSA/BSP/ELF/FSBL/BOOT，成功哨兵+六制品SHA |
 | 制品选择 | `python3 tools/board/g3_artifacts.py --artifact-dir <完整包>` | XSA内bit/part/HWH七参数、源码manifest、工具版本、SHA一致 |
 | 真板唯一入口 | `bash tools/run_g3.sh --artifact-dir <完整包> ...` | 实际下载/任务/LDPC/最终SHA/四级DDR；禁止旧bit与新ELF混用 |
 | 性能 | tools/board/g3_performance_matrix.py、run_cpu_benchmark.py、arm_baseline.py | 前者不自动烧录，先确认已加载同一包；ARM工具会复位整板，当前硬件假设先审计 |
-| 泛化/故障/长稳 | run_multi_payload_regression.py、run_robustness_scan.py、g5_false_accept.py、run_g5_matrix.sh、board的guard/recovery/netfault、stress_test_suite.py | 先审计旧脚本的硬编码export/设备/几何，使其消费完整新板包后才运行；禁止直接用legacy自动切SE250 |
+| 泛化/故障/长稳 | run_multi_payload_regression.py、run_robustness_scan.py、g5_false_accept.py、run_g5_matrix.sh、board的guard/recovery/netfault、严格G3逐轮编排 | 先审计现用脚本的硬编码export/设备/几何；长稳按实际2h/8h留证。旧stress/switch已归档，不直接运行 |
 
 任何新修复必须有能失败的判据：错误part、缺制品、非法P16组合应明确拒绝；已知START故障注入应变红；完整输入译码/图片失败必须保留并使功能门禁失败。小规模覆盖不足的译码失败不冒充整机故障，也不算完整正确性PASS。禁止为了全绿重录黄金轨迹或改成比较实现本身。
 
-正式XSim复现（RUN_ID自行选未使用值，输出目录必须全新）：
+主线仿真使用WSL2022.2现有XSim/仿真入口，先核对实际版本；以下Windows2026.1命令是已有正式证据的复现及最后26开发复核入口，不能反过来要求先在26开发。RUN_ID自行选未使用值，输出目录必须全新：
 
 ```bash
 python3 tools/board/generate_stage1_fixture.py --num-lc 50 --out-dir logs/iverilog/<RUN_ID>/fixtures
@@ -133,7 +135,7 @@ Windows PowerShell用权威脚本或带SHA的脚本快照：
 & '\\wsl.localhost\Ubuntu\home\lucian\projects\FPGA\FpgaAccelerationSystemOfDataReadout\tools\run_stage1_xsim.ps1' -InputDir 'D:\Agent\outputs\bkb220-xsim26\<RUN_ID>-input' -RunDir 'D:\Agent\outputs\bkb220-xsim26\<RUN_ID>-run'
 ```
 
-软件JSON必填`repo_root/workspace/xsa/export_dir/uart/board_id/part/bootgen`，可选`embedded_sw_repo`。uart来自实际BSP/profile，不能照抄旧UART1。BOM兼容脚本仅创建库副本，不修改安装。软件wrapper参数为`-Config/-Vitis/-LogDir/-Script`，完整命令及A14证据见[工具核查](benchmarks/bkb220-toolchain-audit.md)。
+最后26软件重建所用JSON必填`repo_root/workspace/xsa/export_dir/uart/board_id/part/bootgen`，可选`embedded_sw_repo`。uart来自实际BSP/profile，不能照抄旧UART1。BOM兼容脚本仅创建库副本，不修改安装。软件wrapper参数为`-Config/-Vitis/-LogDir/-Script`，完整命令及A14证据见[工具核查](benchmarks/bkb220-toolchain-audit.md)。
 
 新板资料确认后才运行以下模板；尖括号都是待填值，不能照字面执行：
 
@@ -144,9 +146,9 @@ bash tools/run_g3.sh --artifact-dir <完整制品目录> --xsdb D:/xilinx/2026.1
 python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制品目录> --out-dir <新矩阵目录> --limits 128,512,2048,8192,32768,full --repeat 3 --ip <实际板IP>
 ```
 
-构建模板展示已存在的WSL入口；正式选择Windows2026.1或WSL2022.2需记录硬软版本组合，不暗示新板最终路线已验证。矩阵需先加载相应P4/P16包；UART周期采集复用唯一追加日志，Stage1未测周期和功耗保持null，不能墙钟×时钟代替硬件计数。
+构建模板按用户要求使用WSL2022.2主线，Windows2026.1 XSDB下载；先验证真实Vitis2022.2能力并完善同XSA软件打包，最后按F9独立验证26开发。每次记录实际硬软/下载工具版本组合，不能把模板当作已验证的新板结果。矩阵需先加载相应P4/P16包；UART周期采集复用唯一追加日志，Stage1未测周期和功耗保持null，不能墙钟×时钟代替硬件计数。
 
-旧平台脚本的已复核风险：stress_test_suite.py的flash_mode会调用switch_export.sh覆盖旧export和固件/BSP头，再不带artifact-dir烧录；auto会切SE250。ARM基准固定旧BSP/XSA/GCC/XSDB并rst -system，必须适配后再用。多payload/run_demo主要是TCP任务，不下载或复位；run_robustness_scan的board_equivalent为软件模拟。不能将名称当作板测证据。
+旧stress_test_suite.py/switch_export.sh已成对原样归档至docs/archive/tools/2026/retired-20261011，不再作为现用入口。新板长稳以run_g3.sh --artifact-dir完整包、显式XSDB/device/实际PS串口和现用guard/recovery/netfault探针编排，保存逐轮证据，以实际墙钟时长验收2h/8h；禁止自动切SE250或覆盖旧export。ARM基准固定旧BSP/XSA/GCC/XSDB并rst -system，必须适配后再用。多payload/run_demo主要是TCP任务，不下载或复位；run_robustness_scan的board_equivalent为软件模拟。不能将名称当作板测证据。
 
 ## 6. 提交、推送、工作区整理与完成定义
 
@@ -154,7 +156,7 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 
 提交说明写清问题、变化、测试及未测边界；准备提交不能称为新板迁移完成。大EDA生成目录不提交；可复现源码/入口、参数、fixture/source manifest、必要小证据、结果摘要必须交付。每次迭代更新03/05/07/09和相关benchmark，避免文档互相矛盾。
 
-本轮工作区整理按[整理记录](reference/workspace-cleanup-2026-10-10.md)：原位保留历史生成物与证据，仅用精确.gitignore规则防止误提交；没有删除数据/旧制品、没有释放其磁盘空间。最终Git status应无源码改动或未知未跟踪文件。ignored不等于已备份到GitHub，目录归档与hash清单仍须保留。未来确需释放空间按本文件清理条款先保留日志/manifest和用户认可的范围，不盲删生成目录，不移动活证据导致路径断裂。
+本轮工具退役及启动器修正见[2026-10-11整理记录](reference/tool-cleanup-2026-10-11.md)，历史工作区整理按[整理记录](reference/workspace-cleanup-2026-10-10.md)：原位保留历史生成物与证据，仅用精确.gitignore规则防止误提交；没有删除数据/旧制品、没有释放其磁盘空间。最终Git status应无源码改动或未知未跟踪文件。ignored不等于已备份到GitHub，目录归档与hash清单仍须保留。未来确需释放空间按本文件清理条款先保留日志/manifest和用户认可的范围，不盲删生成目录，不移动活证据导致路径断裂。
 
 收工前确认没有本任务仍运行的EDA/下载/串口进程；只关闭本任务明确持有的资源，其他用户进程不动。恢复点stash在确认新提交与远端同步后按OID核对是否仍需保留，不能批量drop他人stash。用agent_view.sh对已结束角色done；真实外部阻塞写block或交接，不挂“正在测试”假状态。
 

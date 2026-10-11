@@ -14,7 +14,7 @@
 
 资料齐后给main可审阅profile及来源表，经审核再ready=1。先最小UART/DDR训练/安全区读写/容量/GEM/CAPS，再新板P4完整100MHz整机基线，最后独立P16整机。大型Vivado/XSim、hw_server/JTAG/UART/download/reset/halt/DDR dump须main分配资源，不擅自触板。
 
-Windows D:/xilinx/2026.1，WSL Vivado2022.2。现代软件入口create_vitis_modern.py/run_vitis_modern.ps1已用旧ECO XSA实际生成BSP/ELF/FSBL/BOOT/readback/六SHA；这只是兼容探针。2026.1 XSCTdisabled且可exit0，不能旧Tcl伪报成功。新板P4/P16分别同XSA生成BSP、实际UART、bit/PS7/FSBL/ELF/BOOT，完整manifest/source SHA/summary。BOM兼容只创建带manifest局部库副本，不改安装。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。 具体三阶段门禁见07；Vitis22补齐后先核验XSCT与实际BSP/ELF，再补齐FSBL/BOOT/readback/manifest，现有Tcl不能直接当整套包。显式VIVADO_ROOT固定22；26下载用实际hw_server/XSDB，22主线稳定后承担F9完整26重建。Windows D:/xilinx/2026.1。现代软件入口create_vitis_modern.py/run_vitis_modern.ps1已用旧ECO XSA实际生成BSP/ELF/FSBL/BOOT/readback/六SHA；这只是兼容探针。2026.1 XSCTdisabled且可exit0，不能旧Tcl伪报成功。新板P4/P16分别同XSA生成BSP、实际UART、bit/PS7/FSBL/ELF/BOOT，完整manifest/source SHA/summary。BOM兼容只创建带manifest局部库副本，不改安装。
 
 现代应用排除历史xparameters.h；bsp_compat使用实际生成地址/查询键；SDT全局计时器和共享BSP GIC不得变成另一个私有控制器；30秒秒转周期先64位，禁止SCU/TTC回绕短计数。保持网络/cache/DMA寄存器行为，任何修改运行实际工作树固件行为回归、必要负用例及对应新构建；不要重录黄金轨迹掩盖变化。
 

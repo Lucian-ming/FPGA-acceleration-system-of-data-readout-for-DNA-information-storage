@@ -8,7 +8,11 @@
 
 目标SE150、100MHz、150/50/807/957/64，P4=4/0、P16=16/1。已有LC50独立模块与真实AXI包装两轮XSim通过、47项G3主机测试与真实C工作树行为回归通过；不要重复覆盖成果。模块cycle约3.27倍不是板端倍率。BKB220 ready=0且资料/连接待确认，无新板route/G3。
 
-先审计全部测试/板脚本真实参数、外部依赖及触板副作用。尤其stress_test_suite、run_demo、run_multi_payload_regression、run_robustness_scan、ARM基准和故障探针可能仍硬编码旧export/旧工具/旧device或自动SE250。新板执行前让它们消费同一完整artifact包及显式工具/目标/串口；在fixture负用例证明错part/错几何/缺制品/SHA/manifest或非法配置被拒绝。不要直接legacy auto切换。
+旧stress_test_suite.py/switch_export.sh已成对原样归档至docs/archive/tools/2026/retired-20261011，不再作为现用入口。新板长稳以run_g3.sh --artifact-dir完整包、显式XSDB/device/实际PS串口和现用guard/recovery/netfault探针编排，保存逐轮证据，以实际墙钟时长验收2h/8h；禁止自动切SE250或覆盖旧export。
+
+先审计现用run_demo、run_multi_payload_regression、run_robustness_scan、ARM基准和故障探针的实际参数、依赖及触板副作用；使其消费同一完整artifact包及显式工具/目标/串口，再执行新板测试。fixture负用例须证明错part/错几何/缺制品/SHA/manifest或非法配置被拒绝。
+
+先验证WSL Vivado/Vitis2022.2产生的包能由Windows2026.1工具下载并实际运行；最后F9按07在相同冻结输入上独立复核Windows2026.1完整开发包，比较功能/G3/恢复/性能/长稳，不用跨版本整文件bit/ELF SHA相等作为判据。
 
 独立Stage1 oracle逐符号枚举，不照抄RTL；涵盖末region、位置807/806等、末组有效lane、首并列pos、零分/补帧、正反向、两轮复位/重跑。真实包装验证AW/W分离、WSTRB、背压/TLAST、FIFO、START脉冲和输出顺序/拍数。LC6短与LC50正式分别标明，源manifest与打包一致；故障注入应真红。
 

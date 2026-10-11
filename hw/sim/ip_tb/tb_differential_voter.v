@@ -343,7 +343,7 @@ module tb_differential_voter #(
                 $display("[TB] ✗ 第 %0d 轮 DONE 后 IDLE 未回 1（status=%h）", run, status);
                 errors = errors + 1;
             end
-            // 调试：+dump_bram 时转储累加器（与 tools/debug_vote_diff.py 配合用）
+            // 调试：+dump_bram 时转储累加器（与 docs/archive/tools/2026/retired-20261011/debug_vote_diff.py 配合用）
             if (run == 1 && dump_en) $writememh("/tmp/voter_bram_dump.hex", dut.bram);
 
             // 调试寄存器：写拍数 / 首写地址 / 错误标志

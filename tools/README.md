@@ -63,7 +63,6 @@
 | `run_robustness_scan.py` | G5 抗噪边界扫描（错误率/覆盖度 → **恢复成功率**） |
 | `g5_false_accept.py` | G5「**误接受率**」的定义与测量：逐记录判定真/诱饵/错位，扫 `score_min` 出 FAR/FRR 曲线。**定义写在文件头，先读那里** |
 | `run_g5_matrix.sh` | 驱动上者跑 G5 受控误差矩阵（替换率 × 插删率 × 3 种子），产出 `summary.tsv` |
-| `stress_test_suite.py` | 长时压测 |
 
 ## 性能与基准
 
@@ -81,17 +80,19 @@
 | `vote_range.py` | 投票累加器运行中极值实测（回答是否会饱和溢出） |
 | `board_stage_check.py` | 四级 DDR 取证比对（由 `run_g3.sh` 调用） |
 | `m2_chain.py` / `m3_mem.py` | M2/M3 仿真辅助 |
-| `extract_ldpc_dlls.py` | 从历史 `gui_app.exe` 提取 LDPC 缺失的 MinGW DLL（一次性历史工具） |
 
-## 退役与归档工具（tools/attic/）
+## 已退出现用区的历史工具
 
-已确认其结论已被文档吸收或已完成历史定位使命的工具，保留在 `tools/attic/` 中供追溯：
+2026-10-11将以下6个脚本原样移入[历史源码索引](../docs/archive/tools/2026/retired-20261011/README.md)，SHA与文件权限保留。归档脚本不是现用入口，相对路径保留原布局，不能直接从归档目录执行；需要追溯时按整理记录审阅原版本。现用独立黄金、G3/故障探针、CPU基准、打包和构建工具继续保留。
 
-| 脚本 | 原用途 | 归档原因与结论出处 |
-| --- | --- | --- |
-| `debug_high_entropy.py` | 高熵样本失败五级分级诊断 | 结论已固化至 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` 的W2-D 与 `docs/benchmarks/entropy_and_d2_validation.md` |
-| `debug_vote_diff.py` | 重算板端语义票值，与 TB 的 `dut.bram` 转储 diff | 历史定位 BRAM 投票差异的一次性调试脚本，结论已进文档 |
-| `voter_page_split.py` | Voter 读突发 4 KB 跨页拆分参考表（B20） | 结论已固化至 `docs/archive/history/2026/se250-study-2026-08-30.md` §V8 |
+| 历史脚本 | 退役原因 |
+|---|---|
+| [extract_ldpc_dlls.py](../docs/archive/tools/2026/retired-20261011/extract_ldpc_dlls.py) | 历史gui_app.exe的一次性DLL提取；当前客户端运行库已保留，无现用调用者。 |
+| [debug_vote_diff.py](../docs/archive/tools/2026/retired-20261011/debug_vote_diff.py) | 已退役的BRAM票值定位脚本；保留TB的dump能力和历史源码，非现用验收入口。 |
+| [debug_high_entropy.py](../docs/archive/tools/2026/retired-20261011/debug_high_entropy.py) | 已退役的高熵失败诊断；结论和原始失败证据保留在entropy_and_d2_validation等文档中。 |
+| [voter_page_split.py](../docs/archive/tools/2026/retired-20261011/voter_page_split.py) | 已退役的B20跨4KB页参考表；结论已进入SE250历史研究和正式接口实现。 |
+| [stress_test_suite.py](../docs/archive/tools/2026/retired-20261011/stress_test_suite.py) | 旧板压测依赖硬编码旧制品/目标，auto切SE250；新板改用严格完整包G3及故障探针编排。 |
+| [switch_export.sh](../docs/archive/tools/2026/retired-20261011/switch_export.sh) | 只被旧压测调用，覆盖旧export/BSP头；与调用者一同退出现用区，新板每个profile使用独立成套包。 |
 
 ## 构建与制品
 
@@ -100,12 +101,13 @@
 | `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；显式board/part_name/独立build与export目录，未验证BKB220配置拒绝构建 |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
-| `switch_export.sh` | 切换 `hw/build/export/` 制品组 |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
 | `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
 
 
-新板软件构建使用 `sw/scripts/create_vitis_modern.py` 与 `sw/scripts/run_vitis_modern.ps1`（Windows Vitis2026.1 Python入口，显式JSON、全新workspace、成功哨兵和真实产物哈希）。旧 `create_vitis.tcl` 仅适用于支持XSCT的旧版本；2026.1的XSCT禁用且可能退出0，不能据此宣称编译成功。完整工具与板级依赖见 `docs/07-board-build-and-acceptance.md`。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+
+WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。Vitis22需安装后实际核验XSCT，`sw/scripts/create_vitis.tcl`是应用构建起点，完整FSBL/BOOT/readback/manifest须另补齐并实测；Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
 
 Stage1生产P4/P16模块与真实包装接口：`bash tools/run_sim.sh stage1_production` 为LC6短测；`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full` 为LC50生产几何长测，日志和fixture保留在 `logs/iverilog/<run-id>/`。短测不替代生产几何或真板验收。
 
@@ -122,8 +124,7 @@ Windows2026.1 正式 Stage1 XSim 输入由 tools/board/create_stage1_xsim_input.
 
 ## 新板执行前的旧平台风险（2026-10-10核对）
 
-- stress_test_suite.py的flash_mode调用switch_export.sh，覆盖旧export和固件/BSP头，且默认auto可切SE250；当前不可直接用于BKB220，需完整artifact包和显式目标适配。
-- switch_export.sh是旧profile切换工具，不能覆盖新板独立制品。
+- 旧stress_test_suite.py/switch_export.sh已成对退出现用区并归档。新板长稳由main/verify围绕run_g3.sh --artifact-dir完整包、显式工具/目标/串口和现用故障探针编排；按实际运行时长判断2h/8h，保留逐轮证据，不自动切SE250或覆盖旧export。
 - board/arm_baseline.py固定旧BSP/XSA/GCC/XSDB并复位整板；新板先适配，必须持板资源。
 - run_multi_payload_regression.py的board模式及run_demo.sh主要发TCP任务，不下载/复位，仍须实际新板IP/固件/阈值确认；golden/check-dumps离线。
 - run_robustness_scan.py的board_equivalent是软件模拟，不是新板证据；故障探针主动注入错误流量，不是只读健康检查。

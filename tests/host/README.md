@@ -102,6 +102,14 @@ NETIF INPUT                    keep_tcp_alive 的位置
 | `shim/*.h` | Xilinx / lwIP 头文件壳层 |
 | `golden/` | 行为轨迹黄金文件与出处 |
 
+## Vivado启动器版本选择
+
+```bash
+python3 -m unittest discover -s tests/host -p 'test_vivado_launcher.py' -v
+```
+
+4项使用临时替身程序验证显式VIVADO优先于VIVADO_ROOT、根目录优先于PATH（含空格路径）、错误根目录拒绝且不回落、help不启动工具。不会启动真实EDA；防止用户指定22后误调用其他PATH版本。
+
 ## 公平基准契约用例
 
 从仓库根目录执行；该测试通过工具目录导入run_cpu_benchmark，因此需要临时PYTHONPATH，不修改全局环境：

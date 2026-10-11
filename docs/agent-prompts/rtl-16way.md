@@ -8,6 +8,8 @@
 
 当前正式源已可选P4=4/0、P16=16/1，默认仍P4，生产150/50/807/957/64、100MHz、64记录帧。打包/2022.2实际catalog通过，Windows2026.1 XSim正式LC50独立模块和真实AXI包装两个case各两轮通过；Icarus模块同周期P4=1680956/P16=513755，约3.27倍仅模块cycle。不要从零覆盖已完成集成，不把实验目录同名候选误当综合源，不声称新板route或板测通过。
 
+开发优先WSL Vivado2022.2，显式工具根目录并记录版本；Windows2026.1用于下载，已有26 XSim结果保留。22新板主线稳定后，在F9配合board/verify审查独立Windows26完整重建的参数/源集、100MHz route和差异，规则见07。
+
 先逐文件审查顶层→batch核→FIFO/pack/AXI控制、component.xml合成/仿真fileSets、全部七参数与XGUI/Catalog/BD依赖。正式module命名与PACKAGED_VARIANTS一致；非法组合明确elaboration拒绝。检查lane末组屏蔽、同分首pos、所有LC和last-position、score/cw/输出顺序、START边沿、AXIS握手/FIFO满空，不擅自改算法/协议。
 
 与verify-system交换端口、几何和参数；独立oracle/TB由verify审查，不能用实现逻辑生成黄金。若无新修改，核对已有正式manifest/哨兵即可；有相关修改后跑受影响正式LC50、真实包装以及必要M2/M3。短LC6只能排错。包装目录只含真实综合源码，新增文件登记和源集贯通。

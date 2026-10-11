@@ -12,7 +12,7 @@
 | IP模块 | run_sim.sh各级与stage1_production/full | 正式源集功能，LC6短测与LC50正式分别标明 |
 | 真实接口 | run_xsim.sh all、Stage1真实AXI包装TB | AW/W独立、WSTRB、AXIS背压/TLAST/FIFO、START0→1→0、顺序/拍数/补帧/重复/复位 |
 | 三级和BD | run_m2_full.sh、run_m3_bd.sh | 三级串联、PS7控制/互连、DDR背压与复位；改相关接口才扩展到对应层 |
-| 完整实现/软件 | Vivado route与现代Vitis/Bootgen入口 | WNS/WHS、TNS/THS、DRC、合法约束/路由；实际BSP/ELF/FSBL/BOOT，不代表启动 |
+| 完整实现/软件 | WSL22主线route/Vitis/Bootgen；最后Windows26独立重建 | WNS/WHS、TNS/THS、DRC、合法约束/路由；实际BSP/ELF/FSBL/BOOT，不代表启动 |
 | 真板G3 | run_g3.sh --artifact-dir完整包 | 下载、CAPS、真实任务、LDPC、图片SHA和四级DDR；唯一端到端验收 |
 
 只编译、有波形、有GUI图片或退出0都不够。改数据契约需Python/PS/RTL对应回归；改接口需真实接口TB及负用例；改固件需工作树行为与新制品；改板级需最小启动和G3；性能修改需公平同输入板测。
@@ -29,8 +29,10 @@ SE150固定READ_BPS=150、NUM_LC=50、STRIDE=807、REF_LEN=957、BATCH=64；P4=4
 2. 新板P4、再P16：2048源读段smoke→全量至少3次→full/2048/full连续序列；最终D0 JPEG SHA必须相同。
 3. 严格弄脏轮：低阈值/足量输入把累加器弄脏，再67干净轮；验证第二轮正确及各状态/cache重新初始化。不能用弱弄脏掩盖不重置。
 4. CONFIG超容量/不对齐/零条数/不支持几何、畸变包、断网/断连、超时和恢复，拒绝码从CONFIG_OK载荷读取，0才接受；错误后正常任务必须恢复。
-5. 改造旧stress/泛化/故障脚本使其消费完整新板包及显式目标后才运行；禁止自动切legacy SE250/旧export。先2小时稳定观察，再计划8小时长稳，保留逐轮JSONL和失败样本。
+5. 旧stress_test_suite.py/switch_export.sh已成对原样归档至docs/archive/tools/2026/retired-20261011，不再作为现用入口。新板长稳以run_g3.sh --artifact-dir完整包、显式XSDB/device/实际PS串口和现用guard/recovery/netfault探针编排，保存逐轮证据，以实际墙钟时长验收2h/8h；禁止自动切SE250或覆盖旧export。 现用泛化和故障脚本按同一完整包与显式目标审计适配后运行。
 6. 多payload至少5组、受控sub/ins/del×覆盖度×阈值×至少3种子；区分合成/真实、主机复算/板测、FAR/FRR与最终恢复率。D0没有真值位置，不能报告其FAR。
+
+7. 22主线稳定后按05 F9及07独立验证Windows2026.1完整开发，冻结相同源/输入/参数，比较合法100MHz整机、实际接口/任务结果、G3/恢复/性能与长稳；不同工具产物不要求整文件SHA相等，各包自身仍需完整SHA与同源链。
 
 ## 4. 统计与失败分类
 

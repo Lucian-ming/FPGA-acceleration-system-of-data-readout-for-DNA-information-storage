@@ -39,7 +39,9 @@ bash tools/run_sim.sh stage1_production
 
 正式LC50长测：`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full`；Windows2026.1的可复现XSim入口见运行手册。LC6短测不能替代LC50。起点参赛脚本附件重复告警已收敛为唯一源引用，过程见[整理记录](docs/reference/workspace-cleanup-2026-10-10.md)；旧失败日志保留。
 
-整机构建用 `tools/run_vivado_build.sh` 和 `hw/scripts/build.tcl`；Windows Vitis2026.1软件构建用 `sw/scripts/run_vitis_modern.ps1` / `create_vitis_modern.py`。2026.1的XSCT已实测禁用，退出0不能代表构建成功。BKB220资料门禁通过后，使用独立P4/P16目录完整重建，再经 `tools/board/g3_artifacts.py` 和 `tools/run_g3.sh --artifact-dir ...` 验收。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+
+整机构建使用`VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2 bash tools/run_vivado_build.sh ...`。BKB220资料门禁通过后，独立P4/P16目录生成同XSA完整硬软包，经g3_artifacts.py和run_g3.sh --artifact-dir验收；22软件包补齐及最后26现代Python路线见[07](docs/07-board-build-and-acceptance.md)。
 
 ## 目录与保护范围
 
@@ -54,6 +56,6 @@ bash tools/run_sim.sh stage1_production
 | `data/`、`archive/` | 原始数据和历史提交资产，只读保护 |
 | `hw/build/`、`sw/workspace/`、`logs/` | 制品、生成物和运行证据；保留旧基线，新运行不覆盖 |
 
-全部受版本管理文件及本次新增文件的职责清单见[项目清单](docs/reference/project-inventory-2026-10-10.tsv)。脚本用法见[工具索引](tools/README.md)。
+2026-10-10起点的职责清单见[项目清单](docs/reference/project-inventory-2026-10-10.tsv)；后续布局以当前Git文件清单和[工具整理记录](docs/reference/tool-cleanup-2026-10-11.md)为准。现用脚本用法见[工具索引](tools/README.md)。
 
 仅此WSL原生checkout、仅main；主Agent统一Git写入，每次按路径提交后立即推送。数据、旧发布制品和失败证据不删除；生成目录的精确忽略规则不代表远程已包含这些文件。交付前确认main/origin为0/0、源码工作区干净、所有剩余门禁真实可追溯。

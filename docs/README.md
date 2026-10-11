@@ -22,6 +22,7 @@
 - [BKB220板级资料](board/bkb220/README.md)：已收录并校验的用户提供v1.1产品手册；main/board-migrate接管时完整阅读，后续资料缺项按03/07核对。
 - [工具索引](../tools/README.md)：全部工具类别与入口。
 - [逐文件清单](reference/project-inventory-2026-10-10.tsv)：源码、脚本、配置、测试、文档与资产职责。
+- [本轮工具整理与开发路线](reference/tool-cleanup-2026-10-11.md)：6个历史脚本原样归档、启动器选择修正、22开发/26下载及最终26复核。
 - [工作区整理记录](reference/workspace-cleanup-2026-10-10.md)：精确忽略/原位保留范围与已知卫生告警。
 
 ## 本轮证据与历史

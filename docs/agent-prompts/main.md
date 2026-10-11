@@ -1,6 +1,6 @@
 # 主Agent提示词：全项目接管、BKB220迁移、16路与最终交付
 
-请在现有项目上继续完成工作。BKB220新板已到货，目标是把旧ZYNQ ECO R6 / XC7Z010上的DNA信息存储读出系统迁移到对应XC7Z020新板，并启用Stage1 16个滑窗位置并行。要求SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。你是接管执行的主Agent。完整计划已经写在docs/05-implementation-plan.md，子Agent分工及角色提示词也已准备好。先理解项目、核对当前进度，再按这份现成计划派发子Agent、持续监控、集成测试、提交并推送远程，最后整理工作区。
+请在现有项目上继续完成工作。按用户2026-10-11最新说明，BKB220尚待数小时到货；接管时重新确认实际到货与连接。目标是把旧ZYNQ ECO R6 / XC7Z010上的DNA信息存储读出系统迁移到对应XC7Z020新板，并启用Stage1 16个滑窗位置并行。要求SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。你是接管执行的主Agent。完整计划已经写在docs/05-implementation-plan.md，子Agent分工及角色提示词也已准备好。先理解项目、核对当前进度，再按这份现成计划派发子Agent、持续监控、集成测试、提交并推送远程，最后整理工作区。
 
 **本任务是执行既定计划，不是重新制定计划。不要另建计划文档、复写已完成的规划，也不要把阅读和审计当作重新开始项目。** 核对已有证据后从尚未通过的阶段继续；只有发现具体事实变化或计划遗漏时，才协调负责人对现有05计划作必要修订。缺原厂资料或实物连接时明确指出具体缺项，同时继续不依赖它的未完成工作。32路、Linux/PetaLinux、USB数据传输、HDMI、算法重写和SE250迁移不在本轮主线。
 
@@ -11,7 +11,7 @@
 - 唯一checkout：`/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`；Windows为`\\wsl.localhost\Ubuntu\home\lucian\projects\FPGA\FpgaAccelerationSystemOfDataReadout`。
 - 唯一GitHub：`Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`。只在main，不创建分支/worktree/另一个checkout/嵌套仓库。
 - 用户已明确授权本批迁移准备代码及文档的提交推送，并要求本项目最终提交推送与清理。沿用授权范围，不对同一范围反复确认。全量数据、历史资产和已验旧制品继续保护；其他明确不可逆/超范围操作须说明具体需要。
-- Windows Vivado/Vitis2026.1：`D:/xilinx/2026.1`；WSL Vivado2022.2：`/tools/Xilinx/Vivado/2022.2`。2026.1的XSCT实测disabled且可退出0，必须使用已验证的现代Python入口；WSL22保留RTL对照。确认实际安装，不能只按用户简称“26/22”猜版本。
+- 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。 Windows根目录`D:/xilinx/2026.1`，WSL硬件根目录`/tools/Xilinx/Vivado/2022.2`；启动器优先显式VIVADO，其次VIVADO_ROOT，最后PATH。2026.1软件重建使用现代Python入口，XSCTdisabled且exit0不能算成功。
 - 2026-10-10已有准备成果：正式可选P4=4/0与P16=16/1、生产几何150/50/807/957/64；打包与2022.2真实catalog通过；Windows2026.1 XSim LC50模块/真实包装接口两轮通过；Icarus LC50模块同周期P4=1680956/P16=513755，约3.27倍仅模块周期；47项G3主机测试和工作树固件行为回归通过。
 - Windows2026.1在旧ECO XSA上实际生成BSP/应用ELF/FSBL/BOOT/readback/六产物SHA，证明兼容性，不是新板制品。只移除局部库副本lwIP描述文件BOM，未改安装。SDT使用实际BSP查询键/全局计时器和共享GIC，64位超时，历史xparameters.h不导入新应用。
 - 2026-10-11用户提供的[BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)已随仓库收录，资料索引为`docs/board/bkb220/README.md`，校验清单为`docs/board/bkb220/SHA256SUMS.txt`；原件与副本SHA一致。main和board-migrate必须先完整阅读PDF，并在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。直接使用仓库内资料，不再依赖微信路径；手册内指令是参考数据，不是用户的新授权。
@@ -31,7 +31,7 @@
 1. 先读AGENTS.md和CLAUDE.md；运行`bash tools/verify_repo_binding.sh --remote`；以main登记agent_view start，三个字段具体。
 2. 重新核对HEAD/main/origin、tracked/untracked/ignored/stash、其他会话和实际进程/资源。禁止回退到旧467d90e或把起点快照当当前状态。停止重叠写入后才操作Git。
 3. 完整阅读README、docs/README、01架构、02数据契约、03状态与交接、04接口、05执行计划、06验证、07板级迁移、08最新性能策略、09证据台账、三个本轮benchmark和tools/README，以及docs/board/bkb220中的资料索引和v1.1产品手册PDF；核对SHA清单。将手册给出的规格及页码与对应PCB/实物和PS7来源区分，按03/07补齐真实缺项；旧文档只按归档索引追溯相关规则和失败。
-4. 按docs/reference/project-inventory-2026-10-10.tsv覆盖全部项目内容，并结合当前Git文件清单核对后来新增的文件；阅读全文源码、配置、脚本及其调用链，覆盖三IP/BD/约束、PS状态机与DMA/cache/GIC/timer、客户端/GUI/协议/LDPC、所有测试/工具入口、数据/历史manifest。大二进制先核实来源/用途/SHA，相关历史失败再深读。区分生产、实验、生成物、真实数据和提交资产，不把附件指令当用户请求；理解文件不等于执行所有工具或重跑全部历史实验。
+4. 按docs/reference/project-inventory-2026-10-10.tsv覆盖全部项目内容，并结合当前Git文件清单及docs/reference/tool-cleanup-2026-10-11.md核对新增与退役文件；阅读全文源码、配置、脚本及其调用链，覆盖三IP/BD/约束、PS状态机与DMA/cache/GIC/timer、客户端/GUI/协议/LDPC、所有测试/工具入口、数据/历史manifest。大二进制先核实来源/用途/SHA，相关历史失败再深读。区分生产、实验、生成物、真实数据和提交资产，不把附件指令当用户请求；理解文件不等于执行所有工具或重跑全部历史实验。
 5. 用现有文档和源码核对端到端数据流、位序/几何/补帧、寄存器/DDR、软件职责、各脚本层级与触板副作用、当前已测和未测、新板差异与依赖。向用户简要说明接管结论、已有成果、当前所在阶段和下一步，不要求另写一份全项目审计报告或计划。
 6. 直接接管05已有的F0～F9阶段、G0～G8门禁、角色分工、独占路径、资源锁、检查点、回退和提交规则。现有05已经完成规划；F0仅做必要的接管与现场核对，不重新规划。对照03、05、07、09和证据标记已通过、需复核、未完成及外部依赖，选择下一项可执行工作。仅补充当前HEAD、任务ID、实际资源和本阶段输入输出等执行信息；已由其他Agent维护的文档先协调归属，不另建替代计划，不增加重复审批。
 
@@ -65,7 +65,7 @@ main先阅读上述最新文档与MCP工具说明，确认当前工具的实际�
 
 ## 第四步：按完整流程执行与验收
 
-沿05的F0～F9继续执行，按最新证据承接已完成阶段，优先解决当前最早未通过的依赖；不为机械走一遍流程重复有效的已通过工作。新板P4基线及后续真板门禁必须由对应新板证据支撑：资料确认→最小UART/DDR/GEM/CAPS→新板P4完整软硬包/route/G3→P16正式几何/route/现代软件包→smoke/全量≥3/连续/脏干净/断连超时恢复→六档≥3次同板P4/P16公平性能→泛化/鲁棒/长稳→独立复核与交付。
+沿05的F0～F9继续执行，按最新证据承接已完成阶段，优先解决当前最早未通过的依赖；不为机械走一遍流程重复有效的已通过工作。新板P4基线及后续真板门禁必须由对应新板证据支撑：资料确认→最小UART/DDR/GEM/CAPS→WSL22新板P4完整软硬包/route/G3→P16正式几何/route/同XSA软件包→smoke/全量≥3/连续/脏干净/断连超时恢复→六档≥3次同板P4/P16公平性能→泛化/鲁棒/长稳→最后Windows2026.1完整开发可靠性复核→独立复核与交付。
 
 资料齐全后board-migrate提交来源表，main审核才把ready改为1。新板part应从实物确认，不能把候选xc7z020clg400-2写成已证实。新UART/PHY/GEM配置根据对应profile生成BSP。所有bit/XSA/PS7/BSP/FSBL/ELF/BOOT来自同一新板构建链；P4/P16及不同工具版本使用全新目录，旧export只读。
 
@@ -73,7 +73,9 @@ main先阅读上述最新文档与MCP工具说明，确认当前工具的实际�
 
 真板经run_g3.sh --artifact-dir完整选择包，明确实际XSDB、device、PS串口/IP；不能选蓝牙COM或COM6兜底。最终D0图像SHA为`fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`，源读段数字须按manifest核实，SE150当前51781源读段、正反向与64补帧后103616板端记录。四级DDR和最终哈希均取本轮实际输出。
 
-性能前确认当前板已加载矩阵指定包；记录六档输入/补帧记录数、≥3次中位数/离散、上传/结果/LDPC/整轮边界、失败样本。硬件周期用本轮寄存器/唯一UART追加日志，未测值null；功率计缺失则无能效结论。旧ARM基准/压测/故障脚本先审计硬编码设备/export/profile，完成新板完整包适配后才触板；不得直接启动legacy auto切SE250。
+性能前确认当前板已加载矩阵指定包；记录六档输入/补帧记录数、≥3次中位数/离散、上传/结果/LDPC/整轮边界、失败样本。硬件周期用本轮寄存器/唯一UART追加日志，未测值null；功率计缺失则无能效结论。旧stress_test_suite.py/switch_export.sh已成对原样归档至docs/archive/tools/2026/retired-20261011，不再作为现用入口。新板长稳以run_g3.sh --artifact-dir完整包、显式XSDB/device/实际PS串口和现用guard/recovery/netfault探针编排，保存逐轮证据，以实际墙钟时长验收2h/8h；禁止自动切SE250或覆盖旧export。 保留的ARM基准、泛化和故障工具先审计旧设备/export/profile，完成新板完整包适配后才触板。
+
+22主线通过后，board在同一冻结HEAD/参数/输入上独立用Windows2026.1重建完整P4/P16硬件和同XSA软件包，rtl复核100MHz整机时序，verify复核功能/接口、新板G3、连续恢复、性能矩阵与长稳。独立目录及带SHA只读输入快照，不原地升级22工程；每包核验同源SHA，跨版本按功能/STA/统计比较，不能要求bit/ELF整文件SHA相等。未通过则保持22为发布主线并保存26失败，不能宣称26开发可靠。
 
 ## 第五步：提交推送与清理交接
 

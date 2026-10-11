@@ -23,6 +23,6 @@
 
 ### 消费方
 
-`tools/run_multi_payload_regression.py` 与 `tools/debug_high_entropy.py` 通过
+现用`tools/run_multi_payload_regression.py`与历史`docs/archive/tools/2026/retired-20261011/debug_high_entropy.py`通过
 `resolve_watermark(dataset_dir)` 解析：**数据集目录下若存在同名文件则优先用它**
 （兼容历史数据集与外部投放），否则回落到本共享副本。

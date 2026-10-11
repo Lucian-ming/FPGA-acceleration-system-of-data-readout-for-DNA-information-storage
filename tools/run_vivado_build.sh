@@ -8,17 +8,6 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 RUN_DIR="$LOG_ROOT/$STAMP"
 mkdir -p "$RUN_DIR"
 
-if [[ -n "${VIVADO:-}" ]]; then
-    VIVADO_BIN="$VIVADO"
-elif command -v vivado >/dev/null 2>&1; then
-    VIVADO_BIN="$(command -v vivado)"
-elif [[ -n "${VIVADO_ROOT:-}" && -x "$VIVADO_ROOT/bin/vivado" ]]; then
-    VIVADO_BIN="$VIVADO_ROOT/bin/vivado"
-else
-    echo "找不到 Vivado；请设置 VIVADO 或 VIVADO_ROOT" >&2
-    exit 127
-fi
-
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat <<'HELP'
 用法：tools/run_vivado_build.sh [key=value ...]
@@ -26,10 +15,26 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
       build_dir=... export_dir=... report_dir=... jobs=8
       stage1_p_ways=4|16 stage1_pipe_tree=0|1 dry_run=0|1
 新板资料未验证时必须失败；P4默认保持旧板；P16必须16/1并使用独立目录。
-配置预检可直接运行：tclsh hw/scripts/build.tcl board=... dry_run=1
-Windows2026.1请对只读源码快照调用vivado.bat，并使用Windows本地生成目录。
+当前开发主线：VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2。
+选择顺序：显式VIVADO > 显式VIVADO_ROOT > PATH；显式路径无效就失败。
+配置预检：tclsh hw/scripts/build.tcl board=... dry_run=1。
+Windows2026.1先用于下载；主线验收后在独立Windows目录复核26开发。
 HELP
     exit 0
+fi
+if [[ -n "${VIVADO:-}" ]]; then
+    VIVADO_BIN="$VIVADO"
+elif [[ -n "${VIVADO_ROOT:-}" ]]; then
+    if [[ ! -x "$VIVADO_ROOT/bin/vivado" ]]; then
+        printf '显式VIVADO_ROOT无可执行Vivado：%s\n' "$VIVADO_ROOT" >&2
+        exit 127
+    fi
+    VIVADO_BIN="$VIVADO_ROOT/bin/vivado"
+elif command -v vivado >/dev/null 2>&1; then
+    VIVADO_BIN="$(command -v vivado)"
+else
+    echo "找不到 Vivado；请设置 VIVADO 或 VIVADO_ROOT" >&2
+    exit 127
 fi
 for arg in "$@"; do
     if [[ ! "$arg" =~ ^[a-z0-9_]+= ]]; then
