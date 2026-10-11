@@ -3,7 +3,7 @@
 """tests/test_empirical_noise_profile.py —— D3 经验误差轮廓「提取 -> 加噪 -> 重提取」闭环测试套件
 
 被测对象：`tools/extract_error_profile.py`（轮廓提取）与 `tools/mutate_reads.py --profile-from`
-（轮廓驱动加噪）。依据 docs/reference/d3-wetlab-survey.md §5.1 与 docs/05 §7.3 的 R9 判据。
+（轮廓驱动加噪）。依据 docs/reference/d3-wetlab-survey.md §5.1 与 docs/06-verification-plan.md的经验噪声判据 判据。
 
 本套件刻意**不满足于「跑得通」**。真实测序数据没有真值可比，所以这里合成一份
 **误差轮廓已知**的数据集（3' 端指数翘尾 + 转换/颠换不等概 + Q 随 cycle 衰减），

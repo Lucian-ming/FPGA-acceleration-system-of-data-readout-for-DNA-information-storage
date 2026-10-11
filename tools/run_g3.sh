@@ -45,7 +45,7 @@
 #                                                     # 只打印逐轮计划，不碰板子（自查参数）
 #   tools/run_g3.sh --ready-deadline 150              # 板端就绪探针（CAPS 握手）多等一会儿
 #
-# 环境（docs/09、docs/05 已验证，勿重摸）
+# 旧ECO默认环境（新板按docs/07-board-build-and-acceptance.md和实际目标核对）
 # --------------------------------------
 #   Windows 侧 D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat，从 WSL 用 cmd.exe /c 调用；
 #   工作目录 D:\dna_board_smoke\；JTAG Digilent 210251A08870，器件 xc7z010_1；
@@ -68,7 +68,7 @@ ARTIFACT_DIR="hw/build/export"
 ARTIFACT_EXPLICIT=0
 
 # ---------------------------------------------------------------------------
-# 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/09 §2。
+# 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/07-board-build-and-acceptance.md和docs/04-interfaces.md。
 # ---------------------------------------------------------------------------
 EXPECT_SHA="fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
 LIMIT=2048

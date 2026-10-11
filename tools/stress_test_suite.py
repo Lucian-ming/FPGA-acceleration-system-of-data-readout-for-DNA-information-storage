@@ -404,7 +404,7 @@ class StressTestSuite:
         total = len(self.records)
         passed = sum(1 for r in self.records if r.recovered)
         
-        # 按照 docs/27 区分产品有效轮次与探索/自证轮次
+        # 按照 docs/06-verification-plan.md的统计与失败分类 区分产品有效轮次与探索/自证轮次
         product_records = [r for r in self.records if r.failure_class not in ["boundary_expected", "fault_injection_expected"]]
         prod_total = len(product_records)
         prod_passed = sum(1 for r in product_records if r.recovered)

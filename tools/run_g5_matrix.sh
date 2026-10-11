@@ -4,7 +4,7 @@
 #
 # 做什么
 # ------
-# 按 docs/05 §4 G5 要求的受控矩阵，用 tools/mutate_reads.py 生成加噪读段，
+# 按 docs/05-implementation-plan.md的G5及docs/06-verification-plan.md 要求的受控矩阵，用 tools/mutate_reads.py 生成加噪读段，
 # 再用 tools/g5_false_accept.py 逐点测「误接受率 / 误拒绝率 vs score_min」。
 #
 #   替换率扫描   sub = 0 / 0.5% / 1% / 2% / 4%      (indel = 0)

@@ -11,7 +11,7 @@
     Cycle 依赖的 InDel 速率，以及与 match/mismatch 相关的 Q-score 衰减。
     该模式下均匀速率参数被忽略，误差强度只由轮廓与 `--profile-scale` 决定。
 
-依据 docs/26 §3.3 与 docs/reference/d3-wetlab-survey.md §5.1 设计：
+依据 docs/06-verification-plan.md的受控噪声矩阵 与 docs/reference/d3-wetlab-survey.md §5.1 设计：
     以标准 FASTQ 文件及对应的 manifest 为输入，在保留随机可复现性的前提下，
     注入受控的替换 (substitution)、插入 (insertion)、缺失 (deletion) 与覆盖度抽样扰动。
     输出独立新目录，严禁覆盖或污染原数据文件。

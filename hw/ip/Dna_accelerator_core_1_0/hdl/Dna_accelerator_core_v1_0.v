@@ -220,7 +220,7 @@ module Dna_accelerator_core_v1_0 #(
     // 而 S_AXIS_DATA_TREADY = ~in_full 本来就在做背压，深度只影响缓冲余量、
     // 不影响正确性。1024 深属于严重过量：SE150 下它吃掉 8×RAMB36 + 1×RAMB18，
     // 而 SE250 把宽度从 300 推到 500 后需要 14 块，整机 BRAM 会从 90% 直接爆表
-    // （docs/20 §4.2）。256 深仍是 BATCH 的 4 倍余量。
+    // （docs/04-interfaces.md的AXIS/补帧契约）。256 深仍是 BATCH 的 4 倍余量。
     fifo_sync_sdpram_b64 #(.WIDTH(CODEBITS), .DEPTH(256)) u_in_fifo (
         .clk   (aclk),
         .rst_n (aresetn & ~soft_reset_s),

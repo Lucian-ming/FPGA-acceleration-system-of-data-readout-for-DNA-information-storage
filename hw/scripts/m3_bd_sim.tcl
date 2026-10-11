@@ -6,7 +6,7 @@
 #       [tb_top=<顶层>] [tb_srcs=<以逗号分隔的 TB 源文件>] [stage=bd1|sim] \
 #       [sim_time=<如 2ms>] [bd_script_sel=prod|sim_mem]
 #
-# 设计约束（对应 docs/13-xsim-simulation-plan.md §7.1）：
+# 设计约束（对应 docs/archive/history/2026/xsim-simulation-plan.md §7.1）：
 #   - 工程建在 outdir 下的一次性目录，**绝不触碰** hw/build/dna_accel.xpr；
 #     那是用户保留的构建证据，M3 不得覆盖或清理。
 #   - BD 由 hw/scripts/bd.tcl 重新生成，不从现存 .xpr 复制，保证「干净目录可复现」。

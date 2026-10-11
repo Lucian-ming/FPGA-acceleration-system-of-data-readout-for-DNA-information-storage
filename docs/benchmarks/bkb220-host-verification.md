@@ -20,7 +20,7 @@
 
 ## 真板仍需完成
 
-按 [迁移计划](../20-bkb220-16way-migration-plan.md) 的 S2～S4：新板 P4 基线、P16 完整时序、匹配 XSA 的 BSP/FSBL/应用/BOOT、真实 TCP/CAPS、全量至少 3 次、逐级 DDR、低阈值弄脏→正式判据、非法配置/断连恢复及同板六档性能。
+按 [迁移计划](../05-implementation-plan.md) 的 S2～S4：新板 P4 基线、P16 完整时序、匹配 XSA 的 BSP/FSBL/应用/BOOT、真实 TCP/CAPS、全量至少 3 次、逐级 DDR、低阈值弄脏→正式判据、非法配置/断连恢复及同板六档性能。
 
 最终判据仍为真实回传经 LDPC 后的 JPEG SHA-256：`fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。串口可用、TCP 有返回、四级中间检查或主机合成测试均不能单独替代该判据。
 

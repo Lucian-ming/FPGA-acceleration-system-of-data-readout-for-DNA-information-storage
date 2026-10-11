@@ -4,7 +4,7 @@
 # ⚠️ 本脚本只用于仿真，**绝不能用于综合或上板**。
 #    生产 BD 永远是 hw/scripts/bd.tcl，本脚本在其基础上做一处替换。
 #
-# 为什么需要它（详见 docs/15-m3-bd-simulation-2026-08-29.md §5）：
+# 为什么需要它（详见 docs/archive/history/2026/m3-bd-simulation-2026-08-29.md §5）：
 #   Vivado 2022.2 的 processing_system7_vip 的 HP/AFI 从机读通路在本配置下
 #   接受 AR 之后不返回任何 RDATA。已逐条排除跨 4KB 边界、地址范围、DDR 容量、
 #   未完成事务上限、三档从机延迟、单个 IP、时钟/复位、RDISSUECAP1_EN

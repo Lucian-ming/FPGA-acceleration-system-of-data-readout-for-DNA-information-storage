@@ -5,7 +5,7 @@
 // 真实 PS7（仿真时为 Xilinx processing_system7_vip）→ M_AXI_GP0 →
 // 实际 axi_interconnect(ic_lite) → 四个实际从机（DNA / Decoder / Voter / AXI DMA）。
 //
-// 覆盖 docs/13-xsim-simulation-plan.md §7.2 BD-2 的判据：
+// 覆盖 docs/archive/history/2026/xsim-simulation-plan.md §7.2 BD-2 的判据：
 //   1) GP0 经 Interconnect 到各从机的地址译码；
 //   2) 三个自研 IP 的寄存器写/读回；
 //   3) 从机之间无地址混叠（写一个不影响另一个）；
@@ -35,7 +35,7 @@ module tb_m3_bd2_ctrl;
     // ic_lite 的四个 M 口之外、仍落在 GP0 段内的地址：应当被译码为错误
     localparam [31:0] ADDR_UNMAPPED = 32'h43C3_0000;
 
-    // Voter 寄存器（docs/05-interfaces.md §3.2）
+    // Voter 寄存器（docs/04-interfaces.md §3.2）
     localparam VOTER_IN_ADDR    = 8'h04;
     localparam VOTER_IN_BEATS   = 8'h08;
     localparam VOTER_OUT_ADDR   = 8'h0C;
@@ -44,14 +44,14 @@ module tb_m3_bd2_ctrl;
     localparam VOTER_SCORE_MIN  = 8'h30;
     localparam VOTER_STATUS     = 8'h00;
 
-    // Decoder 寄存器（docs/05-interfaces.md §3.3）
+    // Decoder 寄存器（docs/04-interfaces.md §3.3）
     localparam DEC_IN_ADDR   = 8'h00;
     localparam DEC_IN_BEATS  = 8'h04;
     localparam DEC_OUT_ADDR  = 8'h08;
     localparam DEC_OUT_BEATS = 8'h0C;
     localparam DEC_STATUS    = 8'h18;
 
-    // DNA 寄存器（docs/05-interfaces.md §3.1）
+    // DNA 寄存器（docs/04-interfaces.md §3.1）
     localparam DNA_CTRL   = 8'h00;
     localparam DNA_WMSEL  = 8'h04;
 

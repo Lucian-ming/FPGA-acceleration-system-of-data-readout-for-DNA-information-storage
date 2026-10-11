@@ -101,3 +101,13 @@ NETIF INPUT                    keep_tcp_alive 的位置
 | `shim/hostenv.{h,c}` | 假 DDR + 设备模型 + 轨迹录制 + lwIP 模型 |
 | `shim/*.h` | Xilinx / lwIP 头文件壳层 |
 | `golden/` | 行为轨迹黄金文件与出处 |
+
+## 公平基准契约用例
+
+从仓库根目录执行；该测试通过工具目录导入run_cpu_benchmark，因此需要临时PYTHONPATH，不修改全局环境：
+
+```bash
+PYTHONPATH="$PWD/tools${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s tests/host -p 'test_benchmark_contract.py' -v
+```
+
+这是主机侧CPU/计时/结果分类契约测试，不触板、不证明新板性能。2026-10-11复查实际通过；首次遗漏PYTHONPATH的导入失败日志与正确调用的重试日志均保留在logs/host/current-residue-20261011。

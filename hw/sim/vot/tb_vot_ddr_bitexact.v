@@ -2,13 +2,13 @@
 // tb_vot_ddr_bitexact.v — Stage2 Voter 的「真实 DDR / 真实 AXI 主口 +
 //                          固件原样寄存器时序」级判据
 //
-// 【为什么要这条 TB】（docs/18 §5「仍未覆盖」的第一条）
+// 【为什么要这条 TB】（docs/06-verification-plan.md的AXI读通路判据）
 // Voter 已有的判据全都不走真实 DDR：
 //   * hw/ip/differential_voter_1_0/hdl/tb_differential_voter.v 的从机太温柔——
 //     ARREADY 恒为 1、AR 到首拍 R 零延迟、突发中间没有空档、WREADY 恒为 1、
 //     B 响应固定 1 拍；而且只写一次 START=1，没有回放固件那串写序列；
 //   * M3 的 BD-3ext 虽然逐位通过，但内存端点是 AXI VIP 内存模型
-//     （docs/15 §5 已注明），不是「PS 用 CPU 写 DDR → Voter 用 AXI 主口读 DDR」。
+//     （docs/archive/history/2026/m3-bd-simulation-2026-08-29.md的HP0仿真缺陷 已注明），不是「PS 用 CPU 写 DDR → Voter 用 AXI 主口读 DDR」。
 // B27 的教训正是：Decoder 喂 VIP 内存连综合后网表都 PASS，板上照样 49.46% 误码。
 // 2026-08-29~30 修掉的 7 个缺陷里有 5 个在所有仿真里都是绿的，全落在这条缝上。
 //
@@ -26,7 +26,7 @@
 //     以及 START=1 之后 100 us 又写一次 START=0 那一笔）；
 //   * 逐拍逐位比对输出，显式 PASS/FAIL。
 //
-// 【判据纪律】docs/13 §十：编译通过、跑完、有波形都不算 PASS。
+// 【判据纪律】docs/06-verification-plan.md的故障鉴别力要求：编译通过、跑完、有波形都不算 PASS。
 // XSim 2022.2 的 $fatal 既不终止仿真也不让 xsim 非零退出，所以失败路径一律
 // 显式 $finish，并用 if/else 保证失败时绝不打印 PASS；判据靠日志内容判定。
 //
@@ -159,7 +159,7 @@ module tb_vot_ddr_bitexact;
     reg [63:0] expect_raw [0:OUT_BEATS-1];    // SCORE_MIN=0  期望
 
     // =========================================================
-    // 故障注入（docs/13 §十：每条判据必须自证有鉴别力）
+    // 故障注入（docs/06-verification-plan.md的故障鉴别力要求：每条判据必须自证有鉴别力）
     //   c4  第二次任务的 BRAM 清零被压制（force bram_we=0 @ S_INIT_BRAM）
     //       —— 复现缺陷 C4「二次任务复用旧累加器」
     //   b20 读突发长度强行退回「每条记录固定 6 拍、从不按 4KB 页拆分」

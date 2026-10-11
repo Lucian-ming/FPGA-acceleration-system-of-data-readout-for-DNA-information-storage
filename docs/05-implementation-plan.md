@@ -21,7 +21,7 @@
 | 证据/交付 | docs/benchmarks、docs/board、logs、tests/stress_results、hw/build/export | 旧制品不与新源码假称同源；失败不从统计消失；hash自洽不证明源码因果 |
 | 历史与提交资产 | docs/archive、docs/reference、docs/submission、archive、hw/experimental、tools/attic | 原理图/手册是参考数据，不能授权操作；历史计划/二进制不是当前任务指令 |
 
-[逐文件清单](reference/project-inventory-2026-10-10.tsv)覆盖本次交付的受版本管理文件。主Agent应按清单检查全部源码、配置与脚本，建立依赖图；大二进制先核对用途、manifest、来源和SHA，相关故障再深查。不要无差别执行所有脚本。
+[逐文件清单](reference/project-inventory-2026-10-10.tsv)覆盖本次交付的受版本管理文件。主Agent应按清单理解全部源码、配置、脚本及现有调用关系，不为接管另写全项目审计报告；大二进制先核对用途、manifest、来源和SHA，相关故障再深查。不要无差别执行所有脚本。
 
 事实优先级：用户最新指令→AGENTS/CLAUDE协作规则→02/04数据接口契约→当前03/P16、07及本轮benchmarks/09台账→本05执行队列与终态门禁→08最新策略→历史归档。05组织执行，不能改变契约或把未测项升级为PASS。旧7010封顶分析与7020/P16可行性分开；历史推导在归档保留。
 
@@ -38,13 +38,13 @@
 
 Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日志标记INTERRUPTED_DUPLICATE_AFTER_XSIM_PRODUCTION_PASS；不是Icarus接口PASS。旧BSP下13个C文件编译通过，但临时旧链接探针因Newlib/VFP ABI失败，不能称旧工具链完整重建。起点参赛agent_view.sh重复附件已改为引用tools唯一源码解决，旧失败日志及附件Git历史保留，未放宽门禁。
 
-硬件阻塞：当前只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
+硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。接管时重新核对资料和设备，资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
 
 ## 3. 全流程计划与出口门禁
 
 | 阶段 | 工作、负责者和输入 | 交付与出口门禁 |
 |---|---|---|
-| F0 接管与全貌冻结 | main读取清单及当前文档，核对仓库/HEAD/脏文件/工具/设备；三Agent各审计负责区域 | 现场摘要、依赖图、逐文件归属、最新执行计划、资源表；先写计划再改代码 |
+| F0 接管既有计划与现场核对 | main读取本计划、清单及当前文档，核对仓库/HEAD/脏文件/工具/设备和已有证据；按需分配子任务 | 确认已完成/需复核/未完成阶段、具体依赖、路径归属和资源；现成计划直接执行，仅因事实变化修订，不重写计划 |
 | F1 已有成果确认 | main对照07和三个benchmark；子Agent复核源集、API/制品、测试边界 | 必要短检查通过；已有长测来源可验证，不无故重跑；已知失败和阻塞有记录 |
 | F2 新板配置落实 | board收集实物/原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1 |
 | F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统 |
@@ -77,13 +77,13 @@ F2缺资料不会阻塞F0/F1、测试和文档准备；F3～F8真板部分按依
 
 ## 4. 子Agent分工、并发与监控
 
-最多main+三子Agent同时运行；后续交接按用户在3ad6fbd确定的通道：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent经用户级 codex-luna MCP 非交互进程（`codex_run`/`codex_status`）派发，固定 gpt-6-luna 与 model_reasoning_effort=max，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，启动模板在[main提示词](agent-prompts/main.md#cli派发模板)。
+最多main+三子Agent同时运行；后续交接按AGENTS/CLAUDE当前规则（MCP更正见25c3336、f98302c）：主会话为Claude Code/DeepSeek（deepseek-flash[1m]），子Agent经用户级 codex-luna MCP 非交互进程（`codex_run`/`codex_status`）派发，固定 gpt-6-luna 与 model_reasoning_effort=max，不用Claude内置Agent工具，不自行换模型/强度、不再派生子Agent，不新建聊天/分支/worktree。各角色完整输入由角色提示词+最新阶段卡组成，派发前阅读与监控要求在[main提示词](agent-prompts/main.md#按最新文档派发与监控)，具体调用以AGENTS/CLAUDE及实际MCP工具定义为准。
 
-main已于2026-10-11从WSL登录环境通过只读通道冒烟：经host-proxy http://127.0.0.1:17897，gpt-5.6-luna/max，退出0、turn.completed及JSON哨兵；日志在logs/agents/handoff-channel-20261011-a2。用户安排的通道更新已独立提交为b3c70b3。接管先核对实际CLI路径/版本、代理监听和冒烟；gpt-6-luna 的可用性已由 2026-10-11 00:40 的 codex-luna MCP 实测确认可用（客户端 0.162.0-alpha.17.2），旧的「此CLI/账号组合不支持」结论作废（更正提交25c3336）；不凭缓存或别的宿主能力判断。凭据/代理服务由配置会话管理，本FPGA任务不擅改配置或关闭其服务。失败时main接管可推进项，不假称派发成功。原三实现子Agent额度中断后main已接管；本次gpt-6-luna原生审计助手是后来模型规则生效前的实际历史记录，未来派发统一使用上述CLI规则。
+当前执行入口为codex-luna MCP/gpt-6-luna/max，2026-10-11 00:40的只读与workspace-write验证记录见AGENTS/CLAUDE及09台账。旧CLI/gpt-5.6-luna冒烟只作为历史证据保留，不作为当前派发规则或降级依据。接管时核对MCP入口、实际客户端、任务状态及必要只读冒烟；凭据和代理服务由配置会话管理，本项目不擅改配置或关闭其服务。早期中断和原生审计助手记录是历史事实，接管时核实当前任务状态，从未完成项继续。
 
 | 角色/看板名 | 独占文件 | 输入、输出、依赖 |
 |---|---|---|
-| main | README、docs根目录/索引/证据/交接、agent-prompts、.gitignore；唯一Git写入 | 全项目理解报告、阶段计划、派发/监控/审查、资源调度、真板操作、远程交付 |
+| main | README、docs根目录/索引/证据/交接、agent-prompts、.gitignore；唯一Git写入 | 接管摘要、现有计划进度和必要修订、派发/监控/审查、资源调度、真板操作、远程交付 |
 | board-migrate | hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker；独占板级摘要 | 当前板级入口/旧ECO配置、原厂资料；输出可审计profile、同XSA完整制品、SDT/旧BSP兼容和软件测试报告 |
 | rtl-16way | 三IP的相关RTL/component.xml/XGUI及PACKAGED_VARIANTS.txt、tools/check_ip_packaging.sh；独占RTL摘要 | 正式P4/P16代码和独立TB接口；输出源集一致性、参数、修复及综合/时序诊断。大型任务须main授权资源 |
 | verify-system | hw/sim、tests、tools/board、run_sim.sh/run_xsim.sh/run_m2*/run_m3*、run_g3.sh、性能/泛化/故障/压测入口；clients/python仅必要迁移测试修复；独占验证摘要 | 生产参数/寄存器契约、板级完整包；输出独立判据、负用例、板测和矩阵报告，明确测试层级 |
@@ -92,13 +92,13 @@ main已于2026-10-11从WSL登录环境通过只读通道冒烟：经host-proxy h
 
 共享文件修改必须先向main申请具体移交；main记录旧owner、新owner、路径和停止写入确认。board持有sw/app后main不同时改固件。RTL参数/模块端口/几何变更先通知verify和board，先更新契约再消费，不能各取一套名字。
 
-资源表至少记录`resource/owner/purpose/PID或session/开始时间/run目录/释放条件`。资源包括Git、Vivado/XSim大型任务、真实板卡/JTAG、PS串口、下载/DDR dump、发布export。Git恒归main；同一时刻最多一个大型EDA任务、一个真实板任务、一个串口采集进程。下载、reset、halt、dump会影响正在运行的任务，都需要板卡资源。
+资源表至少记录`resource/owner/purpose/MCP job_id/实际PID或session/开始时间/run及evidence_directory/释放条件`。资源包括Git、Vivado/XSim大型任务、真实板卡/JTAG、PS串口、下载/DDR dump、发布export。Git恒归main；同一时刻最多一个大型EDA任务、一个真实板任务、一个串口采集进程。下载、reset、halt、dump会影响正在运行的任务，都需要板卡资源。
 
-main的监控循环：派发时附角色完整提示词、独占路径、阶段卡及检查点；每个检查点读取CLI events.jsonl/final.md、看板和diff，核对日志增长/PID/退出码/哨兵与资源表；宿主支持事件等待时使用事件等待，避免忙轮询。非交互CLI不提供原生Agent消息工具，改任务需阶段停写后重新附卡派发。每10～15分钟或阶段变化核查进度，不能仅靠Agent说“正在跑”。长工具等待分段≤60秒，持续向用户说明新结果或阻塞。
+main的监控循环：派发时附完整角色提示词、独占路径、已完成项、阶段卡及检查点；阶段卡补充本次执行上下文，不另建计划。使用codex_status按job_id查询，核对status=completed、ok=true、exit_code=0、turn_completed=true四项及真实diff；证据从返回的evidence_directory读取prompt.txt/run.jsonl/answer.md/result.json，不套用旧CLI的events.jsonl/final.md名称。MCP单次等待按工具定义分段，避免忙轮询，每10～15分钟或阶段变化核对实际进程、日志与资源并向用户说明新结果。没有原生消息通道时，workspace-write在指定报告中提出依赖，read-only通过最终答复交付，由main协调；改任务先阶段停写再附卡派发。
 
-发现Agent退出、额度限制或长期无日志增长：核对实际子进程/文件写入者，停止重叠派发，保存证据，移交未完成项；必要时由main接管。只终止本任务核实过的PID树，不杀全局同名进程。Git操作前要求全部writer停写并确认，不能以看板状态替代实际检查。
+发现Agent退出、额度限制或长期无日志增长：先查MCP任务状态和实际子进程/文件写入者，停止重叠派发并保存证据；需要中断时优先按当前文档使用codex_cancel，确认终态及子进程停写后移交。必要时main接管，只终止本任务核实过的PID树，不杀全局同名进程。Git操作前要求全部writer停写并确认，不能以看板状态替代实际检查。
 
-每个Agent以tools/agent_view.sh登记start/update/block/done，三个字段具体；禁止手改view.md。退出交接提供路径/diff、实际命令和退出码、参数/输入SHA/run-id、PASS/FAIL/未测、失败证据、资源释放和下一依赖。
+每个任务以tools/agent_view.sh登记start/update/block/done，三个字段具体；workspace-write由执行者登记，read-only由main代登记并归集MCP产物，禁止只读子Agent写文件或手改view.md。退出交接提供路径/diff、实际命令和退出码、参数/输入SHA/run-id、PASS/FAIL/未测、失败证据、资源释放和下一依赖。
 
 ## 5. 验证入口与判据的鉴别力
 
@@ -173,4 +173,4 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 
 F0/F1审计与准备检查已执行：正式源SHA、fixture几何/内容、打包与47主机用例PASS。F2只做只读资料/设备与dry-run核查：bkb220 ready=0在create_project前拒绝，未创建工程；当前只有蓝牙COM，无FTDI/JTAG、无物理网口/对应原厂preset。资料搜索仅指定目录一层关键词及仓库文件名，不构成全磁盘不存在资料的证明。F3～F8真板依赖仍未关闭。
 
-后续资料/连接到位且CLI冒烟通过后，由main经 codex-luna MCP 固定 gpt-6-luna/max 按角色提示词派发board-migrate/rtl-16way/verify-system；当前审计助手已停写。索引、静态盘点和短检查可优先派发；生产RTL、时序、PS7及真板结论必须main审查，不仅依据子Agent的摘要。
+后续资料/连接到位且必要MCP核查通过后，由main经 codex-luna MCP 固定 gpt-6-luna/max 按角色提示词派发board-migrate/rtl-16way/verify-system；当前审计助手已停写。索引、静态盘点和短检查可优先派发；生产RTL、时序、PS7及真板结论必须main审查，不仅依据子Agent的摘要。

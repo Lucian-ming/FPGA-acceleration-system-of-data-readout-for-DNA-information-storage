@@ -227,8 +227,8 @@
       "sha256": "2c2ca645a90643b7fe86b9299a5e29c7195990561455ba5943bb93c7dbd20887"
     },
     "hw/build/export/README.md": {
-      "bytes": 13372,
-      "sha256": "4055e1c9e88e43f08f12344819a9acd2d250670060bcc9e1e4227146dbf254dc"
+      "bytes": 14099,
+      "sha256": "a546ac38fc460747bce67c9994c807909977eec50b14077dac836c65b2723081"
     },
     "hw/build/export/SHA256SUMS": {
       "bytes": 402,

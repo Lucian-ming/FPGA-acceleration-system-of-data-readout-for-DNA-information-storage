@@ -9,9 +9,9 @@ PC FASTQ/水印 → TCP → PS裸机/lwIP/AXI-DMA
 → TCP回传8100 B → PC LDPC → 原始文件及SHA-256
 ```
 
-## 当前状态（2026-10-10）
+## 当前状态（2026-10-11）
 
-旧板 ZYNQ ECO R6 / XC7Z010 的 SE150 生产链路有历史真板闭环。当前任务是迁移到 BKB220 / XC7Z020，并启用 Stage1 16 个滑窗位置并行，PL 100 MHz、64记录/帧、协议及结果格式保持现有契约。新板完整料号、PS7/DDR/MIO/PHY资料与实际连接尚未确认，配置保持 `ready=0`。
+旧板 ZYNQ ECO R6 / XC7Z010 的 SE150 生产链路有历史真板闭环。当前任务是迁移到 BKB220 / XC7Z020，并启用 Stage1 16 个滑窗位置并行，PL 100 MHz、64记录/帧、协议及结果格式保持现有契约。交接快照中的新板完整料号、PS7/DDR/MIO/PHY资料与实际连接尚未确认，配置保持 `ready=0`；接管时重新核对实际资料与设备，不把旧枚举当当前现场。
 
 迁移准备已完成：正式可选P4/P16源集及参数、完整制品门禁、现代软件构建入口、独立oracle和AXI包装测试。正式LC50模块/包装接口在 Windows2026.1 XSim通过；47项G3主机用例和工作树固件行为回归通过；Windows2026.1使用旧ECO XSA实际完成BSP/ELF/FSBL/BOOT/readback/SHA核验。
 
@@ -21,7 +21,7 @@ PC FASTQ/水印 → TCP → PS裸机/lwIP/AXI-DMA
 
 1. 读 [AGENTS.md](AGENTS.md)、[CLAUDE.md](CLAUDE.md)，核验唯一WSL checkout与远程绑定。
 2. 读 [完整运行手册](docs/05-implementation-plan.md)，了解项目全貌、所有入口、分阶段计划、资源及交付规则。
-3. 主Agent直接使用 [主提示词](docs/agent-prompts/main.md)，按其中的阅读和计划要求拉起三类子Agent并监控。
+3. 主Agent直接使用 [主提示词](docs/agent-prompts/main.md)，接管现成05计划，从尚未完成阶段继续，按最新文档经codex-luna MCP派发gpt-6-luna/max并监控；无需重写计划。
 4. [07板级迁移文档](docs/07-board-build-and-acceptance.md)记录本轮具体事实；[03状态](docs/03-status.md)与[09证据台账](docs/09-evidence-ledger.md)限定可对外使用的结论。
 5. 其余阅读顺序见 [文档索引](docs/README.md)。历史资料保留供追溯。
 

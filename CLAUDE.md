@@ -5,10 +5,10 @@
 **`AGENTS.md` 是本项目的开发规范，动手前必须完整读一遍**（语言约定、Git 绑定门禁、
 文档地图、事实边界、开发前检查表、常见陷阱）。本文件只放对 Claude Code 生效的操作规则。
 
-## 强制：每个 agent 都要写 view.md 看板
+## 强制：每个 agent 都要有 view.md 看板状态
 
 用户只看仓库根目录的 `view.md` 来了解各个 agent 在干什么。**主会话和每个子 agent
-都必须**用 `tools/agent_view.sh` 登记自己的状态（脚本内部 `flock` 串行化，支持并发）：
+都必须**有 `tools/agent_view.sh` 登记的状态（脚本内部 `flock` 串行化，支持并发）。workspace-write任务由执行者登记；read-only由main代登记，只读子Agent不写文件，通过最终答复交付：
 
 ```bash
 tools/agent_view.sh start  --agent "<名字>" --doing "在做什么" --why "为了解决什么问题" --next "下一步可能干什么"
@@ -20,7 +20,7 @@ tools/agent_view.sh show                                                # 查看
 
 规则要点：
 
-1. **拿到任务、动手之前**先 `start`；**交接之前**最后 `done`。
+1. **拿到任务、动手之前**先 `start`；**交接之前**最后 `done`。read-only任务的这些动作由main代执行。
    `done` 之后条目会自动从「当前状态」摘除（**零残留**），完成记录留在「最近动态」里，
    所以正常收工**不需要**再手工 `clear`。看板上永远只剩还在跑的 agent。
    反之，「进行中/阻塞」超过 6 小时没更新会被自动标注「⚠️ 可能已中断」——
@@ -31,7 +31,7 @@ tools/agent_view.sh show                                                # 查看
    受阻立刻 `block`，并把「在等用户回答什么」写进 `--next`。
 4. 三个字段都要写具体内容（带上关键文件名/脚本名），不要写「处理任务中」这类空话。
 5. **派生子 agent 时**，必须在给它的 prompt 里指定 `--agent` 名字，
-   并要求它按本节规则 `start` / `update` / `done`。承载通道见下一节。
+   并明确workspace-write自行登记、read-only由main代登记，按本节 `start` / `update` / `done`。承载通道见下一节。
 6. **禁止手工编辑 `view.md`**：它由脚本生成，手改会被下一次刷新覆盖。
    `view.md` 与 `.agent_view/` 不进 Git；结论与判据仍要写进 `docs/` 并提交。
 
@@ -63,7 +63,7 @@ MCP 不可用时用 Bash 后备入口 `~/.local/bin/codex-subagent run --cwd <�
 也不要用旧的 shell codex 封装**（会把已关闭的 Windows 系统代理同步进来、冲掉手工代理）。
 
 子 agent 没有原生消息通道：prompt 里要写清范围、产出路径、验收要求，以及它用哪个 `--agent`
-看板任务名，并要求它按上节规则 `start` / `update` / `done`、**不执行任何 Git 写操作**。
+看板任务名、sandbox和交付方式。workspace-write按上节规则自行登记并写指定报告；read-only由main登记看板和归集MCP产物，子Agent只在最终答复报告。两类任务均**不执行任何 Git 写操作**。
 
 通道自身的可用性、验证依据与当前阻塞项见 `AGENTS.md` 的
 「子 Agent 的承载通道与模型」一节。

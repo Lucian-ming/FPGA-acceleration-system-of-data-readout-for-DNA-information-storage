@@ -9,7 +9,7 @@
 #   bash tests/host/run_host_tests.sh --selftest   # 故障注入：证明判据能失败
 #
 # **为什么默认不是工作树**：这棵工作树是多个会话共用的，别的会话的半成品就在
-# 旁边（docs/21 §5）。默认编译 HEAD 里的 echo.c，判据才不会被别人的中间状态
+# 旁边（tests/host/README.md的判据鉴别力）。默认编译 HEAD 里的 echo.c，判据才不会被别人的中间状态
 # 搞成假红。真正做拆分时用 --worktree —— 那时「轨迹逐行相同」就是行为等价判据。
 #
 # 单一 PASS/FAIL + 非零退出码。

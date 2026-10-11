@@ -2,7 +2,7 @@
 // File: srpe_batch_4way.v
 // Desc: 64-read batch engine using bit-plane BRAM & 4-Way Multi-Position Sliding Window
 // ----------------------------------------------------------------------------
-// 【打包变体与架构契约】（docs/19 §C1）
+// 【打包变体与架构契约】（docs/05-implementation-plan.md的热整理门禁）
 // 1. 本文件是 hw/ip/Dna_accelerator_core_1_0/component.xml 当前打包的生产实现变体，
 //    与 hw/ip/PACKAGED_VARIANTS.txt 保持严格一致（模块名通过宏别名定义为 srpe_batch）。
 // 2. 4-Way 展开微架构：

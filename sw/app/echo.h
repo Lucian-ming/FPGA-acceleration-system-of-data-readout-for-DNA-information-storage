@@ -21,7 +21,7 @@
 #include "ddr_layout.h"   /* 【C2/C3】按实际条数计算/校验 DDR 区间（主机可测） */
 #include "task_config.h"  /* 【P3】PKT_CONFIG 解析/校验/CRC（主机可测） */
 
-/* 【P3】读段碱基数：SE250 规格 */
+/* 【P3】读段碱基数：当前SE150规格 */
 #define READ_BASES_PER_READ     150U
 /* 容量内最大的 64 对齐条数：TOTAL_READS=129600 本身就是 64 的倍数 (2025 批) */
 #define TASK_MAX_READS          ((TOTAL_READS / FRAME_READS) * FRAME_READS)
@@ -48,7 +48,7 @@
  *============================================================================*/
 #define READ_SIZE_BYTES         40U
 #define FRAME_READS             64U
-#define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* 4096B */
+#define FRAME_BYTES             (FRAME_READS * READ_SIZE_BYTES)   /* SE150: 64*40=2560B */
 /* DDR 预留的**记录数容量**上限——不是本次任务的大小，也不是数据集条数。
  * 本次任务的实际条数由 PKT_CONFIG 下发，cache 范围用 ddr_layout_*_bytes() 算。
  *
@@ -69,8 +69,8 @@
 /*=============================================================================
  * 水印几何（必须与 srpe_batch 的 parameter 一致）
  *
- *   REF_LEN = STRIDE + READ_BPS = 805 + 250 = 1055
- *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*805 + 250 = 40,500
+ *   REF_LEN = STRIDE + READ_BPS = 807 + 150 = 957
+ *   L(符号) = NUM_LC * STRIDE + READ_BPS = 50*807 + 150 = 40,500
  *   水印比特数 = 2 * L = 81,000
  *
  * 【修订 B1】MAX_WATERMARK_SIZE 原为 10120，小于 81,000 bit 所需的 10,125 B；
@@ -87,31 +87,31 @@
 /* 展开后的区域缓冲：每个符号占一个 32-bit 字（低 2 位有效），
  * DNA 核预载时每拍只取 TDATA[1:0]，故必须一符号一拍地送。 */
 #define WM_REGION_SYMBOLS       WM_REF_LEN
-#define WM_REGION_BYTES         (WM_REGION_SYMBOLS * 4U)         /* 4,220 B */
-#define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 211,000 B */
+#define WM_REGION_BYTES         (WM_REGION_SYMBOLS * 4U)         /* 3,828 B */
+#define WM_REGIONS_TOTAL_BYTES  (WM_NUM_LC * WM_REGION_BYTES)    /* 191,400 B */
 
 /*=============================================================================
- * DDR 地址映射 (SE250 全量布局，扩充读段区至 8.38MB，docs/07 §5.3)
+ * DDR 地址映射（当前SE150，容量129600记录，见docs/04-interfaces.md）
  *
- * 内存布局:
- * 0x10000000 - 0x10002800  : 水印数据 (~10KB)
- * 0x10040000 - 0x10073800  : 展开后水印区域 (211KB)
- * 0x10100000 - 0x108E8000  : 原始读段数据 (129600×64B = 8.294MB ≤ 8.388MB)
- * 0x10900000 - 0x111E6000  : Stage1输出 (129600×72B = 9.331MB ≤ 9.437MB)
- *                             ↑ 直接被Stage2使用，无需重打包！
- * 0x11200000 - 0x11203000  : Stage2(Voter)输出 (1266×8B = 10.128KB)
- * 0x11300000 - 0x11302000  : Stage3(Decoder)输出 (1013×8B = 8.1KB)
- * 0x11800000 - 0x1181FFFF  : DMA TX BD空间 (2048×64B = 128KB)
- * 0x11900000 - 0x1190FFFF  : DMA RX BD空间 (1024×64B = 64KB)
+ * 起址/有效数据上限（分区跨度由下一缓冲起址决定）：
+ * 0x10000000 : 打包水印最大10240B，当前传输10128B
+ * 0x10040000 : 展开水印50*957*4=191400B
+ * 0x10100000 : 读段129600*40=5184000B；到0x10600000预留5242880B
+ * 0x10600000 : Stage1输出129600*48=6220800B；到0x11000000预留10485760B
+ *                直接作为Stage2输入，无需重打包
+ * 0x11000000 : Stage2输出1266*8=10128B
+ * 0x11100000 : Stage3输出1013*8=8104B，TCP逻辑结果8100B
+ * 0x11800000 : DMA TX BD，2048*64=131072B
+ * 0x11900000 : DMA RX BD，1024*64=65536B
  *============================================================================*/
 
 /* 输入数据区 */
 #define DDR_WATERMARK_BASE      0x10000000U    /* 上位机送来的打包水印（LSB-first） */
-#define DDR_WM_REGIONS_BASE     0x10040000U    /* 展开后的 50 个区域，共 211,000 B */
-#define DDR_READS_BASE          0x10100000U    /* 原始读段数据：跨度 8,388,608 B */
+#define DDR_WM_REGIONS_BASE     0x10040000U    /* 展开后的50个区域，共191400B */
+#define DDR_READS_BASE          0x10100000U    /* 原始读段数据：当前分区跨度5242880B */
 
 /* Stage1: DNA Accelerator */
-#define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 129600×72B = 9,331,200 B */
+#define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 129600*48B = 6220800B */
 #define DNA_ACC_RESULT_PACKED_BYTES  48U
 #define DNA_ACC_OUTPUT_SIZE_BYTES    (TOTAL_READS * DNA_ACC_RESULT_PACKED_BYTES)
 

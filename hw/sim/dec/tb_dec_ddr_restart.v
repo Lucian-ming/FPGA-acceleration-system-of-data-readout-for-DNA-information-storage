@@ -41,7 +41,7 @@ module tb_dec_ddr_restart;
     localparam integer OUT_BEATS = 1013;
     localparam integer OUT_BITS  = 64800;
 
-    // 板上真实地址（docs/05-interfaces.md / sw/app/echo.h）
+    // 板上真实地址（docs/04-interfaces.md / sw/app/echo.h）
     localparam [31:0] IN_ADDR  = 32'h1100_0000;
     localparam [31:0] OUT_ADDR = 32'h1110_0000;
 

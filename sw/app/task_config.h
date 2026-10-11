@@ -33,7 +33,7 @@ typedef struct {
     uint32_t num_lc;       /* 比特流综合参数（当前 50） */
     uint32_t stride;       /* 比特流综合参数（当前 807） */
     uint32_t max_symbols;  /* 当前几何的水印符号数（当前 40,500） */
-    uint32_t max_reads;    /* 容量内最大 64 对齐条数（当前 107,968） */
+    uint32_t max_reads;    /* 容量内最大64对齐条数，由board_caps/TASK_MAX_READS给定 */
     uint32_t features;     /* bit0: 支持 SCORE_MIN 寄存器 */
 } task_caps_t;
 

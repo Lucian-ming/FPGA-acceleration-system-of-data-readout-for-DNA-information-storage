@@ -1,14 +1,15 @@
 # 可上板交付制品（ZYNQ ECO R6，16 bit DDR，4-way Stage1 + P7 周期计数器 + S-5 瘦身）
 
-本目录是与当前 `main` 的 RTL / PS 固件匹配、且**按目标板 ZYNQ ECO(R6) 实物 DDR 配置**
-重建的最小完整交付集。
+本目录是冻结的旧ECO/P4发布基线，按当时源码和目标板ZYNQ ECO(R6)实物DDR配置重建。当前main已加入BKB220/P16准备及后续源码修订，本目录不能作为当前源码、新板或P16的同源包。
+
+当前执行查[03状态](../../../docs/03-status.md)和[07板级迁移](../../../docs/07-board-build-and-acceptance.md)；新运行使用独立制品目录。本页下文保留各次构建和调试的历史记录，其中“当前阻塞”“尚未验证”等字样指对应写作时点，不能覆盖最新状态。bit/XSA/ELF/FSBL/BOOT和原SHA清单保持不变。
 
 ## 2026-09-22 固件重建：P13 Voter/Decoder 墙钟超时（全量回归修复）
 
 只换 `dna_lwip_app_b27.elf`（`58d84ad3…`）与 `BOOT.bin`（`2c2ca645…`）；bit / xsa / fsbl 不变。
 P12 版 ELF 跑 SE150 全量必然 `Voter timeout after 100000 polls`，本版修复。
 板端 `run_g3.sh --run-limits 2048,full` G3 PASS（run `20260922T120755Z-p13-release`，全量 26.52 s），
-详见 `docs/03-status.md` P13。
+详见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md` P13。
 
 ## 2026-09-11 重建：4-way Stage1 + P7 周期计数器 + S-5 热清理
 
@@ -19,7 +20,7 @@ P12 版 ELF 跑 SE150 全量必然 `Voter timeout after 100000 polls`，本版�
 - **固件瘦身**：移除 7 个未引用的 Xilinx 模板源文件（1,292 行，占 20.3%），ELF 机器码完全同源且大小自洽；
 - **仿真覆盖**：`tools/run_sim.sh` 16/16 全 PASS，TB 精确验证 Voter（2,853,481 周期，分项守恒等式成立）与 Decoder（2,053 周期）。
 
-## 当前交付集
+## 本目录冻结交付集
 
 | 文件 | 用途 |
 | --- | --- |
@@ -60,7 +61,7 @@ P12 版 ELF 跑 SE150 全量必然 `Voter timeout after 100000 polls`，本版�
   Stage1 码字 4,096/4,096（B26 错位消失）、Stage2⊕水印 误码 0/81,000、
   **Stage3 误码 0/64,800**（上一版是 49.47%）。
 - 闭环范围仅限 SE150 / 2,048 条源读段 / `--orient both` / `SCORE_MIN=67` 这一组参数，
-  SE250、全量 51,781 条、二次任务均未验证。详见 `docs/03-status.md`「第五次上板」一节。
+  SE250、全量 51,781 条、二次任务均未验证。详见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`「第五次上板」一节。
 
 ## 本次重建的验证
 
@@ -84,7 +85,7 @@ P12 版 ELF 跑 SE150 全量必然 `Voter timeout after 100000 polls`，本版�
 会周期性跨越 4 KB 页边界，违反 AXI 规范 A3.4.1（4,096 条记录中 32 次）。
 已改为跨页时拆成两笔突发。验证：`run_sim.sh` 11/11、`run_xsim.sh` 6/6、
 M2 完整串联全链 PASS（图片哈希不变）、BD-3ext 的 Voter 与 Decoder 均逐位通过且零协议违规。
-详见 `docs/15-m3-bd-simulation-2026-08-29.md` §6.6。
+详见 `docs/archive/history/2026/m3-bd-simulation-2026-08-29.md` §6.6。
 
 ## 复核
 
@@ -110,7 +111,7 @@ xsct sw/scripts/create_vitis.tcl -tclargs \
 
 ## 本轮（2026-08-29 晚）在此基础上的修复
 
-这套制品比上一版多了四个已定位缺陷的修复，详见 `docs/03-status.md`：
+这套制品比上一版多了四个已定位缺陷的修复，详见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`：
 
 | 编号 | 位置 | 内容 | 验证状态 |
 | --- | --- | --- | --- |
@@ -145,12 +146,12 @@ DNA 核 AXIS 结果输出级）。
 
 本次只保证制品与实物 DDR 配置一致。
 DDR 板级走线延迟（`PCW_UIPARAM_DDR_BOARD_DELAY*`）仍是从历史板卡继承的 `0.25`，
-ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此处（见 `docs/09` §5）。
+ECO 资料未给出该参数——若上板 DDR 自检不过，优先怀疑此处（见 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/board-build-and-acceptance.md` §5）。
 
 最终验收仍是 FPGA 真实回传经 LDPC 后图片 SHA-256 等于
 `fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3`。
 
-首次上板顺序见 `docs/16-board-zynq-eco-7010.md` §6：**先用官方 LED 例程冒烟，
+首次上板顺序见 `docs/archive/history/2026/board-zynq-eco-7010.md` §6：**先用官方 LED 例程冒烟，
 再下载本目录制品**；首次一律用 JTAG 模式（SW1 = `00`），不写 QSPI、不动 SD 卡。
 
 ## 只改 PS 固件时怎么重建 ELF（2026-09-03 实测可复现）

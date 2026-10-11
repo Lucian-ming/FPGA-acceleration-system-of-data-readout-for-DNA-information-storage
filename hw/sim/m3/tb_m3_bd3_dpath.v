@@ -8,10 +8,10 @@
 // 与 BD-2 的区别：BD-2 只证明「能配寄存器」，BD-3 让 IP 真的经由实际 Interconnect
 // 去 DDR 读写业务数据，覆盖突发、WSTRB/WLAST、背压和响应码。
 //
-// 真实性红线（与 M2 一致，见 docs/13-xsim-simulation-plan.md §6.3）：
+// 真实性红线（与 M2 一致，见 docs/archive/history/2026/xsim-simulation-plan.md §6.3）：
 //   - DDR 的输入镜像由外部脚本从**上一级实际输出**派生，黄金向量只用于最终比较；
 //   - 本 TB 不读取任何 *_expect 文件，不做任何「期望值注入」；
-//   - 每一级都跑在实际地址（docs/05-interfaces.md §4）上。
+//   - 每一级都跑在实际地址（docs/04-interfaces.md §4）上。
 //
 // 用 plusarg 选择本次跑哪一级，便于像 run_m2_full.sh 那样把 PS 等价 XOR
 // 放在两次仿真之间的 Python 里，保持级间数据是真实的。
@@ -31,11 +31,11 @@ module tb_m3_bd3_dpath;
 
     `define PS7 dut.top_bd_i.ps_0.inst
 
-    // 地址（docs/05-interfaces.md §3、§4，BD-1 已核对 bd_address.txt）
+    // 地址（docs/04-interfaces.md §3、§4，BD-1 已核对 bd_address.txt）
     localparam [31:0] ADDR_VOTER = 32'h43C2_0000;
     localparam [31:0] ADDR_DEC   = 32'h43C1_0000;
 
-    // 默认使用 docs/05-interfaces.md §4 的真实地址；可用 plusarg 覆盖，
+    // 默认使用 docs/04-interfaces.md §4 的真实地址；可用 plusarg 覆盖，
     // 用于诊断「地址是否落在仿真内存模型可服务范围内」这类问题。
     reg [31:0] DDR_STAGE1_OUT = 32'h1060_0000;  // Voter 输入
     reg [31:0] DDR_STAGE2_OUT = 32'h1100_0000;  // Voter 输出 / Decoder 输入

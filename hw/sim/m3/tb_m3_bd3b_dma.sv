@@ -1,7 +1,7 @@
 // ================================================================
 // tb_m3_bd3b_dma.sv —— M3 / BD-3b：AXI DMA <-> DNA 加速核 数据面
 //
-// 这是 docs/13 §7.2 BD-3 的第 1、2 项，也是缺陷 B21（Stage1 板上硬卡死）
+// 这是 docs/06-verification-plan.md的BD接口验证 的第 1、2 项，也是缺陷 B21（Stage1 板上硬卡死）
 // 唯一从未被 BD 级仿真覆盖的一段链路：
 //
 //     AXI DMA MM2S      -> DNA S_AXIS_DATA        （水印预载 + 读段下发）
@@ -10,7 +10,7 @@
 // DUT 是 hw/scripts/bd_sim_mem.tcl 生成的实际 BD 变体：真实 PS7 VIP 的 GP0
 // 控制面、真实 ic_lite / ic_hp、真实 AXI DMA（SG 模式）、真实 DNA 核，
 // 只把 ps_0/S_AXI_HP0 这一个内存端点换成 AXI VIP 内存模型
-// （原因见 docs/15 §5：Vivado 2022.2 的 PS7 VIP 的 HP0 读通路不返回 RDATA）。
+// （原因见 docs/archive/history/2026/m3-bd-simulation-2026-08-29.md的HP0仿真缺陷：Vivado 2022.2 的 PS7 VIP 的 HP0 读通路不返回 RDATA）。
 //
 // !! 结论边界：内存端点不是实际 PS7 的 AFI 通路。本 TB 能证明
 //    「AXI DMA 与 DNA 核之间的 AXIS 链路 + SG 描述符管理」的行为，
@@ -24,7 +24,7 @@
 // [B26] 2026-08-29 补上本项目至今完全没有的**入口逐条判据**：
 //   「送入第 k 条读段 -> 引擎第 k 个槽位装的就是第 k 条读段
 //     -> 第 k 条结果记录的码字就是第 k 条读段的码字」。
-//   这正是 docs/13 §7.2 BD-3 第 1 项、docs/17 任务 A 点名的那一段，
+//   这正是 docs/06-verification-plan.md的BD接口验证 第 1 项、docs/06-verification-plan.md的AXIS握手判据 点名的那一段，
 //   也是 B26（板上 result[k] == read[k+1]、read[0] 的结果丢失、末尾多一条）
 //   唯一能在 BD 级坐实的判据。
 //
@@ -46,7 +46,7 @@
 //   +reads_file=<file>      读段镜像：每行一个 32 bit 字，每条读段 10 个字
 //   +mem_out=<file>         把 Stage1 输出区 dump 成 VIP 32 bit 字格式，供逐位比较
 //
-// 判据纪律（docs/13 §十）：编译过、跑完、有波形都不算 PASS。
+// 判据纪律（docs/06-verification-plan.md的故障鉴别力要求）：编译过、跑完、有波形都不算 PASS。
 // 每一条判据都有显式 PASS/FAIL、超时保护和逐位比较，不屏蔽 X/Z。
 // ================================================================
 
@@ -877,7 +877,7 @@ module tb_m3_bd3b_dma;
         step(50);
         $display("[TB] PL 复位已释放 @%0t ps", $time);
 
-        // [B26 故障注入自检 / docs/13 §十]
+        // [B26 故障注入自检 / docs/06-verification-plan.md的故障鉴别力要求]
         // 把引擎的 cw_data 强行接回 in_fifo 的 dout —— 这正是修复前的接法。
         // 用它证明本用例的判据真的能抓住 B26，而不是「编译过、跑完、没报错」。
         // 注入后本用例**必须失败**；如果仍然通过，说明判据没有鉴别力，同样判 FAIL。

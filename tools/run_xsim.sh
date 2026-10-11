@@ -171,10 +171,10 @@ if [[ "$WHICH" == all || "$WHICH" == dec_restart ]]; then
 fi
 if [[ "$WHICH" == all || "$WHICH" == vot_ddr ]]; then
     # Stage2 Voter 的「真实 DDR / 真实 AXI 主口 + 固件原样寄存器时序」判据。
-    # docs/09 §5「仍未覆盖」的第一条：Voter 的 AXI 读通路此前只走过温柔从机
+    # docs/06-verification-plan.md的AXI接口负用例要求：Voter 的 AXI 读通路此前只走过温柔从机
     # （tb_differential_voter：ARREADY 恒 1、零延迟、无背压、只写一次 START=1）
     # 和 M3 BD-3ext 的 AXI VIP 内存模型，从来没走过「PS 写 DDR -> Voter 读 DDR」。
-    # 一次 build，四次复跑：正常档 + 三档故障注入自检（docs/05 §十）。
+    # 一次 build，四次复跑：正常档 + 三档故障注入自检（docs/06-verification-plan.md的故障鉴别力要求）。
     printf '\n=== %s ===\n' vot_ddr
     if build_case vot_ddr tb_vot_ddr_bitexact \
         "$REPO_ROOT/$VOTER/differential_voter_v1_0.v" \

@@ -2,7 +2,7 @@
  * test_ddr_layout.c — ddr_layout.h 的主机单元测试（C2/C3 判据）
  *
  * 与固件共用 sw/app/ddr_layout.h；地址与容量按 docs/04-interfaces.md
- * 的 DDR 布局取黄金值，钉死四类边界：空任务、非整帧、超容量、区间越界。
+ * 的DDR布局算法构造边界fixture（生产容量由echo.h定义），钉死四类边界：空任务、非整帧、超容量、区间越界。
  *
  *   gcc -O2 -I sw/app -o /tmp/test_ddr tools/test_ddr_layout.c && /tmp/test_ddr
  * ============================================================= */

@@ -1,6 +1,6 @@
 // ============================================================================
 // tools/align_omp.c —— 高度优化的 CPU 序列滑动比对基准 (支持单核与多核 OpenMP)
-// 用于 docs/26 要求的 CPU vs FPGA 公平基准测试 (Eliminating Strawman Comparison)
+// 用于 docs/08-performance-and-strategy.md 要求的 CPU vs FPGA 公平基准测试 (Eliminating Strawman Comparison)
 // ============================================================================
 #include <stdio.h>
 #include <stdlib.h>

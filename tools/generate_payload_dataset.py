@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """D1 多 Payload 独立数据集生成器。
 
-依据 docs/26 §3.2 设计：
+依据 docs/06-verification-plan.md的多payload判据 设计：
     从全新、独立的原始 Payload 开始，执行正向全流程编码：
         Source Payload (54,000 bit)
         --> DVB-S2 R=5/6 LDPC 编码 (64,800 bit)
@@ -77,7 +77,7 @@ def mutate_read_sequence(
     rng: np.random.Generator,
     fixed_len: bool = True,
 ) -> tuple[str, str, int, int, int]:
-    """对单条读段注入替换 (sub)、缺失 (del)、插入 (ins) 错误，并做定长适配（docs/05 §8）。"""
+    """对单条读段注入替换 (sub)、缺失 (del)、插入 (ins) 错误，并做定长适配（docs/06-verification-plan.md的统计与失败分类）。"""
     orig_len = len(seq)
     seq_chars = list(seq)
     qual_chars = list(qual)
@@ -639,7 +639,7 @@ def generate_dataset(
 
 
 def make_standard_suite(base_dir: Path, reads_count: int = 4096):
-    """生成 docs/26 §3.2 指定的首批 4 套代表性 Payload 数据集。"""
+    """生成 docs/06-verification-plan.md的多payload判据 指定的首批 4 套代表性 Payload 数据集。"""
     print("\n=======================================================")
     print(" 启动生成首批 4 套全新独立 D1 Payload 数据集")
     print("=======================================================")

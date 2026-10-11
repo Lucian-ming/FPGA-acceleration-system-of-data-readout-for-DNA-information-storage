@@ -4,7 +4,7 @@
 //
 // 为什么需要这个 TB：
 //   `AXI DMA MM2S -> DNA S_AXIS` 与 `DNA M_AXIS -> AXI DMA S2MM` 这条链此前
-//   没有任何仿真覆盖（docs/13 §7.2 BD-3 第 1、2 项、docs/17 §1「根因缺口」）。
+//   没有任何仿真覆盖（docs/06-verification-plan.md的真实AXIS/BD接口判据）。
 //   run_m2_full.sh 的 Stage1 只编译 srpe_batch.v + tb_srpe_batch.v，直接抓引擎的
 //   res_din 记录，**完全绕开** Dna_accelerator_core_v1_0.v 的 AXIS 输出级和
 //   s2mm_pack64。于是 B23（TDATA 组合直连、TVALID 寄存，数据比 valid 早一拍）

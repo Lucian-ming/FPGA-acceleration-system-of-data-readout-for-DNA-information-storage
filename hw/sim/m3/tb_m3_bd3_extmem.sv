@@ -8,7 +8,7 @@
 //
 // 为什么需要它：Vivado 2022.2 的 processing_system7_vip 的 HP/AFI 从机读通路
 // 在本配置下接受 AR 后不返回任何 RDATA（已逐条排除设计侧因素，见
-// docs/15-m3-bd-simulation-2026-08-29.md §5）。本 TB 绕开该仿真模型缺陷，
+// docs/archive/history/2026/m3-bd-simulation-2026-08-29.md §5）。本 TB 绕开该仿真模型缺陷，
 // 让数据面判据得以执行。
 //
 // ⚠️ 结论边界：内存端点**不是实际 PS7 的 AFI 通路**。本 TB 能证明
@@ -41,7 +41,7 @@ module tb_m3_bd3_extmem;
     // 仿真专用内存端点
     top_bd_mem_vip_0_slv_mem_t mem_agent;
 
-    // 地址（与生产 BD 完全一致，docs/05-interfaces.md §3、§4）
+    // 地址（与生产 BD 完全一致，docs/04-interfaces.md §3、§4）
     localparam [31:0] ADDR_VOTER = 32'h43C2_0000;
     localparam [31:0] ADDR_DEC   = 32'h43C1_0000;
 

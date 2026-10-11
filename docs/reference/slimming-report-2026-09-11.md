@@ -1,5 +1,7 @@
 # 项目瘦身与代码质量专项（P9）完成报告
 
+本文是2026-09-11历史复核。正文中的旧`docs/19`指[合并前清理计划原文](../archive/history/2026/pre-bkb220-handoff-2026-10-10/slimming-and-code-quality-plan.md)，章节号保留当时含义；当前执行查[05清理规则](../05-implementation-plan.md#清理分类与不可省略的门禁)。
+
 > **日期**：2026-09-11  
 > **执行 Agent**：`slim`  
 > **审查与提交**：主会话 `main`  

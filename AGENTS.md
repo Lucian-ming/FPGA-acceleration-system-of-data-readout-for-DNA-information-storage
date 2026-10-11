@@ -62,7 +62,7 @@
 ## 工作可见性：view.md 看板（强制）
 
 用户只看仓库根目录的 `view.md`，就应当知道**每个 agent 此刻在干什么**。因此所有 agent
-（主会话与任何子 agent、并行 agent）都必须实时登记自己的工作状态。
+（主会话与任何子 agent、并行 agent）都必须实时登记自己的工作状态。workspace-write任务由执行者登记；read-only任务由main代登记全生命周期，只读子Agent通过最终答复交付，不写看板或项目文件。
 
 - **唯一写入方式**是 `tools/agent_view.sh`（内部用 `flock` 串行化，支持多 agent 并发）。
   **禁止**手工编辑 `view.md`：它是自动生成的，手改会被下一次刷新覆盖。
@@ -91,7 +91,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   4. 受阻立刻 `block`，把「在等用户回答什么」写进 `--next`；
   5. 结束时 `done`。
 - **派生子 agent 时**，必须在给子 agent 的 prompt 里明确写上：它要用哪个 `--agent` 名字，
-  并要求它按本节规则 `start` / `update` / `done`。
+  并按sandbox明确登记责任：workspace-write执行者按本节 `start` / `update` / `done`；read-only由main代登记。
 - **`done` 之后条目会自动从「当前状态」摘除（零残留）**，不需要再手工 `clear`。
   完成这件事本身仍然留痕——它出现在 view.md 的「最近动态」里；
   结论、判据和证据以 `docs/` 为准。所以看板上永远只剩「还在跑的 agent」，

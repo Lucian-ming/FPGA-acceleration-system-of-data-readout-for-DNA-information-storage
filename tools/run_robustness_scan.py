@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """tools/run_robustness_scan.py —— G5 测序错误鲁棒性多维矩阵扫描与抗噪边界评测
 
-依据 docs/05 §4 (G5 错误鲁棒性) 与 docs/05 §3 规范设计：
+依据 docs/06-verification-plan.md的G5鲁棒性与统计判据 规范设计：
 1. 采用纯软黄金模型全流水线 (C 比对加速 + 大数投票 + 反稀疏化 + C LDPC 译码)；
 2. 扫描四大维度：
    - 替换错误率 (Substitution: 0.0% ~ 2.0%)

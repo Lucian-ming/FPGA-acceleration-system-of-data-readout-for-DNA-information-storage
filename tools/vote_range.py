@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 """实测 Voter 投票累加器的运行中极值，回答「10 bit 够不够」。
 
-`differential_voter_v1_0.v:319-326` 的 `safe_vote_value` 是一个**逐票饱和**的
-10 bit 有符号累加器：每收一票就 `clip(x±1, -512, 511)`。docs/07 §3.2 据一个
+`differential_voter_v1_0.v`的`safe_vote_value` 是一个**逐票饱和**的
+10 bit 有符号累加器：每收一票就 `clip(x±1, -512, 511)`。旧性能分析（原文见docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/performance.md）据一个
 **估算**的位级同意率 0.72 推出「全量 SE250 运行中上界 ≈ 282 < 511，不用加宽」，
 并把它标成**未验证**。本脚本把那个数直接量出来。
 
-顺带回答第二个问题：`tools/make_golden.py` 生成 `stage2_rtl_expect.hex` 时用的是
-**最后一次性** `np.clip(votes, -512, 511)`，注释却写「每次 ±1 后钳位」。两者只在
+历史第二个问题：早期`tools/make_golden.py`生成`stage2_rtl_expect.hex`时用了
+最后一次性`np.clip(votes, -512, 511)`；当前生成器已改为逐票钳位，冻结黄金SHA未变。旧两种语义只在
 **从不饱和**时才等价（自由累加到 +600 再回落 200 = 400；逐票饱和则是 511 再回落
 200 = 311，符号判决都可能因此不同）。所以「会不会饱和」同时决定了黄金向量在该
 规模下还算不算数。

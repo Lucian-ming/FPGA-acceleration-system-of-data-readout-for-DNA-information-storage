@@ -1,5 +1,8 @@
 # tools/ 工具索引
 
+冻结说明：make_golden.py及tests/golden/se250/GEOMETRY.txt中的旧`docs/20`是生成时的历史引用，指向[SE250研究原文](../docs/archive/history/2026/se250-study-2026-08-30.md)。本轮保持生成器与黄金元数据字节不变，不为修引用重录黄金；当前契约查02/04，验证查06。
+
+
 当前完整流程、资源与Agent任务见[05执行计划](../docs/05-implementation-plan.md)；新板配置/同源制品见[07](../docs/07-board-build-and-acceptance.md)。
 
 > **为什么需要这份索引**：2026-09-10 卫生审计发现 `tools/` 下有 **7 个脚本零引用**

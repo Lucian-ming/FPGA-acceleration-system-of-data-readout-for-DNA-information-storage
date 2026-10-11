@@ -20,7 +20,7 @@
 #define VOTER_WAIT_TIMEOUT_S   30U
 
 /* ============================================================================
- * 投票语义、score_min 作用点与累加器鉴别力契约（docs/05 §C1）
+ * 投票语义、score_min 作用点与累加器鉴别力契约（docs/04-interfaces.md的Differential Voter接口及docs/02-data-contract.md）
  * ----------------------------------------------------------------------------
  * 1. 投票语义：Stage2 Voter 硬件核通过 AXI4 Master 从 DDR（DDR_VOTER_IN_BASE）
  *    流式读入 Stage1 生成的 48 字节/读段结果（包含 score、position 与码字）。

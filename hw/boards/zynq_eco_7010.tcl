@@ -1,5 +1,5 @@
 # ECO R6 已验证基线；参数原样提取自历史 bd.tcl，不用于新板。
-# 来源见 docs/09-board-build-and-acceptance.md、docs/board/zynq-eco-7010/。
+# 来源见 docs/07-board-build-and-acceptance.md、docs/board/zynq-eco-7010/。
 set ps7_properties [list \
   CONFIG.PCW_USE_M_AXI_GP0 {1} \
   CONFIG.PCW_USE_S_AXI_HP0 {1} \
@@ -45,5 +45,5 @@ set ps7_properties [list \
 set board_config [dict create \
   id zynq_eco_7010 ready 1 part xc7z010clg400-1 \
   uart ps7_uart_1 xdc hw/constr/top.xdc \
-  source_refs {docs/09-board-build-and-acceptance.md docs/board/zynq-eco-7010/} \
+  source_refs {docs/07-board-build-and-acceptance.md docs/board/zynq-eco-7010/} \
   ps7_properties $ps7_properties]
