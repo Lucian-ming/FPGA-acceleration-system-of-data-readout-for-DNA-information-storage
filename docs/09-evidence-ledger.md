@@ -152,7 +152,8 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | 现代软件入口实际完整构建核验 | [工具摘要](benchmarks/bkb220-toolchain-audit.md)；D:/Agent/outputs/bkb220-vitis26/logs-a14/vitis.log与export-a14/software_build_config.json | 旧ECO XSA兼容探针，不是新板包 |
 | 正式源/参数与实际catalog包装通过 | [集成摘要](benchmarks/stage1-16way-ip-integration.md)；logs/vivado/stage1_ip_catalog_20261010_2110 | 默认P4，BKB220 ready=0 |
 | 2026-10-11用户提供的BKB220 v1.1产品手册已随仓库收录，副本与原件字节一致 | [资料索引](board/bkb220/README.md)、[PDF](board/bkb220/BKB220产品手册v1.1.pdf)及[SHA256SUMS](board/bkb220/SHA256SUMS.txt)；SHA `40b50e66…c8cd086`；在docs/board/bkb220运行`sha256sum -c SHA256SUMS.txt` | 只证明所收录文档一致；不证明实物型号、PS7配置或新板验收；缺项见03/07 |
-| 6个历史工具原样退役、22主开发/26下载/最后26复核顺序已同步 | [整理记录](reference/tool-cleanup-2026-10-11.md)；logs/host/tools-cleanup-route-20261011：启动器4/G3主机47/公平基准8/固件2/打包/卫生11 PASS；归档源码SHA/权限、135个链接与Windows镜像核验 | 仅主机/工具/文档验证；Vitis22补装尚待实际安装后核验，无新板构建/下载/验收 |
+| 6个历史工具原样退役、22主开发/26下载/最后26复核顺序已同步 | [整理记录](reference/tool-cleanup-2026-10-11.md)；logs/host/tools-cleanup-route-20261011：启动器4/G3主机47/公平基准8/固件2/打包/卫生11 PASS；归档源码SHA/权限、135个链接与Windows镜像核验 | 主机/工具/文档验证及Vitis22安装后能力核验通过；无新板构建/下载/验收 |
+| WSL Vitis2022.2补装成功，实际XSCT与ARM编译器可用 | D:/Agent/outputs/fpga-migration-handoff-20261010/vitis22-installation-verification-20261011-a2/verification.json：Vivado2022.2、XSCT2022.2.0六命令、GCC11.2.0、Cortex-A9 ARM32对象编译全部PASS | 仅工具安装与能力验证；没有生成新BSP/应用/FSBL/BOOT或触板，完整软件链继续按05/07验证 |
 
 Icarus重复接口已在XSim正式通过后停止，不称Icarus接口PASS。起点重复附件告警及唯一源引用修复记录保留，边界见[整理记录](reference/workspace-cleanup-2026-10-10.md)。全项目门禁与当前Agent任务见05/07。
 

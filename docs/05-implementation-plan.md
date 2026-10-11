@@ -42,7 +42,7 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 
 硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。接管时重新核对资料和设备，资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL已实测Vivado2022.2及Vitis_HLS2022.2，现有Vivado维护安装器正在补装，Vitis/XSCT是否具备仍待安装后核验。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
 ## 3. 全流程计划与出口门禁
 

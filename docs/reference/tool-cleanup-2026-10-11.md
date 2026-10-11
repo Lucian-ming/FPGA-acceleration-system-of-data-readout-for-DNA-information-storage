@@ -25,3 +25,8 @@
 本机已实测Vivado2022.2可运行，Vitis_HLS2022.2目录存在；当时未找到用于PS开发的Vitis/XSCT。2026-10-11用户从已有Vivado维护入口手动开始补装，安装日志明确“Adding design tools/devices to Edition: Vitis Unified Software Platform”，目标/tools/Xilinx/Vitis/2022.2；界面总下载7.24GB。这是正在安装的快照，完成与否须重新核验实际Vitis/XSCT及原Vivado，不等同于完整软件构建通过。认证/用户账户数据不纳入项目。
 
 官方2022.2的[增补入口说明](https://docs.amd.com/r/2022.2-English/ug973-vivado-release-notes-install-license/Adding-Additional-Tools-and-Devices)与[Vitis安装说明](https://docs.amd.com/r/2022.2-English/ug1400-vitis-embedded/Installing-the-Vitis-Software-Platform)分别说明修改现有安装及统一包的组件选择；本机实际补装状态以上述现场证据为准。
+
+
+后续实测更新（2026-10-11）：维护安装器显示Install completed successfully。/tools/Xilinx/Vitis/2022.2已具备vitis/xsct/xsdb/settings64.sh；原Vivado v2022.2仍可启动，XSCT实际报告xsct 2022.2.0且setws/platform/domain/app/bsp/importsources六命令可用。SDK内GCC11.2.0（arm-xilinx-eabi）以cortex-a9/hard/vfpv3成功生成ARM32对象，ELF机器字段为ARM。最终报告及命令输出在D:/Agent/outputs/fpga-migration-handoff-20261010/vitis22-installation-verification-20261011-a2/；仅验证安装与基本工具能力，不是完整BSP/应用/FSBL/BOOT构建或真板验收。
+
+首轮编译器实际--version退出0，但检查脚本误要求输出包含arm-none-eabi-gcc；实际厂商名为arm-xilinx-eabi-gcc.real。首次日志原样保留在不带-a2的同名目录；修正为实际目标架构与ARM对象编译后通过，没有修改安装内容。
