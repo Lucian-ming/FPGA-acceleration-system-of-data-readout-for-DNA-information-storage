@@ -65,6 +65,18 @@ else
     ok "IP hdl/ 目录内无 testbench"
 fi
 
+# --- 1b. IP 的 hdl/ 里不得出现非 .v 文件 -------------------------------------
+# 2026-10-12 新增。原检查只扫 tb_*.v 与同名模块，于是 hdl/ 里的 .tcl/.sv/.md
+# 之类**完全漏检**——vivado_quick_sim.tcl 就在一个「只放会被综合的文件」的目录里
+# 躺了很久而门禁全绿（AGENTS.md 代码卫生 §1：卫生问题必须是会红的判据）。
+STRAY_NONV="$(find hw/ip/*/hdl -maxdepth 1 -type f ! -name '*.v' 2>/dev/null || true)"
+if [[ -n "$STRAY_NONV" ]]; then
+    bad "IP 的 hdl/ 目录里发现非 HDL 文件（hdl/ 只放会被综合的 .v）："
+    echo "$STRAY_NONV" | sed 's/^/      /'
+else
+    ok "IP hdl/ 目录内无非 HDL 文件"
+fi
+
 # --- 2. 同一 IP 内不得有多个文件定义同一模块名 ------------------------------
 for d in hw/ip/*/hdl; do
     ip="$(basename "$(dirname "$d")")"

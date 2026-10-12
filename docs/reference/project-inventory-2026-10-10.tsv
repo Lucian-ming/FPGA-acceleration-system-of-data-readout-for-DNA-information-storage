@@ -234,7 +234,7 @@ hw/ip/Dna_accelerator_core_1_0/hdl/s2mm_pack64.v	.v	生产IP与打包元数据
 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch.v	.v	生产IP与打包元数据
 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_4way.v	.v	生产IP与打包元数据
 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_pway.v	.v	生产IP与打包元数据
-hw/ip/Dna_accelerator_core_1_0/hdl/vivado_quick_sim.tcl	.tcl	生产IP与打包元数据
+hw/experimental/vivado_quick_sim.tcl	.tcl	生产IP与打包元数据
 hw/ip/Dna_accelerator_core_1_0/scripts/validate_catalog.tcl	.tcl	生产IP与打包元数据
 hw/ip/Dna_accelerator_core_1_0/xgui/Dna_accelerator_core_v1_0.tcl	.tcl	生产IP与打包元数据
 hw/ip/PACKAGED_VARIANTS.txt	.txt	生产IP与打包元数据
