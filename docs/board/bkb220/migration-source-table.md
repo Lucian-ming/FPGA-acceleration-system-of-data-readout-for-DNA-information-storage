@@ -504,3 +504,67 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 **据此更新的判断**：§9.3 里"工业级料号未定""ENET0 候选"两项，ENET0 侧已被原理图补齐（RGMII + RTL8211E + PHY 地址 1 + 复位由 PS_POR_B 驱动）；**仍未定**的只剩工业级精确料号、DDR 板级延迟与 DQS-to-CLK、QSPI/SD 冷启动。
 
 **边界**：原理图证明的是**设计意图与连接关系**，不等于板子实物与该版图一致（PCB 修订/改板未核对）；也不等于整机 G3 通过。
+
+## 11. F4 首次整机 G3：烧录成功、以 FAIL 结束，根因已定位（2026-10-12）
+
+### 11.1 做得对的部分（都是 PASS）
+
+- **烧录走 Windows 2026.1**（用户指定的分工）：`usbipd` 把 FT4232H 还给 Windows，用 `D:\xilinx\2026.1\Vitis\bin\xsdb.bat` 下载 22 产出的制品。
+- 制品选择：`--strict-artifacts`、`--artifact-dir <P4软件包>`、`--device xc7z020`，`g3_artifacts.py` 预检 exit 0（`board_id=bkb220`、`part=xc7z020clg400-2`、几何 150/50/807/957/64、`P_WAYS=4/PIPE_TREE=0`、`legacy=false`）。
+- **板上启动链全通**：`rst -system` → `fpga`（PL 编程）→ `ps7_init`+`post_config` → `dow`（ELF）→ `con`。串口（COM10）实录到完整应用启动：
+  `DNA Accelerator Complete Pipeline`、Voter/Decoder 复位 IDLE=1、DMA `MM2S/S2MM` 描述符与无错误、`[INIT] DNA Accelerator ready`、
+  `Board IP: 192.168.1.10`、`[TCP] Server ready`、`*** Waiting for connections ***`。
+- 留证目录：`D:\bkb220_board_smoke\g3_runs\20261012T132657Z\`（`uart.log`、`artifact_selection.json`、`wait_ready.out` 等）。
+
+### 11.2 FAIL 的直接判据
+
+```
+PASS  完整制品包一致性
+PASS  烧录
+FAIL  板端应用层就绪（CAPS）  — 90 s 内 192.168.1.10:7 没有正常应答
+SKIP  四级逐级取证  — 任务未跑到出结果
+FAIL  串口实录  — 采集器报"没有可确认的输出"（实际 uart.log 有 1757 B 内容，见 §11.4）
+######## G3 FAIL ########
+```
+主机侧独立佐证：`ping 192.168.1.10` 100% 丢包；TCP 7 报 `No route to host`（连 ARP 都不通）。
+
+### 11.3 根因：PHY 自协商在驱动侧超时，GEM 从未被启用
+
+串口实录**开头**就有决定性三行：
+
+```
+Start PHY autonegotiation
+Waiting for PHY to complete autonegotiation.
+Auto negotiation error
+Phy setup error
+Phy setup failure init_emacps
+```
+
+定位到 BSP 的 `xemacpsif_physpeed.c` → `get_Realtek_phy_speed()` 里的等待循环：
+
+```c
+while ( !(status & IEEE_STAT_AUTONEGOTIATE_COMPLETE) ) {   /* BMSR bit5 */
+    sleep(1); timeout_counter++;
+    if (timeout_counter == 30) { xil_printf("Auto negotiation error \r\n"); return XST_FAILURE; }
+    XEmacPs_PhyRead(xemacpsp, phy_addr, IEEE_STATUS_REG_OFFSET, &status);
+}
+```
+
+30 秒内 BMSR bit5 一直没置位 → `XST_FAILURE` → `phy_setup_emacps` 失败 → **GEM0 从未被启用** → 应用能起 lwIP 与 TCP server 但链路层不通。这也解释了紧随其后的 `Ethernet Link down`（应用每秒调 `eth_link_detect`，用的是从未建立起来的 `phyaddrforemac`）。
+
+**为什么是这颗 PHY 出问题**：新旧 BSP 的 `lwipopts.h` **逐行相同**（都是 `CONFIG_LINKSPEED_AUTODETECT 1`），`xemacpsif_physpeed.c` 也是同一份 BSP 源码；**旧板 10 份 UART 实录取样全都打出 `autonegotiation complete`，新板超时**。差别只在 PHY：新板 `PHYID1=0x001C` → 走 **`get_Realtek_phy_speed()`** 分支；旧板不是 Realtek，走别的分支。**所以这是 Realtek 分支与这颗 RTL8211E 的适配问题，不是板子或连线问题。**
+
+**一条必须并存的观察（防止归因错）**：main 从前端经 JTAG 读同一颗 PHY 时，`BMSR=0x796D`（**bit5=1 自协商完成**）、`ANLPAR=0xCDE1`、`GBTSTS=0x7800`（1000BASE-T 全双工）。**PHY 自己能协商成功**，是**驱动的时序/写法**在这颗 PHY 上拿不到结果。金线与 PHY 都是好的（Windows ASIX 网卡也一直显示 1 Gbps link up）。
+
+### 11.4 一个次要的判据缺陷（需修）
+
+G3 把"串口实录"判成 FAIL，理由是采集器报"没有可确认的输出（count=未报告）"，**但 `uart.log` 实际有 1757 字节完整启动日志**。也就是说这一格的裁决逻辑与实际内容不符——它可能只认某几个特定标记，或 count 没回传。**这是判据侧的 bug，不是板子的问题**，但它会把"串口其实录到了"误报成失败，应当修掉后再跑（否则每次都会多一个假 FAIL）。
+
+### 11.5 下一步（不在此轮下结论）
+
+修 PHY 初始化，候选方向（**都要以能变红的判据验证，不许猜着改**）：
+1. **换用固定速率路径**：把 BSP 的 `CONFIG_LINKSPEED_AUTODETECT` 换成 `CONFIG_LINKSPEED1000`，走 `configure_IEEE_phy_speed()` —— 那条路径会写 **page2/reg0x15 的 RGMII 收发时钟延迟**（`IEEE_RGMII_TXRX_CLOCK_DELAYED_MASK`），正是原理图 p.15「RGMII clock timing control / RXDLY」提示的东西，而 AUTODETECT 路径**不碰**这些寄存器。
+2. **确认驱动实际用的 PHY 地址**：`detect_phy` 填 `phymapemac0[]` 后由 `phy_setup_emacps` 取用；main 的前端扫描在地址 0 和 1 都读到同一 ID，而驱动的取用循环是 `for (i=31; i>0; i--)`。要用板上实测（而非推断）确认驱动最终用的是哪个地址。
+3. **RTL8211E 特有的初始化**：若 1/2 都无效，再考虑在 `sw/app` 或 BSP 层加 Realtek 专页配置。
+
+**边界**：本轮**没有**改动 `sw/app` 或 BSP 源码；以上是定位与候选方向，不是已完成的修复。
