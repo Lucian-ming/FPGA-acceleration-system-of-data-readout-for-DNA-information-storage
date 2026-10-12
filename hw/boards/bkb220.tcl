@@ -1,18 +1,26 @@
-# BKB220 候选 profile。ready 必须保持 0，直到 main 审核来源表并补齐实物资料。
-# 手册中的 XC7Z020-2CLG400I 与仓库候选 xc7z020clg400-2 的温度/完整料号对应关系
-# 尚未由芯片顶标、PCB 修订和 Vivado 2022.2 catalog 交叉确认；不得据此开启构建。
-
-# 候选值只用于审阅。load_board.tcl 在 ready=0 时会在 create_project 前拒绝该 profile。
-# DDR 时序是 DDR3-1066 工作点的 JEDEC/Micron 数据表推导，不是板测值；
-# -107 器件速度等级、板级延迟与 DQS-to-CLK 仍须经原厂资料和实板确认。
+# BKB220 profile。ready=1 于 2026-10-12 由 main 置位，依据与边界如下 ——
+# **这不是"配置已全部证实"的声明。**
 #
-# 【2026-10-12 F3 实板结果，见 docs/board/bkb220/migration-source-table.md §9】
-#   已实测：ps7_init/ps7_post_config RC=0；DDR 在 0x10000000 起 1024 字写读 0 不符
-#   （DDR 训练可用）；PS UART = UART0/MIO14-15 → FT4232H 通道 C（/dev/ttyUSB2）
-#   115200 8N1，ASCII 明文正确。PS_CLK=33.333MHz、DDR PLL=533.33MHz(DDR3-1066)、
-#   FCLK0=100MHz 由 PLL 寄存器回读证实。
-#   仍未通过：ENET0/PHY —— GEM0 时钟与复位都正常但 MDIO 读不到任何 PHY ID，
-#   疑为 PHY 复位脚未驱动或 MDIO 不在此 MIO。**因此 ready 保持 0。**
+# 【为什么可以置 1】用户 2026-10-12 明确选择"先把 P4 整机建起来，ENET0 留到板测
+#   再验"。构建不触板；本次迁移最大的技术未知是"P4/P16 能否在真实 xc7z020 上
+#   收敛到 100MHz"，这一项与 ENET0 无关，不必等原理图。用户的这一指示覆盖此前
+#   "不得猜 PHY 配置"的一般要求，仅限本项。
+#
+# 【已实测证实，见 docs/board/bkb220/migration-source-table.md §9】
+#   * ps7_init/ps7_post_config RC=0；JTAG 单目标 xc7z020
+#   * DDR 在 0x10000000 起 1024 字写读 0/1024 不符（DDR 可用）
+#   * PS UART = UART0/MIO14-15 → FT4232H 通道 C（/dev/ttyUSB2），115200 8N1，
+#     经 JTAG 直写 TX FIFO 后被正确 ASCII 接收
+#   * PS_CLK=33.333MHz、DDR PLL=533.33MHz(DDR3-1066)、FCLK0=100MHz（PLL 寄存器回读）
+#
+# 【仍未证实 —— 板测必须验，失败就回来改这里】
+#   * **ENET0/PHY 完全未通过**：GEM0 存在、寄存器可写、MDIO 完成标志正常
+#     （完成标志在 NETWORK_STATUS[2]，不是 PHY_MAINT），但 PHY 0..31 全地址无应答。
+#     已知网线是板子直连主机 ASIX 网卡且链路 1Gbps Up，说明 PHY 有电、未复位，
+#     故 MDIO/MDC 很可能不在 MIO52/53。**MIO16-27 + MDIO52/53 是 Zynq 标准接法、
+#     与旧 ECO 板一致的候选，不是已证实值。**
+#   * 工业级料号：手册写 XC7Z020-2CLG400I，2022.2 catalog 未确认对应条目
+#   * DDR 板级延迟与 DQS-to-CLK 用 Vivado Custom 默认值，非数据手册/实测值
 set ps7_properties [list \
   CONFIG.PCW_USE_M_AXI_GP0 {1} \
   CONFIG.PCW_USE_S_AXI_HP0 {1} \
@@ -48,7 +56,7 @@ set ps7_properties [list \
 ]
 
 set board_config [dict create \
-  id bkb220 ready 0 part xc7z020clg400-2 \
+  id bkb220 ready 1 part xc7z020clg400-2 \
   uart ps7_uart_0 xdc hw/constr/top.xdc \
   source_refs {docs/board/bkb220/migration-source-table.md docs/board/bkb220/README.md docs/board/bkb220/BKB220产品手册v1.1.pdf docs/04-interfaces.md docs/07-board-build-and-acceptance.md hw/constr/top.xdc} \
   ps7_properties $ps7_properties \
