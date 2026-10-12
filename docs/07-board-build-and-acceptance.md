@@ -34,7 +34,12 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 
 完整新包须有bit、含bit的XSA、同XSA的ps7_init.tcl、BSP、应用ELF、FSBL、BOOT.bin、readback、SHA256SUMS、硬/软件summary和G3 artifact_manifest.json。实际manifest字段以g3_artifacts.py读取为准，必须记录完整part、board、工具/源码SHA、几何和P_WAYS/PIPE_TREE，并验证XSA内bit和HWH七参数。
 
-现代软件JSON显式repo_root/workspace/xsa/export_dir/uart/board_id/part/bootgen，workspace全新、UART来自实际BSP、CPU为ps7_cortexa9_0 standalone/lwip220。排除sw/app/xparameters.h历史快照；SDT地址/查询键/共享GIC/全局timer使用实际BSP，30秒超时先转64位。sw/app是权威源，workspace不手改。
+现代软件JSON显式repo_root/workspace/xsa/export_dir/uart/board_id/part/bootgen，workspace全新、UART来自实际BSP、CPU为ps7_cortexa9_0 standalone。排除sw/app/xparameters.h历史快照；SDT地址/查询键/共享GIC/全局timer使用实际BSP，30秒超时先转64位。sw/app是权威源，workspace不手改。
+
+**lwIP 版本按工具链实际提供的选，不要写死。**（2026-10-12 更正：原句在此处写"standalone/lwip220"，被误读成 22 主线也要 lwip220，导致 board-migrate 在 F4 因"lwip220 不在 Vitis 2022.2 安装树"而阻塞一轮。）
+- **22 主线（WSL Vitis 2022.2）**：安装树只有 `lwip211_v1_5/1_6/1_7/1_8`；仓库现有 `sw/scripts/create_vitis.tcl` 本来就按 `lwip213 → lwip211 → lwip210` 回落，**以它的选择为准**；旧板已验证的 BSP 用的就是 `lwip211_v1_8`。
+- **Windows 2026.1（F9 复核）**：现代 Vitis 提供 **lwip220**，届时由现代入口选择。跨版本不要求 lwIP 主版本相同，按功能/接口/统计比较。
+- 通用规则：**BSP 选择必须来自实际安装树**；缺指定版本时**如实报告并按实际可用版本构建 + 标注差异**，不得静默替换，也不得因为版本号不同就判整包失败。
 
 本机lwIP BOM兼容副本由prepare_vitis_compat_repo.py创建并验证414文件manifest；只移除描述文件BOM，不改安装或原厂库实现。构建同时要求成功哨兵、build状态0、实际非空产物、Bootgen readback和六SHA；不能仅依赖launcher exit0。完整命令及A14边界见[工具核查](benchmarks/bkb220-toolchain-audit.md)。
 
