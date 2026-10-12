@@ -76,7 +76,7 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 3. 断电后 FT4232H 回落 Windows、usbipd 断开，并在 3132 留下**已无设备的旧 hw_server**，恢复时先杀它再起新的。
 4. **MDIO / PHY 观测必须排在 `ps7_init` 之后**；`BMSR` bit2 是 latching-low，链路状态至少读两次。
 
-**风险留存（不是已解决）**：2026-10-12 连接测试期间 Windows 主机**蓝屏两次**（BugCheck `0x139`/参数1=`0xA`，进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。用户已统一 FTDI 驱动到 `2.12.36.20` 并确认 **USB 供电即可**。**根因未被独立查明或根治**；若 Windows 烧录重现同类异常，**回退到已验证的 WSL 22 路径**并保留现场。
+**蓝屏历史的处置（2026-10-12 用户确认已解决）**：2026-10-12 连接测试期间 Windows 主机**蓝屏两次**（BugCheck `0x139`/参数1=`0xA`，进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。同日用户自行处置并**明确告知崩溃风险已解决**，同时确认 **USB 供电即可**。因此 **Windows 2026.1 的烧录路径按正常状态使用**。原始诊断证据保留在仓库外但**具体修复项未入仓**——"已解决"属环境所有者的判断，非本项目独立复现；WSL 22 路径（已验证）作为替代入口保留备用。
 
 **厂商资料**：2026-10-12 递归搜 `*b220*/*bkb*` 无任何 BKB220 板卡文件，2026.1 的 `XilinxBoardStore` 只有 Xilinx 官方板，**厂商 board_files/PS7 preset 仍缺**；但**厂商原理图已入库**（[BK_B220_SchDoc.pdf](board/bkb220/BK_B220_SchDoc.pdf)，核对见[来源表 §10](board/bkb220/migration-source-table.md)）。
 
