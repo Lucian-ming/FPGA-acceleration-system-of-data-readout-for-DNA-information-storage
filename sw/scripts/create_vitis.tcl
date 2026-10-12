@@ -4,7 +4,8 @@
 #   xsct sw/scripts/create_vitis.tcl
 # 此入口仅用于仍支持XSCT的旧版Vitis。2026.1 XSCT已disabled，使用create_vitis_modern.py。
 # 可选参数（-tclargs 覆盖）：
-#   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1
+#   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1 phy_link_speed=CONFIG_LINKSPEED_AUTODETECT
+# phy_link_speed 可选：CONFIG_LINKSPEED_AUTODETECT / CONFIG_LINKSPEED1000 / CONFIG_LINKSPEED100 / CONFIG_LINKSPEED10
 # =========================================
 
 # ---------- 默认参数 ----------
@@ -37,6 +38,7 @@ set ip   "192.168.1.10"
 set mask "255.255.255.0"
 set gw   "192.168.1.1"
 set uart "ps7_uart_1"
+set phy_link_speed "CONFIG_LINKSPEED_AUTODETECT"
 
 # ---------- 解析 -tclargs ----------
 proc _arg {name default} {
@@ -57,7 +59,11 @@ _arg ip   $ip
 _arg mask $mask
 _arg gw   $gw
 _arg uart $uart
+_arg phy_link_speed $phy_link_speed
 if {$uart ni {ps7_uart_0 ps7_uart_1}} {error "uart必须为本板PS UART实例名"}
+if {$phy_link_speed ni {CONFIG_LINKSPEED_AUTODETECT CONFIG_LINKSPEED1000 CONFIG_LINKSPEED100 CONFIG_LINKSPEED10}} {
+  error "phy_link_speed必须是CONFIG_LINKSPEED_AUTODETECT/1000/100/10之一"
+}
 foreach command {setws platform domain app bsp importsources} {
   if {![llength [info commands $command]]} {error "当前工具不提供XSCT命令$command；Vitis2026.1请使用Python入口"}
 }
@@ -73,6 +79,7 @@ puts "     XSA : $xsa"
 puts "     WS  : $ws"
 puts "     PLAT: $plat"
 puts "     DOM : $dom"
+puts "     PHY : $phy_link_speed"
 puts "     APP : $app"
 
 # ---------- 路径（相对仓库根） ----------
@@ -123,6 +130,8 @@ if {$lwip_lib eq ""} {
   catch { bsp config lwip_tcp  1 } _
   catch { bsp config lwip_udp  1 } _
   catch { bsp config lwip_pbuf_pool_size 256 } _
+  # 由 BSP 元数据生成 lwipopts.h；不要直接修改生成头文件。
+  bsp config phy_link_speed $phy_link_speed
 }
 
 # 默认保留旧板UART1；新板须按对应XSA显式选择uart。
