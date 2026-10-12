@@ -118,7 +118,8 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | **F2 新板配置** | **基本完成**：来源表与候选 PS7 profile 已产出并经 Vivado 2022.2 逐属性验证（[来源表](board/bkb220/migration-source-table.md) §8、`hw/boards/bkb220.tcl`，`ready=0`）。**实测已定**：PS_CLK=33.333 MHz、DDR=533.33 MHz(DDR3-1066)、FCLK0=100 MHz、PS UART=UART0/MIO14-15→FT4232H 通道 C。`MT41K256M16TW-107` 被 PS7 catalog 拒绝，改用自定义 DDR 参数 |
 | **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
 | **F4/F5 构建与整机时序** | **通过**：P4(4/0) 与 P16(16/1) 均在 `xc7z020clg400-2` 完成完整 route + bitstream + XSA，**WNS +0.680/+0.617、WHS +0.036/+0.017、失败端点 0、DRC 0 errors、`clk_fpga_0`=100.000MHz**。P16 资源 33,987 LUT(63.89%)，与先验 33.9k/64% 吻合。详见 [benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md) |
-| F4 软件包 + F6～F8 | 未开始：同 XSA 软件包（BSP/ELF/FSBL/BOOT/manifest）未生成；板端下载/G3/性能/长稳未测；`REQP-1839/1840` 异步复位 BRAM 警告待 RTL 复核 |
+| **F4 整机 G3** | **通过（7/7 全绿）**（[来源表 §13](board/bkb220/migration-source-table.md)）：补回 profile 缺失的 ENET0 MIO 配置并重建后，CAPS 握手、4096 板端记录、**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、串口实录 7781 字符。通道为 Windows 2026.1 烧录 22 制品 + COM10，符合 §1b 分工 |
+| F6～F8 | 未开始：全量≥3 次、连续/脏干净、断连恢复、性能矩阵、泛化/长稳；`REQP-1839/1840` 异步复位 BRAM 警告待 RTL 复核。**板上是 P4，P16 尚未上板** |
 | F9 | 未开始：22 主线稳定后，用 Windows 2026.1 独立重建 P4/P16 硬软包并复核（分工见 §1b） |
 
 ## 1c. 2026-10-12 F3 实板结果摘要
