@@ -732,3 +732,36 @@ iptables 规则已清理干净。共 3 个用例，未恢复 0 个
 | A3-3 任务中途断网 + SIGKILL | **3/3 恢复** |
 
 **边界**：以上都是 **P4**。P16 的同等门禁要在 B（重建 P16 包 → 上板）之后另跑，不能用 P4 的结论代替。
+
+## 15. B2 P16 首次上板（2026-10-12）
+
+### 15.1 重建后的 P16 包（B1）
+
+| | |
+|---|---|
+| 硬件包 | `hw/build/bkb220-p16-enet0-100mhz-20261012T144141Z-board-migrate/` |
+| 软件包 | `hw/build/bkb220-p16-enet0-software-20261012T144141Z-board-migrate/` |
+| 时序（main 读原始报告） | WNS **+0.617** / TNS 0 / WHS **+0.017** / THS 0；失败端点 **0/86,415**；`clk_fpga_0`=100.000 MHz；DRC 0 errors |
+| 资源 | LUT **33,987/53,200（63.89%）**、FF 36,067、BRAM 45/140、DSP 3/220 |
+| **ENET0 自查（main 亲自 grep）** | `ps7_init.tcl` **`F80007D0/D4 = 0x1280`** ✓，MIO16-27 RGMII 行齐 ✓ |
+| **P16 身份核对** | `g3_artifacts.py` 读出 **`C_STAGE1_P_WAYS=16 / C_STAGE1_PIPE_TREE=1`** ✓（P4 为 4/0）——这是 TCP/CAPS 层**分不出来**、只能从 manifest/XSA 认的字段 |
+| 与修复前 P16 对照 | WNS/WHS/失败端点/LUT/DRC 全部一致（合理：ENET0 修复只动 PS7 配置，PL 网表未变） |
+
+### 15.2 P16 smoke（2048 源读段）—— **PASS**
+
+```
+PASS  完整制品包一致性 / 烧录 / CAPS READY 6.1 1
+PASS  第 1 轮 first.py  — 4096 条记录 / score_min=67；Result: 8100 bytes, 0.75s
+PASS  第 1 轮 唯一判据（图片 SHA-256）— fcd0cf90…f2c3
+PASS  四级逐级取证    PASS  串口收到板端输出 — 7780 字符
+```
+留证 `D:\bkb220_board_smoke\g3_runs\20261012T150336Z\`。
+
+**★ 同板 P4/P16 首个端到端对照**（同 smoke 档、同输入、同判据）：
+
+| | `t_result`（POST→收齐 8100B） | 轮耗时 |
+|---|---|---|
+| P4 | 1.45 s | 2 s |
+| **P16** | **0.75 s** | **1 s** |
+
+即 **P16 在该档快约 1.9 倍**。**口径注意**：`t_result` **不含**上传与 LDPC，也不是整轮；正式性能矩阵（六档 ≥3 次、中位数/离散/斜率）见 F7，**不要拿这一个点外推整机倍率**。
