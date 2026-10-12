@@ -40,7 +40,7 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 
 2026-10-11已把用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)收录至仓库，原件与副本SHA一致；[资料索引及校验](board/bkb220/README.md)是接管入口。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`，再核对对应PCB/实物及原厂配置；引用手册规格时注明页码。产品手册已具备，后续只按实际缺项补齐原理图/preset/例程，不重新制定计划。
 
-~~硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG~~（**2026-10-12 作废**：BKB220 已到货连接，JTAG 实测为 xc7z020，FT4232H 提供 JTAG + COM9/10/11；见 [03 §1a](03-status.md) 与 [07 §3a](07-board-build-and-acceptance.md)）。仍缺对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号，以及 ENET0 的 PHY 复位/MDIO 归属。WSL Vivado/Vitis 2022.2 为主开发链；**Windows 2026.1 的 hw_server 因两次蓝屏已暂停，下载/调试改走 WSL**。`ready` 仍为 0：不能猜 DDR/MIO/PHY/时钟、复位未知设备或把 USB 调试误当整板供电。
+~~硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG~~（**2026-10-12 作废**：BKB220 已到货连接，JTAG 实测为 xc7z020，FT4232H 提供 JTAG + COM9/10/11；见 [03 §1a](03-status.md) 与 [07 §3a](07-board-build-and-acceptance.md)）。仍缺对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号，以及 ENET0 的 PHY 复位/MDIO 归属。**工具链分工（用户 2026-10-12 明确）：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 里的 2026.1 只负责烧录。** 22 主线是唯一发布线，26 不产出新板验收制品。板级资料（原理图）已补齐，`ready` 已按授权置 1 并实板验证；见 [03 §1b/§1c](03-status.md) 与 [07 §3a](07-board-build-and-acceptance.md)。
 
 **2026-10-12 接管进度**：F0 完成；F1 由子 Agent 只读复核并由 main 复跑门禁确认（P4/P16 源集与 `PACKAGED_VARIANTS.txt` 一致、打包与卫生 PASS、P16 整机 LUT 先验约 33.9k）；F2 基本完成（来源表 + 候选 PS7 经 Vivado 2022.2 逐条验证，`ready=0`）；**F3 大部分通过**（`ps7_init`/`ps7_post_config` RC=0、DDR 0x10000000 起 1024 字写读 0 不符、PS UART 实测 = UART0/MIO14-15 → FT4232H 通道 C `/dev/ttyUSB2`），**但 ENET0/PHY 未通过**（MDIO 全地址无应答），故 F4～F8 仍被前置阻塞。详细判据见 [BKB220 来源表 §9](board/bkb220/migration-source-table.md)。
 

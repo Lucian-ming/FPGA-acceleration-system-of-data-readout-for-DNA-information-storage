@@ -11,6 +11,8 @@
 - 唯一checkout：`/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout`；Windows为`\\wsl.localhost\Ubuntu\home\lucian\projects\FPGA\FpgaAccelerationSystemOfDataReadout`。
 - 唯一GitHub：`Lucian-ming/FPGA-acceleration-system-of-data-readout-for-DNA-information-storage`。只在main，不创建分支/worktree/另一个checkout/嵌套仓库。
 - 用户已明确授权本批迁移准备代码及文档的提交推送，并要求本项目最终提交推送与清理。沿用授权范围，不对同一范围反复确认。全量数据、历史资产和已验旧制品继续保护；其他明确不可逆/超范围操作须说明具体需要。
+**工具链分工（2026-10-12 明确，覆盖下文历史表述）：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 里的 2026.1 只负责烧录/下载/调试，只烧 22 产出的 bit / 同 XSA 的 ps7_init 与 ELF，不产出新板验收制品。** 详见 `docs/07` §3a 与 `docs/03` §1b。
+
 - 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。 Windows根目录`D:/xilinx/2026.1`，WSL硬件根目录`/tools/Xilinx/Vivado/2022.2`；启动器优先显式VIVADO，其次VIVADO_ROOT，最后PATH。2026.1软件重建使用现代Python入口，XSCTdisabled且exit0不能算成功。
 - 2026-10-10已有准备成果：正式可选P4=4/0与P16=16/1、生产几何150/50/807/957/64；打包与2022.2真实catalog通过；Windows2026.1 XSim LC50模块/真实包装接口两轮通过；Icarus LC50模块同周期P4=1680956/P16=513755，约3.27倍仅模块周期；47项G3主机测试和工作树固件行为回归通过。
 - Windows2026.1在旧ECO XSA上实际生成BSP/应用ELF/FSBL/BOOT/readback/六产物SHA，证明兼容性，不是新板制品。只移除局部库副本lwIP描述文件BOM，未改安装。SDT使用实际BSP查询键/全局计时器和共享GIC，64位超时，历史xparameters.h不导入新应用。

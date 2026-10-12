@@ -39,6 +39,8 @@ bash tools/run_sim.sh stage1_production
 
 正式LC50长测：`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full`；Windows2026.1的可复现XSim入口见运行手册。LC6短测不能替代LC50。起点参赛脚本附件重复告警已收敛为唯一源引用，过程见[整理记录](docs/reference/workspace-cleanup-2026-10-10.md)；旧失败日志保留。
 
+**工具链分工（2026-10-12 明确）：开发全部在 WSL 用 Vivado/Vitis 2022.2（RTL/BD/约束/综合/实现/时序/bit/XSA/BSP/ELF/FSBL/BOOT）；Windows 里的 2026.1 只负责烧录/下载/调试，烧的是 22 产出的制品。** 见 [07 §3a](docs/07-board-build-and-acceptance.md)。
+
 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
 整机构建使用`VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2 bash tools/run_vivado_build.sh ...`。BKB220资料门禁通过后，独立P4/P16目录生成同XSA完整硬软包，经g3_artifacts.py和run_g3.sh --artifact-dir验收；22软件包补齐及最后26现代Python路线见[07](docs/07-board-build-and-acceptance.md)。

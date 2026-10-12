@@ -51,7 +51,7 @@
 | `g3_runs_to_jsonl.py` | run 目录收敛成结构化 JSONL |
 | `read_pipe_counters.tcl` | **不依赖串口**、用 XSDB 读固件内 poll 计数器；从本轮 ELF 的 `pipe_poll_steps` / `wm_poll_steps` / `pipe_state` 符号经 `arm-none-eabi-nm` 解析。`--addresses` 仅供显式排错，无旧地址兜底 |
 | `arm_baseline.py` | **同片 ARM 纯软件 Stage1 基线**：编译 `sw/bench_arm/`（主机参考 + A9 裸机 NEON 版），XSDB 复位 PS、`dow -data` 读段进 DDR、运行并读回，与主机参考逐条比对后才报耗时。**会复位整板**，跑前确认板上没有其他任务。2026-09-22 实测 12.10 ms/记录（单核），见 `docs/benchmarks/measured_arm_baseline.md` |
-| `bkb220_f3_bringup.sh` | **BKB220 F3 最小启动判据入口**（2026-10-12 新增）：真实 FT4232H/USB 前置检查 → 被动抓 `/dev/ttyUSB1/2/3` → `rst -system` + `source ps7_init.tcl` + `ps7_init`/`ps7_post_config` → 读回 DDR/UART/GEM/MIO/时钟寄存器 → 汇总哪个通道收到字节；PS7 初始化命令或寄存器读失败会失败退出；可选 `--ddr-window <基址>,<字节数>` 做指定窗口 walking-1 与固定 pattern 写读比对。**只走 WSL：`usbipd` 直通 + Linux 2022.2 hw_server，禁止 Windows hw_server（已知蓝屏路径，见 `docs/07` §3a）**。边界：`ps7_post_config` 退出 0 不等于 DDR PASS；指定窗口回环不等于全容量/温压验证；串口没字节不等于该通道不是 PS UART；JTAG 启动通过不证明 QSPI/SD 冷启动通过 |
+| `bkb220_f3_bringup.sh` | **BKB220 F3 最小启动判据入口**（2026-10-12 新增）：真实 FT4232H/USB 前置检查 → 被动抓 `/dev/ttyUSB1/2/3` → `rst -system` + `source ps7_init.tcl` + `ps7_init`/`ps7_post_config` → 读回 DDR/UART/GEM/MIO/时钟寄存器 → 汇总哪个通道收到字节；PS7 初始化命令或寄存器读失败会失败退出；可选 `--ddr-window <基址>,<字节数>` 做指定窗口 walking-1 与固定 pattern 写读比对。**触板路径见 `docs/07` §3a 的工具链分工：开发在 WSL 2022.2；Windows 2026.1 只负责烧录。** 本脚本按 **WSL 路径**实现（`usbipd` 直通 + Linux 2022.2 hw_server），那是 F3 实际跑通的路径；若要归 Windows 烧录，则改用 COM10 + Windows XSDB。边界：`ps7_post_config` 退出 0 不等于 DDR PASS；指定窗口回环不等于全容量/温压验证；串口没字节不等于该通道不是 PS UART；JTAG 启动通过不证明 QSPI/SD 冷启动通过 |
 
 ## 数据集与鲁棒性
 

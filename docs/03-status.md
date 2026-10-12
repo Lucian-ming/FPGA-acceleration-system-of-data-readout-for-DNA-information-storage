@@ -19,23 +19,43 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 
 **仍缺**：厂商 board_files/PS7 preset、原厂例程、DDR 板级延迟与 DQS-to-CLK、工业级精确料号，以及**板卡实物与该版原理图修订是否一致（未核对）**。~~PCB 原理图~~、~~PS UART 的 MIO~~、~~ENET0 的 PHY/MDIO/RGMII/复位~~ 均已由原理图关闭；PS_CLK 已由寄存器证据 + 原理图双重确定。
 
-## 1b. 触板通道：只能走 WSL，禁止 Windows hw_server（2026-10-12 新增）
+## 1b. 工具链分工与触板通道（2026-10-12 重写）
 
-2026-10-12 用户做连接测试时 **Windows 主机蓝屏两次**（BugCheck `0x139 KERNEL_SECURITY_CHECK_FAILURE`，参数1=`0xA`；两份转储当前进程均为 `hw_server.exe`，调用栈均为 `ftdibus+0xf4d4`）。用户当日已修复并建立安全通道：
+**用户 2026-10-12 明确的分工：开发全部在 WSL 用 2022.2；Windows 里的 2026.1 只负责烧录。**
 
-- 统一 7 个 FTDI 子设备驱动到 `2.12.36.20`；安装 usbipd-win 5.3.0。
-- **把新板 USB 桥（序列号 15051，busid 4-2）直通 WSL**，Windows 不再持有该设备。
-- 在 WSL 起 **Vivado 2022.2 的 `hw_server`**（`-sTCP:127.0.0.1:3132`），用 WSL `xsdb` 连接。
+| 用途 | 工具链 | 位置 |
+|---|---|---|
+| **RTL / BD / 约束 / 综合 / 实现 / 时序 / bit / XSA** | **Vivado 2022.2** | WSL `/tools/Xilinx/Vivado/2022.2` |
+| **PS 软件（BSP / 应用 ELF / FSBL / BOOT / readback）** | **Vitis + XSCT 2022.2** | WSL `/tools/Xilinx/Vitis/2022.2`（ARM GCC 11.2） |
+| **烧录 / 下载 / 调试** | **Vivado / Vitis 2026.1** | Windows `D:/xilinx/2026.1`（XSDB / hw_server / Hardware Manager） |
+| F9：26 完整开发链的独立复核 | Vivado / Vitis 2026.1 | 同上，22 主线稳定后才做 |
 
-**操作规则（硬性）**：
+- **22 主线是唯一发布线**：F0～F8 的构建、软件包与判据都来自 WSL 2022.2；Windows 26 不产出新板验收制品，只烧录 22 产出的 bit / ps7_init / ELF。
+- **软件版本按各自安装树实际提供的选**：WSL Vitis 2022.2 只有 `lwip211_*`（仓库 `sw/scripts/create_vitis.tcl` 本就按 `lwip213→lwip211→lwip210` 回落）；`lwip220` 是 **2026.1** 才有的（见 [工具核查](benchmarks/bkb220-toolchain-audit.md) 的 BOM 绕行记录）。跨版本不要求 lwIP 主版本相同。
+- **2026.1 的已知坑**：`xsct.bat` 实测 disabled 且可能 **exit 0**，软件必须走现代 Python 入口（`create_vitis_modern.py`/`run_vitis_modern.ps1`）；**launcher 退出 0 不能单独作为成功判据**。
 
-1. **禁止启动 Windows 原生 hw_server**（`D:\xilinx\2026.1\Vivado\bin\unwrapped\win64.o\hw_server.exe`）——已知崩溃路径，用户已暂停。
-2. 因此原计划「Windows 2026.1 负责下载/调试」在 FTDI 问题被证明根治前**不可用**；下载/调试同样走 WSL 2022.2。F9 的 26 复核需重新评估入口。
-3. **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` + `attach`，确认设备号变化）才能再取到 `arm_dap`；仅重启 hw_server 不够，会只看到 `xc7z020` 而误判「PS 不在链上」。
-4. **供电（2026-10-12 用户明确）**：**用 USB 供电即可**，不必接手册 p.15 的 10 号 5V-DC。此前诊断提出的"USB 供电不足"假设据此不再作为待办项。
-5. **Windows 26 编程入口恢复（2026-10-12 用户明确）**：**Windows 已可用 Vivado 26 进行烧录**，故上面第 1 条的暂停可解除，Windows 2026.1 重新作为下载/调试入口。**但这不等于两次 BugCheck `0x139` 的根因已被查明或根治**——历史证据原样保留；恢复直连后要记录实际观察时长与是否复现，不能凭"用户说可用"就写成"已根治"。
+**串口与 JTAG 的通道映射（2026-10-12 实测 + 原理图双重确认）**
 
-证据（仓库外，保留）：`D:\Agent\outputs\reboot-diagnosis-20261012\`、`D:\Agent\outputs\ftdi-repair-20261012\`、`D:\Agent\outputs\bkb220-connectivity-20261012\`。仓库内 JTAG 只读证据在 `logs/jtag/20261012T*-bkb220-wsl-jtag/`（`logs/` 已被 .gitignore 覆盖，未入库）。
+| FT4232H 通道 | 功能 | 序列号 | Windows | WSL |
+|---|---|---|---|---|
+| A | JTAG | 15051A | （XSDB 直接用） | `/dev/ttyUSB0` |
+| B | 未使用/备用 | 15051B | COM9 | `/dev/ttyUSB1` |
+| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **`/dev/ttyUSB2`** |
+| D | PL UART | 15051D | COM11 | `/dev/ttyUSB3` |
+
+> 按序列号认通道比按 COM 号稳（重枚举后 COM 号可能变）。**不要用蓝牙 COM3/COM4 兜底。**
+
+**触板操作要点**
+
+1. **两种可用路径**：Windows 26（烧录，指定路径）与 WSL 22（`usbipd` 直通 + Linux hw_server，**F3 就是这么做通的，已验证**）。设备同一时刻只能归一边：归 Windows 就用 `COMx` + Windows XSDB；归 WSL 就用 `/dev/ttyUSBn` + Linux hw_server。
+2. **切换归属后必须真正重新枚举 USB**（`usbipd attach/detach`，确认设备号变化）；只重启 hw_server 会只看到 `xc7z020` 而看不到 `arm_dap`，容易误判「PS 不在链上」。
+3. **断电后 FT4232H 回落到 Windows**，usbipd 直通断开，且会在 3132 端口留下一个**已无设备的旧 hw_server**——恢复时要先按端口找 PID 杀掉它再起新的。
+4. **任何 MDIO / PHY 观测必须排在 `ps7_init` 之后**（MDIO 要 MIO52/53 被 mux 才通；断电后 MIO 未配置，直接读会全回 0）。
+5. **`BMSR` bit2 是 latching-low**，判断链路当前状态至少读两次。
+
+**风险留存（不是已解决）**：2026-10-12 连接测试期间 Windows 主机**蓝屏两次**（BugCheck `0x139`/参数1=`0xA`，两份转储当前进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。用户随后统一了 FTDI 驱动到 `2.12.36.20`、并确认 **USB 供电即可**（不必接手册 p.15 的 10 号 5V-DC）。**根因并未被独立查明或根治**；历史证据原样保留。若 Windows 烧录时重现同类异常，**回退到已验证的 WSL 22 路径**，并保留现场。
+
+证据（仓库外，保留）：`D:\Agent\outputs\reboot-diagnosis-20261012\`、`ftdi-repair-20261012\`、`bkb220-connectivity-20261012\`。仓库内 JTAG 只读证据在 `logs/jtag/`（`logs/` 已被 .gitignore 覆盖，未入库）。
 
 ## 1. 当前目标与完成边界
 
@@ -75,11 +95,11 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 2026-10-11资料更新：用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)已随仓库收录；原件与副本SHA-256一致，来源、校验命令见[资料索引](board/bkb220/README.md)。main和board-migrate先阅读并校验仓库内手册，使用手册页码注明规格来源，不再把产品手册列为缺项或依赖微信目录。
 
-~~2026-10-10/11设备核查快照没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4~~（2026-10-12 作废：已实测到 FT4232HL JTAG 与 COM9/10/11，见 §1a）。**仍然**待确认的是：厂商对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号（顶标/温度等级/PCB 修订），以及 PS UART 的 MIO、ENET0 的 PHY/MDIO/RGMII/复位、DDR 板级延迟与 DQS-to-CLK。`hw/boards/bkb220.tcl` 的 `ready=0` 不变，手册收录与器件枚举都不代表新板配置或真板验收通过。
+~~2026-10-10/11设备核查快照没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4~~（2026-10-12 作废：已实测到 FT4232HL JTAG 与 COM9/10/11，见 §1a）。**仍然**待确认的是：厂商对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号（顶标/温度等级/PCB 修订），以及 ~~PS UART 的 MIO~~、~~ENET0 的 PHY/MDIO/RGMII/复位~~（均已由原理图 §10 关闭）、DDR 板级延迟与 DQS-to-CLK。~~`hw/boards/bkb220.tcl` 的 `ready=0` 不变~~（2026-10-12 已按用户授权置 1 并实板验证，见 §1c）。
 
 按05的F2～F9继续：可靠配置→最小UART/DDR/GEM/CAPS→新板P4基线→P16完整route和同XSA软件包→全量/连续/恢复→同板性能及相关泛化/长稳→最后独立复核→独立交付。功耗需仪器；SE250另profile；D0不默认分发。没有新板实测就不能宣布迁移完成。
 
-~~最后Windows2026.1完整开发可靠性比较~~：因 §1b 的 Windows hw_server 崩溃路径被暂停，F9 的「Windows2026.1 负责下载/调试」与 26 复核入口须重新评估；在 FTDI 问题被证明根治前，下载/调试走 WSL 2022.2。
+**工具链分工不变**：开发与构建全部在 WSL 2022.2，**Windows 2026.1 只负责烧录**；F9 用 26 做完整开发链的独立复核（22 主线稳定后）。见 §1b。
 
 ### 2026-10-12 接管进度（F0 完成 / F2 进行中）
 
@@ -91,7 +111,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
 | **F4/F5 构建与整机时序** | **通过**：P4(4/0) 与 P16(16/1) 均在 `xc7z020clg400-2` 完成完整 route + bitstream + XSA，**WNS +0.680/+0.617、WHS +0.036/+0.017、失败端点 0、DRC 0 errors、`clk_fpga_0`=100.000MHz**。P16 资源 33,987 LUT(63.89%)，与先验 33.9k/64% 吻合。详见 [benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md) |
 | F4 软件包 + F6～F8 | 未开始：同 XSA 软件包（BSP/ELF/FSBL/BOOT/manifest）未生成；板端下载/G3/性能/长稳未测；`REQP-1839/1840` 异步复位 BRAM 警告待 RTL 复核 |
-| F9 | 入口因 §1b 需重评 |
+| F9 | 未开始：22 主线稳定后，用 Windows 2026.1 独立重建 P4/P16 硬软包并复核（分工见 §1b） |
 
 ## 1c. 2026-10-12 F3 实板结果摘要
 

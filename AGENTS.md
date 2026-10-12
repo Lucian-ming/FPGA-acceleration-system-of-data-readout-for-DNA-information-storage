@@ -102,6 +102,18 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 - `view.md` 与 `.agent_view/` 是本机实时看板，已在 `.gitignore` 中忽略，**不进 Git**。
   它不替代交接文档：结论、判据和证据仍然要写进 `docs/` 下对应文档并提交。
 
+## 工具链分工（用户 2026-10-12 明确，硬性）
+
+- **开发全部在 WSL，用 Vivado / Vitis 2022.2**：RTL、BD、约束、综合、实现、时序、bit、XSA、BSP、应用 ELF、FSBL、BOOT、readback、manifest。
+  路径 `/tools/Xilinx/Vivado/2022.2`、`/tools/Xilinx/Vitis/2022.2`（ARM GCC 11.2）。
+- **Windows 里的 2026.1 只负责烧录/下载/调试**：`D:/xilinx/2026.1` 的 XSDB / hw_server / Hardware Manager，
+  烧的是 **22 产出的** bit、同 XSA 的 `ps7_init` 与 ELF。**26 不产出新板验收制品。**
+- **22 主线是唯一发布线。** 26 的完整开发链只在 F9（22 主线稳定后）做独立复核，通过与否都不改写已发布的 22 制品。
+- 软件版本**按各安装树实际提供的选**：WSL Vitis 2022.2 只有 `lwip211_*`（`sw/scripts/create_vitis.tcl` 本就按 `lwip213→lwip211→lwip210` 回落）；
+  `lwip220` 是 2026.1 才有的。缺指定版本时**如实报告并按实际可用版本构建 + 标注差异**，不静默替换、也不因版本号不同判整包失败。
+- **2026.1 的 `xsct.bat` 实测 disabled 且可能 exit 0**，软件必须走现代 Python 入口；**launcher 退出 0 不能单独作为成功判据**。
+- 触板通道与串口映射、以及一次蓝屏风险的留存说明，见 `docs/07` §3a。
+
 ## 子 Agent 的承载通道与模型（2026-10-10 新增，2026-10-11 实测更新）
 
 **主对话与子 agent 用两套模型，由用户指定，不得自行更换。**

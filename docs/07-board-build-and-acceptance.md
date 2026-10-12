@@ -43,22 +43,42 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 
 本机lwIP BOM兼容副本由prepare_vitis_compat_repo.py创建并验证414文件manifest；只移除描述文件BOM，不改安装或原厂库实现。构建同时要求成功哨兵、build状态0、实际非空产物、Bootgen readback和六SHA；不能仅依赖launcher exit0。完整命令及A14边界见[工具核查](benchmarks/bkb220-toolchain-audit.md)。
 
-## 3a. 触板通道：只走 WSL，禁止 Windows hw_server（2026-10-12 新增）
+## 3a. 工具链分工与触板通道（2026-10-12 重写）
 
-2026-10-12 连接测试期间 **Windows 主机两次蓝屏**（BugCheck `0x139`，参数1=`0xA`；两份转储当前进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。用户当日已建立安全通道，本文件据此规定触板方式：
+**用户 2026-10-12 明确：开发全部在 WSL 用 2022.2；Windows 里的 2026.1 只负责烧录。**
 
-| 项 | 规定 |
-|---|---|
-| 设备归属 | 用 `usbipd attach --wsl --busid 4-2` 把新板 FT4232H（序列号 15051）**直通 WSL**；Windows 不再持有该设备 |
-| 硬件服务 | 跑 WSL 的 `/tools/Xilinx/Vivado/2022.2/bin/hw_server -sTCP:127.0.0.1:3132` |
-| 连接入口 | WSL `/tools/Xilinx/Vitis/2022.2/bin/xsdb` 连 `TCP:127.0.0.1:3132` |
-| **禁止** | 启动 Windows 原生 `hw_server.exe`（`D:\xilinx\2026.1\...`）——已知崩溃路径，用户已暂停 |
-| 重挂规则 | **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化）才能再取到 `arm_dap`；只重启 hw_server 会只看到 `xc7z020`，容易误判「PS 不在链上」 |
-| 供电 | **用户 2026-10-12 明确：USB 供电即可**，不必接手册 p.15 的 10 号 5V-DC。此前"USB 供电不足"假设不再作为待办 |
-| Windows 26 编程 | **用户 2026-10-12 明确：Windows 已可用 Vivado 26 烧录**，故上表「禁止 Windows hw_server」可解除。**但两次 BugCheck `0x139` 的根因并未因此被查明或根治**，历史证据保持不变；恢复直连后须记录实际观察时长与是否复现 |
-| 厂商 board file | 2026-10-12 在 `D:\xilinx\2026.1`、`D:\Xilinx\2026.1`、`C:\Xilinx`、`E:\` 递归搜 `*b220*/*B220*/*bkb*/*BKB*`：**只命中 Xilinx 自带内容（Model_Composer 的 libkbd*.a 等），无 BKB220 板卡文件**；2026.1 的 `Vivado\data\xhub\boards\XilinxBoardStore` 仅有 Xilinx 官方板。**厂商 board_files/PS7 preset 仍缺**；但**厂商原理图已由用户于 2026-10-12 提供并入库**（[BK_B220_SchDoc.pdf](board/bkb220/BK_B220_SchDoc.pdf)，逐条核对见[来源表 §10](board/bkb220/migration-source-table.md)） |
+| 用途 | 工具链 | 位置 |
+|---|---|---|
+| RTL / BD / 约束 / 综合 / 实现 / 时序 / bit / XSA | **Vivado 2022.2** | WSL `/tools/Xilinx/Vivado/2022.2` |
+| PS 软件（BSP / 应用 ELF / FSBL / BOOT / readback） | **Vitis + XSCT 2022.2** | WSL `/tools/Xilinx/Vitis/2022.2`（ARM GCC 11.2） |
+| **烧录 / 下载 / 调试** | **Vivado / Vitis 2026.1** | Windows `D:/xilinx/2026.1` |
+| F9：26 完整开发链独立复核 | Vivado / Vitis 2026.1 | 同上，22 主线稳定后 |
 
-由此，本文件 §3 第 2 阶段「Windows 2026.1 负责下载/调试」以及 F9 的 Windows 26 复核入口**在 FTDI 问题被证明根治前不可用**；下载/调试改走 WSL 2022.2。这不是把 26 结论改成通过，而是如实记录入口被阻塞。恢复 Windows 直连需先有「驱动/服务版本对照 + 供电条件明确 + 单次受控验证」的证据。
+**22 主线是唯一发布线**：F0～F8 的构建、软件包与判据都来自 WSL 2022.2；Windows 26 **不产出**新板验收制品，只烧录 22 产出的 bit / ps7_init / ELF。2026.1 的 `xsct.bat` 实测 disabled 且可能 **exit 0**，软件必须走现代 Python 入口，且 **launcher 退出 0 不能单独作为成功判据**。
+
+**lwIP 版本按各自安装树实际提供的选**（2026-10-12 更正）：WSL Vitis 2022.2 只有 `lwip211_v1_5/1_6/1_7/1_8`，仓库 `sw/scripts/create_vitis.tcl` 本就按 `lwip213 → lwip211 → lwip210` 回落，**以它的选择为准**（旧板已验证的 BSP 用的正是 `lwip211_v1_8`）；`lwip220` 是 **2026.1** 才有的。跨版本不要求 lwIP 主版本相同。通用规则：BSP 选择必须来自实际安装树；缺指定版本时**如实报告并按实际可用版本构建 + 标注差异**，不静默替换、也不因版本号不同判整包失败。
+
+**通道映射（2026-10-12 实测 + 原理图双重确认）**
+
+| FT4232H 通道 | 功能 | 序列号 | Windows | WSL |
+|---|---|---|---|---|
+| A | JTAG | 15051A | XSDB 直接使用 | `/dev/ttyUSB0` |
+| B | 未使用/备用 | 15051B | COM9 | `/dev/ttyUSB1` |
+| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **`/dev/ttyUSB2`** |
+| D | PL UART | 15051D | COM11 | `/dev/ttyUSB3` |
+
+> 按序列号认通道比按 COM 号稳（重枚举后 COM 号可能变）。**不用蓝牙 COM3/COM4 兜底。**
+
+**触板操作要点**
+
+1. Windows 26（烧录，指定路径）与 WSL 22（`usbipd` 直通 + Linux hw_server，**F3 已验证**）两条路径都可用，但设备同一时刻只归一边。
+2. 切换归属后**必须真正重新枚举 USB**（确认设备号变化）；只重启 hw_server 会只看到 `xc7z020`、看不到 `arm_dap`。
+3. 断电后 FT4232H 回落 Windows、usbipd 断开，并在 3132 留下**已无设备的旧 hw_server**，恢复时先杀它再起新的。
+4. **MDIO / PHY 观测必须排在 `ps7_init` 之后**；`BMSR` bit2 是 latching-low，链路状态至少读两次。
+
+**风险留存（不是已解决）**：2026-10-12 连接测试期间 Windows 主机**蓝屏两次**（BugCheck `0x139`/参数1=`0xA`，进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。用户已统一 FTDI 驱动到 `2.12.36.20` 并确认 **USB 供电即可**。**根因未被独立查明或根治**；若 Windows 烧录重现同类异常，**回退到已验证的 WSL 22 路径**并保留现场。
+
+**厂商资料**：2026-10-12 递归搜 `*b220*/*bkb*` 无任何 BKB220 板卡文件，2026.1 的 `XilinxBoardStore` 只有 Xilinx 官方板，**厂商 board_files/PS7 preset 仍缺**；但**厂商原理图已入库**（[BK_B220_SchDoc.pdf](board/bkb220/BK_B220_SchDoc.pdf)，核对见[来源表 §10](board/bkb220/migration-source-table.md)）。
 
 ## 4. 本轮已验证准备成果
 
