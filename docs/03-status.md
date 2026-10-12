@@ -138,6 +138,32 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 **断电后从这里继续**（**权威顺序见 [05 §7 按比赛评分表重排的后续计划](05-implementation-plan.md)**，那里把评分权重、合规缺口和单列项都编进去了）：
 
+### 1e. 2026-10-12 深夜补记：板子已断电，收尾后的准确断点
+
+**板子状态：已断电（用户 23:30 市电切断，板子靠该 USB 供电，FT4232H 已从系统消失）。**
+清查方式（**别被幽灵条目骗**）：`Get-PnpDevice -PresentOnly` 匹配 `VID_0403` 应为空、`usbipd list` 的 **Connected 段**无 `0403:6011`。那些 `Status: Unknown` 的 `FTDIBUS\VID_0403+PID_6011+15051B/C/D` 是**记忆条目**，不是在线设备。
+**明天开工第一步：重新接上板子 USB，按 [07 §3a](07-board-build-and-acceptance.md) 确认通道**（`usbipd` 归属 → `hw_server` → **COM10** / `ttyUSB2`）。
+
+**今晚新增（全部已提交推送，`main...origin/main` = 0/0，工作树干净）**：
+
+| 项 | 结果 |
+|---|---|
+| **C2 泛化首测（重要）** | 用户外部数据包 **8 套全跑，8/8 成功** —— 4 张 SIPI 图 ×（干净 / 加 1% 替换噪声），**板端回传经 LDPC 重建的图片 SHA 全部与 manifest 的 payload SHA 逐字符相同**；**无需重建比特流**（水印随任务上传）。见[来源表 §16](board/bkb220/migration-source-table.md) |
+| 大模型协作出赛材料 | `docs/submission/ai-collaboration/`（含 `self-correction.md` 四条纠错轨迹） |
+| 技能包 | `docs/submission/skill/` 8 个包审阅补齐 + `AUDIT.md`；**修了一个真缺陷**：`ooc_probe.tcl` 原来 WNS 为负也 `exit 0`，现在会红 |
+| 阶段总结 | `docs/reference/phase-summary-2026-10-12.md`（**非最终报告**） |
+| 计划重排 | [05 §7](05-implementation-plan.md)：按比赛评分表重排 + 单列项编入 |
+| 纪律补强 | `AGENTS.md` 新增：**子 agent 在沙箱内不要跑 `verify_repo_binding.sh`**（今晚因漏写这条白跑四个子任务） |
+
+**明天待办（按优先级）**：
+
+1. **接回板子** → 补跑 C2 的 `--skip-dump` 那轮（首轮 8/8 已有效，这轮只为拿无歧义 PASS 留证；脚本在 `logs/g3/c2-sweep/rerun_skipdump.sh`）。
+2. **C2 收尾**：`score_min=67` 下逐套复测（数据包自报软件侧 67 只 4/8，**板端未测**）；**为每个载荷生成四级黄金向量**（`tests/golden` 现在只有 R0.83 一套，导致四级取证对新载荷误报 FAIL）。
+3. **C1 六档矩阵**：同板 P4/P16 各 ≥3 次（性能与资源 20 分的正式证据）。
+4. **P2 合规缺口**：**仓库根无 `LICENSE`**（比赛要求开源 MIT/Apache）；Vivado 版本说明（主线 2022.2 vs 硬要求 2026.1/2025.2）；`README.md`/`AUDIT.md` 大写命名与"纯英文小写"的冲突待用户定。
+5. **B2 剩余**：P16 的配置守卫 / 断连畸变 / 中途断网三个探针（**中途断网那个用 `sudo iptables`，只在 `finally` 清理**）。
+6. 之后按 [05 §7](05-implementation-plan.md) 的 P3～P7：全面优化 → 冻结 → 报告 → 26 → 交付与海报。
+
 1. **B2 剩余**：P16 的三个故障探针（配置守卫 / 断连畸变恢复 / 中途断网）。**中途断网探针会用 `sudo iptables`，注意它只在 `finally` 里清理规则** —— 若再次临近断电，先别跑它。
 2. **C1 性能矩阵**：同板 P4/P16 六档（128/512/2048/8192/32768/full）各 ≥3 次，出中位数/离散/斜率/截距；矩阵**不自动烧录**，先确认板上加载的是哪个包。
 3. **C2 泛化**：≥5 独立 payload + sub/ins/del × 覆盖度 × 阈值 × ≥3 种子（FAR 真值只能来自合成 header）。
