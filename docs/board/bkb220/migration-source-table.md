@@ -568,3 +568,42 @@ G3 把"串口实录"判成 FAIL，理由是采集器报"没有可确认的输出
 3. **RTL8211E 特有的初始化**：若 1/2 都无效，再考虑在 `sw/app` 或 BSP 层加 Realtek 专页配置。
 
 **边界**：本轮**没有**改动 `sw/app` 或 BSP 源码；以上是定位与候选方向，不是已完成的修复。
+
+## 12. F4 板测失败的真根因：profile 从未包含 ENET0 的 MIO 配置（2026-10-12 结案）
+
+§11 把失败定位到 `get_Realtek_phy_speed()` 自协商超时，**方向对但根因不对**。真根因是**配置缺失**，而且**是我这边的**：
+
+### 12.1 证据链
+
+| # | 观测 | 结论 |
+|---|---|---|
+| 1 | 带时间戳启动：`Waiting for PHY to complete autonegotiation.` → **28.55 秒后**才 `Auto negotiation error` | 驱动**真的睡满 30 次**，`sleep(1)` 正常（BSP 的 `COUNTS_PER_SECOND=333333343`，实测全局定时器 ~333 MHz，对得上）。**"sleep 坏了"的假设被推翻** |
+| 2 | 用 JTAG **原样重放**驱动的寄存器序列（写 ANAR/GBCR/BMCR → 写 BMCR 软复位 0x8000 → 等 bit5） | 复位位 1 次轮询自清，ANAR/GBCR **没被擦掉**，**BMSR bit5 在 t=3s 置位**。**寄存器序列本身没问题，软复位也不是元凶** |
+| 3 | 应用跑完后读驱动决策变量（ELF 符号表地址）：`phyaddrforemac = 0`、**`phymapemac0[]` 全 0** | **`detect_phy()` 一个 PHY 都没扫到** → 走 `phy_setup_emacps(..., 0)` 兜底 → 后面的自协商与链路轮询全在错的 PHY 地址上 |
+| 4 | 读 GEM 留下的 MIO：**`MIO_PIN_52 = 0x1201`、`MIO_PIN_53 = 0x1201`** | 正确值是 **`0x1280`**（L3_SEL=4 = GEM MDIO）。**MDIO 引脚根本没 mux 出来**，所以驱动在 MDIO 线上什么都读不到 |
+| 5 | 对比两份 `ps7_init`：**P4 包的 MIO16-27 / MIO52-53 写入 = 0 行**；v1 探针的 = 各 6 行（`0x1280`） | **P4 整机的 PS7 完全没配 ENET0 的 MIO** |
+| 6 | `git log`：`hw/boards/bkb220.tcl` 里 `PCW_ENET0` **历次提交都只有 1 行**（只有 `ENET0_PERIPHERAL_ENABLE`） | **那 4 行 `ENET0_ENET0_IO`/`GRP_MDIO_ENABLE`/`GRP_MDIO_IO`/`PERIPHERAL_FREQMHZ` 从来没进过 profile**，只活在 board-migrate 的一次性探针变体里 |
+
+### 12.2 因果链
+
+`hw/boards/bkb220.tcl` 缺 4 行 ENET0 属性 → `bd.tcl` 把它们整体 `set_property` 给 PS7 时**没有这些配置** → P4 XSA 的 `ps7_init.tcl` **不写 MIO16-27/MIO52-53** → 板上 MDIO 引脚未 mux → 驱动的 `detect_phy` 扫不到 PHY → 自协商必然超时 → `phy_setup_emacps` 失败 → GEM 从未启用 → 应用起得来但网络不通 → **G3 CAPS FAIL**。
+
+### 12.3 必须更正 §9.6 的说法
+
+§9.6 写「ENET0 从候选升级为已实测」——**这个说法要限定**：那些 MDIO/PHY 读数是在 **v1 探针的 `ps7_init`**（含 ENET0 配置）下得到的，**而真正构建进 P4 的 profile 里压根没有这些配置**。所以它证明的是"**这组属性在这块板子上可用**"，**没有**证明"**构建出来的东西带着这组属性**"——这正是一个我会犯的经典错误：拿探针/仿真的结论去替代制品的结论。
+
+（同类教训 09 台账里已经写过一条：**仿真喂黄金数据不等于真实接口正确**。这次是**探针配置对不等于制品配置对**。）
+
+### 12.4 已做的修复与仍待做的
+
+- **已修**：`hw/boards/bkb220.tcl` 补回那 4 行（写法取自 v1 探针 `property-results.tsv` 里 `ACCEPTED_EXACT` 的原文），profile 现 35 对属性、无重复。ENET0 由 `PCW_ENET0_PERIPHERAL_ENABLE` 单行变为完整的 RGMII MIO16-27 + MDIO MIO52-53 + 1000 Mbps。
+- **仍待做**：**重建 P4 的 XSA 与同源软件包**（PS7 配置变了 → `ps7_init` 与 XSA 都要重出；PL 网表本身没变，但要走一遍正规流程），然后重跑 F4 G3。
+- **判据**：新包 `ps7_init.tcl` 里必须出现 `0xF80007D0/0xF80007D4 = 0x1280`；板端 uart.log 必须出现 `autonegotiation complete`（且**不应**再出现 `Auto negotiation error`）。
+
+### 12.5 本轮我在 PHY 这条线上犯的三个错（都记下来）
+
+1. MDIO 读错完成标志（应读 `NETWORK_STATUS[2]`）+ 漏写 `MDEN`（`NETWORK_CONTROL` bit4）→ 误判「ENET0 未通过」，差点写成"需要原理图"。
+2. 给 board-migrate 的阶段卡里写死了 Vitis 2022.2 并不存在的 `lwip220` → 造成一次假阻塞。
+3. **本次**：把探针配置下的实测结论当成制品已验证，而 profile 里根本没有那几行配置 —— 直接导致 P4 建出来后以太网必然不通。
+
+三次都是"结论比证据跑得快"。共同解药是同一件事：**先量、再下结论；并且要量「真正被构建/被烧录的那一份」，不是旁边那份更好看的。**
