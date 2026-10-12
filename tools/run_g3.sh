@@ -18,7 +18,7 @@
 #
 # 制品选择与证据边界
 # ------------------
-# 默认兼容旧 hw/build/export；新板必须 --artifact-dir 指定完整新包和manifest。
+# 默认兼容旧 hw/build/export；xc7z020 或 --strict-artifacts 验收必须显式指定完整包。
 # bit/XSA/ELF/FSBL/BOOT/manifest/source_manifest 均校验SHA，且核对XSA实际part、
 # 内置bit和HWH生产参数。ps7_init只从选中XSA提取，禁止新bit+旧PS7混搭。
 # 校验只证明包内一致；源码到制品的因果关系仍须审查源manifest和构建日志。
@@ -28,7 +28,7 @@
 #   tools/run_g3.sh                                   # 复现 G3 闭环那组参数（2048 条源读段）
 #   tools/run_g3.sh --limit 4096                      # 分档测量：源读段数翻倍
 #   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
-#   tools/run_g3.sh --artifact-dir <export> --xsdb D:/xilinx/2026.1/Vitis/bin/xsdb.bat --device xc7z020 --uart-port COMx
+#   tools/run_g3.sh --artifact-dir <export> --xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132 --device xc7z020 --uart-port /dev/ttyUSB2 --win-root /tmp/bkb220-g3
 #   tools/run_g3.sh --win-root D:/dna_board_smoke
 #   tools/run_g3.sh --bit <path>                      # 仅兼容指定所选包内同一bit，禁止独立覆盖
 #   tools/run_g3.sh --elf <path>                      # 仅允许选中包内同一ELF；独立实验也要完整制品包
@@ -66,6 +66,8 @@ ELF_OVERRIDE=""
 BIT_OVERRIDE=""
 ARTIFACT_DIR="hw/build/export"
 ARTIFACT_EXPLICIT=0
+STRICT_ARTIFACTS=0
+ALLOW_UART_SKIP=0
 
 # ---------------------------------------------------------------------------
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/07-board-build-and-acceptance.md和docs/04-interfaces.md。
@@ -75,7 +77,9 @@ LIMIT=2048
 SCORE_MIN=67
 READ_BPS=150
 ORIENT="both"
-BOARD_IP="192.168.1.10"
+BOARD_IP="${G3_BOARD_IP:-192.168.1.10}"
+IP_EXPLICIT=0
+[[ -n "${G3_BOARD_IP:-}" ]] && IP_EXPLICIT=1
 BOARD_PORT=7
 RESULT_TIMEOUT=""            # 空 = 按条数自动估
 READY_DEADLINE=90            # 板端「应用层就绪」探针最多等多少秒（见第 5 步）
@@ -112,8 +116,11 @@ READS_FILE="data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM_FILE="data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 
 WIN_ROOT_VALUE="${G3_WIN_ROOT:-D:/dna_board_smoke}"
+WIN_ROOT_EXPLICIT=0
 XSDB_VALUE="${G3_XSDB:-D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat}"
+HW_SERVER_URL="${G3_HW_SERVER_URL:-}"
 JTAG_DEVICE="${G3_DEVICE:-}"
+XSDB_MODE="windows"
 
 # 使用同一转换函数，支持 Windows 盘符、反斜杠和 /mnt/<盘符>/，拒绝相对/UNC猜测。
 path_pair() {
@@ -137,9 +144,11 @@ usage() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --artifact-dir)     ARTIFACT_DIR="$2"; ARTIFACT_EXPLICIT=1; shift 2 ;;
+        --strict-artifacts) STRICT_ARTIFACTS=1; shift ;;
         --xsdb)             XSDB_VALUE="$2"; shift 2 ;;
+        --hw-server)        HW_SERVER_URL="$2"; shift 2 ;;
         --device)           JTAG_DEVICE="$2"; shift 2 ;;
-        --win-root)         WIN_ROOT_VALUE="$2"; shift 2 ;;
+        --win-root)         WIN_ROOT_VALUE="$2"; WIN_ROOT_EXPLICIT=1; shift 2 ;;
         --limit)            LIMIT="$2"; shift 2 ;;
         --full)             LIMIT=""; shift ;;          # 不传 --limit 给 first.py = 全量
         --score-min)        SCORE_MIN="$2"; shift 2 ;;
@@ -155,7 +164,7 @@ while [[ $# -gt 0 ]]; do
         --ready-deadline)   READY_DEADLINE="$2"; shift 2 ;;
         --runs)             RUNS="$2"; shift 2 ;;
         --tag)              TAG="$2"; shift 2 ;;
-        --ip)               BOARD_IP="$2"; shift 2 ;;
+        --ip)               BOARD_IP="$2"; IP_EXPLICIT=1; shift 2 ;;
         --port)             BOARD_PORT="$2"; shift 2 ;;
         --reads)            READS_FILE="$2"; shift 2 ;;
         --watermark)        WM_FILE="$2"; shift 2 ;;
@@ -166,6 +175,7 @@ while [[ $# -gt 0 ]]; do
         --bit)              BIT_OVERRIDE="$2"; shift 2 ;;
         --skip-dump)        DO_DUMP=0; shift ;;
         --no-uart)          DO_UART=0; shift ;;
+        --allow-uart-skip)  ALLOW_UART_SKIP=1; shift ;;
         --uart-port)        UART_PORT="$2"; shift 2 ;;
         -h|--help)          usage 0 ;;
         *) echo "未知参数：$1" >&2; usage 2 ;;
@@ -193,12 +203,40 @@ warn() { printf '\033[33m    %s\033[0m\n' "$*" >&2; }
 [[ "$RUNS" =~ ^[1-9][0-9]*$ ]] || die "--runs 必须为正整数"
 [[ "$TAG" =~ ^[A-Za-z0-9_.-]*$ ]] || die "--tag 只允许字母/数字/点/横线/下划线"
 [[ "$ORIENT" == "both" || "$ORIENT" == "fwd" || "$ORIENT" == "rev" ]] || die "未知 orient"
-PAIR="$(path_pair "$WIN_ROOT_VALUE")" || die "--win-root 路径转换失败"
-WIN_ROOT_WIN="$(printf '%s\n' "$PAIR" | head -1)"
-WIN_ROOT_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
-PAIR="$(path_pair "$XSDB_VALUE")" || die "--xsdb 路径转换失败"
-XSDB_BAT="$(printf '%s\n' "$PAIR" | head -1)"
-XSDB_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
+# xc7z020 是新板严格验收的明确标记；调用者也可在不传 --device 时显式收紧。
+[[ "${JTAG_DEVICE,,}" == "xc7z020" || "${JTAG_DEVICE,,}" == xc7z020* ]] && STRICT_ARTIFACTS=1
+if [[ "$XSDB_VALUE" == /* ]]; then
+    XSDB_MODE="wsl"
+    STRICT_ARTIFACTS=1
+    XSDB_UNIX="$XSDB_VALUE"
+    XSDB_BAT="(WSL 本机) $XSDB_VALUE"
+    [[ -x "$XSDB_UNIX" ]] || die "WSL XSDB 不存在或不可执行：$XSDB_UNIX"
+    [[ -n "$HW_SERVER_URL" ]] || die "WSL XSDB 必须显式传 --hw-server TCP:127.0.0.1:3132"
+    [[ "$HW_SERVER_URL" =~ ^TCP:[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || die "--hw-server 格式必须为 TCP:<主机>:<端口>"
+    (( WIN_ROOT_EXPLICIT )) || die "WSL XSDB 必须显式传 --win-root <WSL 绝对留证目录>"
+    [[ "$WIN_ROOT_VALUE" == /* ]] || die "WSL XSDB 的 --win-root 必须是 Linux 绝对路径"
+    WIN_ROOT_UNIX="$(realpath -m "$WIN_ROOT_VALUE")"
+    WIN_ROOT_WIN="$WIN_ROOT_UNIX"
+else
+    PAIR="$(path_pair "$WIN_ROOT_VALUE")" || die "--win-root 路径转换失败"
+    WIN_ROOT_WIN="$(printf '%s\n' "$PAIR" | head -1)"
+    WIN_ROOT_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
+    PAIR="$(path_pair "$XSDB_VALUE")" || die "--xsdb 路径转换失败"
+    XSDB_BAT="$(printf '%s\n' "$PAIR" | head -1)"
+    XSDB_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
+fi
+if (( STRICT_ARTIFACTS && ! ARTIFACT_EXPLICIT )); then
+    die "新板严格验收模式必须显式传 --artifact-dir；拒绝默认 hw/build/export legacy 回退"
+fi
+if (( STRICT_ARTIFACTS && ! IP_EXPLICIT )); then
+    die "新板严格验收模式必须显式传 --ip <实测板端IP>"
+fi
+if [[ -n "$HW_SERVER_URL" ]]; then
+    [[ "$HW_SERVER_URL" =~ ^TCP:[A-Za-z0-9.-]+:[0-9]{1,5}$ ]] || die "--hw-server 格式必须为 TCP:<主机>:<端口>"
+    CONNECT_CMD="connect -url {$HW_SERVER_URL}"
+else
+    CONNECT_CMD="connect"
+fi
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_NAME="$STAMP${TAG:+-$TAG}"
 RUN_DIR="$WIN_ROOT_UNIX/g3_runs/$RUN_NAME"
@@ -293,6 +331,7 @@ done
 info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次才比图片哈希）"
 info "判据哈希  : $EXPECT_SHA"
 info "留证目录  : $RUN_DIR"
+info "XSDB 模式 : $XSDB_MODE${HW_SERVER_URL:+，hw_server=$HW_SERVER_URL}"
 
 # ---------------------------------------------------------------------------
 # 0.5 弄脏强度：结构性校验，跑之前就挡住「不会失败的判据」
@@ -334,7 +373,7 @@ done
 
 # 计划模式也运行只读制品/工具门禁，避免批准后才发现 XSA/PS7 混搭。
 ARTIFACT_ARGS=(--artifact-dir "$ARTIFACT_DIR" --read-bps "$READ_BPS")
-(( ARTIFACT_EXPLICIT )) || ARTIFACT_ARGS+=(--allow-legacy)
+if (( ! ARTIFACT_EXPLICIT && ! STRICT_ARTIFACTS )); then ARTIFACT_ARGS+=(--allow-legacy); fi
 [[ -n "$JTAG_DEVICE" ]] && ARTIFACT_ARGS+=(--device "$JTAG_DEVICE")
 [[ -n "$BIT_OVERRIDE" ]] && ARTIFACT_ARGS+=(--bit "$BIT_OVERRIDE")
 [[ -n "$ELF_OVERRIDE" ]] && ARTIFACT_ARGS+=(--elf "$ELF_OVERRIDE")
@@ -343,14 +382,26 @@ JTAG_DEVICE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["device"]
 info "制品包     : $ARTIFACT_DIR，目标 $JTAG_DEVICE"
 info "制品证据   : $SELECTION"
 if (( DO_BOOT || DO_DUMP )); then
-    [[ -f "$XSDB_UNIX" ]] || die "找不到 XSDB：$XSDB_BAT（WSL: $XSDB_UNIX）；请 --xsdb 指定本机安装"
-    command -v powershell.exe >/dev/null || die "调不到powershell.exe，无法驱动Windows工具"
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        [[ -x "$XSDB_UNIX" ]] || die "找不到可执行 WSL XSDB：$XSDB_UNIX"
+    else
+        [[ -f "$XSDB_UNIX" ]] || die "找不到 XSDB：$XSDB_BAT（WSL: $XSDB_UNIX）；请 --xsdb 指定本机安装"
+        command -v powershell.exe >/dev/null || die "调不到powershell.exe，无法驱动Windows工具"
+    fi
 fi
-info "Windows留证根 : $WIN_ROOT_WIN（WSL: $WIN_ROOT_UNIX）"
+info "留证根       : $WIN_ROOT_WIN（本机路径: $WIN_ROOT_UNIX）"
 info "XSDB          : $XSDB_BAT"
 if (( PLAN_ONLY )); then
     info "--plan-only：只读制品/工具核验完成，不打开串口、不连接JTAG、不下发TCP、不创建run"
-    info "串口选择      : ${UART_PORT:-实际执行时只从唯一USB串口自动选择；多口必须显式 --uart-port}"
+    if [[ -n "$UART_PORT" ]]; then
+        info "串口选择      : $UART_PORT"
+    elif [[ "$XSDB_MODE" == "wsl" ]]; then
+        info "串口选择      : 运行时必须显式传 --uart-port。BKB220 2026-10-12 实测：PS UART=UART0/MIO14-15 → FT4232H 通道 C = /dev/ttyUSB2（见 docs/board/bkb220/migration-source-table.md §9）"
+    else
+        info "串口选择      : Windows 运行时按唯一 USB 串口选择；多口必须显式 --uart-port"
+    fi
+    info "串口裁决      : $([[ "$ALLOW_UART_SKIP" -eq 1 ]] && echo '排错放宽(--allow-uart-skip)' || echo '验收严格(必须打开且收到数据)')"
+    [[ "$XSDB_MODE" == "wsl" ]] && info "WSL hw_server : $HW_SERVER_URL"
     exit 0
 fi
 
@@ -366,7 +417,11 @@ for f in "$READS_FILE" "$WM_FILE" tools/ldpc_decode.py tools/board_stage_check.p
 done
 info "仓库内数据与脚本齐备"
 
-[[ -d "$WIN_ROOT_UNIX" ]] || die "看不到 $WIN_ROOT_UNIX（Windows 侧工作目录未挂载？）"
+if [[ "$XSDB_MODE" == "wsl" ]]; then
+    mkdir -p "$WIN_ROOT_UNIX" || die "不能创建 WSL 留证根目录：$WIN_ROOT_UNIX"
+else
+    [[ -d "$WIN_ROOT_UNIX" ]] || die "看不到 $WIN_ROOT_UNIX（Windows 侧工作目录未挂载？）"
+fi
 [[ ! -e "$RUN_DIR" ]] || die "本轮留证目录已存在，禁止覆盖：$RUN_DIR（换 --tag 或稍后重试）"
 mkdir -p "$RUN_DIR" || die "建不了留证目录 $RUN_DIR"
 python3 tools/board/g3_artifacts.py "${ARTIFACT_ARGS[@]}" --stage "$RUN_DIR" \
@@ -395,7 +450,8 @@ fi
 
 render() {
     [[ "$RUN_DIR_WIN" != *'&'* && "$RUN_DIR_WIN" != *'#'* && "$RUN_DIR_WIN" != *'{'* && "$RUN_DIR_WIN" != *'}'* ]] || die "留证路径含Tcl/sed保留字符"
-    sed -e "s#@@DEVICE@@#$JTAG_DEVICE#g" \
+    sed -e "s#@@CONNECT_CMD@@#$CONNECT_CMD#g" \
+        -e "s#@@DEVICE@@#$JTAG_DEVICE#g" \
         -e "s#@@BITFILE@@#$RUN_DIR_WIN/top_bd_wrapper.bit#g" \
         -e "s#@@ELFFILE@@#$RUN_DIR_WIN/dna_lwip_app.elf#g" \
         -e "s#@@PS7INIT@@#$RUN_DIR_WIN/ps7_init.tcl#g" \
@@ -422,6 +478,16 @@ info "boot.tcl / dump.tcl / uart_cap.ps1 已渲染到 run 目录（原样留证�
 UART_LOG="$RUN_DIR/uart.log"
 STOP_FILE="$RUN_DIR/uart.stop"
 UART_PID=""
+UART_CAPTURE_STARTED=0
+
+uart_unavailable() {
+    local detail="$1"
+    if (( ALLOW_UART_SKIP )); then
+        step_skip "串口实录" "$detail（--allow-uart-skip 排错放宽）"
+    else
+        step_bad "串口实录" "$detail；验收模式要求串口可打开且本轮收到输出"
+    fi
+}
 
 stop_uart() {
     [[ -n "$UART_PID" ]] || return 0
@@ -438,9 +504,38 @@ trap stop_uart EXIT INT TERM
 
 say "3/7 串口实录"
 if (( DO_UART )); then
-    # 只读枚举 USB/FTDI 串口。蓝牙COM和历史COM6均不作为兜底。
-    UART_DEVICES="$(powershell.exe -NoProfile -Command 'ConvertTo-Json -Compress -InputObject @(Get-PnpDevice -PresentOnly -Class Ports | Select-Object FriendlyName,InstanceId)' < /dev/null | tr -d '\r')" || die "枚举USB串口失败"
-    UART_PORT="$(python3 - "$UART_DEVICES" "$UART_PORT" <<'PY'
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        if [[ -z "$UART_PORT" || "$UART_PORT" != /dev/ttyUSB[0-9]* ]]; then
+            uart_unavailable "WSL 串口必须显式指定为 /dev/ttyUSBn；BKB220 实测 PS UART 在通道 C = /dev/ttyUSB2（2026-10-12，见来源表 §9）"
+            DO_UART=0
+        elif [[ ! -e "$UART_PORT" ]]; then
+            uart_unavailable "串口设备不存在：$UART_PORT"
+            DO_UART=0
+        else
+            python3 tools/board/g3_uart_cap.py --device "$UART_PORT" --log "$UART_LOG" \
+                --seconds "$UART_SECONDS" --stop-file "$STOP_FILE" \
+                > "$RUN_DIR/uart_cap.out" 2>&1 &
+            UART_PID=$!
+            sleep 1
+            if grep -q '^CAPTURING ' "$RUN_DIR/uart_cap.out" 2>/dev/null; then
+                UART_CAPTURE_STARTED=1
+                info "$UART_PORT@115200 抓取中，上限 ${UART_SECONDS}s（WSL 本地串口；收工时用 stop 文件收尾）"
+            else
+                uart_unavailable "WSL 串口采集未能启动，见 uart_cap.out"
+                sed -n '1,8p' "$RUN_DIR/uart_cap.out" 2>/dev/null | sed 's/^/      /'
+                wait "$UART_PID" 2>/dev/null || true
+                UART_PID=""
+                DO_UART=0
+            fi
+        fi
+    else
+        # 只读枚举 USB/FTDI 串口。蓝牙COM和历史COM不作为兜底。
+        UART_DEVICES="$(powershell.exe -NoProfile -Command 'ConvertTo-Json -Compress -InputObject @(Get-PnpDevice -PresentOnly -Class Ports | Select-Object FriendlyName,InstanceId)' < /dev/null | tr -d '\r')"
+        if [[ $? -ne 0 ]]; then
+            uart_unavailable "枚举 USB 串口失败"
+            DO_UART=0
+        else
+            SELECTED_UART="$(python3 - "$UART_DEVICES" "$UART_PORT" <<'PY'
 import json,sys
 from tools.board.g3_artifacts import choose_uart
 try:
@@ -448,32 +543,38 @@ try:
 except (ValueError,TypeError) as error:
     print(error, file=sys.stderr); raise SystemExit(2)
 PY
-    )" || die "不能明确确定USB/PS串口，请 --uart-port COMx；不要选蓝牙COM"
-    powershell.exe -NoProfile -ExecutionPolicy Bypass \
-        -File "$(echo "$RUN_DIR_WIN/uart_cap.ps1" | tr '/' '\\')" \
-        -LogPath "$(echo "$RUN_DIR_WIN/uart.log" | tr '/' '\\')" \
-        -Seconds "$UART_SECONDS" \
-        -StopFile "$(echo "$RUN_DIR_WIN/uart.stop" | tr '/' '\\')" \
-        -PortName "$UART_PORT" \
-        < /dev/null \
-        > "$RUN_DIR/uart_cap.out" 2>&1 &
-    UART_PID=$!
-    sleep 3
-    # 判据要正着写：必须看到 CAPTURING 才算抓起来了。
-    # 只查 OPEN_FAIL 不够 —— 第一次实跑就栽在这：ps1 被 PowerShell 5.1 当 GBK 解析、
-    # param() 块直接语法错误，进程压根没跑到打开串口那一步，
-    # 于是「没有 OPEN_FAIL」被误判成成功，整轮跑完才发现根本没有串口实录。
-    if grep -q "^CAPTURING" "$RUN_DIR/uart_cap.out" 2>/dev/null; then
-        info "${UART_PORT}@115200 抓取中，上限 ${UART_SECONDS}s（收工时用 stop 文件收尾）"
-    else
-        info "串口实录没起来（${UART_PORT} 被占用？或 ps1 解析失败），详见 $RUN_DIR/uart_cap.out"
-        sed -n '1,6p' "$RUN_DIR/uart_cap.out" 2>/dev/null | sed 's/^/      /'
-        step_skip "串口实录" "未能启动，见 uart_cap.out"
-        UART_PID=""
-        DO_UART=0
+            )"
+            if [[ $? -ne 0 ]]; then
+                uart_unavailable "不能明确确定 USB/PS 串口；请传 --uart-port COMx，不要选蓝牙 COM"
+                DO_UART=0
+            else
+                UART_PORT="$SELECTED_UART"
+                powershell.exe -NoProfile -ExecutionPolicy Bypass \
+                    -File "$(echo "$RUN_DIR_WIN/uart_cap.ps1" | tr '/' '\\')" \
+                    -LogPath "$(echo "$RUN_DIR_WIN/uart.log" | tr '/' '\\')" \
+                    -Seconds "$UART_SECONDS" \
+                    -StopFile "$(echo "$RUN_DIR_WIN/uart.stop" | tr '/' '\\')" \
+                    -PortName "$UART_PORT" \
+                    < /dev/null \
+                    > "$RUN_DIR/uart_cap.out" 2>&1 &
+                UART_PID=$!
+                sleep 3
+                # 必须看见 CAPTURING；沉默失败不能伪装成一次有效采集。
+                if grep -q "^CAPTURING" "$RUN_DIR/uart_cap.out" 2>/dev/null; then
+                    UART_CAPTURE_STARTED=1
+                    info "${UART_PORT}@115200 抓取中，上限 ${UART_SECONDS}s（收工时用 stop 文件收尾）"
+                else
+                    uart_unavailable "串口实录未启动，见 uart_cap.out"
+                    sed -n '1,8p' "$RUN_DIR/uart_cap.out" 2>/dev/null | sed 's/^/      /'
+                    wait "$UART_PID" 2>/dev/null || true
+                    UART_PID=""
+                    DO_UART=0
+                fi
+            fi
+        fi
     fi
 else
-    step_skip "串口实录" "--no-uart"
+    uart_unavailable "--no-uart 已关闭串口采集"
 fi
 
 # ---------------------------------------------------------------------------
@@ -481,10 +582,15 @@ fi
 # ---------------------------------------------------------------------------
 say "4/7 烧录（rst -system → fpga → ps7_init → dow → con）"
 if (( DO_BOOT )); then
-    if powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        "$XSDB_UNIX" "$RUN_DIR/boot.tcl" > "$RUN_DIR/boot.out" 2>&1
+    else
+        powershell.exe -NoProfile -ExecutionPolicy Bypass \
             -File "$RUN_DIR_WIN/xsdb_run.ps1" -XsdbPath "$XSDB_BAT" \
             -TclPath "$RUN_DIR_WIN/boot.tcl" < /dev/null \
-            > "$RUN_DIR/boot.out" 2>&1; then
+            > "$RUN_DIR/boot.out" 2>&1
+    fi
+    if [[ $? -eq 0 ]]; then
         if grep -q "BOOT> running" "$RUN_DIR/boot.out"; then
             step_ok "烧录"
             info "$(grep '^BOOT>' "$RUN_DIR/boot.out" | tr '\n' ' ')"
@@ -690,10 +796,15 @@ fi
 # ---------------------------------------------------------------------------
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
 if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
-    if powershell.exe -NoProfile -ExecutionPolicy Bypass \
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        "$XSDB_UNIX" "$RUN_DIR/dump.tcl" > "$RUN_DIR/dump.out" 2>&1
+    else
+        powershell.exe -NoProfile -ExecutionPolicy Bypass \
             -File "$RUN_DIR_WIN/xsdb_run.ps1" -XsdbPath "$XSDB_BAT" \
             -TclPath "$RUN_DIR_WIN/dump.tcl" < /dev/null \
-            > "$RUN_DIR/dump.out" 2>&1 && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
+            > "$RUN_DIR/dump.out" 2>&1
+    fi
+    if [[ $? -eq 0 ]] && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
         info "四级快照已导出到 $RUN_DIR"
         if python3 tools/board_stage_check.py --dump-dir "$RUN_DIR" --reads "$STAGE1_DUMP_RECORDS" --read-bps "$READ_BPS" \
                 > "$RUN_DIR/stage_check.log" 2>&1; then
@@ -711,6 +822,19 @@ else
 fi
 
 stop_uart
+
+if (( UART_CAPTURE_STARTED )); then
+    if grep -Eq '^CAPTURE_DONE (bytes|chars)=[1-9][0-9]*$' "$RUN_DIR/uart_cap.out" 2>/dev/null; then
+        UART_COUNT="$(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" | tail -1)"
+        step_ok "串口收到板端输出" "$UART_COUNT 个字符/字节；原始日志 uart.log"
+    else
+        UART_COUNT="$(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" | tail -1)"
+        uart_unavailable "串口打开后没有可确认的输出（count=${UART_COUNT:-未报告}），见 uart.log/uart_cap.out"
+    fi
+fi
+
+READS_SHA="$(sha256sum "$READS_FILE" | awk '{print $1}')"
+WM_SHA="$(sha256sum "$WM_FILE" | awk '{print $1}')"
 
 # ---------------------------------------------------------------------------
 # 8. 裁决
@@ -737,8 +861,16 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "bitstream   : $(sha256sum "$RUN_DIR/top_bd_wrapper.bit" | awk '{print $1}')"
     echo "ELF         : $(sha256sum "$RUN_DIR/dna_lwip_app.elf" | awk '{print $1}')"
     echo "制品目录    : $ARTIFACT_DIR"
+    echo "制品严格模式: $([[ "$STRICT_ARTIFACTS" -eq 1 ]] && echo '是（legacy 禁止）' || echo '否（兼容旧板入口）')"
     echo "目标器件    : $JTAG_DEVICE"
     echo "XSDB        : $XSDB_BAT"
+    echo "XSDB 模式   : $XSDB_MODE"
+    echo "hw_server   : ${HW_SERVER_URL:-XSDB 默认连接}"
+    echo "板端地址    : $BOARD_IP:$BOARD_PORT"
+    echo "FASTQ SHA256: $READS_SHA"
+    echo "水印 SHA256 : $WM_SHA"
+    echo "串口裁决    : $([[ "$ALLOW_UART_SKIP" -eq 1 ]] && echo '排错放宽 --allow-uart-skip（可能带 SKIP）' || echo '验收严格（必须打开且收到输出）')"
+    echo "串口接收量  : $(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" 2>/dev/null | tail -1)"
     echo "串口        : ${UART_PORT:-未抓取}"
     echo "制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）"
     echo "判据哈希    : $EXPECT_SHA"

@@ -17,6 +17,7 @@ REPO=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(REPO/'clients/python'))
 from first import ClientConfig,run_client
 from g3_artifacts import validate
+from g3_caps import CAPS_ARCHITECTURE_BOUNDARY,query_board_caps
 
 EXPECT_SHA='fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3'
 
@@ -70,7 +71,7 @@ def main():
     ap.add_argument('--watermark',type=Path,default=REPO/'data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt')
     ap.add_argument('--limits',default='128,512,2048,8192,32768,full')
     ap.add_argument('--repeat',type=int,default=3)
-    ap.add_argument('--ip',default='192.168.1.10');ap.add_argument('--port',type=int,default=7)
+    ap.add_argument('--ip',required=True,help='必须显式指定本轮实测板端 IP');ap.add_argument('--port',type=int,default=7)
     ap.add_argument('--timeout',type=float,default=1800)
     ap.add_argument('--uart-log',type=Path,help='由外部唯一串口采集进程持续追加的UART日志；本脚本不打开串口')
     ap.add_argument('--plan-only',action='store_true')
@@ -91,8 +92,12 @@ def main():
                         'round_wall':'run_client开始至LDPC进程结束和图片hash完成，含输入处理/上传/结果/LDPC；不含烧录、DDR取证和轮间settle',
                         'hardware_cycles':'本轮追加UART中的Stage2/3寄存器周期；未采集为null，绝不用t_result乘时钟冒充'},
           'uart_log':str(args.uart_log) if args.uart_log is not None else None,
+          'caps_architecture_boundary':CAPS_ARCHITECTURE_BOUNDARY,
           'input_sha256':{str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in (args.reads,args.watermark)}}
     if args.plan_only:print(json.dumps(plan,ensure_ascii=False,indent=2));return 0
+    caps=query_board_caps(args.ip,args.port)
+    plan['caps_at_start']={name:getattr(caps,name) for name in
+                           ('version','read_bps','num_lc','stride','max_symbols','max_reads','features')}
     if args.out_dir.exists() and any(args.out_dir.iterdir()):ap.error('out-dir已有证据，不覆盖')
     args.out_dir.mkdir(parents=True,exist_ok=True)
     (args.out_dir/'plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')

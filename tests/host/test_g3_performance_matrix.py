@@ -46,9 +46,10 @@ class PerformanceTests(unittest.TestCase):
         out=self.root/'out'
         argv=['matrix','--artifact-dir',str(self.root/'artifacts'),'--out-dir',str(out),
               '--reads',str(self.reads),'--watermark',str(self.wm),'--limits',limits,
-              '--uart-log',str(self.uart),'--repeat','3']
+              '--uart-log',str(self.uart),'--repeat','3','--ip','127.0.0.1']
         expected=hashlib.sha256(self.image).hexdigest() if full_correct else 'f'*64
         with patch.object(sys,'argv',argv),patch.object(matrix,'validate',return_value={'_ps7':b'fake','board_id':'fake-host-only'}),\
+             patch.object(matrix,'query_board_caps',return_value=SimpleNamespace(version=1,read_bps=150,num_lc=50,stride=807,max_symbols=40500,max_reads=129600,features=1)),\
              patch.object(matrix,'run_client',side_effect=client or self.client),\
              patch.object(matrix.subprocess,'run',side_effect=self.decode),\
              patch.object(matrix.time,'sleep'),patch.object(matrix,'EXPECT_SHA',expected),\

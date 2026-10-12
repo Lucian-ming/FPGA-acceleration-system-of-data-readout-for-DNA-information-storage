@@ -157,6 +157,23 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 
 Icarus重复接口已在XSim正式通过后停止，不称Icarus接口PASS。起点重复附件告警及唯一源引用修复记录保留，边界见[整理记录](reference/workspace-cleanup-2026-10-10.md)。全项目门禁与当前Agent任务见05/07。
 
+## 8. 2026-10-12 接管与新板现场实测
+
+| 可以说的话 | 判据/原始证据 | 边界 |
+|---|---|---|
+| BKB220 已到货并连接，器件经 JTAG 证实为 **xc7z020**（IDCODE `0x23727093`），单目标链 | 2026-10-12 main 实测：JTAG 链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A` → `arm_dap (4ba00477)` → `xc7z020`；原始输出 `logs/jtag/20261012T112212Z-bkb220-wsl-jtag/probe3.txt`（`logs/` 被 .gitignore 覆盖） | 只证明 JTAG 上识别到的器件与 IDCODE；**不证明**完整料号/温度等级/PCB 修订，也不证明任何 PS7/DDR/MIO 配置 |
+| PS 处于干净的 JTAG 待机态，`BOOT_MODE=0`，DDR PLL 掉电、FCLK0 关闭、GEM 与两个 UART 均未启用 | 同一目录 `state_read.txt` 的寄存器读数 | 读数反映 BootROM 状态，不代表板级设计；不能据此推断 PS UART 的 MIO |
+| **PS_CLK = 33.333 MHz** | `IO_PLL_CTRL` FBDIV=26 → IO PLL 433.33 MHz，且 BootROM 正常执行 | **推导 + 寄存器证据**，非厂商书面确认；ps7_init 实跑训练后应复核 |
+| 触板只能走 WSL：usbipd 直通 + Linux 2022.2 hw_server；Windows 原生 hw_server 是已知蓝屏路径 | 用户 2026-10-12 诊断：两次 BugCheck `0x139`/参数1=`0xA`，进程均 `hw_server.exe`，栈均 `ftdibus+0xf4d4`；修复记录在 `D:\Agent\outputs\ftdi-repair-20261012\` | 这是**实验环境**事实，不是 FPGA 功能/时序/真板验收证据。恢复 Windows 直连需另立对照证据 |
+| P4/P16 正式源集与打包一致、无未覆盖文件；打包与卫生门禁 PASS | main 复跑 `bash tools/check_ip_packaging.sh`（exit 0）、`bash tools/check_repo_hygiene.sh`（exit 0，11 项） | 子 Agent 只读沙箱内报的 packaging FAIL 是沙箱无法建临时输入所致，非真实缺陷；已由 main 复跑否定 |
+| 候选 BKB220 PS7 profile 的 `ready=0` 守卫有效 | `tclsh hw/scripts/build.tcl board=bkb220 dry_run=1` → exit 1，在 `dna_load_board` 的 ready 守卫处失败，未进入 `file_create`/`create_project`，未建目录 | 只证明守卫与 Tcl 结构；**不证明** PS7 属性被 Vivado 2022.2 catalog 接受 |
+| 候选 PS7 属性经 Vivado 2022.2 逐条验证；`MT41K256M16TW-107` 被 catalog 拒绝 | [来源表 §8](board/bkb220/migration-source-table.md)；原始日志与逐属性 TSV 在 `hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/`（该目录已被 .gitignore 精确覆盖，不入库也不自动删除） | 属性被接受只说明属性名/取值合法，**不证明**与实物 PCB 接线一致；DDR 改用 `Custom` 后仍属推导参数 |
+| **BKB220 新板 DDR 训练可用** | `ps7_init`/`ps7_post_config` RC=0；`0x10000000` 起 1024 字写入后逐字回读 **0/1024 不符**；原始输出 `logs/bringup/20261012T120117Z-bkb220-f3-v1/f3.out`（`logs/` 已忽略） | 证明该配置下 DDR 可读写；**不等于**板级延迟/DQS-to-CLK 已确认或已优化，也不等于 QSPI/SD 冷启动或整机 G3 通过 |
+| **BKB220 PS UART 归属已实测确定：UART0 / MIO14-15 → FT4232H 通道 C（`/dev/ttyUSB2`）115200 8N1** | 经 JTAG 直接写 UART0 TX FIFO，三路串口同时被动抓取：`/dev/ttyUSB2` 收到 `BKB220-UART0-1..8` 共 128 B 且 ASCII 完全正确，另两路 0 B；证据同上一行目录 | 只证明 PS→PC 方向；**反向（PC→PS）未测**。ASCII 正确即证明 115200 波特率正确 |
+| BKB220 PS 时钟：PS_CLK 33.333 MHz、DDR PLL 533.33 MHz(DDR3-1066)、FCLK0 100 MHz | 回读 `0xF8000104/0x0108/0x0170`：DDR PLL FBDIV=32、IO PLL FBDIV=30 且 FCLK0 分频 5、`0xF800010C`(=PLL_STATUS)=0x3F 三 PLL 全 lock | 由寄存器回读与 PLL 公式推出，非频率计实测 |
+| **BKB220 ENET0/PHY 未通过** | GEM0 时钟已使能（`0xF8000140=0x00100801`）、APER 复位已释放（`0xF8000244=0`）、MDC 分频已设，MDIO 在 0..31 全地址读不到任何 PHY ID | 如实记录为**未通过**。最可能是 PHY 复位脚未被驱动或 MDIO 不在 MIO52/53；须原理图或受控探测，**不得猜**。因此 `hw/boards/bkb220.tcl` 的 `ready` 保持 `0` |
+| 新板脚本适配完成一轮，门禁未放宽 | `python3 -m unittest discover -s tests/host -p 'test_g3_*.py'` 53 项 PASS；`tests/host/run_host_tests.sh --worktree`、`check_ip_packaging.sh`、`check_repo_hygiene.sh` 均 exit 0；新板缺 `--artifact-dir` 的负例在临时移除严格门禁后按预期变红 | 主机/工具层验证；本轮**未触板**跑过 G3，也不代表新板 CAPS/G3 通过 |
+
 2026-10-11 Agent承载通道补充：logs/agents/handoff-channel-20261011-a2/result.json、events.jsonl及final.md证明现有代理下gpt-5.6-luna/max的只读调用退出0、turn.completed与JSON哨兵通过；这是Agent运行环境证据，不是FPGA功能、时序或真板验收证据。用户目标gpt-6-luna 已由 2026-10-11 00:40 codex-luna MCP 的冒烟与真实派发实测可用（11.7s / 34.0s，均 completed/ok/exit0/turn_completed，更正提交25c3336）；b3c70b3 依据的旧 CLI 0.147.0 拒绝是客户端版本问题，不是账号权限。
 
 2026-10-11文档/引用残留清理：logs/host/current-residue-20261011/documentation-integrity.json记录全仓当前引用和连续01～09校验；对应备份verification.json记录Python AST（除文档/帮助引用）、C/HDL词法标记及Shell非注释行不变，ECO PS7参数仅来源文档路径变化。固件2项、G3主机47项、基准契约8项、IP打包和卫生通过；基准首次缺PYTHONPATH的失败保留，正确命令见tests/host/README.md。源码副本单向同步前有备份，原BSP/ELF未重建。此记录不扩张新板功能/时序/性能结论。

@@ -18,6 +18,10 @@
 必须收到合法的 `PKT_CAPS_INFO`（0x16）应答才算就绪。实测烧录后约 7 s 才通过，
 而裸连通性在那之前就已经"成功"了 —— 这个差就是所有假失败的来源。
 
+就绪还要求 CAPS 全字段匹配 SE150：v1、150 bp、50 LC、stride 807、40500 symbols、
+129600 reads、features bit0=1。CAPS **不包含 P_WAYS/PIPE_TREE**；TCP 探针无法区分
+板上运行 P4 还是 P16，架构归属必须靠本轮制品/下载证据建立。
+
 用法：
     python3 tools/board/g3_wait_ready.py --ip 192.168.1.10 --port 7 --deadline 90
 退出码 0 = 已就绪（stdout 最后一行是 `READY <秒数> <尝试次数>`）；1 = 超时未就绪。
@@ -39,7 +43,7 @@ import protocol as pr  # noqa: E402
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ip", default="192.168.1.10")
+    ap.add_argument("--ip", required=True, help="必须显式指定本轮实测板端 IP")
     ap.add_argument("--port", type=int, default=7)
     ap.add_argument("--deadline", type=float, default=90.0, help="最多等多少秒")
     ap.add_argument("--interval", type=float, default=2.0, help="两次尝试之间等多久")
@@ -57,9 +61,14 @@ def main(argv=None) -> int:
             sock = socket.create_connection((args.ip, args.port), timeout=5)
             sock.settimeout(8)
             caps = pr.query_caps(sock, pr.NetStats())
+            from g3_caps import CAPS_ARCHITECTURE_BOUNDARY, validate_caps
+            validate_caps(caps)
             sock.close()
-            print(f"[{elapsed:6.1f}s] 第 {attempt} 次：CAPS 应答正常 "
-                  f"read_bps={caps.read_bps} max_reads={caps.max_reads}")
+            print(f"[{elapsed:6.1f}s] 第 {attempt} 次：CAPS 全字段匹配 "
+                  f"version={caps.version} read_bps={caps.read_bps} num_lc={caps.num_lc} "
+                  f"stride={caps.stride} max_symbols={caps.max_symbols} "
+                  f"max_reads={caps.max_reads} features=0x{caps.features:X}")
+            print(f"PROFILE_BOUNDARY {CAPS_ARCHITECTURE_BOUNDARY}")
             # 探针自己也占了一条连接。板端 g_conn 是单例，连接关闭的处理要占一个
             # tcp 回调周期，所以握手成功后再让一会儿，别把任务的连接挤在它头上。
             time.sleep(args.settle)

@@ -56,6 +56,7 @@ if str(CLIENTS_PY) not in sys.path:
 
 import protocol as pr  # noqa: E402
 from task_protocol import CONFIG_REJECT_REASONS, TaskCaps  # noqa: E402
+from g3_caps import validate_caps  # noqa: E402
 
 class _Stats:
     """protocol.recv_packet 会往 stats 上累加字节数，传 None 会 AttributeError。
@@ -102,6 +103,7 @@ def _caps(sock) -> dict:
     if t != pr.PKT_CAPS_INFO:
         raise RuntimeError(f"CAPS 应答类型异常: 0x{t:02X}")
     caps = TaskCaps.from_payload(payload)
+    validate_caps(caps)
     return {"read_bps": caps.read_bps, "max_reads": caps.max_reads,
             "num_lc": caps.num_lc, "stride": caps.stride}
 
@@ -237,7 +239,7 @@ def _probe_late_guard(ip: str, port: int, max_reads: int) -> dict:
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ip", default="192.168.1.10")
+    ap.add_argument("--ip", required=True, help="必须显式指定本轮实测板端 IP")
     ap.add_argument("--port", type=int, default=7)
     ap.add_argument("--out-dir", default=None)
     args = ap.parse_args(argv)

@@ -10,7 +10,7 @@
 | PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在docs/board/zynq-eco-7010/ | 必须使用对应原理图/PS7 preset确认组织、时序/延迟/容量；产品手册不足以生成配置 |
 | 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | PS时钟、UART MIO、PHY/reset/MDIO等未齐；禁止猜测或照抄旧板 |
 | 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | 尚无新板完整包、整机时序、真实G3或性能结果 |
-| 连接 | 历史板测设备路径不能直接沿用 | 最近无FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4，需实际供电/USB调试/网线 |
+| 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：板载 FT4232HL 提供 JTAG（链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A`，单目标 xc7z020/IDCODE `0x23727093`）+ 三串口（Windows COM9/10/11）。直通 WSL 后 `/dev/ttyUSB0`=JTAG、`1/2/3`=串口。ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`。**触板只允许走 WSL（见 §3a）**；PS UART 的 MIO、ENET0 的 PHY 仍未定 |
 
 产品手册已收录：[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)，[资料来源与SHA校验](board/bkb220/README.md)。2026-10-11按用户提供文件原样复制，原件与副本SHA一致。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`；来源表记录仓库资料路径、手册页码及其对应的PCB/器件。对应原厂原理图/board_files/PS7 preset/例程及实物仍需确认，不把手册示例当实际参数或操作授权。
 
@@ -38,6 +38,21 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 
 本机lwIP BOM兼容副本由prepare_vitis_compat_repo.py创建并验证414文件manifest；只移除描述文件BOM，不改安装或原厂库实现。构建同时要求成功哨兵、build状态0、实际非空产物、Bootgen readback和六SHA；不能仅依赖launcher exit0。完整命令及A14边界见[工具核查](benchmarks/bkb220-toolchain-audit.md)。
 
+## 3a. 触板通道：只走 WSL，禁止 Windows hw_server（2026-10-12 新增）
+
+2026-10-12 连接测试期间 **Windows 主机两次蓝屏**（BugCheck `0x139`，参数1=`0xA`；两份转储当前进程均为 `hw_server.exe`，栈均为 `ftdibus+0xf4d4`）。用户当日已建立安全通道，本文件据此规定触板方式：
+
+| 项 | 规定 |
+|---|---|
+| 设备归属 | 用 `usbipd attach --wsl --busid 4-2` 把新板 FT4232H（序列号 15051）**直通 WSL**；Windows 不再持有该设备 |
+| 硬件服务 | 跑 WSL 的 `/tools/Xilinx/Vivado/2022.2/bin/hw_server -sTCP:127.0.0.1:3132` |
+| 连接入口 | WSL `/tools/Xilinx/Vitis/2022.2/bin/xsdb` 连 `TCP:127.0.0.1:3132` |
+| **禁止** | 启动 Windows 原生 `hw_server.exe`（`D:\xilinx\2026.1\...`）——已知崩溃路径，用户已暂停 |
+| 重挂规则 | **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化）才能再取到 `arm_dap`；只重启 hw_server 会只看到 `xc7z020`，容易误判「PS 不在链上」 |
+| 供电 | 用户诊断指出故障时板上**未接**手册 p.15 的 10 号 5V-DC 输入；USB 供电是否足够未被证实也未被排除，断电重上后应重测 |
+
+由此，本文件 §3 第 2 阶段「Windows 2026.1 负责下载/调试」以及 F9 的 Windows 26 复核入口**在 FTDI 问题被证明根治前不可用**；下载/调试改走 WSL 2022.2。这不是把 26 结论改成通过，而是如实记录入口被阻塞。恢复 Windows 直连需先有「驱动/服务版本对照 + 供电条件明确 + 单次受控验证」的证据。
+
 ## 4. 本轮已验证准备成果
 
 | 内容 | 结果/摘要 |
@@ -46,12 +61,14 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | LC50模块与真实包装接口 | Windows2026.1 XSim两个case各两轮PASS，Icarus模块同周期；约3.27倍仅模块周期 |
 | G3严格制品选择、串口与性能入口 | 47项主机fixture/替身测试通过；[主机摘要](benchmarks/bkb220-host-verification.md) |
 | Windows2026.1软件路线 | 旧ECO XSA A14：BSP/应用/FSBL/BOOT/readback/六SHA PASS；不是新板制品 |
+| **BKB220 PS7 catalog 验证** | 29 属性经 Vivado 2022.2 逐条检查（[来源表 §8](board/bkb220/migration-source-table.md)）。`MT41K256M16TW-107` **被 catalog 拒绝**，改用 `Custom` + 自定义容量/时序；`xc7z020clg400-2` 在库中，但手册的工业级条目未确认 |
+| **BKB220 F3 实板最小启动** | **部分通过**（[来源表 §9](board/bkb220/migration-source-table.md)）：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 0 不符；PS UART = UART0/MIO14-15 → FT4232H 通道 C（`/dev/ttyUSB2`）115200 8N1 明文正确；PS_CLK 33.333 MHz、DDR 533.33 MHz、FCLK0 100 MHz。**ENET0/PHY 未通过**：GEM0 时钟与复位正常但 MDIO 全地址无 PHY 应答 |
 
 计划与索引曾先推送c4d7ad4；后续用户已明确授权代码和完整整理交付。原三子Agent额度中断后main接管。新板core门禁仍未关闭。
 
 ## 5. 迁移顺序与真实验收
 
-1. 对应PCB/part/原理图/preset来源表核对；实际电源、USB调试和网口；确定唯一JTAG、实际PS UART，不选蓝牙/COM6兜底。
+1. 对应PCB/part/原理图/preset来源表核对；实际电源、USB调试和网口；确定唯一JTAG（**已实测**：`15051A` 单目标 xc7z020）、实际PS UART（**仍未定**：FT4232H 通道 B/C/D 对应 `/dev/ttyUSB1/2/3`，用最小 hello 固件逐一实测，不选蓝牙兜底）。
 2. 最小同XSA包验证UART、DDR训练/容量/安全区读写、GEM链路和CAPS；不要先跑整机来定位未知DDR。
 3. 新板P4/SE150/100MHz合法route及完整软件包；smoke2048、全量、四级DDR、最终SHA，冻结同板P4基线。
 4. P16/16/1正式LC50独立模块/真实包装PASS、完整route及完整同XSA软件包；smoke→全量≥3次→连续/脏干净/恢复。

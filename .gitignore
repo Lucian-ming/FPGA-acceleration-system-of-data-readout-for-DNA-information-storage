@@ -13,6 +13,9 @@ hw/build/dna_accel.srcs/
 hw/build/dna_accel.xpr
 hw/build/reports/
 hw/build/xsim/
+# BKB220 PS7 catalog/ps7_init 探针：每变体都是完整 Vivado 工程（r3 实测约 54 MB），
+# 只保留可复现 Tcl 入口与结果摘要入库，工程目录本身不入库、也不自动删除。
+hw/build/bkb220-ps7-probe/
 sw/workspace/
 *.jou
 *.log

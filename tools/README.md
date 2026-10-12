@@ -20,7 +20,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → LDPC → 比图片哈希 → 四级 DDR 取证。`--artifact-dir` 成套选择bit/XSA/PS7/ELF与manifest；拒绝仅覆盖不同bit/ELF的混用，新板必须严格制品门禁 |
+| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → LDPC → 比图片哈希 → 四级 DDR 取证。`xc7z020` 自动启用严格制品门禁并要求显式 `--artifact-dir`、`--ip`；WSL XSDB 用 `--xsdb /tools/.../xsdb --hw-server TCP:127.0.0.1:3132 --win-root /绝对路径` 本地执行，串口必须收到输出才可验收 PASS。`--allow-uart-skip` 仅供排错并写入摘要 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
 | `verify_repo_binding.sh` | Git 绑定门禁，动手前必跑 |
@@ -40,17 +40,18 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `g3_artifacts.py` | 完整制品目录、SHA、XSA内bit/器件/生产几何与manifest核验；只读预检，不将哈希自洽当作源码因果证明 |
-| `g3_uart_cap.ps1` | run_g3调用的PS串口采集内部依赖；唯一采集者，实际端口不得用蓝牙/固定COM兜底 |
+| `g3_uart_cap.ps1` / `g3_uart_cap.py` | Windows COM 与 WSL `/dev/ttyUSBn` 串口采集器；端口必须显式传入，记录接收量，禁止默认 COM6 |
 | `g3_xsdb.ps1` | Windows XSDB参数桥接，安装/留证路径含空格时分别传参，供G3调用 |
 | `generate_stage1_fixture.py` | 独立NumPy逐符号枚举Stage1 oracle；生产LC50与显式LC6短测，定向807/末区域/补零/并列向量 |
 | `g3_performance_matrix.py` | 同板P4/P16多规模≥3次性能矩阵；明确t_result/上传/LDPC/整轮边界，未采集硬件周期时null |
-| `g3_wait_ready.py` | 应用层就绪探针（CAPS 握手） |
+| `g3_caps.py` / `g3_wait_ready.py` | 完整核对 CAPS 的 SE150 几何；探针要求显式 `--ip`。CAPS 不含 P_WAYS/PIPE_TREE，因此无法区分 P4/P16 |
 | `g3_overhead_sweep.py` | 固定开销尺寸扫描与模型拟合。**必须 `post=True`**，`--no-post` 是「不发 POST 触发」，板子根本不算 |
 | `g3_recovery_probe.py` / `g3_netfault_probe.py` | 畸变包 / 断网注入恢复探针 |
 | `g3_config_guard_probe.py` | **配置/容量守卫故障注入**：手工拼 CONFIG 字节绕开客户端全部校验，直打固件守卫。2026-09-11 实测 **7/7 通过**：超容量/非 64 对齐/零条数均被 `rc=5` 拒绝，`read_bps=250` 被 `rc=2` 拒绝。⚠️ 注意 `PKT_CONFIG_OK` 只是应答，payload 里的 u32 **才是理由码，0 才是接受**——初版探针把拒绝当成接受，得出过错误结论 |
 | `g3_runs_to_jsonl.py` | run 目录收敛成结构化 JSONL |
-| `read_pipe_counters.tcl` | **不依赖串口**、用 XSDB 读固件内 poll 计数器。串口没接时固件的 `xil_printf` 插桩等于不存在 |
+| `read_pipe_counters.tcl` | **不依赖串口**、用 XSDB 读固件内 poll 计数器；从本轮 ELF 的 `pipe_poll_steps` / `wm_poll_steps` / `pipe_state` 符号经 `arm-none-eabi-nm` 解析。`--addresses` 仅供显式排错，无旧地址兜底 |
 | `arm_baseline.py` | **同片 ARM 纯软件 Stage1 基线**：编译 `sw/bench_arm/`（主机参考 + A9 裸机 NEON 版），XSDB 复位 PS、`dow -data` 读段进 DDR、运行并读回，与主机参考逐条比对后才报耗时。**会复位整板**，跑前确认板上没有其他任务。2026-09-22 实测 12.10 ms/记录（单核），见 `docs/benchmarks/measured_arm_baseline.md` |
+| `bkb220_f3_bringup.sh` | **BKB220 F3 最小启动判据入口**（2026-10-12 新增）：真实 FT4232H/USB 前置检查 → 被动抓 `/dev/ttyUSB1/2/3` → `rst -system` + `source ps7_init.tcl` + `ps7_init`/`ps7_post_config` → 读回 DDR/UART/GEM/MIO/时钟寄存器 → 汇总哪个通道收到字节；PS7 初始化命令或寄存器读失败会失败退出；可选 `--ddr-window <基址>,<字节数>` 做指定窗口 walking-1 与固定 pattern 写读比对。**只走 WSL：`usbipd` 直通 + Linux 2022.2 hw_server，禁止 Windows hw_server（已知蓝屏路径，见 `docs/07` §3a）**。边界：`ps7_post_config` 退出 0 不等于 DDR PASS；指定窗口回环不等于全容量/温压验证；串口没字节不等于该通道不是 PS UART；JTAG 启动通过不证明 QSPI/SD 冷启动通过 |
 
 ## 数据集与鲁棒性
 
@@ -118,7 +119,7 @@ Stage1生产P4/P16模块与真实包装接口：`bash tools/run_sim.sh stage1_pr
 
 2026.1 本机 lwIP YAML 的 UTF-8 BOM 与 GBK 读取路径有实际兼容问题：先运行 `sw/scripts/prepare_vitis_compat_repo.py --vitis-root D:/xilinx/2026.1/Vitis --out-dir <新目录>`，再将目录填入现代构建 JSON 的 `embedded_sw_repo`。仅移除描述文件 BOM，保留原厂库源码 SHA 与 compat-manifest；不修改安装。完整命令和已测边界见 `docs/benchmarks/bkb220-toolchain-audit.md`。
 
-性能矩阵可加 `--uart-log <外部持续追加的现有采集日志>`，记录本轮 Voter/Decoder 的原始硬件周期；不自动抢占串口。主机回归：`python3 -m unittest discover -s tests/host -p 'test_g3_*.py' -v`，涵盖 `test_g3_artifacts.py` 和 `test_g3_performance_matrix.py`；这些替身测试不能替代板测。
+性能矩阵可加 `--uart-log <外部持续追加的现有采集日志>`，记录本轮 Voter/Decoder 的原始硬件周期；不自动抢占串口。主机回归：`python3 -m unittest discover -s tests/host -p 'test_g3_*.py' -v`，涵盖制品/严格回退、CAPS 几何和网络探针显式 IP；这些替身测试不能替代板测。恢复、断网、配置守卫、性能矩阵和 overhead 探针均必须显式传实测 `--ip`。
 
 Windows2026.1 正式 Stage1 XSim 输入由 tools/board/create_stage1_xsim_input.py 制作：先使用 generate_stage1_fixture.py --num-lc 50 生成oracle，再将生产RTL/TB/fixture复制为带14文件SHA的只读构建输入。`tools/run_stage1_xsim.ps1 -InputDir <带SHA的输入目录> -RunDir <新run目录>` 为Windows2026.1正式仿真入口；LC50模块/真实包装接口已通过，结果见 `docs/benchmarks/stage1-16way-ip-integration.md`。
 

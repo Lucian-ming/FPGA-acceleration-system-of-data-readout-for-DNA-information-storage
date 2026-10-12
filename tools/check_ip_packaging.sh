@@ -43,7 +43,7 @@ if (( WRITE_MANIFEST )); then
             ip="$(basename "$(dirname "$cx")")"
             grep -oE '<spirit:name>hdl/[^<]*\.v</spirit:name>' "$cx" \
               | sed -E 's|</?spirit:name>||g' | sort -u | sed "s|^|$ip |"
-        done
+        done | LC_ALL=C sort
     } > hw/ip/PACKAGED_VARIANTS.txt
     echo "已写出 hw/ip/PACKAGED_VARIANTS.txt"
     exit 0
@@ -151,13 +151,14 @@ CUR="$(for cx in hw/ip/*/component.xml; do
          ip="$(basename "$(dirname "$cx")")"
          grep -oE '<spirit:name>hdl/[^<]*\.v</spirit:name>' "$cx" \
            | sed -E 's|</?spirit:name>||g' | sort -u | sed "s|^|$ip |"
-       done)"
+       done | LC_ALL=C sort)"
 if [[ ! -f "$MANIFEST" ]]; then
     bad "缺少 $MANIFEST —— 无法验证当前打包的是哪个实现变体"
     info "首次生成： tools/check_ip_packaging.sh --write-manifest"
-elif ! diff -q <(echo "$CUR") <(grep -vE '^\s*#|^\s*$' "$MANIFEST") >/dev/null; then
+elif ! diff -q <(printf '%s\n' "$CUR") <(grep -vE '^\s*#|^\s*$' "$MANIFEST" | LC_ALL=C sort) >/dev/null; then
     bad "打包内容与 $MANIFEST 不符 —— 有人换了实现变体却没更新清单"
-    diff <(grep -vE '^\s*#|^\s*$' "$MANIFEST") <(echo "$CUR") | sed 's/^/      /' | head -12
+    diff <(grep -vE '^\s*#|^\s*$' "$MANIFEST" | LC_ALL=C sort) \
+         <(printf '%s\n' "$CUR") | sed 's/^/      /' | head -12
     info "确认这是有意变更后，用 --write-manifest 更新清单并在提交说明里写明原因"
 else
     ok "打包内容与 $MANIFEST 一致"

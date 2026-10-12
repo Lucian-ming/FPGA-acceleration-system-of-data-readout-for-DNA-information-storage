@@ -103,6 +103,18 @@ class ArtifactTests(unittest.TestCase):
             self.assertEqual(p.returncode,0,p.stderr);self.assertEqual((Path(temp_stage)/'ps7_init.tcl').read_text(),'fixture-init')
     def test_plan_new_no_hardware(self):
         p=self.plan('--device','xc7z020');self.assertEqual(p.returncode,0,p.stderr);self.assertIn('不打开串口',p.stdout)
+    def test_plan_z020_without_artifact_dir_refuses_legacy_fallback(self):
+        p=subprocess.run(['bash','tools/run_g3.sh','--device','xc7z020','--ip','127.0.0.1',
+            '--plan-only','--skip-boot','--skip-dump','--no-uart'],cwd=REPO,capture_output=True,text=True)
+        self.assertEqual(p.returncode,2,p.stdout+p.stderr)
+        self.assertIn('新板严格验收模式必须显式传 --artifact-dir',p.stderr)
+        self.assertIn('拒绝默认 hw/build/export legacy 回退',p.stderr)
+    def test_plan_wsl_xsdb_local_path_and_server_url(self):
+        p=self.plan('--xsdb','/bin/true','--hw-server','TCP:127.0.0.1:3132',
+                    '--win-root','/tmp/g3-wsl-fixture','--device','xc7z020','--ip','127.0.0.1')
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        self.assertIn('WSL hw_server : TCP:127.0.0.1:3132',p.stdout)
+        self.assertIn('XSDB 模式 : wsl',p.stdout)
     def test_plan_wrong_target(self):
         p=self.plan('--device','xc7z010');self.assertEqual(p.returncode,2);self.assertIn('目标器件',p.stderr)
     def test_plan_missing_tool(self):
@@ -115,7 +127,7 @@ class ArtifactTests(unittest.TestCase):
         p=subprocess.run(['bash','tools/run_g3.sh','--plan-only','--skip-boot','--skip-dump','--no-uart'],cwd=REPO,capture_output=True,text=True)
         self.assertEqual(p.returncode,0,p.stderr);self.assertIn('legacy',p.stdout)
     def plan(self,*extra,skip_tools=True):
-        cmd=['bash','tools/run_g3.sh','--artifact-dir',str(self.root),'--plan-only','--no-uart']
+        cmd=['bash','tools/run_g3.sh','--artifact-dir',str(self.root),'--plan-only','--no-uart','--ip','127.0.0.1']
         if skip_tools:cmd+=['--skip-boot','--skip-dump']
         return subprocess.run(cmd+list(extra),cwd=REPO,capture_output=True,text=True)
 

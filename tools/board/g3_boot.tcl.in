@@ -3,7 +3,7 @@
 # 与历史的 boot2.tcl / boot_b27.tcl 同流程：
 #   rst -system -> fpga -> ps7_init + post_config -> dow ELF -> con
 # bit/elf/PS7路径由run_g3从完整选中包核验后填入，源码因果关系另审构建证据。
-connect
+@@CONNECT_CMD@@
 # 先核对本次完整制品包指定的器件；未知/多目标必须失败，不能先复位APU再辨认。
 targets -set -nocase -filter {name =~ "@@DEVICE@@*"}
 puts "BOOT> requested FPGA target selected"

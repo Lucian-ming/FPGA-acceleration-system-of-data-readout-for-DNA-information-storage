@@ -36,7 +36,7 @@ from task_protocol import TASK_PROTO_VERSION  # noqa: E402
 
 # 一份合法的 CAPS_INFO 载荷：>BBHIIIII = version, read_bps, reserved, num_lc,
 # stride, max_symbols, max_reads, features。取 SE150 的实际几何（docs/02）。
-CAPS_PAYLOAD = struct.pack(">BBHIIIII", TASK_PROTO_VERSION, 150, 0, 807, 129, 4096, 103616, 0)
+CAPS_PAYLOAD = struct.pack(">BBHIIIII", TASK_PROTO_VERSION, 150, 0, 50, 807, 40500, 129600, 1)
 
 
 class FakeBoard:

@@ -4,7 +4,7 @@
 # 否则中间结果会被清掉，就只剩「最后不对」而不知道错在第几级。
 # mrd 的长度单位是 32 bit 字，不是字节；各区间长度由 run_g3.sh 按本次条数算好填入。
 # XSDB 默认禁止访问 PL 地址（0x4000_0000+），所以这里只读 DDR 里的中间结果。
-connect
+@@CONNECT_CMD@@
 targets -set -nocase -filter {name =~ "@@DEVICE@@*"}
 targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
 puts "DUMP> target selected (no reset)"

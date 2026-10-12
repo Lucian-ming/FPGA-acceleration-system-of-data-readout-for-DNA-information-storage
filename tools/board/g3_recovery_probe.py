@@ -38,6 +38,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO / "clients" / "python"))
 import protocol as pr  # noqa: E402
+from g3_caps import validate_caps  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +49,9 @@ def try_caps(ip: str, port: int, timeout: float = 5.0):
     sock = socket.create_connection((ip, port), timeout=timeout)
     try:
         sock.settimeout(8)
-        return pr.query_caps(sock, pr.NetStats())
+        caps = pr.query_caps(sock, pr.NetStats())
+        validate_caps(caps)
+        return caps
     finally:
         try:
             sock.close()
@@ -202,7 +205,7 @@ CASES = [
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ip", default="192.168.1.10")
+    ap.add_argument("--ip", required=True, help="必须显式指定本轮实测板端 IP")
     ap.add_argument("--port", type=int, default=7)
     ap.add_argument("--jsonl", required=True, help="结构化结果输出路径（JSONL，追加）")
     ap.add_argument("--deadline", type=float, default=60.0, help="每个用例的恢复超时")

@@ -59,6 +59,7 @@ if str(CLIENTS_PY) not in sys.path:
     sys.path.insert(0, str(CLIENTS_PY))
 
 from first import ClientConfig, run_client  # noqa: E402
+from g3_caps import CAPS_ARCHITECTURE_BOUNDARY, query_board_caps  # noqa: E402
 
 DEF_READS = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 DEF_WM = REPO / "data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
@@ -104,7 +105,7 @@ def fit_line(xs, ys):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ip", default="192.168.1.10")
+    ap.add_argument("--ip", required=True, help="必须显式指定本轮实测板端 IP")
     ap.add_argument("--port", type=int, default=7)
     ap.add_argument("--limits", default="64,128,256,512,1024,2048,4096",
                     help="源读段数序列（逗号分隔）")
@@ -113,6 +114,8 @@ def main(argv=None):
     ap.add_argument("--out-dir", default=None)
     args = ap.parse_args(argv)
 
+    caps = query_board_caps(args.ip, args.port)
+
     limits = [int(x) for x in args.limits.split(",") if x.strip()]
     run_id = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     out_dir = Path(args.out_dir) if args.out_dir else REPO / "logs" / "overhead_sweep" / run_id
@@ -120,6 +123,7 @@ def main(argv=None):
 
     print(f"=== 板端固定开销尺寸扫描 run={run_id} ===")
     print(f"    目标 {args.ip}:{args.port}   档位 {limits}   每档 {args.repeat} 次")
+    print(f"    CAPS 全字段匹配：{caps}; {CAPS_ARCHITECTURE_BOUNDARY}")
     print(f"    留证 {out_dir}")
     print("    注意：本工具只测时间，不判正确性；小规模覆盖度不足，LDPC 必然不收敛。\n")
 

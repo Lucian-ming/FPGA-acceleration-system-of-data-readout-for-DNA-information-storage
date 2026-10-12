@@ -1,0 +1,424 @@
+# BKB220 板级来源表与 PS7 配置草案
+
+更新：2026-10-12。用途是为 main 审核 F2 配置并规划 F3 最小启动。此文和 `hw/boards/bkb220.tcl` 都是配置草案；不构成 Vivado PS7 校验、板端启动或新板验收通过。`ready` 保持 `0`。
+
+状态标签严格区分：
+
+- **已证实（main 现场）**：来自 main 在阶段卡中记录的 2026-10-12 实测；本子任务不触板、不复测。
+- **手册给出**：产品手册明确写出；只证明手册陈述，不证明当前 PCB 修订与实物一致。
+- **仍缺**：仓库手册和阶段卡都未提供足以写入最终 PS7 profile 的依据。
+- **推导草案**：从器件资料/接口契约推导出的待验证起始值，不能当作实测或已通过的 PS7 参数。
+
+## 1. 手册校验与阅读记录
+
+仓库资料：[BKB220 产品手册 v1.1](BKB220产品手册v1.1.pdf)、[资料索引](README.md)。复核命令在 `docs/board/bkb220/` 执行：
+
+```text
+$ sha256sum -c SHA256SUMS.txt
+BKB220产品手册v1.1.pdf: OK
+exit_code=0
+```
+
+校验值为 `40b50e666ecab4ee83fbcfb1eea816a04a0989f73b001d9b9432e4778c8cd086`，与 `SHA256SUMS.txt` 一致。`pdfinfo` 报告 30 页。用 `pdftotext -layout` 完整提取了第 1–30 页；另将第 5–10、15–17、27 页渲染成 PNG 目视核对，图文页码与提取文本一致。渲染只用于核对手册，不是 PCB 原理图或实物照片核验。
+
+实际提取命令：
+
+```text
+pdftotext -layout -f 1 -l 15 'docs/board/bkb220/BKB220产品手册v1.1.pdf' -   # exit 0
+pdftotext -layout -f 16 -l 30 'docs/board/bkb220/BKB220产品手册v1.1.pdf' - # exit 0
+pdfinfo 'docs/board/bkb220/BKB220产品手册v1.1.pdf'                           # exit 0，Pages: 30
+pdftoppm -f 5 -l 10 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+pdftoppm -f 15 -l 17 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+pdftoppm -f 27 -l 27 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+```
+
+## 2. 板级来源表
+
+| 状态 | 规格或事实 | 出处与适用边界 |
+|---|---|---|
+| 手册给出 | 产品系列列出 XC7Z020-2CLG400I（另有 XC7Z010 选项）；正文亦写 XC7Z020-2CLG400I。 | 仓库手册 pp.5–6。阶段卡要求 Vivado profile 候选写 `xc7z020clg400-2`；main 的 JTAG 只识别到 xc7z020 与 IDCODE，尚未用芯片顶标/PCB 修订核对完整 speed/package/temperature 后缀。候选 part 不是完整料号已证实。 |
+| 已证实（main 现场） | JTAG 串链名 `Xilinx HW-Z1-ZCU104 FT4232H 15051A`，单一目标 xc7z020，IDCODE `0x23727093`。 | 2026-10-12 阶段卡；实际枚举事实由 main 提供，本任务未启动 XSDB/JTAG。手册 p.7 说明板载 FT4232HL JTAG bridge。 |
+| 手册给出 | 板载 FT4232HL 实现 USB 到 ZYNQ JTAG，无需外置 Xilinx 下载器。 | 仓库手册 p.7。USB 外观/桥片型号仍需对照当前 PCB 修订；main 的链名与此相符。 |
+| 已证实（main 现场） | Windows COM9、COM10、COM11 对应 FT4232H B/C/D 通道，序列号 15051B/C/D；WSL 未枚举 `/dev/ttyUSB*`。 | 2026-10-12 阶段卡。三个 FTDI COM 口中哪个接 PS UART 尚未确认；端口枚举不是串口功能验证。 |
+| 手册给出 | FTDI USB 转串口一路接 PL、一路接 PS，并有 USB JTAG。 | 仓库手册 p.16。不能从此推出 PS UART 的具体 COM 号或 MIO。 |
+| 手册给出 | PS 有 2 个 UART；板级 automation 示意勾选 UART0。 | 仓库手册 pp.6、27。手册未列 PS UART MIO；p.17 的 F16/F17 是 **PL UART** 引脚，不能作为 PS UART MIO。 |
+| 仍缺 | PS UART 实际选择、UART0/1 MIO、串口电平/通道对应、线速配置。 | 厂商原理图、board_files/PS7 preset、对应板卡例程或逐候选 MIO/COM 实测；不能照抄旧 ECO UART1 MIO48..49。 |
+| 手册给出 | PS MIO bank 电压：VCCO_MIO0=3.3V、VCCO_MIO1=1.8V、VCCO_DDR=1.5V。 | 仓库手册 p.8。该项是 PS bank 电压；不等于 DDR 芯片 VDD/VDDQ 已确认。 |
+| 手册给出 | 两颗 Micron MT41K256M16TW-107，各 256M×16bit / 4Gbit；合计 32bit、8Gbit，即 1GB；连接 PS BANK502；手册称最高 533MHz / 1066Mbps。 | 仓库手册 pp.9–10，DDR 引脚表继续在 pp.11–14。p.16 的资源摘要写“双路 DDR3，共 1Gb”，与 p.9–10 的“两颗 4Gbit”矛盾；本表采用详细器件表并按容量算出 1GB，将 p.16 视作摘要单位/数值疑点，仍需厂商确认。 |
+| 手册给出 | QSPI 为 Winbond W25Q256、32MByte、3.3V；QSPI_CLK/CS/D0..D3 分配到 PS_MIO6/1/2/3/4/5（MIO1..6）。 | 仓库手册 pp.8–9。板卡和焊接器件的修订对应仍待实物核对。 |
+| 手册给出 | 支持 JTAG、QSPI、SD 三种启动；BOOT_CFG 拨码表列出三种模式及无效组合。 | 仓库手册 pp.8、15。未验证任何冷启动镜像；本轮不切换拨码、不写 QSPI/SD。 |
+| 手册给出 | 有 PS 端 TF 卡；PS 泛型资源支持 SD/SDIO；block automation 示意勾选 SD0。 | 仓库手册 pp.6、15、27。SD0 MIO、CD/WP/供电和当前板上的具体走线仍待确认。 |
+| 手册给出 | PS 泛型资源有 USB OTG；板卡资源页列 USB2.0 host 与 USB2.0 slave Type-C；板级 automation 示意勾选 USB0。 | 仓库手册 pp.6、15–16、27。USB0 MIO、PHY、复位/供电和各 USB 口功能映射仍待确认。 |
+| 手册给出 | PS 有两个千兆网控制器的一般能力；板卡资源页列 PS 以太网；block automation 示意勾选 ENET0。 | 仓库手册 pp.6、16、27。没有给出本板 PHY 型号或 MIO、接口模式、MDIO/复位脚。 |
+| 已证实（main 现场） | Windows ASIX USB 千兆网卡“以太网 2”为 192.168.1.100/24、链路 Up、1Gbps；ReceivedBytes=0。 | 2026-10-12 阶段卡。这是主机侧适配器状态；因 PS 尚未发包，不能宣称 BKB220 GEM/PHY 链路已通。 |
+| 仍缺 | ENET0 PHY/地址、RGMII/GMII/SGMII、MIO 组、MDIO MIO、PHY reset MIO/极性、参考时钟及协商行为。 | 对应 PCB 原理图、PHY 数据表/板级 preset 和 main 持板逐项探测。不能复制旧 ECO 的 MIO16..27、MDIO52..53 或 reset MIO。 |
+| 手册给出 | PL 系统时钟输入 U18；PL UART 为 F16/F17。 | 仓库手册 p.17 的 XDC 示例。它描述 PL 外部引脚，不给出 PS_CLK 频率，F16/F17 也不是 PS UART。 |
+| 手册给出 | Vivado 2022.1 示例里对 Zynq 执行 block automation，会勾选 UART0、GPIO、SD0、USB0、ENET0；后续 connection automation 导入 PS 配置。 | 仓库手册 pp.26–28。手册没有随附 board_files、preset 内容或实际工程 XSA；界面示例不能替代厂商 preset/当前 Vivado 2022.2 catalog 验证。 |
+| 已证实（main 现场） | WSL Vivado=/tools/Xilinx/Vivado/2022.2/bin/vivado；WSL Vitis/XSCT=/tools/Xilinx/Vitis/2022.2；Windows 2026.1 根目录 D:/xilinx/2026.1，XSDB 为 `D:\xilinx\2026.1\Vitis\bin\xsdb.bat`。 | 2026-10-12 阶段卡。只是工具路径核实，不代表本任务运行 Vivado 或生成新板制品。 |
+| 仍缺 | PS_CLK 输入频率/来源、PS7 preset、当前 PCB 原理图、厂家 board_files 和裸机例程。 | 本任务开始前 `docs/board/bkb220/` 的原始资料只有产品手册、SHA 清单和 README；本任务未发现随仓库提供上述资料。需要向厂商/用户补齐。 |
+
+## 3. PS7 配置草案
+
+以下值写在 `hw/boards/bkb220.tcl` 的候选 `ps7_properties` 中，便于 main 审阅。只有数据手册值可直接归因；所有 board-specific pin mux、PS_CLK、DDR delay 与 PS7 catalog 接受情况未通过 Vivado 2022.2 实证。**ready=0 时 `build.tcl` 不会把这些值应用到 PS7。**
+
+### 3.1 互联、时钟和 MIO bank
+
+| 候选属性 | 草案值 | 来源 / 确信度 | 条件 |
+|---|---|---|---|
+| `CONFIG.PCW_USE_M_AXI_GP0` | `1` | `hw/scripts/bd.tcl` 的现有互联拓扑；**高（项目接口需求）**，不是 BKB220 手册事实。 | FCLK/PS 时钟稳定后用于当前 BD。 |
+| `CONFIG.PCW_USE_S_AXI_HP0` | `1` | `hw/scripts/bd.tcl` 的现有互联拓扑；**高（项目接口需求）**。 | 确认 PS7 HP0 与 DDR 地址空间可用。 |
+| `CONFIG.PCW_EN_CLK0_PORT` | `1` | 当前 BD 使用 PS FCLK_CLK0；**高（项目接口需求）**。 | PS_CLK/PLL 尚未核实。 |
+| `CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ` | `100` | `hw/scripts/bd.tcl`、`docs/07-board-build-and-acceptance.md` 的 100MHz 项目目标；**高（项目目标）**，手册未给 FCLK 输出值。 | PS_CLK 确定后须复核 PS7 PLL 与实现后的时钟报告。 |
+| `CONFIG.PCW_PRESET_BANK0_VOLTAGE` | `LVCMOS 3.3V` | 手册 p.8 的 VCCO_MIO0；**中（电压规格明确，Vivado 属性映射待核）**。 | 按当前板修订的 PS7 preset/catalog 验证。 |
+| `CONFIG.PCW_PRESET_BANK1_VOLTAGE` | `LVCMOS 1.8V` | 手册 p.8 的 VCCO_MIO1；**中（电压规格明确，Vivado 属性映射待核）**。 | 按当前板修订的 PS7 preset/catalog 验证。 |
+
+### 3.2 DDR3
+
+| 候选属性 | 草案值 | 来源 / 确信度 | 说明 |
+|---|---|---|---|
+| `CONFIG.PCW_UIPARAM_DDR_ENABLE` | `1` | 手册 pp.9–10；**中高（手册规格）**。 | 精确 DRAM 电源与 DDR3/DDR3L 兼容配置仍需原理图/电源资料。 |
+| `CONFIG.PCW_UIPARAM_DDR_MEMORY_TYPE` | `DDR 3` | 手册 pp.9–10 称 DDR3；**中高（手册规格）**。 | Micron 器件资料含 DDR3L 系列属性，板上供电仍需核对。 |
+| `CONFIG.PCW_UIPARAM_DDR_BUS_WIDTH` | `32 Bit` | 手册 p.9 两颗 x16 合成 32bit；**高（手册明确）**。 | 原理图确认两颗都装配、rank/片选组织与 PCB 修订。 |
+| `CONFIG.PCW_UIPARAM_DDR_PARTNO` | `MT41K256M16TW-107` | 手册 p.9；**中（手册给出型号，PS7 catalog 项未验证）**。 | 检查完整器件后缀、温度等级和 catalog 映射。 |
+| `CONFIG.PCW_UIPARAM_DDR_DRAM_WIDTH` | `16 Bits` | 手册 p.9 的单颗 256M×16；**高（手册明确）**。 | 等原理图/实物确认。 |
+| `CONFIG.PCW_UIPARAM_DDR_DEVICE_CAPACITY` | `4096 MBits` | 手册 p.9 单颗 4Gbit；**高（手册明确，PS7 单颗容量字段语义待 catalog 复核）**。 | 两颗合计 8Gbit=1GB。 |
+| `CONFIG.PCW_UIPARAM_DDR_SPEED_BIN` | `DDR3_1066F` | 手册 p.9 的 1066Mbps；**中（候选运行点，catalog 未验证）**。 | Micron 将 `-107` 器件标为 933MHz/1866MT/s 能力等级；`DDR3_1066F` 是本草案采用的较低运行点，不把二者混为同一 bin。见 [Micron 料号页](https://www.micron.com/products/memory/dram-components/ddr3-sdram/part-catalog/part-detail/mt41k256m16tw-107-m-p)。 |
+| `CONFIG.PCW_UIPARAM_DDR_FREQ_MHZ` | `533.333333` | 手册 p.9 的 533MHz；**中（板级目标/上限来自手册，PS_CLK/PLL 未验证）**。 | 必须先确定 PS_CLK、DDR PLL 和 board delay。 |
+| `CONFIG.PCW_UIPARAM_DDR_CL` | `7` | tCK≈1.875ns；Micron 4Gb DDR3L Table 53 DDR3L-1066 7-7-7 档；**推导，不是实测**。 | 1066工作点，不代表 `-107` 料号本身是 -1066。 |
+| `CONFIG.PCW_UIPARAM_DDR_CWL` | `6` | Micron Table 53 在 1.875ns tCK 支持 CL7/CWL6；**推导，不是实测**。 | 待 PS7 catalog/板测。 |
+| `CONFIG.PCW_UIPARAM_DDR_T_RCD` | `7` CK（13.125ns） | Micron Table 53 的 DDR3L-1066 tRCD=13.125ns；**推导，不是实测**。 | `ceil(13.125/1.875)=7`。 |
+| `CONFIG.PCW_UIPARAM_DDR_T_RP` | `7` CK（13.125ns） | Micron Table 53 的 DDR3L-1066 tRP=13.125ns；**推导，不是实测**。 | `ceil(13.125/1.875)=7`。 |
+| `CONFIG.PCW_UIPARAM_DDR_T_RC` | `50.625ns` | Micron Table 53 的 DDR3L-1066 tRC；**推导，不是实测**。 | 不能沿用旧 ECO profile 的 48.91ns。 |
+| `CONFIG.PCW_UIPARAM_DDR_T_RAS_MIN` | `37.5ns` | Micron Table 53 的 DDR3L-1066 tRAS；**推导，不是实测**。 | 不能沿用旧 ECO profile 的 35ns。 |
+| `CONFIG.PCW_UIPARAM_DDR_T_FAW` | `50.0ns` | Micron Table 58 对 x16/2KB page 的 DDR3L-1066 tFAW；**推导，不是实测**。 | 本手册器件为 x16；不能沿用旧 ECO profile 的 40ns。 |
+| `PCW_UIPARAM_DDR_BOARD_DELAY0..3`、`PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_0..3` | **不设置** | 手册未给；**仍缺**。 | 不复制 ECO profile 的 0.25ns/0ns；须有本板走线/延迟来源。 |
+
+DDR 时序参考：Micron-authored [4Gb x4/x8/x16 DDR3L SDRAM datasheet, Rev. R](https://datasheet.lcsc.com/datasheet/pdf/5dffd7a5abc502f4a8d151b6c508c1b4.pdf?productCode=C2888412)，Table 53（印刷页 78）给出 DDR3L-1066 CL/tRCD/tRP/tRAS/tRC，Table 58（印刷页 85）给出 x16/2KB page 的 tFAW。它是器件级时序表，不含 BKB220 的 PS_CLK、PCB 走线、DQS-to-CLK 或 Vivado 2022.2 preset；以上只能作为待验证草案。
+
+### 3.3 UART、ENET0、QSPI、SD、USB
+
+| 外设 / 候选属性 | 草案值 | 手册支持与确信度 | 待实物确认 |
+|---|---|---|---|
+| `uart` profile 字段 | `ps7_uart_0` | p.16 说一路 USB 转串口接 PS；p.27 automation 选 UART0；**中（功能选择）**。 | 不能据此确定哪个 COM 或 UART MIO。 |
+| `CONFIG.PCW_UART0_PERIPHERAL_ENABLE` | `1` | 手册 p.27；**中（示例 automation）**。 | UART0 实际 MIO、FTDI COM9/10/11 对应、波特率/电平；p.17 的 PL F16/F17 不是 PS UART。 |
+| `CONFIG.PCW_ENET0_PERIPHERAL_ENABLE` | `1` | p.16 列 PS 以太网，p.27 automation 选 ENET0；**中（功能选择）**。 | MIO、PHY 型号/地址、RGMII/GMII/SGMII、MDIO、reset、时钟及链路协商。 |
+| `CONFIG.PCW_QSPI_PERIPHERAL_ENABLE` | `1` | p.8–9 的 W25Q256/32MB；**中高（手册规格）**。 | 当前实物器件与 PS 端接线。 |
+| `CONFIG.PCW_QSPI_QSPI_IO` | `MIO 1 .. 6` | p.9 的 QSPI MIO1..6 逐信号表；**中高（手册明确 pin mapping）**。 | 当前 PCB revision 与 Vivado 2022.2 catalog 属性值。 |
+| `CONFIG.PCW_QSPI_GRP_SINGLE_SS_ENABLE` | `1` | p.9 单颗 W25Q256；**中（单片选候选）**。 | 检查当前 PS7 IP 单片选属性/board preset。 |
+| `CONFIG.PCW_QSPI_GRP_SINGLE_SS_IO` | `MIO 1 .. 6` | p.9 的 QSPI_CLK/CS/D0..D3 映射；**中（属性映射待 catalog 验证）**。 | 确认 catalog 对 group I/O 的接受格式及实际 PCB 连线。 |
+| `CONFIG.PCW_SD0_PERIPHERAL_ENABLE` | `1` | p.6 列 SD/SDIO，p.15 为 PS TF 卡，p.27 automation 选 SD0；**中（功能选择）**。 | SD0 MIO、CD/WP/供电脚、卡槽和实际读写；不从 automation 猜 MIO。 |
+| `CONFIG.PCW_USB0_PERIPHERAL_ENABLE` | `1` | p.6 列 USB OTG，p.15–16 列 host/slave Type-C/串口/JTAG，p.27 automation 选 USB0；**中（功能选择）**。 | USB0 MIO、PHY、复位/供电、host/slave 口与 FTDI 功能对应关系。 |
+
+## 4. 进入 F3 前的硬缺项
+
+1. **芯片/PCB 身份**：拍照并核对完整 FPGA 顶标（含 speed/temperature）、板卡 PCB 修订、两颗 DDR 实装型号；解释手册 p.16 “1Gb”与 p.9 的 8Gbit 总量差异。
+2. **PS_CLK**：频率、振荡器来源、容差与对应 bank/管脚；FCLK0=100MHz 是项目输出目标，不是 PS_CLK 输入值。
+3. **厂商设计资料**：当前板修订的原理图、PS7 preset 或 board_files、Vivado 工程/裸机例程、DDR 引脚/布线资料。手册 pp.26–28 的 automation 截图不是 preset 文件。
+4. **DDR 供电与控制器参数**：DRAM VDD/VDDQ、DDR bank 电压/布线、rank/片选/组织、speed-bin 与 Vivado 2022.2 catalog 映射；DDR 板级走线延迟和各 byte lane 的 DQS-to-CLK 延迟/长度、传播延迟。不要从 ECO profile 复制。
+5. **PS UART**：PS UART0/1 的 MIO 分配、UART 对应的 FTDI 通道与 Windows COM9/10/11、I/O 电压和实际波特率。F16/F17 只属于 PL UART。
+6. **GEM0**：PHY 厂牌/型号/地址、MIO pin group、RGMII/GMII/SGMII 模式、MDIO/MDC、reset pin/极性、参考时钟及 PHY 电源/复位时序。
+7. **QSPI/SD/USB**：以当前 PCB 原理图核对 PS MIO、复位/卡检测/写保护/供电及端口角色；手册给 QSPI 的 MIO1..6 仍需当前 PCB 修订确认。
+8. **启动资料**：BOOT_CFG 拨码实际状态和厂商冷启动流程；JTAG 启动通过不证明 QSPI/SD 冷启动通过。
+
+## 5. F3 最小启动计划（由 main 持板执行）
+
+本子任务没有操作 JTAG、COM 口、网络适配器或板卡。以下操作均由 main 持板执行；board-migrate 只准备经审阅的配置/同 XSA 软件包并分析 main 回传的日志。进入物理步骤前先由 main 审核本表、取得足以填写最终 PS7 参数的厂商资料，并在配置属性通过 Vivado 2022.2 catalog 检查后另行解除 `ready=0` 守卫。不得仅为启动测试把未知值猜入 profile。
+
+| 顺序 | main 执行的最小步骤 | PASS 判据 | 失败分类与下一检查 |
+|---|---|---|---|
+| 0. 输入冻结 | 核对板卡顶标/PCB rev、PS7 preset、手册 SHA、Vivado 2022.2 版本和唯一的独立 run 目录；用 `tclsh hw/scripts/build.tcl board=bkb220 dry_run=1` 检查 profile。 | 输入来源明确；profile 只有在缺项补齐并经 main 审核后才可转 `ready=1`；候选运行目录独立。 | dry-run 仍报未验证/缺项则停在 F2，不生成工程；part/catalog 不匹配回到板卡身份/器件映射核对。 |
+| 1. JTAG/PS 初始化 | main 使用阶段卡记录的唯一目标（xc7z020 / IDCODE `0x23727093`），从 JTAG 下载同一 XSA 的 PS 初始化与最小 UART ELF。先确认 BOOT_CFG 为 JTAG 模式；不要下载混搭的历史 bit/XSA/ELF。 | XSDB 只选中一个目标；PS 初始化与下载成功，无多个同类目标歧义。 | 无目标/IDCODE 变化：FT4232 驱动、USB 线/供电/BOOT_CFG；PS 初始化失败：PS_CLK、完整 part、preset、DDR/PLL 参数分开追查。由 main 执行，不在本轮复测。 |
+| 2. UART 确认 | 依据原理图/preset 逐个构建合法的 UART MIO 候选配置；每次启动 hello 固件输出独特递增串 `BKB220-UART0-<seq>`。main 依次打开 Windows COM9、COM10、COM11，115200 8N1 先作候选，再按实际 PS 外设/串口配置调整；保存端口、MIO、baud、时间戳和原始日志。不得对无资料的 MIO 任意驱动/盲扫。 | 唯一的 MIO/COM 组合连续收到至少 10 条序号递增、无乱码输出；冷启动 PS init 后复测仍一致。 | 无字节：PS init/UART mux/COM通道/线缆；有乱码：baud/时钟/电平；多个通道重复：映射未唯一；检查 USB 串口驱动与 UART 引脚来源。由 main 执行。 |
+| 3. DDR 初始化与安全区 | hello 固件代码/栈放 OCM，按最终 PS7 初始化执行 DDR write leveling/read gate/data-eye 等训练；记录初始化返回码/状态。由 main 先划定不覆盖 ELF、栈、FSBL、旧制品或项目数据的 scratch window，再做 walking-1/0、`0xAA55...`、地址线、固定种子 PRBS 写读；按合法容量边界做地址别名检查。测试范围/地址和恢复策略写入 run 记录。 | DDR 初始化/训练完成；每个 pattern 多轮逐字节一致；不同地址窗口无 alias；确认可用容量为至少产品手册规格 1GB。 | 初始化失败：先核 PS_CLK、DDR 类型/组织、时序、rail、delay；pattern 随机错：lane/DQS/走线/训练裕量；高地址 alias/读写失配：容量、地址位/片选或焊接；错误保留 raw log，不扩大到全系统数据区。由 main 执行。 |
+| 4. GEM0/PHY 链路 | 仅在获取 PHY 资料/正确 MIO/reset 后启动 GEM0；通过 MDIO 读取 PHY ID/状态，记录 autoneg、速度/双工/错误计数。使用 main 已测 Windows 网卡 `192.168.1.100/24`，按记录的板 IP 做 ping 和最小 TCP 回环。 | 读到与原理图一致的 PHY ID，link up；Windows 与 PS 双向 ping/TCP 连续传输通过且计数增长、无链路反复掉线。 | MDIO 无响应：MIO/MDIO/reset/PHY 供电；PHY ID 不匹配：板型/地址/器件；PHY link down：RGMII 时钟/复位/线缆/协商；Host NIC Up 只证明 PC 侧，不能算 GEM PASS。由 main 执行。 |
+| 5. CAPS | 最小应用运行协议栈，仅发送 `PKT_CAPS (0x06)`；不发送 WM/BATCH/POST、不启动数据流水线。按 `docs/04-interfaces.md` 解码 24B `CAPS_INFO (0x16)`。 | 收到版本1、read_bps=150、num_lc=50、stride=807、max_symbols=40500、max_reads=129600、features bit0=1；至少重复 3 次内容一致。 | TCP 无连接：回到 GEM；TCP 通但无响应：固件/监听端口；包头/长度不符：协议/缓冲；字段不符：XSA/ELF/编译参数不同源。由 main 执行并保存 PC 请求、板 UART 与原始响应。 |
+
+F3 最小项仅覆盖 JTAG、PS UART、DDR、GEM0 与 CAPS；不会证明 QSPI/SD 冷启动、USB host/slave、生产 G3、P4/P16 timing 或性能。每个失败保留独立日志和报告；修复后重跑受影响步骤，不删除失败证据。
+
+## 6. 板级入口审计与 ready=0 守卫
+
+| 入口 | 审计结论 |
+|---|---|
+| `hw/boards/load_board.tcl` / `dna_load_board` | `id`、`ready`、`part` 是最先检查的必填字段；`id` 必须等于所选 profile 名。仅当 `ready` 字符串等于 `1` 时才继续检查非空 `uart`、`xdc`、`source_refs`、`ps7_properties`；通过后附加规范化的 `config_path` 并返回 dict。`pending` 不在 ready=1 的字段循环里，但 `ready!=1` 错误会读取它来说明拒绝原因，因此此 profile 保留该字段。非法板名、缺 profile、ID 不符和未 ready 都明确 `error`。 |
+| `hw/boards/bkb220.tcl` | profile 有完整字段 `id/ready/part/uart/xdc/source_refs/ps7_properties/pending`，`ready=0`。`ps7_properties` 是候选草案，不会绕过守卫；pending 列出未核对的资料和 PS7 参数。 |
+| `hw/boards/zynq_eco_7010.tcl` | 旧 ECO 的已验证基线；含旧板 DDR/MIO/时钟延迟，不作为 BKB220 的数值来源。 |
+| `hw/scripts/build.tcl` / `dna_load_board` | 先解析参数和 P4/P16/100MHz 约束，随后调用 `dna_load_board`、核 part、XDC 与目录；`dry_run` 判断及 `create_project` 都在 loader 之后。因而 BKB220 `ready=0` 时在 `create_project` 前清晰失败，也不会 mkdir 构建目录。 |
+| `hw/scripts/bd.tcl` | build 传入已验证的 `::dna_board_config` 后使用其中 `ps7_properties`。如果直接 source 且没有传入配置，脚本有历史兼容分支会选择 `zynq_eco_7010`；因此新板必须从 build/load_board 入口调用，不能把该 fallback 当 BKB220 默认。 |
+| `tools/run_vivado_build.sh` | 选择显式 Vivado/VIVADO_ROOT/PATH，创建 `logs/vivado/<run-id>/` 再调用 Vivado；入口帮助已指出可用 `tclsh hw/scripts/build.tcl board=... dry_run=1` 做配置预检。此任务直接调用 tclsh，不启动 Vivado。 |
+| `hw/constr/top.xdc` | 当前仅有说明注释；顶层没有 PL 外部引脚。PL 时钟由 BD 中 PS7 `FCLK_CLK0` 经 `clk_wiz_0` 输出，PS 固定 IO/DDR 由 PS7 及 BD 参数管理。因此候选 profile 复用 `hw/constr/top.xdc`，不把手册中的 PL U18/F16/F17 接入本系统顶层。 |
+
+## 7. 本次执行结果
+
+| 检查 | 实际命令/结果 | 状态 |
+|---|---|---|
+| 手册 SHA | `sha256sum -c SHA256SUMS.txt`（在 `docs/board/bkb220/`）；完整输出见本节上方。 | PASS，exit 0 |
+| PDF 阅读/页面 | `pdfinfo`、两段 `pdftotext -layout` 和三次 `pdftoppm`；均 exit 0。目标页面 5–10、15–17、27 已目视检查。 | PASS（文档阅读与页码核对）；不含实物核验 |
+| Profile 字段/属性列表语法 | 下方 `source hw/boards/bkb220.tcl` 的 Tcl 结构预检；exit 0，8 个必需字段齐全、29 对 PS7 key/value 无重复。 | PASS（仅 Tcl 结构，不验证 Vivado catalog） |
+| ready=0 构建守卫 | `tclsh hw/scripts/build.tcl board=bkb220 dry_run=1`；exit 1，`dna_load_board` 报出未验证原因，调用栈显示在 `build.tcl` 的 profile 加载处停止。 | PASS（预期拒绝）；在 `create_project` 前失败 |
+| 仓库根工具残留 | `find . -maxdepth 1 -type f \( -name '*.log' -o -name '*.jou' -o -name '*.str' -o -name '*.pb' \)`；exit 0、无输出。 | PASS |
+| 新板实物/PS7/Vivado | 无触板、无 XSDB、无 Vivado、无 PS7 catalog 验证。 | 未测；由 main 按 F2/F3 资源门禁执行 |
+
+字段/PS7 属性预检实际命令和输出：
+
+```text
+$ tclsh <<'TCL'
+source hw/boards/bkb220.tcl
+set required {id ready part uart xdc source_refs ps7_properties pending}
+foreach key $required {
+  if {![dict exists $board_config $key]} {error "missing field $key"}
+}
+if {[dict get $board_config id] ne "bkb220"} {error "wrong id"}
+if {[dict get $board_config ready] ne "0"} {error "ready must remain 0"}
+if {[llength $ps7_properties] % 2 != 0} {error "ps7_properties is not key/value pairs"}
+set seen {}
+foreach {key value} $ps7_properties {
+  if {$key in $seen} {error "duplicate ps7 property $key"}
+  lappend seen $key
+}
+puts "PROFILE_SCHEMA_PASS id=[dict get $board_config id] ready=[dict get $board_config ready] part=[dict get $board_config part] fields=[llength $required] ps7_property_pairs=[expr {[llength $ps7_properties] / 2}]"
+TCL
+PROFILE_SCHEMA_PASS id=bkb220 ready=0 part=xc7z020clg400-2 fields=8 ps7_property_pairs=29
+exit_code=0
+```
+
+ready 守卫预检完整输出：
+
+```text
+$ tclsh hw/scripts/build.tcl board=bkb220 dry_run=1
+板配置 'bkb220' 尚未验证：未核对实物完整器件顶标与PCB修订；PS_CLK来源及频率缺失；DDR VDD/VDDQ、板级走线/延迟与DQS-to-CLK缺失；UART0的PS MIO和COM映射缺失；ENET0的PHY型号、MIO/RGMII/MDIO/复位与时钟缺失；QSPI/SD0/USB0的实物连线和对应MIO/复位仍须核对；厂商board_files、PS7 preset、原理图和例程未提供；候选PS7属性名/器件支持情况尚未由Vivado 2022.2 catalog验证
+    while executing
+"error "板配置 '$board_id' 尚未验证：[dict get $board_config pending]""
+    (procedure "dna_load_board" line 17)
+    invoked from within
+"dna_load_board $repo_root $board"
+    invoked from within
+"set ::dna_board_config [dna_load_board $repo_root $board]"
+    (file "hw/scripts/build.tcl" line 25)
+exit_code=1
+```
+
+该错误发生在 `dna_load_board` 对 `ready` 的守卫中；`build.tcl` 尚未走到输出目录 `file mkdir`、dry-run PASS 分支或 `create_project`。profile 文件已被 Tcl 解释并完成字段/属性列表检查；Vivado 属性名、值域、器件支持仍未验证。
+
+本次改动路径：`hw/boards/bkb220.tcl`、`docs/board/bkb220/migration-source-table.md`。仍缺项和下一步依赖见第 4 节；进入 F3 的依赖是厂商/PCB 来源补齐、main 审核配置、Vivado 2022.2 PS7/catalog 验证以及 ready 守卫通过。
+
+## 8. F3 阶段二：Vivado 2022.2 PS7 catalog 验证与上板候选
+
+更新：2026-10-12。**本节只追加阶段二结果；第 1–7 节保留第一阶段当时的结论。**`hw/boards/bkb220.tcl` 未改，`ready=0` 保持不变。本阶段没有连接 JTAG、串口或板卡，没有下载、reset、DDR 读写，也没有生成 bit/XSA 或运行综合/实现。所有板端步骤仍由 main 执行。
+
+### 8.1 Vivado 工程与可复现入口
+
+- 工具：`/tools/Xilinx/Vivado/2022.2/bin/vivado`，版本输出 `Vivado v2022.2 (64-bit) / SW Build 3671981 / IP Build 3669848`。
+- 最终探测 run：`hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/`。其中 `ps7_probe.tcl` 从仓库的 `hw/boards/bkb220.tcl` 读取原始 29 对 `ps7_properties`，逐条设置并读回；每个变体创建独立工程和 standalone `processing_system7:5.5` IP，调用 `validate_ip` 与 `generate_target all`。输出 `.xci`、`ps7_init.tcl`、`ps7_init.html`；没有 `synth_design`、综合 run、implementation run 或 XSA/bit 导出。
+- 最终实际命令：
+
+```bash
+VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2 \
+/tools/Xilinx/Vivado/2022.2/bin/vivado -mode batch \
+  -source hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/ps7_probe.tcl \
+  -log hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/vivado.log \
+  -journal hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/vivado.jou \
+  > hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/vivado.stdout.txt 2>&1
+```
+
+  实际以 `> .../vivado.stdout.txt 2>&1` 捕获控制台；shell `exit_code=0`。四个 `IP_VALIDATE` 与四个 `GENERATE_TARGET` 均为 `rc=0`，四个变体都生成了 `ps7_init.tcl/.html/.xci`。完整命令记录和逐属性结果分别在 `vivado.log`、各变体的 `property-results.tsv` 与 `effective-ddr.txt`。
+- 保留的中间失败：首轮 `20261012T114440Z-board-migrate` 因 Vivado Tcl 不含 `lmap` 退出 1；第二轮 `...-r2/` 的属性探测完成，但其 standalone PS7 被放入空 BD 后 `generate_target` 对四个变体均报未连接 M_AXI_GP0/时钟、BD 生成失败（`BD 41-2670`、`BD 41-758`、`BD 41-1031`）。两轮均保留；r3 改为独立 standalone PS7 IP 后通过。r2 的逐属性日志仍用于记录**原始 profile 直设**时的拒绝/忽略情况，r3 用于最终生成候选。
+- Vivado 启动日志有本机环境提示：`CRITICAL WARNING: [Common 17-741] No write access right to the local Tcl store ... XilinxTclStore is reverted to the installation area.` Vivado 回退安装目录 Tcl Store，命令继续完成；此项不是 PS7 属性错误。r3 `validate_ip` 另记录 `[Vivado 12-3672]` / `[Vivado 12-3670]` 两条“`is_managed` / `generate_synth_checkpoint` should only be queried on the file object”警告，来自探测脚本把 IP 对象交给 `validate_ip`，四次 `validate_ip` 仍为 `rc=0`，`generate_target` 也全部 `rc=0`；完整原文见 r3 `vivado.log`。
+
+### 8.2 器件 part 与工业级表示
+
+Vivado 2022.2 实际 `get_parts` 结果中，与 CLG400 有关的 Z020 条目是：
+
+| Vivado part | Catalog 属性 | 结论 |
+|---|---|---|
+| `xc7z020clg400-1` / `-2` / `-3` | `DEVICE=xc7z020`；`SPEED=-1/-2/-3`；`TEMPERATURE_GRADE_LETTER` 为空，温度上下限属性为 0。 | 三项均在库；profile 的 `xc7z020clg400-2` **被 catalog 接受**，表示普通 `xc7z020` 的 -2 档，不能据此声称工业级。 |
+| `xc7z020iclg400-1L` | `DEVICE=xc7z020i`、`SPEED=-1L`、`TEMPERATURE_GRADE_LETTER=I`、`MIN_OPERATING_TEMPERATURE=-40`、`MAX_OPERATING_TEMPERATURE=100`。 | Vivado 此库中 CLG400 的工业级条目；命名中 `i` 位于 device 后、package 前，part 对象的温度等级属性是只读信息。 |
+| `xc7z020iclg400-2`、`xc7z020clg400-2i` | `get_parts` 精确查找均不存在。 | 手册料号 `XC7Z020-2CLG400I` 对应的工业级 -2 CLG400 在本机 2022.2 catalog **未找到**。近似的 `xc7z020iclg400-1L` 速度档不同，不能当作等价别名。 |
+
+`xc7z020clg400-2` 的存在性为 PASS；手册完整料号与已安装 catalog 的工业级 -2 part 对应关系仍未解决。须由 main 核对芯片顶标/PCB 修订并决定实际 `part`，此项不解除 `ready=0`。
+
+### 8.3 profile 的 29 项属性逐条结果
+
+下表“直设结果”来自 r2 中每次单独 `set_property` 后的异常、日志警告和 `get_property` 读回。DDR partno 被拒后，Vivado 将 DDR 回滚到默认 `MT41J128M8 JP-125`；此时后续标记为 disabled 的 DDR 参数**即使读回刚好等于草案，也不代表新值已生效**。最终可生成的四个 r3 变体在 `DDR_PARTNO=Custom` 下重新逐项设置，并通过 IP 验证与 `generate_target`。
+
+| `hw/boards/bkb220.tcl` 属性 | 草案值 | 直设结果 | r3 `Custom` 最终有效值 |
+|---|---:|---|---|
+| `PCW_USE_M_AXI_GP0` | `1` | 接受，读回 `1` | `1` |
+| `PCW_USE_S_AXI_HP0` | `1` | 接受，读回 `1` | `1` |
+| `PCW_EN_CLK0_PORT` | `1` | 接受，读回 `1` | `1` |
+| `PCW_FPGA0_PERIPHERAL_FREQMHZ` | `100` | 接受，读回 `100` | `100` MHz |
+| `PCW_PRESET_BANK0_VOLTAGE` | `LVCMOS 3.3V` | 接受，读回相同 | `LVCMOS 3.3V` |
+| `PCW_PRESET_BANK1_VOLTAGE` | `LVCMOS 1.8V` | 接受，读回相同 | `LVCMOS 1.8V` |
+| `PCW_UIPARAM_DDR_ENABLE` | `1` | 接受，读回 `1` | `1` |
+| `PCW_UIPARAM_DDR_MEMORY_TYPE` | `DDR 3` | 接受，读回相同 | `DDR 3` |
+| `PCW_UIPARAM_DDR_BUS_WIDTH` | `32 Bit` | 接受，读回相同 | `32 Bit` |
+| `PCW_UIPARAM_DDR_PARTNO` | `MT41K256M16TW-107` | **拒绝**；读回恢复为 `MT41J128M8 JP-125` | `Custom`；手动几何/时序可用，但 XCI 不再绑定目标 Micron part 名称 |
+| `PCW_UIPARAM_DDR_DRAM_WIDTH` | `16 Bits` | disabled 警告，**忽略**；有效值仍为 `8 Bits` | `16 Bits` |
+| `PCW_UIPARAM_DDR_DEVICE_CAPACITY` | `4096 MBits` | disabled 警告，**忽略**；有效值仍为 `1024 MBits` | `4096 MBits`（每颗 x16 器件） |
+| `PCW_UIPARAM_DDR_SPEED_BIN` | `DDR3_1066F` | disabled 警告，**忽略**；读回同值是默认值巧合 | `DDR3_1066F` |
+| `PCW_UIPARAM_DDR_FREQ_MHZ` | `533.333333` | 接受，读回相同 | `533.333333` MHz |
+| `PCW_UIPARAM_DDR_CL` | `7` | disabled 警告，**忽略**；读回同值是默认值巧合 | `7` |
+| `PCW_UIPARAM_DDR_CWL` | `6` | disabled 警告，**忽略**；读回同值是默认值巧合 | `6` |
+| `PCW_UIPARAM_DDR_T_RCD` | `7` | disabled 警告，**忽略**；读回同值是默认值巧合 | `7` CK |
+| `PCW_UIPARAM_DDR_T_RP` | `7` | disabled 警告，**忽略**；读回同值是默认值巧合 | `7` CK |
+| `PCW_UIPARAM_DDR_T_RC` | `50.625` | disabled 警告，**忽略**；有效值 `48.75` | `50.625` ns |
+| `PCW_UIPARAM_DDR_T_RAS_MIN` | `37.5` | disabled 警告，**忽略**；有效值 `35.0` | `37.5` ns |
+| `PCW_UIPARAM_DDR_T_FAW` | `50.0` | disabled 警告，**忽略**；有效值 `30.0` | `50.0` ns |
+| `PCW_UART0_PERIPHERAL_ENABLE` | `1` | 接受，读回 `1` | UART0 变体 `1`；UART1 变体覆盖为 `0` |
+| `PCW_ENET0_PERIPHERAL_ENABLE` | `1` | 接受，读回 `1` | `1`（候选，见 §8.6） |
+| `PCW_QSPI_PERIPHERAL_ENABLE` | `1` | 接受，读回 `1` | `1` |
+| `PCW_QSPI_QSPI_IO` | `MIO 1 .. 6` | 接受，读回相同 | `MIO 1 .. 6` |
+| `PCW_QSPI_GRP_SINGLE_SS_ENABLE` | `1` | 接受，读回 `1` | `1` |
+| `PCW_QSPI_GRP_SINGLE_SS_IO` | `MIO 1 .. 6` | 接受，读回相同 | `MIO 1 .. 6` |
+| `PCW_SD0_PERIPHERAL_ENABLE` | `1` | 接受，读回 `1` | `1` |
+| `PCW_USB0_PERIPHERAL_ENABLE` | `1` | 接受，读回 `1` | `1` |
+
+DDR partno 原始日志（r2 `vivado.log`，PS7 BD Cell）：
+
+```text
+ERROR: [IP_Flow 19-3478] Validation failed for parameter 'PCW UIPARAM DDR PARTNO(PCW_UIPARAM_DDR_PARTNO)' with value 'MT41K256M16TW-107' for BD Cell 'processing_system7_0'. PARAM PCW_UIPARAM_DDR_PARTNO :: MT41K256M16TW-107 is out of range { MT41J128M8 JP-125,MT41J128M8 JP-15E,MT41J64M16 JT-125G,MT41J64M16 JT-15E,MT41J256M8 DA-107,MT41K128M16 JT-125,MT41J256M8 HX-125,MT41J256M8 HX-15E,MT41J256M8 HX-187E,MT41J128M16 HA-107G,MT41J128M16 HA-125,MT41J128M16 HA-15E,MT41J128M16 HA-187E,MT41J512M8 RA-15E,MT41K128M16 HA-15E,MT41K256M16 RE-125,MT41K256M16 RE-15E,MT41K256M8 DA-125,MT41K256M8 DA-15E,MT41K256M8 HX-15E,MT41J256M16 RE-125,Custom }
+```
+
+按器件名/组织最接近的 PS7 下拉项是 `MT41K256M16 RE-125` 与 `MT41K256M16 RE-15E`：它们和手册 `MT41K256M16TW-107` 共享 `MT41K256M16` 基名，但 catalog 后缀/速度档代码不同，Vivado 不会把它们自动视作同一料号。安装树的 DDR memory IP CSV 虽列有 `MT41K256M16TW-107`，PS7 IP 自己的 `PCW_UIPARAM_DDR_PARTNO` 允许值仍明确拒绝它；不能以通用 CSV 存在代替 PS7 接受。
+
+直设期间的原始 disabled 警告示例（同类警告也覆盖 speed bin、CL/CWL、tRCD/tRP、tRC/tRAS/tFAW）：
+
+```text
+WARNING: [BD 41-721] Attempt to set value '16 Bits' on disabled parameter 'PCW_UIPARAM_DDR_DRAM_WIDTH' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '4096 MBits' on disabled parameter 'PCW_UIPARAM_DDR_DEVICE_CAPACITY' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value 'DDR3_1066F' on disabled parameter 'PCW_UIPARAM_DDR_SPEED_BIN' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '7' on disabled parameter 'PCW_UIPARAM_DDR_CL' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '6' on disabled parameter 'PCW_UIPARAM_DDR_CWL' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '7' on disabled parameter 'PCW_UIPARAM_DDR_T_RCD' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '7' on disabled parameter 'PCW_UIPARAM_DDR_T_RP' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '50.625' on disabled parameter 'PCW_UIPARAM_DDR_T_RC' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '37.5' on disabled parameter 'PCW_UIPARAM_DDR_T_RAS_MIN' of cell '/processing_system7_0' is ignored
+WARNING: [BD 41-721] Attempt to set value '50.0' on disabled parameter 'PCW_UIPARAM_DDR_T_FAW' of cell '/processing_system7_0' is ignored
+```
+
+r3 先将 `PCW_UIPARAM_DDR_PARTNO` 设为 PS7 接受的 `Custom`，再设置 profile 的其余 DDR 属性；四个变体的 `validate_ip` 和 `generate_target all` 都成功。最终有效值与草案中的容量、速度档和 tRC/tRAS/tFAW 一致：32-bit bus、单颗配置 16-bit/4096 Mbit、533.333333 MHz、CL7/CWL6、tRCD/tRP 7 CK、tRC 50.625 ns、tRAS 37.5 ns、tFAW 50.0 ns；地址几何为 row=15/column=10/bank=3、BL=8。两颗 x16 组成总线 32-bit，对应手册所述 1GB。**这证明的是 Vivado `Custom` 配置接受并写入 PS7 IP，不是实物训练/读写通过。**
+
+由于 profile 未提供走线延迟，四个最终 XCI 还带有 Vivado 默认 `PCW_UIPARAM_DDR_BOARD_DELAY0..3=0.25`、`PCW_UIPARAM_DDR_DQS_TO_CLK_DELAY_0..3=0.0`；它们不是 BKB220 测量值。`DDR_HIGH_TEMP` 仍为工具默认 `Normal (0-85)`。这两项连同 PCB 走线、VDD/VDDQ 与实际器件后缀仍需 main/厂商资料确认，不能由 `Custom` 模式或生成成功升级为板级 PASS。
+
+### 8.4 PS_CLK 与其余候选属性
+
+main 提供的 2026-10-12 现场证据：`IO_PLL_CTRL` 的 FBDIV=26，推导 IO PLL=433.33 MHz；BootROM 在 JTAG 待机态正常运行。由此把 PS_CLK 记为 **33.333 MHz（推导 + 可复现寄存器证据）**，不是厂商书面确认。本次在每套 IP 额外设置 `CONFIG.PCW_CRYSTAL_PERIPHERAL_FREQMHZ {33.333333}`，Vivado 读回完全相同；PS7 其余读回包括 IO PLL=1000 MHz、APU=666.666666 MHz、UART peripheral clock=100 MHz。
+
+四套候选都额外设置并被 Vivado 精确读回：
+
+| 属性 | 值 | 验证边界 |
+|---|---|---|
+| `PCW_ENET0_ENET0_IO` | `MIO 16 .. 27` | Vivado 接受，板级 RGMII 接线仍未核实。 |
+| `PCW_ENET0_GRP_MDIO_ENABLE` | `1` | Vivado 接受。 |
+| `PCW_ENET0_GRP_MDIO_IO` | `MIO 52 .. 53` | Vivado 接受；不是旧板值已被证明适用于 BKB220。 |
+| `PCW_ENET0_PERIPHERAL_FREQMHZ` | `1000 Mbps` | Vivado 接受该枚举值；不是链路已建立。 |
+| `PCW_CRYSTAL_PERIPHERAL_FREQMHZ` | `33.333333` | Vivado 接受；PS_CLK 来源仍属 main 的寄存器推导。 |
+
+ENET0 是交给 main 的**待实测候选**。必须由 main 用 MDIO 读到与实物一致的 PHY ID，再核 PHY reset、参考时钟、协商和链路；在此之前不宣称 PHY 型号、RGMII 时序或网络 PASS。
+
+### 8.5 四套 UART 初始化候选
+
+四个 UART MIO 组合在 Vivado 2022.2 均被接受；r3 每个属性逐条读回一致，`IP_VALIDATE=rc 0`、`GENERATE_TARGET=rc 0`。路径以 repo root 为基准；每个目录还保留独立 `.xci`、`.html`、`property-results.tsv` 和 Vivado project。
+
+| 变体 | 逐条 UART 属性 | `ps7_init.tcl` | SHA-256 |
+|---|---|---|---|
+| `v1-uart0-mio14-15` | `PCW_UART0_PERIPHERAL_ENABLE=1`；`PCW_UART1_PERIPHERAL_ENABLE=0`；`PCW_UART0_UART0_IO={MIO 14 .. 15}`；`PCW_UART0_BAUD_RATE=115200` | `hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v1-uart0-mio14-15/ps7_init.tcl` | `2f80e045cb18d7c37d5144bf0a819cd8fd42d09a622fca164f2ef7b007b6c81f` |
+| `v2-uart0-mio46-47` | `PCW_UART0_PERIPHERAL_ENABLE=1`；`PCW_UART1_PERIPHERAL_ENABLE=0`；`PCW_UART0_UART0_IO={MIO 46 .. 47}`；`PCW_UART0_BAUD_RATE=115200` | `hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v2-uart0-mio46-47/ps7_init.tcl` | `4e401a4886ccade2e97de36de2a5bda80be792828fbb2de488bf8c9168f9e2d2` |
+| `v3-uart1-mio08-09` | `PCW_UART0_PERIPHERAL_ENABLE=0`；`PCW_UART1_PERIPHERAL_ENABLE=1`；`PCW_UART1_UART1_IO={MIO 8 .. 9}`；`PCW_UART1_BAUD_RATE=115200` | `hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v3-uart1-mio08-09/ps7_init.tcl` | `b06959ccdeb9f867933411bc45dc061e9d6c3eff48ff4bb2ee08e10c7685d16a` |
+| `v4-uart1-mio48-49` | `PCW_UART0_PERIPHERAL_ENABLE=0`；`PCW_UART1_PERIPHERAL_ENABLE=1`；`PCW_UART1_UART1_IO={MIO 48 .. 49}`；`PCW_UART1_BAUD_RATE=115200` | `hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v4-uart1-mio48-49/ps7_init.tcl` | `308390212b257f3263c1e6f5e84e22a57d5cce8454110939980e38be8b6e456e` |
+
+UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止位属性，8N1 应由后续最小 UART ELF 驱动设置/确认。生成 Tcl 的 MIO 写寄存器也随候选变化（例如 UART0 MIO14/15 对应 `0xF8000738/0xF800073C`，MIO46/47 对应 `0xF80007B8/0xF80007BC`），说明不是同一份被改名的文件。四种组合仍都是**待主机串口实测的 MIO 候选**，catalog 通过不等于知道哪个 FTDI 通道接 PS UART。
+
+### 8.6 main 可直接照做的 F3 清单
+
+**风险边界：`rst -system` 会复位整板。每试一套都必须 reset 并重新运行该套 `ps7_init`/`ps7_post_config`。错误 DDR 参数、未知板级延迟或错 MIO 可能导致训练失败、XSDB 失去目标或系统挂起。只使用 main 已运行的 Linux `hw_server` `TCP:127.0.0.1:3132`；禁止在 Windows 启动 hw_server。**
+
+1. 在 WSL 开三个终端，分别持续监听 main 已确认的 `/dev/ttyUSB1`、`/dev/ttyUSB2`、`/dev/ttyUSB3`，每个端口 115200、8N1。例如每个终端分别执行（换成对应设备）：
+
+   ```bash
+   stty -F /dev/ttyUSB1 115200 cs8 -cstopb -parenb raw -echo
+   cat -v /dev/ttyUSB1
+   ```
+
+   本任务没有打开这些设备。当前 WSL 没有 `picocom`/`minicom`/`tio`/`screen` 或 pyserial，因此上面的 `stty`+`cat` 使用系统自带工具；三路要在三个终端同时监听。**只运行 PS7 init 时没有 hello 固件，三个串口都可能保持静默；静默不能判断 UART MIO，也不单独表示 DDR 失败。**
+
+2. 先选一个候选（如 v1），启动 WSL XSDB 2022.2：
+
+   ```text
+   /tools/Xilinx/Vitis/2022.2/bin/xsdb
+   xsdb% connect -url TCP:127.0.0.1:3132
+   xsdb% targets
+   xsdb% targets -set -filter {name =~ "APU*"}
+   xsdb% rst -system
+   xsdb% source /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout/hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v1-uart0-mio14-15/ps7_init.tcl
+   xsdb% ps7_init
+   xsdb% ps7_post_config
+   ```
+
+   XSDB 本机版本只读检查为 `2022.2`；此任务没有执行 `connect`。若 target 列表实际名称不同，main 以 `targets` 输出中唯一 APU/CPU0 目标为准，不要选 PL 目标。
+
+3. 先把 init-only 结果记作**PS7 初始化/DDR 控制器轮询初筛**，不要把它当作完整 DDR 容量或读写 PASS。生成的 `ps7_init.tcl` 中 `ps7_init` 没有显式 `return 0/DDR_PASS`；DDR 初始化过程包含 `mask_poll 0xF8000B74 0x00002000` 和 `mask_poll 0xF8006054 0x00000007`，超时时会在 XSDB 控制台打印 `Timeout Reached. Mask poll failed at ADDRESS: ...`，但 `mask_poll` 是打印后 break，不会可靠地向上层返回失败码。因此初筛 PASS 条件是：`ps7_init` 与 `ps7_post_config` 都执行结束、APU 仍可响应，且两个 DDR 轮询均无 `Timeout Reached`/XSDB 错误；任一超时、异常或 APU 丢失均 FAIL。PS7 Tcl 自身没有 DDR 校准的 UART 打印。
+
+4. 真实 DDR 访问和 UART 通道归属需要 main 另准备**最小 hello ELF**：代码、向量和栈放 OCM，分别为 UART0 / UART1 构建合适的串口驱动配置；串口 115200 8N1。ELF 先输出唯一递增标记，再只对 main 划定的 DDR scratch window 做 bounded write/read（固定图样、反码/地址相关图样、多轮逐字比较），全匹配才打印 `DDR_SMOKE_PASS`，否则打印 `DDR_SMOKE_FAIL` 并停下。不能用旧 ECO 的 UART1 ELF 假设新板管脚，也不要在没有划定 scratch 区前访问 DDR。这个 ELF 本阶段未构建。
+
+   - DDR smoke PASS：hello 从 OCM 启动；出现 `DDR_SMOKE_PASS`；指定 scratch 区所有读回与写入逐字一致；XSDB/CPU 无挂死。该结果只证明本次安全区可用，不证明完整 1GB 容量或全地址无 alias，后续按 F3 容量/地址线检查补测。
+   - UART 映射 PASS：同一 hello 的至少 10 条递增标记无乱码，且只在 `/dev/ttyUSB1/2/3` 中唯一一路收到；记录 UART 编号、MIO、ttyUSB、波特率、原始日志与 `ps7_init.tcl` SHA。没有串口字节时映射仍为未测，不能把“没看到打印”归因于 DDR。
+
+5. 对 v2/v3/v4 重复：三路监听保持开启，重新 `targets` 选择 APU、`rst -system`、source 对应绝对路径、执行 `ps7_init` 与 `ps7_post_config`，再下载匹配 UART0/1 的 OCM hello。每个 variant 都单独记录 run、串口原始输出、DDR scratch 地址/长度/图样和上述哈希；不把一次变体的 init 套用到下一变体。
+
+**失败后恢复干净 JTAG 态：**停止当前 hello/串口采集，XSDB 仍可用时重新选 APU 并执行 `rst -system`；若 target 消失，先 `connect -url TCP:127.0.0.1:3132`、等待 `targets` 重新枚举，再选 APU 执行 `rst -system`。当前 BOOT_MODE=0 时复位回 BootROM 的 JTAG 待机态；main 按初始现场基线复核 JTAG/BOOT_MODE、DDR PLL 掉电、FCLK0/GEM/UART 未被旧配置保持开启。恢复后不要 source 错误候选或继续 DDR 访问，先保存 XSDB/串口日志，再由 main 决定下一项；不切换拨码、不写 QSPI/SD、不启动 Windows hw_server。若 JTAG reset 后仍不可访问，停止候选测试并由 main 处理供电/线缆/硬件恢复。
+
+### 8.7 阶段结果与未完成项
+
+| 验收项 | 结果 |
+|---|---|
+| PS7 profile 29 属性逐条 Vivado 检查 | 已测。非 DDR 组和 bank/QSPI 等读回通过；目标 DDR partno 被拒，依赖该 part 的手工容量/时序在默认 part 下 disabled；改用 `Custom` 后最终手动参数有效。原文日志及逐属性 TSV 均保留。 |
+| `xc7z020clg400-2` 在 2022.2 catalog | PASS（存在）；它不是 catalog 中标记工业级 `I` 的 part。手册工业级 -2 的精确 catalog 条目未找到。 |
+| 四套 UART `ps7_init` + SHA | PASS（四套 IP validate/generate 均 `rc=0`，SHA 见 §8.5）；UART/COM 实际归属未测。 |
+| ENET0 候选属性 | PASS（Vivado 接受）；MDIO PHY ID/链路未测。 |
+| Vivado 综合、实现、bit/XSA | 未测/未运行（本任务明确不做）。 |
+| JTAG、串口、DDR 训练实板结果 | 未测/未触板，由 main 按 §8.6 执行。 |
+| 最小 OCM hello ELF / DDR scratch smoke | 未完成；main 需要按 UART0/1 分别准备可打印 ELF。 |
+| `ready` 与第一阶段两份产物 | `ready=0` 未变；第一阶段表与 profile 结论未改。 |
+
+## 9. F3 实板最小启动结果（2026-10-12，main 持板执行）
+
+本节由 main 在真板上执行并记录，**取代** §8.7 中「未触板」的对应行。执行通道是 WSL：`usbipd` 直通 FT4232H → Linux `/tools/Xilinx/Vivado/2022.2/bin/hw_server -sTCP:127.0.0.1:3132` → `/tools/Xilinx/Vitis/2022.2/bin/xsdb`。**全程未启动 Windows hw_server**（见 `docs/07` §3a）。
+
+- 运行目录（仓库内，`logs/` 已被 .gitignore 覆盖）：`logs/bringup/20261012T120117Z-bkb220-f3-v1/`
+- 使用的 ps7_init：`hw/build/bkb220-ps7-probe/20261012T114440Z-board-migrate-r3/v1-uart0-mio14-15/ps7_init.tcl`，SHA-256 `2f80e045cb18d7c37d5144bf0a819cd8fd42d09a622fca164f2ef7b007b6c81f`
+
+### 9.1 已实测通过
+
+| 项 | 判据 | 实际结果 |
+|---|---|---|
+| JTAG | 单目标、器件正确 | 链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A` → `arm_dap (4ba00477)` → `xc7z020 (23727093)`；APU 目标唯一 |
+| PS 初始化 | `ps7_init` / `ps7_post_config` 退出码 | 两者 **RC=0** |
+| MIO 生效 | 回读寄存器等于生成值 | `MIO_PIN_14 = 0x000016E1`、`MIO_PIN_15 = 0x000016E0`（与 ps7_init 写入逐位一致） |
+| 时钟 | 回读 PLL/时钟寄存器 | `0xF800010C` 是 **PLL_STATUS**（本文档早前误称 DDR_PLL_CTRL，已更正）= `0x3F`，三个 PLL 全部 lock+stable；ARM PLL FBDIV=40 → 666.67 MHz；**DDR PLL FBDIV=32 → 533.33 MHz（DDR3-1066）**；IO PLL FBDIV=30 → 500 MHz，FCLK0 分频 5 → **100 MHz** |
+| **DDR 训练与读写** | 0x10000000 起 1024 字写入后逐字回读 | **0/1024 不符**，写入模式 `0xA5A50000 \| i`。DDR 可用 |
+| **PS UART 归属** | 经 JTAG 直接写 UART0 TX FIFO（`0xE0000030`），三路串口同时被动抓取 | **`/dev/ttyUSB2` 收到 8 条 `BKB220-UART0-1..8` 共 128 字节，ASCII 完全正确**；`/dev/ttyUSB1`、`/dev/ttyUSB3` 各 0 字节 |
+
+**结论（可以对外说）**：BKB220 的 PS UART 是 **UART0、MIO 14/15**，经 FT4232H **通道 C** 接到主机，**115200 8N1**（ASCII 明文正确即证明波特率正确）。项目 `--ip`/`--uart-port` 中的串口项在新板应取该通道。
+
+### 9.2 仍未通过 / 未测（不得写成通过）
+
+| 项 | 状态 | 观察与下一步 |
+|---|---|---|
+| **ENET0 / PHY** | **未通过** | GEM0 时钟已使能（`0xF8000140=0x00100801`）、APER 复位已释放（`0xF8000244=0`）、MDC 分频已设，但 **MDIO 在 0..31 全部 PHY 地址上读不到任何 ID**（无 0xFFFF 之外的有效应答）。说明 GEM0 侧已就绪而**对端 PHY 无响应**。最可能是 PHY 被某个复位脚（GPIO，位置未知）**保持复位**，或 MDIO 实际不在 MIO52/53。**这需要原理图或进一步探测，不得猜。** |
+| UART 反向（PC→PS） | 未测 | 本次只证明了 PS→PC 方向；交互式使用还需确认 RX 方向 |
+| CAPS / 协议栈 | 未测 | 需要能跑 lwIP 的 hello 固件，依赖 GEM |
+| QSPI / SD 冷启动 | 未测 | JTAG 启动通过不证明冷启动 |
+| bit / XSA / 整机 route | 未生成 | 属 F4 |
+| DDR 板级延迟、DQS-to-CLK | 未测 | 本轮用 Vivado `Custom` 默认值；DDR 能读写不等于这些参数已优化或已由数据手册确认 |
+| 工业级器件精确料号 | 未定 | `xc7z020clg400-2` 在 catalog 中存在，但手册写的 `XC7Z020-2CLG400I` 对应的工业级条目未确认 |
+
+### 9.3 对 `ready` 的判断
+
+**`ready` 保持 `0`。** 已实测的只是 JTAG/PS_CLK/DDR/UART；ENET0/PHY 未通过，而它是 CAPS 与整条 G3 的前置。把 `ready=1` 会让构建用上一份**含未验证 ENET0 假设**的配置，与本项目「不猜 PHY」的要求冲突。要改成 1，至少需要：ENET0 的 PHY 复位/MDIO 归属被证实（原理图或受控探测），以及器件料号等级确认。
+
+### 9.4 环境侧教训（供后续 agent 复用）
+
+1. **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化），否则 JTAG 链只显示 `xc7z020`、看不到 `arm_dap`，会误判成「PS 不在链上」。仅重启 hw_server 无效。
+2. `0xF800010C` 是 **PLL_STATUS**，不是 DDR_PLL_CTRL；DDR PLL 控制寄存器是 `0xF8000104`。本文档 §9.1 已按此更正。
+3. WSL 内 `/dev/ttyUSB*` 属 `root:plugdev`，普通用户需临时放开权限或用 sudo 才能做串口采集（JTAG 走 libusb，不受此限）。
+4. 被动抓串口刻意排在 `rst -system` 之前：ftdi_sio 在 open 时会拉起 DTR/RTS，若该线接 PS 复位，顺序倒过来会干扰初始化。
