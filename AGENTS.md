@@ -153,6 +153,11 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
 - **判断模型有无要看活目录**：`~/.codex/models_cache.json`（新版客户端刷新写入）共 10 项，
   含 `gpt-6-luna`、`gpt-6-sol`、`gpt-6-astra`、`gpt-6.1-sol`、`gpt-5.6-luna`、`gpt-reserve` 等；
   旧 CLI 上跑 `codex debug models` 读到的 8 项是陈旧快照，据它判断会得出「gpt-6 不存在」的错误结论。
+- **⚠️ 子 agent 在 codex 沙箱内不要运行 `tools/verify_repo_binding.sh`（含 `--remote` / `--require-synced`）。**
+  该命令是 **main 的门禁**，main 在仓库里已经跑过并留证；而 codex 沙箱把 **git 目录（本仓库的 gitdir 是 `.git-data`，不是 `.git`）挂成只读**，
+  脚本要写 `FETCH_HEAD` 必然报 `Read-only file system` 而失败。**这是沙箱特性，不是仓库故障**，据此阻塞等于白跑一轮。
+  2026-10-12 一晚上因为这条（主会话漏写提醒）白跑过三次共四个子任务，故此条写在这里，**不依赖主会话每轮记得写**。
+  需要确认绑定状态时，直接读 `docs/03-status.md` 的最新记录，或让 main 代跑。
 - 走 codex 的子 agent 仍受本文件其余门禁约束：按上一节用 `tools/agent_view.sh` 登记
   （`--agent` 取任务短名，并行不重名），**不执行任何 Git 写操作**，产物交 main 审查后由 main 提交；
   只读任务的看板由 main 登记。
