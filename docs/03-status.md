@@ -31,7 +31,8 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 1. **禁止启动 Windows 原生 hw_server**（`D:\xilinx\2026.1\Vivado\bin\unwrapped\win64.o\hw_server.exe`）——已知崩溃路径，用户已暂停。
 2. 因此原计划「Windows 2026.1 负责下载/调试」在 FTDI 问题被证明根治前**不可用**；下载/调试同样走 WSL 2022.2。F9 的 26 复核需重新评估入口。
 3. **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` + `attach`，确认设备号变化）才能再取到 `arm_dap`；仅重启 hw_server 不够，会只看到 `xc7z020` 而误判「PS 不在链上」。
-4. 用户的诊断同时指出：故障时板上只接了调试 USB 和网线，**未接手册第 15 页的 10 号 5V-DC 电源输入**；USB 供电是否足够至今未证实也未排除。断电重上后本项应重测。
+4. **供电（2026-10-12 用户明确）**：**用 USB 供电即可**，不必接手册 p.15 的 10 号 5V-DC。此前诊断提出的"USB 供电不足"假设据此不再作为待办项。
+5. **Windows 26 编程入口恢复（2026-10-12 用户明确）**：**Windows 已可用 Vivado 26 进行烧录**，故上面第 1 条的暂停可解除，Windows 2026.1 重新作为下载/调试入口。**但这不等于两次 BugCheck `0x139` 的根因已被查明或根治**——历史证据原样保留；恢复直连后要记录实际观察时长与是否复现，不能凭"用户说可用"就写成"已根治"。
 
 证据（仓库外，保留）：`D:\Agent\outputs\reboot-diagnosis-20261012\`、`D:\Agent\outputs\ftdi-repair-20261012\`、`D:\Agent\outputs\bkb220-connectivity-20261012\`。仓库内 JTAG 只读证据在 `logs/jtag/20261012T*-bkb220-wsl-jtag/`（`logs/` 已被 .gitignore 覆盖，未入库）。
 

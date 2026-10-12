@@ -440,3 +440,15 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 - **不能确定**（不要写成事实）：MDC 分频字段究竟取 `[7:4]` 还是 `[6:4]`——两次结果互相矛盾，说明**仅靠寄存器回读无法自证 MDC 频率**；以及 PHY 是否被某个未驱动脚保持复位、MDIO 是否真的在 MIO52/53、板卡是否其实用 GEM1。
 - **下一步的正当做法**（任一即可让步）：① 拿到厂商 PCB 原理图或 board_files preset；② 用示波器/逻辑分析仪看 MDC/MDIO 是否真的翻转（本机无此仪器，不得声称已测）；③ 在能跑 lwIP 的固件里用 Xilinx 驱动做 PHY 探测并按驱动报错定位。
 - **不要做**：把某组猜测值写进 profile 后置 `ready=1` 声称 PHY 已确认；也不要反复盲扫寄存器制造看似进展的记录。
+
+#### 9.5.1 第 5 轮：修正完成标志后仍未发现 PHY（2026-10-12 main）
+
+前四轮把「完成标志」读错了寄存器，第 5 轮已纠正并重测：
+
+- **纠正**：Cadence/Zynq GEM 的 MDIO 完成标志是 **`NETWORK_STATUS[2]`**（Xilinx 驱动里 `XEMACPS_NWSR_MDIOIDLE_MASK = 0x4`），**不是** `PHY_MAINT` 里的某一位。前四轮轮询 `PHY_MAINT` 的 bit2 属读错寄存器；`NETWORK_STATUS` 一直读到 `0x6`，即 bit2=1（idle）本来就成立。
+- **另外补上**：`NETWORK_CONTROL[3] = Management Port Enable`，前四轮也未置位。
+- **修正后重测**（MPE=1、MDC 分频=8、按 `NETWORK_STATUS[2]` 判完成、扫 PHY 0..31 的 reg2/3）：**`MDIO_PHYS_FOUND=0`**，全部返回 0xFFFF/0x0000。
+- 旁证：`GEM0` 的模块 ID 寄存器 `0xE000B0FC = 0x00020118`（Cadence GEM 存在）；`NETWORK_CONTROL` 写入能读回（寄存器块可写，未被复位挡住）；`PHY_MAINT` 写入也能读回（如 `0x6F8E0000`，SOF/OP/PHY/REG 字段编码正确）。
+- 注意 `0xE000B0F8` 被 XSDB 标为 **"Blocked address ... Access can hang PS interconnect"**，读取它会报错——这不是板卡故障，是 XSDB 对 Zynq 保留地址的保护。
+
+**结论不变但更强**：GEM0 控制器本身存在、可写、完成标志正常，**但对端 PHY 完全不回应**。已排除「完成标志读错」「管理端口未开」「GEM0 被 APER 复位挡住」。剩下的可能集中在**物理层**：MDIO/MDC 是否真在 MIO52/53、PHY 是否被某个未驱动脚保持复位、或板卡其实用 GEM1。**这些都要原理图或实测仪器，不能靠寄存器回读继续推进。**

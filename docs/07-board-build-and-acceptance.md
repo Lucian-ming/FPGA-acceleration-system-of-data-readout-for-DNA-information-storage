@@ -49,7 +49,9 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | 连接入口 | WSL `/tools/Xilinx/Vitis/2022.2/bin/xsdb` 连 `TCP:127.0.0.1:3132` |
 | **禁止** | 启动 Windows 原生 `hw_server.exe`（`D:\xilinx\2026.1\...`）——已知崩溃路径，用户已暂停 |
 | 重挂规则 | **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化）才能再取到 `arm_dap`；只重启 hw_server 会只看到 `xc7z020`，容易误判「PS 不在链上」 |
-| 供电 | 用户诊断指出故障时板上**未接**手册 p.15 的 10 号 5V-DC 输入；USB 供电是否足够未被证实也未被排除，断电重上后应重测 |
+| 供电 | **用户 2026-10-12 明确：USB 供电即可**，不必接手册 p.15 的 10 号 5V-DC。此前"USB 供电不足"假设不再作为待办 |
+| Windows 26 编程 | **用户 2026-10-12 明确：Windows 已可用 Vivado 26 烧录**，故上表「禁止 Windows hw_server」可解除。**但两次 BugCheck `0x139` 的根因并未因此被查明或根治**，历史证据保持不变；恢复直连后须记录实际观察时长与是否复现 |
+| 厂商 board file | 2026-10-12 在 `D:\xilinx\2026.1`、`D:\Xilinx\2026.1`、`C:\Xilinx`、`E:\` 递归搜 `*b220*/*B220*/*bkb*/*BKB*`：**只命中 Xilinx 自带内容（Model_Composer 的 libkbd*.a 等），无 BKB220 板卡文件**；2026.1 的 `Vivado\data\xhub\boards\XilinxBoardStore` 仅有 Xilinx 官方板。**厂商 board_files/PS7 preset 仍缺** |
 
 由此，本文件 §3 第 2 阶段「Windows 2026.1 负责下载/调试」以及 F9 的 Windows 26 复核入口**在 FTDI 问题被证明根治前不可用**；下载/调试改走 WSL 2022.2。这不是把 26 结论改成通过，而是如实记录入口被阻塞。恢复 Windows 直连需先有「驱动/服务版本对照 + 供电条件明确 + 单次受控验证」的证据。
 
