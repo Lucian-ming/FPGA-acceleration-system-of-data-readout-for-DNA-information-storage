@@ -11,7 +11,7 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 | 器件 **xc7z020**，IDCODE `0x23727093` | JTAG 链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A` → `arm_dap (4ba00477)` → `xc7z020`；手册 p.5-6 写 XC7Z020-2CLG400I |
 | 板载 **FT4232HL** 桥，无需外置下载器 | 手册 p.7；三串口 + JTAG 与手册 p.16「一路 PL、一路 PS 加 JTAG」相符 |
 | 串口：通道 A=JTAG，B/C/D=三串口 | Windows 为 COM9/10/11；直通 WSL 后 `/dev/ttyUSB0`=JTAG、`1/2/3`=串口。**哪个是 PS UART 仍未确定** |
-| 网口：ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`，链路 1Gbps | 板端 PS 尚未发过包（ReceivedBytes=0），**不构成 GEM/PHY 已通** |
+| 网口：ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`，链路 1Gbps | 已确认网线是**板子直连该 ASIX 网卡**。2026-10-12 经 JTAG 用 MDIO 实测：PHY = **Realtek RTL8211E**（OUI 0x001CC9），自协商完成、**1000BASE-T 全双工 link up**，与 1Gbps 互相印证。板端仍尚未发过 TCP 包（ReceivedBytes=0，属正常：还没跑固件） |
 | `BOOT_MODE` 0xF800025C = `0` | **JTAG 启动模式**；`DDR_PLL_CTRL=0x3F`（DDR PLL 掉电）、`FPGA0_CLK_CTRL` bit0=0、`GEM0_NETWORK_CONTROL=0`、`UART0/1_CTRL=0x128` → PS 是干净的 JTAG 待机态，只有 BootROM 在跑 |
 | **PS_CLK = 33.333 MHz** | 由 `IO_PLL_CTRL` FBDIV=26 推出 IO PLL=433.33 MHz，且 BootROM 能正常执行。属推导+寄存器证据，非厂商书面确认 |
 | 手册给出的可采信规格 | DDR3 **两片 Micron MT41K256M16TW-107、32bit、1GB、最高 533MHz/1066Mbps**（p.9-10，与旧板单颗 16bit MT41J256M16HA-125 **完全不同**）；QSPI W25Q256 32MB 在 MIO1..6（p.8-9）；启动 JTAG/QSPI/SD（p.15）；MIO0=3.3V、MIO1=1.8V、DDR=1.5V（p.8） |
@@ -87,15 +87,17 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | F0 接管与现场核对 | **完成**：仓库绑定 PASS（main/origin 0/0，HEAD `22a0874`）、工具链与真实设备枚举、`agent_view` 以 main 登记、按现成 05 计划接管 |
 | F1 已有成果确认 | 子 Agent 只读复核完成：P4/P16 正式源集与 `PACKAGED_VARIANTS.txt` 条目集合一致、无未覆盖文件、`check_ip_packaging.sh` 与 `check_repo_hygiene.sh` main 复跑均 **exit 0 PASS**（子 Agent 报的 packaging FAIL 是只读沙箱无法建临时输入所致，非真实缺陷）。P16 整机 LUT 先验约 33.9k（64%），仅 OOC 外推 |
 | **F2 新板配置** | **基本完成**：来源表与候选 PS7 profile 已产出并经 Vivado 2022.2 逐属性验证（[来源表](board/bkb220/migration-source-table.md) §8、`hw/boards/bkb220.tcl`，`ready=0`）。**实测已定**：PS_CLK=33.333 MHz、DDR=533.33 MHz(DDR3-1066)、FCLK0=100 MHz、PS UART=UART0/MIO14-15→FT4232H 通道 C。`MT41K256M16TW-107` 被 PS7 catalog 拒绝，改用自定义 DDR 参数 |
-| **F3 最小启动** | **大部分通过，ENET0 未通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到。**GEM0 时钟与复位正常但 MDIO 0..31 无任何 PHY 应答**——疑 PHY 复位脚未驱动或 MDIO 不在 MIO52/53，须原理图，**不得猜**。详见 §1c |
+| **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
 | F4～F8 | 未开始。F4 前置：ENET0/PHY 归属被证实（否则 CAPS/G3 无从谈起）；脚本适配已由 verify-system 完成一轮 |
 | F9 | 入口因 §1b 需重评 |
 
 ## 1c. 2026-10-12 F3 实板结果摘要
 
-判据、原始命令与失败细节见[来源表 §9](board/bkb220/migration-source-table.md)。**已通过**：JTAG 单目标 xc7z020、`ps7_init`/`ps7_post_config` RC=0、MIO 回读与生成值逐位一致、三个 PLL 全 lock、**DDR 1024 字写读 0 不符**、**PS UART 归属实测确定**。**未通过/未测**：ENET0/PHY（MDIO 无应答）、UART 反向、CAPS、QSPI/SD 冷启动、bit/XSA/整机 route、DDR 板级延迟与 DQS-to-CLK、工业级器件精确料号。
+判据、原始命令与失败细节见[来源表 §9](board/bkb220/migration-source-table.md)。**已通过**：JTAG 单目标 xc7z020、`ps7_init`/`ps7_post_config` RC=0、MIO 回读与生成值逐位一致、三个 PLL 全 lock、**DDR 1024 字写读 0 不符**、**PS UART 归属实测确定**、**ENET0 的 PHY 识别与 1000BASE-T 全双工 link up**。**未测**：CAPS（需固件）、UART 反向、QSPI/SD 冷启动、bit/XSA/整机 route、DDR 板级延迟与 DQS-to-CLK、工业级器件精确料号。
 
-由此**仍不能宣布迁移完成，`ready` 仍为 0**：ENET0 是 CAPS 与整条 G3 的前置，用一份含未验证 PHY 假设的配置开构建与「不猜 PHY」的要求冲突。
+**`ready` 已置 1**：依据用户 2026-10-12 明确授权「先建 P4、ENET0 留到板测再验」，且 ENET0 随后也已实测通过。仍未宣布迁移完成（缺整机 route 与 G3）。
+
+**方法教训**：一度把 ENET0 判成「未通过、需原理图」，实为 main 读错 MDIO 完成标志（应读 `NETWORK_STATUS[2]`）且漏写 MDEN（`NETWORK_CONTROL` bit4）。寄存器级探测应先对着厂商驱动头文件核位定义。详见来源表 §9.6。
 
 顺带修正一处长期误读：`0xF800010C` 是 **PLL_STATUS** 而非 DDR_PLL_CTRL（后者是 `0xF8000104`）。
 

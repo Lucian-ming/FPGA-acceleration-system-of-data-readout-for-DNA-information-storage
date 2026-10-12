@@ -404,7 +404,7 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 
 | 项 | 状态 | 观察与下一步 |
 |---|---|---|
-| **ENET0 / PHY** | **未通过（已排除若干假设，仍未定位）** | 见 §9.5 的完整尝试记录。要点：GEM0 时钟已使能（`0xF8000140=0x00100801`）、APER 复位已释放（`0xF8000244=0`）、MIO52/53 已按标准 RGMII 配置为 MDIO（`0x1280`，与旧板 ps7_init 相同编码），但 MDIO 在任何 PHY 地址上都拿不到有效 ID。**需要原理图/厂商 preset，或带示波器的受控探测；不得猜。** |
+| **ENET0 / PHY** | ~~未通过~~ → **通过（2026-10-12 更正，见 §9.6）** | 一度报"未通过"，实为 main 读错完成标志（应读 `NETWORK_STATUS[2]`）且写错管理端口使能位（MDEN = `NETWORK_CONTROL` bit4，不是 bit3）。改对后 PHY 正常应答：**Realtek RTL8211E**、自协商完成、**1000BASE-T 全双工 link up**。RGMII MIO16-27 + MDIO MIO52-53 配置**已实测可用**。 |
 | UART 反向（PC→PS） | 未测 | 本次只证明了 PS→PC 方向；交互式使用还需确认 RX 方向 |
 | CAPS / 协议栈 | 未测 | 需要能跑 lwIP 的 hello 固件，依赖 GEM |
 | QSPI / SD 冷启动 | 未测 | JTAG 启动通过不证明冷启动 |
@@ -414,7 +414,7 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 
 ### 9.3 对 `ready` 的判断
 
-**`ready` 保持 `0`。** 已实测的只是 JTAG/PS_CLK/DDR/UART；ENET0/PHY 未通过，而它是 CAPS 与整条 G3 的前置。把 `ready=1` 会让构建用上一份**含未验证 ENET0 假设**的配置，与本项目「不猜 PHY」的要求冲突。要改成 1，至少需要：ENET0 的 PHY 复位/MDIO 归属被证实（原理图或受控探测），以及器件料号等级确认。
+~~**`ready` 保持 `0`**~~（2026-10-12 更新）：ENET0 已实测通过（§9.6），本表原先"ENET0 未证实故不能置 1"的理由不再成立。`ready` 现为 **1**，依据是用户明确授权"先建 P4、ENET0 留到板测再验"，**且 ENET0 随后也已实测通过**。仍属未证实、板测须验的项：工业级料号等级、DDR 板级延迟与 DQS-to-CLK（用 Custom 默认值）、QSPI/SD 冷启动。
 
 ### 9.4 环境侧教训（供后续 agent 复用）
 
@@ -452,3 +452,30 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 - 注意 `0xE000B0F8` 被 XSDB 标为 **"Blocked address ... Access can hang PS interconnect"**，读取它会报错——这不是板卡故障，是 XSDB 对 Zynq 保留地址的保护。
 
 **结论不变但更强**：GEM0 控制器本身存在、可写、完成标志正常，**但对端 PHY 完全不回应**。已排除「完成标志读错」「管理端口未开」「GEM0 被 APER 复位挡住」。剩下的可能集中在**物理层**：MDIO/MDC 是否真在 MIO52/53、PHY 是否被某个未驱动脚保持复位、或板卡其实用 GEM1。**这些都要原理图或实测仪器，不能靠寄存器回读继续推进。**
+
+### 9.6 ENET0/PHY 结论更正：**通过**（2026-10-12 main）
+
+§9.2 与 §9.5 里"ENET0 未通过"的结论**作废**。失败原因是 **main 自己的两个寄存器错误**，不是板卡问题：
+
+| # | 我写错的 | 正确的是 | 依据 |
+|---|---|---|---|
+| 1 | 轮询 `PHY_MAINT` 的某一位当完成标志 | 完成标志是 **`NETWORK_STATUS[2]`**（`XEMACPS_NWSR_MDIOIDLE_MASK = 0x4`） | Xilinx `xemacps_hw.h` |
+| 2 | `NETWORK_CONTROL` 写 `0x8`（那是 TXEN） | **MDEN = bit 4 = `0x10`**（`XEMACPS_NWCTRL_MDEN_MASK`） | 同上 |
+
+改对之后 PHY 立刻应答。完整只读证据（`logs/bringup/20261012T120117Z-bkb220-f3-v1/phy_dump.out`）：
+
+| 寄存器 | 值 | 含义 |
+|---|---|---|
+| reg2/reg3 PHYID | `0x001C` / `0xC915` | OUI `0x001CC9` = **Realtek**，model `0x11` rev 5 → **RTL8211E** |
+| reg0 BMCR | `0x1140` | 自协商使能 + 1000 Mbps |
+| reg1 BMSR | `0x7969` | **bit2 = 1 → link up** |
+| reg5 ANLPAR | `0xCDE1` | 对端能力，协商完成 |
+| reg6 ANER | `0x000F` | 无自协商错误 |
+| reg9 1000BASE-T CTRL | `0x0200` | 手动主/从配置位 |
+| reg10 1000BASE-T STS | `0x78FF` | **bit11 = 1 → 1000BASE-T 全双工** |
+
+**因此可以对外说**：BKB220 的 PS ENET0 按 **RGMII on MIO16-27 + MDIO on MIO52-53** 配置**在真板上被证实可用**——MDIO 能读写、PHY 是 Realtek RTL8211E、自协商完成、**1000BASE-T 全双工 link up**，与主机 ASIX 网卡报的 1 Gbps 互相印证。profile 里那组 ENET0 属性**从"候选"升级为"已实测"**。
+
+**教训（值得写下来）**：前四轮的"MDIO 无应答"看起来像硬件/原理图问题，实际是**读错寄存器 + 写错使能位**。寄存器级探测的第一件事应该是**对着厂商驱动的头文件核对位定义**，而不是凭对同名外设（这里是 Cadence GEM）的印象推断；否则会把两个自己制造的 bug 误判成板卡缺陷，并据此把"需要原理图"写成结论。
+
+**仍未完成**（与本项无关）：CAPS 需要能跑 lwIP 的固件，属 F4；QSPI/SD 冷启动、UART 反方向仍未测。

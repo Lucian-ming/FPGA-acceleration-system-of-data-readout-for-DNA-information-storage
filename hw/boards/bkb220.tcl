@@ -13,14 +13,17 @@
 #     经 JTAG 直写 TX FIFO 后被正确 ASCII 接收
 #   * PS_CLK=33.333MHz、DDR PLL=533.33MHz(DDR3-1066)、FCLK0=100MHz（PLL 寄存器回读）
 #
+#   * **ENET0/PHY 已实测通过（2026-10-12 更正）**：MDIO 经 MIO52/53 正常读写，
+#     PHY = Realtek **RTL8211E**（OUI 0x001CC9 / model 0x11 rev5），自协商完成、
+#     **1000BASE-T 全双工 link up**，与主机 ASIX 网卡报的 1Gbps 互相印证。
+#     故下面 ENET0 = MIO16-27 RGMII + MDIO52/53 这组属性**已由真板证实**。
+#     （早前一度报"MDIO 无应答"，实为 main 读错完成标志——应读
+#      NETWORK_STATUS[2]——且漏写 MDEN = NETWORK_CONTROL bit4。见来源表 §9.6。）
+#
 # 【仍未证实 —— 板测必须验，失败就回来改这里】
-#   * **ENET0/PHY 完全未通过**：GEM0 存在、寄存器可写、MDIO 完成标志正常
-#     （完成标志在 NETWORK_STATUS[2]，不是 PHY_MAINT），但 PHY 0..31 全地址无应答。
-#     已知网线是板子直连主机 ASIX 网卡且链路 1Gbps Up，说明 PHY 有电、未复位，
-#     故 MDIO/MDC 很可能不在 MIO52/53。**MIO16-27 + MDIO52/53 是 Zynq 标准接法、
-#     与旧 ECO 板一致的候选，不是已证实值。**
 #   * 工业级料号：手册写 XC7Z020-2CLG400I，2022.2 catalog 未确认对应条目
 #   * DDR 板级延迟与 DQS-to-CLK 用 Vivado Custom 默认值，非数据手册/实测值
+#   * QSPI/SD 冷启动、UART 反方向未测
 set ps7_properties [list \
   CONFIG.PCW_USE_M_AXI_GP0 {1} \
   CONFIG.PCW_USE_S_AXI_HP0 {1} \
@@ -60,4 +63,4 @@ set board_config [dict create \
   uart ps7_uart_0 xdc hw/constr/top.xdc \
   source_refs {docs/board/bkb220/migration-source-table.md docs/board/bkb220/README.md docs/board/bkb220/BKB220产品手册v1.1.pdf docs/04-interfaces.md docs/07-board-build-and-acceptance.md hw/constr/top.xdc} \
   ps7_properties $ps7_properties \
-  pending {未核对实物完整器件顶标与PCB修订（手册写工业级 XC7Z020-2CLG400I，2022.2 catalog 未确认对应条目）；DDR VDD/VDDQ、板级走线延迟与DQS-to-CLK缺失（当前用 Custom 默认值，DDR 可读写不等于已优化）；ENET0/PHY 未通过——GEM0 时钟/复位正常但 MDIO 0..31 地址无任何 PHY 应答，疑 PHY 复位脚未驱动或 MDIO 非 MIO52/53，须原理图或受控探测；QSPI/SD0/USB0 的实物连线与对应MIO/复位仍须核对；厂商board_files、PS7 preset、原理图和例程未提供。已实测（见 §9）：PS_CLK=33.333MHz、DDR 读写可用、UART0/MIO14-15→通道C 115200、FCLK0=100MHz。}]
+  pending {未核对实物完整器件顶标与PCB修订（手册写工业级 XC7Z020-2CLG400I，2022.2 catalog 未确认对应条目）；DDR VDD/VDDQ、板级走线延迟与DQS-to-CLK缺失（当前用 Custom 默认值，DDR 可读写不等于已优化）；QSPI/SD0/USB0 的实物连线与对应MIO/复位仍须核对；厂商board_files、PS7 preset、原理图和例程未提供。已实测（来源表 §9/§9.6）：PS_CLK=33.333MHz、DDR 读写可用、UART0/MIO14-15→通道C 115200、FCLK0=100MHz、ENET0 RGMII MIO16-27 + MDIO MIO52/53 可用且 PHY=RTL8211E 1000BASE-T 全双工 link up。}]
