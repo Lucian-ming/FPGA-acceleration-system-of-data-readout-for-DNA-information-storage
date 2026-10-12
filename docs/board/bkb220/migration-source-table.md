@@ -479,3 +479,25 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 **教训（值得写下来）**：前四轮的"MDIO 无应答"看起来像硬件/原理图问题，实际是**读错寄存器 + 写错使能位**。寄存器级探测的第一件事应该是**对着厂商驱动的头文件核对位定义**，而不是凭对同名外设（这里是 Cadence GEM）的印象推断；否则会把两个自己制造的 bug 误判成板卡缺陷，并据此把"需要原理图"写成结论。
 
 **仍未完成**（与本项无关）：CAPS 需要能跑 lwIP 的固件，属 F4；QSPI/SD 冷启动、UART 反方向仍未测。
+
+## 10. 原理图核对（2026-10-12，用户提供 `BK_B220_SchDoc.pdf`）
+
+用户提供 Altium 导出的原理图（23 页 A4 横版），已按原字节入库为 [BK_B220_SchDoc.pdf](BK_B220_SchDoc.pdf)，SHA-256 `fb7947dfa762a58d7e6a178fc612d8ec48a1d05c677e60c357acc0697e8955a6`，已记入 `SHA256SUMS.txt` 并 `sha256sum -c` 通过。**这份资料关闭了此前"无原理图"的缺项。**
+
+页结构：p1/p2/p14 = `DDR_unit`；p13 = `zynq_7000_ddr` + `zynq_7000_ps`（连接器侧）；**p15 = `PHY`**；**p16 = `ZYNQ_PL`**；**p17 = `ZYNQ_PS`**；p18/p19 = 电源/PMIC；p20 = 根图。
+
+| 事实 | 出处 | 与既有结论的关系 |
+|---|---|---|
+| **PS_CLK = 33.333 MHz 晶振（X2）**，网络 `PS_CLK_500` 接 Zynq `E7` | p17、p23 | **确认**了 main 此前从 `IO_PLL_CTRL` FBDIV 推出的 33.333 MHz |
+| **UART0 = MIO14(TXD→PS) / MIO15(RXD←PS)**，经 `ZYNQ_UART0` 引出 | p13（`ZYNQ_UART0` 簇内 `B0MIO14`→`UART_TXD_PS`、`B0MIO15`→`UART_RXD_PS`） | **确认**了实测的 UART0/MIO14-15 |
+| 主机侧串口：**`UARTC_TXD/RXD` = PS UART**，`UARTD_TXD/RXD` = PL UART | p6（FT4232 引脚 38 等）、p11 | **确认**了实测的"PS UART 在 FT4232 **通道 C**"；通道 D 是 PL UART |
+| FT4232 **通道 A = JTAG**（`FT4232_TCK/TDI/TDO/TMS`），另有 `FT4232_JTAG_ON` 与 `FT4232_JTAG_RST`；JTAG 经电平转换 IC1 出 `FPGA_TCK/TMS/TDI/TDO` | p6 | 与实测链名 `Xilinx HW-Z1-ZCU104 FT4232H 15051A` 一致 |
+| **ENET0 为 RGMII**（`ETH_TCLK/TXD0..3/TCTL/RCLK/RXD0..3/RCTL` 共 12 根） | p13、p15 | **确认** RGMII 而非 MII；否则 RGMII 时序参数与 RXDLY/TXDLY 都不成立 |
+| **PHY = `RTL8211E-VL`（U19，QFN40）** | p15、p23 | **确认**了 main 从 MDIO 读出的 PHYID `0x001C/0xC915`（Realtek RTL8211E） |
+| **PHY Address = 1**（strap），带 `RXDLY`/`TXDLY` 子，RGMII 1.8V 上拉 | p15 | **新信息**：lwIP/驱动应使用 **PHY 地址 1**。main 的 MDIO 扫描在地址 0 和 1 都读到同一 ID，以原理图的 1 为准 |
+| **PHY 复位 `PHYRSTB`（U19 脚 29）接 `PS_POR_B`**，不是 GPIO | p15 | **新信息且重要**：固件**不需要**驱动任何 PHY 复位脚；PHY 随 PS_POR_B 释放。这也解释了只跑 `ps7_init` 时 PHY 已是活的 |
+| DDR = 两片 `MT41K256M16TW-107`（`U18_ZYNQ_7000_DDR_UA` 等） | p1/p2/p14 | 与手册 p.9-10 一致 |
+
+**据此更新的判断**：§9.3 里"工业级料号未定""ENET0 候选"两项，ENET0 侧已被原理图补齐（RGMII + RTL8211E + PHY 地址 1 + 复位由 PS_POR_B 驱动）；**仍未定**的只剩工业级精确料号、DDR 板级延迟与 DQS-to-CLK、QSPI/SD 冷启动。
+
+**边界**：原理图证明的是**设计意图与连接关系**，不等于板子实物与该版图一致（PCB 修订/改板未核对）；也不等于整机 G3 通过。

@@ -8,7 +8,7 @@
 |---|---|---|
 | 器件 | xc7z010clg400-1，实际已有板测 | XC7Z020版本目标，候选xc7z020clg400-2；实物完整料号/PCB待核实 |
 | PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在docs/board/zynq-eco-7010/ | 必须使用对应原理图/PS7 preset确认组织、时序/延迟/容量；产品手册不足以生成配置 |
-| 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | PS时钟、UART MIO、PHY/reset/MDIO等未齐；禁止猜测或照抄旧板 |
+| 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
 | 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | 尚无新板完整包、整机时序、真实G3或性能结果 |
 | 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：板载 FT4232HL 提供 JTAG（链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A`，单目标 xc7z020/IDCODE `0x23727093`）+ 三串口（Windows COM9/10/11）。直通 WSL 后 `/dev/ttyUSB0`=JTAG、`1/2/3`=串口。ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`。**触板只允许走 WSL（见 §3a）**；PS UART 的 MIO、ENET0 的 PHY 仍未定 |
 
@@ -51,7 +51,7 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | 重挂规则 | **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化）才能再取到 `arm_dap`；只重启 hw_server 会只看到 `xc7z020`，容易误判「PS 不在链上」 |
 | 供电 | **用户 2026-10-12 明确：USB 供电即可**，不必接手册 p.15 的 10 号 5V-DC。此前"USB 供电不足"假设不再作为待办 |
 | Windows 26 编程 | **用户 2026-10-12 明确：Windows 已可用 Vivado 26 烧录**，故上表「禁止 Windows hw_server」可解除。**但两次 BugCheck `0x139` 的根因并未因此被查明或根治**，历史证据保持不变；恢复直连后须记录实际观察时长与是否复现 |
-| 厂商 board file | 2026-10-12 在 `D:\xilinx\2026.1`、`D:\Xilinx\2026.1`、`C:\Xilinx`、`E:\` 递归搜 `*b220*/*B220*/*bkb*/*BKB*`：**只命中 Xilinx 自带内容（Model_Composer 的 libkbd*.a 等），无 BKB220 板卡文件**；2026.1 的 `Vivado\data\xhub\boards\XilinxBoardStore` 仅有 Xilinx 官方板。**厂商 board_files/PS7 preset 仍缺** |
+| 厂商 board file | 2026-10-12 在 `D:\xilinx\2026.1`、`D:\Xilinx\2026.1`、`C:\Xilinx`、`E:\` 递归搜 `*b220*/*B220*/*bkb*/*BKB*`：**只命中 Xilinx 自带内容（Model_Composer 的 libkbd*.a 等），无 BKB220 板卡文件**；2026.1 的 `Vivado\data\xhub\boards\XilinxBoardStore` 仅有 Xilinx 官方板。**厂商 board_files/PS7 preset 仍缺**；但**厂商原理图已由用户于 2026-10-12 提供并入库**（[BK_B220_SchDoc.pdf](board/bkb220/BK_B220_SchDoc.pdf)，逐条核对见[来源表 §10](board/bkb220/migration-source-table.md)） |
 
 由此，本文件 §3 第 2 阶段「Windows 2026.1 负责下载/调试」以及 F9 的 Windows 26 复核入口**在 FTDI 问题被证明根治前不可用**；下载/调试改走 WSL 2022.2。这不是把 26 结论改成通过，而是如实记录入口被阻塞。恢复 Windows 直连需先有「驱动/服务版本对照 + 供电条件明确 + 单次受控验证」的证据。
 

@@ -14,9 +14,10 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 | 网口：ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`，链路 1Gbps | 已确认网线是**板子直连该 ASIX 网卡**。2026-10-12 经 JTAG 用 MDIO 实测：PHY = **Realtek RTL8211E**（OUI 0x001CC9），自协商完成、**1000BASE-T 全双工 link up**，与 1Gbps 互相印证。板端仍尚未发过 TCP 包（ReceivedBytes=0，属正常：还没跑固件） |
 | `BOOT_MODE` 0xF800025C = `0` | **JTAG 启动模式**；`DDR_PLL_CTRL=0x3F`（DDR PLL 掉电）、`FPGA0_CLK_CTRL` bit0=0、`GEM0_NETWORK_CONTROL=0`、`UART0/1_CTRL=0x128` → PS 是干净的 JTAG 待机态，只有 BootROM 在跑 |
 | **PS_CLK = 33.333 MHz** | 由 `IO_PLL_CTRL` FBDIV=26 推出 IO PLL=433.33 MHz，且 BootROM 能正常执行。属推导+寄存器证据，非厂商书面确认 |
+| **原理图已入库**（2026-10-12 用户提供） | [BK_B220_SchDoc.pdf](board/bkb220/BK_B220_SchDoc.pdf)（Altium，23 页，SHA `fb7947df…`）。**补齐**：PS_CLK 33.333MHz 晶振、UART0=MIO14/15、ENET0 **RGMII**+PHY=**RTL8211E-VL**、**PHY 地址=1**、**PHY 复位 `PHYRSTB` 接 `PS_POR_B`（非 GPIO）**。逐条见[来源表 §10](board/bkb220/migration-source-table.md) |
 | 手册给出的可采信规格 | DDR3 **两片 Micron MT41K256M16TW-107、32bit、1GB、最高 533MHz/1066Mbps**（p.9-10，与旧板单颗 16bit MT41J256M16HA-125 **完全不同**）；QSPI W25Q256 32MB 在 MIO1..6（p.8-9）；启动 JTAG/QSPI/SD（p.15）；MIO0=3.3V、MIO1=1.8V、DDR=1.5V（p.8） |
 
-**仍缺**（手册没有、不可猜）：厂商 board_files/PS7 preset、PCB 原理图、PS UART 的 MIO、ENET0 的 PHY 型号/MDIO/RGMII/复位、DDR 板级延迟与 DQS-to-CLK。PS_CLK 已由寄存器证据确定。
+**仍缺**：厂商 board_files/PS7 preset、原厂例程、DDR 板级延迟与 DQS-to-CLK、工业级精确料号，以及**板卡实物与该版原理图修订是否一致（未核对）**。~~PCB 原理图~~、~~PS UART 的 MIO~~、~~ENET0 的 PHY/MDIO/RGMII/复位~~ 均已由原理图关闭；PS_CLK 已由寄存器证据 + 原理图双重确定。
 
 ## 1b. 触板通道：只能走 WSL，禁止 Windows hw_server（2026-10-12 新增）
 
