@@ -607,3 +607,36 @@ G3 把"串口实录"判成 FAIL，理由是采集器报"没有可确认的输出
 3. **本次**：把探针配置下的实测结论当成制品已验证，而 profile 里根本没有那几行配置 —— 直接导致 P4 建出来后以太网必然不通。
 
 三次都是"结论比证据跑得快"。共同解药是同一件事：**先量、再下结论；并且要量「真正被构建/被烧录的那一份」，不是旁边那份更好看的。**
+
+## 13. F4 整机 G3 在 BKB220 上通过（2026-10-12）
+
+补回 ENET0 MIO 配置、重建 P4 硬软包后，**F4 的整机 G3 在新板上全绿**：
+
+```
+结果     步骤
+PASS    完整制品包一致性（所选SHA/XSA内bit/part/参数）
+PASS    烧录
+PASS    板端应用层就绪（CAPS）        — READY 9.0 2
+PASS    第 1 轮 first.py             — 4096 条记录 / score_min=67
+PASS    第 1 轮 唯一判据（图片 SHA-256）— fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+PASS    四级逐级取证（board_stage_check.py）
+PASS    串口收到板端输出              — 7781 个字符
+######## G3 PASS ########
+```
+
+- 制品包：`hw/build/bkb220-p4-enet0-software-20261012T140800Z-board-migrate/`（P4 4/0、SE150 150/50/807/957/64、`part=xc7z020clg400-2`、`legacy=false`、`SHA256SUMS` 59 项全 OK）
+- 留证：`D:\bkb220_board_smoke\g3_runs\20261012T142924Z\`（含 `uart.log`，其中可见 **`autonegotiation complete`** —— §11/§12 那条链的修复判据达成）
+- 通道：**Windows 2026.1 XSDB 烧录 22 产出的制品**（`D:/xilinx/2026.1/Vitis/bin/xsdb.bat`，`--device xc7z020`，CH340 无、用 **COM10** 抓 PS UART），符合 [07 §3a](07-board-build-and-acceptance.md) 的工具链分工。
+
+**可以对外说**：BKB220（xc7z020）上，P4/SE150/100MHz 的同源硬软包完成真实下载与端到端任务，板端回传经 LDPC 后重建的 JPEG SHA-256 与判据 `fcd0cf90…f2c3` **逐位相同**，四级 DDR 逐级取证通过。
+
+**边界**：这是 **2048 源读段**的 smoke 档（4096 板端记录），等价于旧板 G3 默认档；**全量三轮、连续/脏干净、断连恢复、性能矩阵、泛化/长稳都还没做**（F6～F8）。也**不等于** P16 已上板 —— 板上跑的是 P4。
+
+### 13.1 顺带修掉一个判据侧 bug（CRLF）
+
+首轮 G3 除"串口实录"外全 PASS，那一步误报 FAIL：采集器实际报了 `CAPTURE_DONE chars=7781`，但 `run_g3.sh` 用
+`^CAPTURE_DONE (bytes|chars)=[1-9][0-9]*$` 判读，而 `uart_cap.out` **由 Windows 侧脚本写、行尾是 CRLF**，
+`$` 锚点被 `\r` 顶掉 → 明明收到了 7781 个字符却判成"没有可确认的输出"。
+
+修法：对该文件的所有读取先 `tr -d '\r'` 归一化（`run_g3.sh` 内已加注释说明原因）。
+**这条会稳定地把 PASS 报成 FAIL**——不是板子的问题，但它会污染每一次验收结论，所以必须修。

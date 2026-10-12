@@ -824,11 +824,14 @@ fi
 stop_uart
 
 if (( UART_CAPTURE_STARTED )); then
-    if grep -Eq '^CAPTURE_DONE (bytes|chars)=[1-9][0-9]*$' "$RUN_DIR/uart_cap.out" 2>/dev/null; then
-        UART_COUNT="$(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" | tail -1)"
+    # uart_cap.out 由 Windows 侧采集脚本写，**行尾是 CRLF**；带 $ 锚点的正则会被 \r 顶掉，
+    # 于是"明明收到了 7781 个字符"会被判成"没有可确认的输出"（2026-10-12 实测踩到）。
+    # 所有对该文件的读取一律先 tr -d '\r' 归一化行尾。
+    UART_CAP_TXT="$(tr -d '\r' < "$RUN_DIR/uart_cap.out" 2>/dev/null)"
+    UART_COUNT="$(printf '%s\n' "$UART_CAP_TXT" | sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' | tail -1)"
+    if printf '%s\n' "$UART_CAP_TXT" | grep -Eq '^CAPTURE_DONE (bytes|chars)=[1-9][0-9]*$'; then
         step_ok "串口收到板端输出" "$UART_COUNT 个字符/字节；原始日志 uart.log"
     else
-        UART_COUNT="$(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" | tail -1)"
         uart_unavailable "串口打开后没有可确认的输出（count=${UART_COUNT:-未报告}），见 uart.log/uart_cap.out"
     fi
 fi
@@ -870,7 +873,7 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "FASTQ SHA256: $READS_SHA"
     echo "水印 SHA256 : $WM_SHA"
     echo "串口裁决    : $([[ "$ALLOW_UART_SKIP" -eq 1 ]] && echo '排错放宽 --allow-uart-skip（可能带 SKIP）' || echo '验收严格（必须打开且收到输出）')"
-    echo "串口接收量  : $(sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' "$RUN_DIR/uart_cap.out" 2>/dev/null | tail -1)"
+    echo "串口接收量  : $(tr -d '\r' < "$RUN_DIR/uart_cap.out" 2>/dev/null | sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' | tail -1)"
     echo "串口        : ${UART_PORT:-未抓取}"
     echo "制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）"
     echo "判据哈希    : $EXPECT_SHA"
