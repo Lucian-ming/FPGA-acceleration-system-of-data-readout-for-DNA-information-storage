@@ -799,3 +799,41 @@ PASS  多轮一致性 / 连续无退化（14 2 15）
 PASS  四级逐级取证    PASS  串口 25852 字符
 ```
 留证 `D:\bkb220_board_smoke\g3_runs\20261012T150740Z\`。与 P4 的 A2 结果同形（同一 1500/64800 bit 鉴别力签名）。
+
+## 16. C2 泛化首测：板子成功恢复用户提供的新载荷（2026-10-12）
+
+用户提供外部数据包 `E:\桌面\scientific-image-datasets-20261012`（4 张 USC-SIPI 标准测试图 × D1 干净 / D2 加 1% 替换噪声 = 8 套）。
+
+### 16.1 为什么能直接跑（无需重建比特流）
+
+| 检查 | 结果 |
+|---|---|
+| 几何 | 每套 `reference_sequence.txt` = **40,500 符号**，与板端 `NUM_LC*STRIDE + READ_BPS = 50×807+150` **完全一致** |
+| 契约 | SE150 / 150 bp / 81,000-bit 水印 / 4b→5b 稀疏码 / DVB-S2 R=5/6 / 8100 B 结果 —— 与本项目同契约 |
+| **水印是否可换** | **可以，且不用重综合**：水印是**每任务上传**的（`echo.c` 的 `PKT_WM` → `stage1_dna.c` 的 preload 逐区域 DMA 进 Stage1 BRAM），`run_g3.sh` 提供 `--reads`/`--watermark`/`--expect-sha`/`--score-min` 覆盖 |
+| 水印内容 | 数据包的 `common/watermark.txt` 与 R0.83 水印**逐位相同**（剥掉行尾差异后整串一致）——即**复用同一水印，只有载荷不同** |
+
+### 16.2 实跑结果：**成功**
+
+```
+PASS  完整制品包一致性 / 烧录 / CAPS READY 6.1 1
+PASS  第 1 轮 first.py  — 4096 条记录 / score_min=65
+PASS  ★ 唯一判据（图片 SHA-256）— e0e65925814e07374dd4188939dd13e9d647cd2ecfb3480b050fe4775119242b
+FAIL  四级逐级取证（board_stage_check.py）
+PASS  串口收到板端输出 — 7780 字符
+```
+用 P4 包 + `--reads D1_image_peppers/reads_se150.fastq --watermark <包>/datasets/common/watermark.txt --expect-sha e0e65925… --score-min 65`。
+**板端回传经 LDPC 重建的 JPEG，SHA 与数据包 manifest 里的 payload SHA 逐字符相同** —— 即板子独立恢复出了这张图。
+留证 `D:\bkb220_board_smoke\g3_runs\20261012T153017Z\`。
+
+### 16.3 那个 FAIL 是**判据不适用**，不是失败（已核实）
+
+`board_stage_check.py` 的四级取证**写死了 `tests/golden/` 里的 R0.83 黄金向量**（脚本内 `GOLDEN = tests/golden`），而本次载荷是 peppers：
+- **展开水印 vs `wm_regions.hex`：PASS（47850/47850）** —— 因为水印本就复用 R0.83 的，所以这一级对得上 ✓
+- **Stage2 ⊕ 水印 vs `sparse_expect.hex`：FAIL 41.64%**、**Stage3 vs `stage3_expect.hex`：FAIL 49.53%** —— 这两份黄金是 **R0.83 载荷专用**的，拿来比一张**新图**当然对不上（≈随机水平）
+
+**判定依据**：端到端图片 SHA 是权威判据，它**精确通过**；若 Stage2 真坏，R=5/6 的 LDPC 不可能从 8100 B 精确还原该图。故四级 FAIL 属**判据范围**问题。
+
+**改进项（记入 C2）**：要让四级取证也覆盖新数据集，需**为每个载荷生成对应的 `stage2_in/sparse_expect/stage3_expect` 黄金向量**；`tests/golden` 目前只有 R0.83 一套。**在此之前，对新载荷只能采信端到端判据。**
+
+**边界**：本次只跑了 **1 套**（D1_peppers，干净、`score_min=65`）。数据包自报的软件侧结果是在 **65 下 8/8、67 下 4/8**，**板端尚未逐套复核**；D2 噪声集、其余 3 张图、以及 67 阈值下的表现都未测。

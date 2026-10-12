@@ -239,6 +239,7 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 ### 重排后的阶段
 
 - **P1 本轮收口（22 主线内）**：B2 剩余（P16 配置守卫/断连畸变/中途断网）→ **C1 同板 P4/P16 六档 ≥3 次矩阵**（性能分 20 的证据）→ **C2 泛化**（≥5 payload + sub/ins/del）→ **D 长稳（2h→8h）**。
+  - **C2 已有首个结果**（[来源表 §16](board/bkb220/migration-source-table.md)）：用户提供的外部数据包（4 张 SIPI 图 × D1/D2 = 8 套，几何与本项目一致、水印复用 R0.83）**已在板上跑通 1 套**——图片 SHA 与 manifest 的 payload SHA 逐字符相同，且**不用重建比特流**（水印随任务上传）。待办：逐套复核（含 D2 噪声集与 `score_min 67`）、**并为新载荷生成四级黄金向量**（`tests/golden` 目前只有 R0.83 一套，导致四级取证对新载荷误报 FAIL）。
 - **P2 合规与得分缺口（便宜且分值高，先做）**：
   - **A. LICENSE + 开源状态**（几乎零成本）
   - **B. LLM 交互记录 + skill 包补齐**（15 分；素材已在手）
