@@ -89,7 +89,8 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | F1 已有成果确认 | 子 Agent 只读复核完成：P4/P16 正式源集与 `PACKAGED_VARIANTS.txt` 条目集合一致、无未覆盖文件、`check_ip_packaging.sh` 与 `check_repo_hygiene.sh` main 复跑均 **exit 0 PASS**（子 Agent 报的 packaging FAIL 是只读沙箱无法建临时输入所致，非真实缺陷）。P16 整机 LUT 先验约 33.9k（64%），仅 OOC 外推 |
 | **F2 新板配置** | **基本完成**：来源表与候选 PS7 profile 已产出并经 Vivado 2022.2 逐属性验证（[来源表](board/bkb220/migration-source-table.md) §8、`hw/boards/bkb220.tcl`，`ready=0`）。**实测已定**：PS_CLK=33.333 MHz、DDR=533.33 MHz(DDR3-1066)、FCLK0=100 MHz、PS UART=UART0/MIO14-15→FT4232H 通道 C。`MT41K256M16TW-107` 被 PS7 catalog 拒绝，改用自定义 DDR 参数 |
 | **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
-| F4～F8 | 未开始。F4 前置：ENET0/PHY 归属被证实（否则 CAPS/G3 无从谈起）；脚本适配已由 verify-system 完成一轮 |
+| **F4/F5 构建与整机时序** | **通过**：P4(4/0) 与 P16(16/1) 均在 `xc7z020clg400-2` 完成完整 route + bitstream + XSA，**WNS +0.680/+0.617、WHS +0.036/+0.017、失败端点 0、DRC 0 errors、`clk_fpga_0`=100.000MHz**。P16 资源 33,987 LUT(63.89%)，与先验 33.9k/64% 吻合。详见 [benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md) |
+| F4 软件包 + F6～F8 | 未开始：同 XSA 软件包（BSP/ELF/FSBL/BOOT/manifest）未生成；板端下载/G3/性能/长稳未测；`REQP-1839/1840` 异步复位 BRAM 警告待 RTL 复核 |
 | F9 | 入口因 §1b 需重评 |
 
 ## 1c. 2026-10-12 F3 实板结果摘要

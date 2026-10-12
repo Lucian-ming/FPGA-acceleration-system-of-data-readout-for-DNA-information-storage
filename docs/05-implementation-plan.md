@@ -54,8 +54,8 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 | F1 已有成果确认 | main对照07和三个benchmark；子Agent复核源集、API/制品、测试边界 | 必要短检查通过；已有长测来源可验证，不无故重跑；已知失败和阻塞有记录 |
 | F2 新板配置落实 | main/board先校验并阅读仓库内v1.1手册；board对照实物收集缺少的原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1。**2026-10-12 进度**：来源表 + 候选 PS7 经 Vivado 2022.2 逐属性验证完成；PS_CLK/DDR/UART 已实测确定；**GEM/PHY/reset 与工业级料号未定，故 ready 仍为 0** |
 | F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统。**2026-10-12 结果**：JTAG/UART/DDR 通过（[来源表 §9](board/bkb220/migration-source-table.md)），**GEM 链路与 CAPS 未通过**（MDIO 无 PHY 应答；CAPS 需 lwIP 固件） |
-| F4 新板P4基线 | board以WSL22完整生成SE150/P4/100MHz整机和同XSA软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线 |
-| F5 P16整机候选 | rtl审查正式P16依赖和关键路径，board按同板profile生成独立目录；改动按层级回归 | 150/50/807/957/64及16/1贯通；LC50真实接口PASS；WNS/WHS≥0、TNS/THS=0、失败端点0、DRC和路由合法、100MHz；完整新XSA软硬包 |
+| F4 新板P4基线 | board以WSL22完整生成SE150/P4/100MHz整机和同XSA软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线。**2026-10-12 进度**：硬件侧 **PASS**（route 完成、WNS+0.680/WHS+0.036、失败端点 0、DRC 0 errors、100MHz）；**同 XSA 软件包与板测未做** |
+| F5 P16整机候选 | rtl审查正式P16依赖和关键路径，board按同板profile生成独立目录；改动按层级回归 | 150/50/807/957/64及16/1贯通；LC50真实接口PASS；WNS/WHS≥0、TNS/THS=0、失败端点0、DRC和路由合法、100MHz；完整新XSA软硬包。**2026-10-12 进度**：**P16 整机 100MHz 收敛 PASS**（WNS+0.617/WHS+0.017、失败端点 0、33,987 LUT=63.89%）；同 XSA 软件包与板测未做 |
 | F6 P16正确性与工程回归 | main持板卡/串口，verify编排；先smoke再全量，再连续和故障恢复 | 全量≥3次哈希相同；full→2048→full及脏轮→干净轮通过；配置拒绝/断连/超时→正常任务恢复；不只靠一次下载PASS |
 | F7 性能与泛化复核 | verify同板P4/P16六档≥3次矩阵；board提供合法完整包；main审核公平口径 | 128/512/2048/8192/32768/full输入一致、补帧记录数明确；中位数/离散程度/斜率/截距；全量LDPC和SHA必须PASS；至少5独立payload复核与受控噪声边界，旧结果注明旧板 |
 | F8 长稳与剩余终态门禁 | verify逐项重核本计划的G0～G8；main安排可用设备 | 建议先2小时新板连续观察，稳定后8小时长稳；异常分类/恢复证据；有功率计才测闲置/任务功率与能耗；无仪器写未测。SE250另制品/另几何，本次16路SE150不能冒充支持 |
