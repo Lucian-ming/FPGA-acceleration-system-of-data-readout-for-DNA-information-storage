@@ -421,6 +421,9 @@ UART baud 属性均为 115200；PS7 IP 没有独立 PCW 数据位/校验/停止�
 1. **杀掉 hw_server 后必须真正重新枚举 USB**（`usbipd detach` 再 `attach`，确认设备号变化），否则 JTAG 链只显示 `xc7z020`、看不到 `arm_dap`，会误判成「PS 不在链上」。仅重启 hw_server 无效。
 2. `0xF800010C` 是 **PLL_STATUS**，不是 DDR_PLL_CTRL；DDR PLL 控制寄存器是 `0xF8000104`。本文档 §9.1 已按此更正。
 3. WSL 内 `/dev/ttyUSB*` 属 `root:plugdev`，普通用户需临时放开权限或用 sudo 才能做串口采集（JTAG 走 libusb，不受此限）。
+5. **断电复位后必须先跑 `ps7_init`，MDIO 才会有反应。** 2026-10-12 实测：板子断电重上后，MDIO 对 PHY 0/1 的**所有寄存器都读回 `0x0000`**（连 `PHYID` 都是 0），而同一时刻 Windows 侧 ASIX 网卡显示 **Up 1 Gbps**（说明 PHY 本身活着、已 link）。原因不是故障：**MDIO 要 `MIO52/53` 被 mux 成 GEM 的 MDIO 功能才通**，断电后 PS 回到 BootROM 默认态、MIO 未配置。跑完 `ps7_init` 后 `MIO_PIN_52/53 = 0x1280`，MDIO 立刻恢复（`PHYID=0x001C/0xC915`）。**所以：任何 MDIO/PHY 观测都必须排在 `ps7_init` 之后**；断电后的第一次读为 0 不代表 PHY 或线有问题。
+6. **`BMSR` bit2（链路状态）是 latching-low，单次读会误判。** 实测同上：link 事件后的第一次读 bit2=0（锁存"曾掉线"），**后续读稳定为 1**（`0x796D`）。**判断链路当前状态至少要读两次**，或用非锁存的佐证 —— `reg10 (1000BASE-T 状态) bit11 = 对端千兆全双工能力`、`ANLPAR != 0`。这条不影响此前网线 A/B 的结论（坏线那组连续 20 次采样 bit2 全为 0，是真没起来），但它解释了旧线复测时"第一次读是 down"的现象。
+7. **Windows 侧硬件服务与 USB 归属不跨断电存活。** 板子断电后 FT4232H 回落到 Windows（COM9/10/11 重新出现），`usbipd` 直通断开且状态回到 `Shared`；端口 3132 上会留下一个**已经没有设备的旧 `hw_server`**。恢复顺序：按端口找 PID 杀掉旧实例 → `usbipd attach --wsl --busid 4-2` → 起新 `hw_server`。
 4. 被动抓串口刻意排在 `rst -system` 之前：ftdi_sio 在 open 时会拉起 DTR/RTS，若该线接 PS 复位，顺序倒过来会干扰初始化。
 
 ### 9.5 ENET0/PHY 探测记录（供下一步接手，避免重复）
