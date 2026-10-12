@@ -35,15 +35,28 @@ puts "BASELINE> running"
 
 set t0 [clock seconds]
 set st 0
+set completed 0
 while {[clock seconds] - $t0 < @@TIMEOUT@@} {
     after 2000
     if {[catch {set st [mrd -force -value 0x09F00000]} err]} {
         puts "BASELINE> mrd err $err"
         continue
     }
-    if {$st == 0xAB5E00D0 || $st == 0xAB5E0BAD} break
+    if {$st == 0xAB5E00D0} {
+        set completed 1
+        break
+    }
+    if {$st == 0xAB5E0BAD} {
+        stop
+        puts "BASELINE> FAIL board reported error status 0xAB5E0BAD"
+        exit 2
+    }
 }
 stop
+if {!$completed} {
+    puts [format "BASELINE> FAIL timeout after %d s; last status 0x%08X" [expr {[clock seconds] - $t0}] $st]
+    exit 2
+}
 puts [format "BASELINE> status 0x%08X after %d s" $st [expr {[clock seconds] - $t0}]]
 
 # 摘要（条数、耗时计数、计数器频率）与逐条结果都读回主机，由主机做逐条比对

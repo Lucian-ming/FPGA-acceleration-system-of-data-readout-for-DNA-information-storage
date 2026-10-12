@@ -9,19 +9,20 @@
 #   vivado -mode batch -source ooc_probe.tcl -tclargs \
 #       my_top 100 rtl/my_top.v
 #
-# 可选环境变量（不设则与原行为相同）：
-#   SYNTH_PART=xc7z020clg400-1      换目标器件（默认 xc7z010clg400-1）
+# 可选环境变量：
+#   SYNTH_PART=xc7z020clg400-2      换目标器件（默认 BKB220 xc7z020clg400-2）
 #   SYNTH_GENERICS="WIDTH=16 ..."  顶层参数覆盖，逐个传给 synth_design -generic
 #   SYNTH_TAG=z020_w16              报告目录后缀，避免多次摸底互相覆盖
+#   SYNTH_OUT_ROOT=logs/vivado/id/reports  报告根目录（默认 build/）
 #   SYNTH_IMPL=1                    再跑 OOC 布局布线，给出布线后 WNS（综合后 WNS 偏乐观：
 #                                   实测案例：同一模块综合后 +2.197 ns，整机布线后只剩约 +0.2 ns）
 # 例（换器件 / 换参数摸底）：
-#   SYNTH_PART=xc7z020clg400-1 SYNTH_GENERICS="WIDTH=16" SYNTH_TAG=z020_w16 \
+#   SYNTH_PART=xc7z020clg400-2 SYNTH_GENERICS="WIDTH=16" SYNTH_TAG=z020_w16 \
 #     vivado -mode batch -source ooc_probe.tcl -tclargs \
 #       my_top 100 rtl/my_top.v
 # =============================================================
 
-set part_name "xc7z010clg400-1"
+set part_name "xc7z020clg400-2"
 if {[info exists ::env(SYNTH_PART)] && $::env(SYNTH_PART) ne ""} { set part_name $::env(SYNTH_PART) }
 set generics {}
 if {[info exists ::env(SYNTH_GENERICS)]} {
@@ -37,7 +38,9 @@ set clk_mhz [lindex $argv 1]
 set files   [lrange $argv 2 end]
 set period  [expr {1000.0 / $clk_mhz}]
 
-set outdir "build/synth_$top"
+set outroot "build"
+if {[info exists ::env(SYNTH_OUT_ROOT)] && $::env(SYNTH_OUT_ROOT) ne ""} { set outroot $::env(SYNTH_OUT_ROOT) }
+set outdir [file join $outroot "synth_$top"]
 if {[info exists ::env(SYNTH_TAG)] && $::env(SYNTH_TAG) ne ""} { append outdir "_$::env(SYNTH_TAG)" }
 file mkdir $outdir
 
@@ -50,6 +53,7 @@ foreach f $files {
 }
 
 set do_impl [expr {[info exists ::env(SYNTH_IMPL)] && $::env(SYNTH_IMPL) eq "1"}]
+set failed 0
 set ooc {}
 if {$do_impl} { set ooc {-mode out_of_context} }
 synth_design -top $top -part $part_name -flatten_hierarchy rebuilt {*}$ooc {*}$generics
@@ -65,7 +69,10 @@ foreach pt $clk_ports {
         incr n
     }
 }
-if {$n == 0} { puts "     ⚠️ 未找到时钟端口，时序报告无意义" }
+if {$n == 0} {
+    puts "     FAIL: 未找到时钟端口，时序报告无意义"
+    exit 2
+}
 opt_design -quiet
 if {$do_impl} {
     place_design
@@ -87,13 +94,31 @@ foreach line [split $txt "\n"] {
 
 puts "\n===== 时序 ($top) ====="
 report_timing_summary -file $outdir/timing.rpt -max_paths 5
-set wns [get_property SLACK [get_timing_paths -delay_type max -max_paths 1]]
-puts "  WNS = $wns ns   (>=0 表示在 ${clk_mhz}MHz 下收敛)"
-if {$wns ne "" && $wns < 0} {
-    puts "  ⚠️  时序未收敛，最高可用频率约 [format %.1f [expr {1000.0/($period - $wns)}]] MHz"
+set setup_paths [get_timing_paths -delay_type max -max_paths 1]
+set hold_paths  [get_timing_paths -delay_type min -max_paths 1]
+set wns ""
+set whs ""
+if {[llength $setup_paths] > 0} { set wns [get_property SLACK $setup_paths] }
+if {[llength $hold_paths] > 0} { set whs [get_property SLACK $hold_paths] }
+
+puts "  WNS = $wns ns   WHS = $whs ns"
+if {$wns eq "" || $whs eq ""} {
+    puts "  FAIL: 找不到 setup 或 hold 时序路径"
+    set failed 1
+} elseif {$wns < 0 || $whs < 0} {
+    if {$do_impl} {
+        puts "  FAIL: 布线后 setup/hold 未收敛"
+    } else {
+        puts "  综合-only 估算为负；此结果不构成时序验收判据"
+    }
+    if {$wns < 0} {
+        puts "  setup 最高频率估算约 [format %.1f [expr {1000.0/($period - $wns)}]] MHz"
+    }
+    if {$do_impl} { set failed 1 }
 } else {
-    puts "  ✓ 时序收敛"
+    puts "  ✓ setup/hold 时序收敛"
 }
 
 puts "\n报告已写入 $outdir/"
+if {$failed} { exit 2 }
 exit 0

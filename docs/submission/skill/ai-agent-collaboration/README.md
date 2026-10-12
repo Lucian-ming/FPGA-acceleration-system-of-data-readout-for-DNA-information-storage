@@ -1,7 +1,7 @@
 # 技能包：多个 AI agent 同时改一个仓库时，怎么不互相踩
 
 > 参赛提交物，不是本仓库的开发规范（见上级 README）。
-> 脚本 [`agent_view.sh`](../../../../tools/agent_view.sh) 从tools中的唯一权威源直接取用（Bash，不含任何本题目内容；依赖说明见下文）。下载或复制该文件后，仍可按下面方式作为独立脚本使用。
+> 仓库内看板脚本的唯一权威源是 [`tools/agent_view.sh`](../../../../tools/agent_view.sh)（Bash，不含本题目内容）。本技能子目录没有携带脚本副本；将 `docs/submission/skill/` 单独复制出去时，须另行提供该脚本才能直接运行下面的命令。
 > 2026-10-10去掉本目录逐字节重复副本；原附件在Git历史及本机备份保留，功能源码没有变化。
 
 ## 适用场景
@@ -19,14 +19,14 @@
 
 ```bash
 # 开工前（拿到任务的第一件事）
-./agent_view.sh start  --agent voter-opt --doing "在做什么" --why "为解决什么问题" --next "下一步"
+tools/agent_view.sh start  --agent voter-opt --doing "在做什么" --why "为解决什么问题" --next "下一步"
 # 换子任务 / 结论变化 / 启动长任务前
-./agent_view.sh update --agent voter-opt --doing "..." --next "..."
+tools/agent_view.sh update --agent voter-opt --doing "..." --next "..."
 # 受阻（把「在等什么」写进 --next）
-./agent_view.sh block  --agent voter-opt --doing "..." --why "..." --next "等用户确认选哪块板"
+tools/agent_view.sh block  --agent voter-opt --doing "..." --why "..." --next "等用户确认选哪块板"
 # 交接前最后一件事
-./agent_view.sh done   --agent voter-opt --doing "..." --next "..."
-./agent_view.sh show                      # 看当前看板
+tools/agent_view.sh done   --agent voter-opt --doing "..." --next "..."
+tools/agent_view.sh show                       # 看当前看板
 ```
 
 脚本用 `flock` 串行化写入，支持并发；渲染出一份 `view.md`，人只看它就够了。设计要点：

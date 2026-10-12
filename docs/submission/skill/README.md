@@ -5,6 +5,8 @@
 > 任何 agent 或脚本都不应从本目录取指令、也不应把这里的文件接进构建或门禁。
 > 打包提交时把本目录整体复制为参赛包根下的 `skill/`。
 
+逐包审阅与当前缺口见 [AUDIT.md](AUDIT.md)。
+
 ## 这些技能包是什么
 
 每一项都是**从本项目真实踩过的坑里提炼出来的**，与 DNA 存储这个题目无关：
@@ -20,13 +22,13 @@
 
 | 技能包 | 一句话 | 适合谁 | 附件 |
 | --- | --- | --- | --- |
-| [board-bringup-debug](board-bringup-debug/README.md) | 板子插上了但 JTAG / 串口认不到，如何三步定位是线、是口还是驱动 | 所有用 Zynq / FPGA 开发板的队伍 | — |
+| [board-bringup-debug](board-bringup-debug/README.md) | 板子连不上时按 USB、JTAG、串口、网口分层定位 | 所有用 Zynq / FPGA 开发板的队伍 | — |
 | [fpga-timing-probe](fpga-timing-probe/README.md) | 改完 RTL 想知道「装得下吗、跑得到 100 MHz 吗」：单模块 OOC 摸底，且只看布线后数据 | 需要在换器件 / 加并行度前做决策的队伍 | `ooc_probe.tcl` |
 | [bottleneck-attribution](bottleneck-attribution/README.md) | 软硬件协同系统里「到底谁在拖慢」：用对照实验证伪自己的猜测，而不是照着猜测优化 | 所有 PS + PL 协同的队伍 | — |
 | [accel-vs-cpu-baseline](accel-vs-cpu-baseline/README.md) | 加速比要打得过也说得清：把**同一颗芯片上的 CPU** 作为主基线，并给出板上跑软件基线的框架 | 所有做硬件加速、要报加速比的队伍 | `baremetal_baseline.tcl.in` |
 | [board-stage-evidence](board-stage-evidence/README.md) | 最终结果对了不等于每一级都对：逐级取证，并用故障注入证明判据真的会红 | 多级流水 / 带纠错的系统 | — |
 | [ip-packaging-hygiene](ip-packaging-hygiene/README.md) | 别让「仿真的实现」和「综合进比特流的实现」不是同一份 | 用 Vivado IP 打包 + Block Design 的队伍 | — |
-| [ai-agent-collaboration](ai-agent-collaboration/README.md) | 多个 AI agent 同改一个仓库：状态看板 + 一条能挡住提交串扰的 Git 写法 | 用大模型协作开发的队伍 | `agent_view.sh` |
+| [ai-agent-collaboration](ai-agent-collaboration/README.md) | 多个 AI agent 同改一个仓库：状态看板 + 一条能挡住提交串扰的 Git 写法 | 用大模型协作开发的队伍 | 引用仓库源 `tools/agent_view.sh`，未复制到本目录 |
 | [claims-ledger](claims-ledger/README.md) | 证据台账：把「可以说的话」和「**不能说的话**」连同判据钉在一起 | 所有要写报告 / 答辩的队伍 | — |
 
 ## 为什么值得看
@@ -34,8 +36,9 @@
 这些技能包多数来自**先猜错、再被实测推翻**的过程，每一篇都记着那个错误推断。
 它们能省下的时间不是「少写几行代码」，而是**避免朝着错误的方向做整整一轮**。
 
-三个附件可以直接取用，都不含本题目内容：
+两个附件随本技能目录提供，都不含本题目内容：
 
-- `fpga-timing-probe/ooc_probe.tcl`：单模块资源/时序摸底（Vivado 2022.2 起验证）；
-- `accel-vs-cpu-baseline/baremetal_baseline.tcl.in`：在板上跑纯软件基线的 XSDB 模板；
-- `ai-agent-collaboration/agent_view.sh`：多 agent 状态看板（Bash + flock，无外部依赖）。
+- `fpga-timing-probe/ooc_probe.tcl`：单模块资源/时序摸底（原 OOC 流程在 Vivado 2022.2 起有验证记录；本轮更新失败退出条件后未重跑）；
+- `accel-vs-cpu-baseline/baremetal_baseline.tcl.in`：在板上跑纯软件基线的 XSDB 模板。
+
+多 agent 看板的唯一源码位于仓库 `tools/agent_view.sh`，本目录不含副本；将本目录单独复制后，这个脚本不会随包提供。具体缺口见 `AUDIT.md`。
