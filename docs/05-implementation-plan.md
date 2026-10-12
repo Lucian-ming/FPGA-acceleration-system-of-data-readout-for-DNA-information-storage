@@ -40,7 +40,9 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 
 2026-10-11已把用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)收录至仓库，原件与副本SHA一致；[资料索引及校验](board/bkb220/README.md)是接管入口。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`，再核对对应PCB/实物及原厂配置；引用手册规格时注明页码。产品手册已具备，后续只按实际缺项补齐原理图/preset/例程，不重新制定计划。
 
-硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG；缺对应PCB原理图、PS7 preset/board_files/原厂例程及实物完整料号。Windows Vivado/Vitis为2026.1，WSL Vivado为2022.2。手册的存在不能消除PS7配置依赖。接管时重新核对资料和设备，资料未齐之前BKB220保持ready=0；不能猜DDR/MIO/PHY/时钟、复位未知设备或把USB调试误当整板供电。
+~~硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG~~（**2026-10-12 作废**：BKB220 已到货连接，JTAG 实测为 xc7z020，FT4232H 提供 JTAG + COM9/10/11；见 [03 §1a](03-status.md) 与 [07 §3a](07-board-build-and-acceptance.md)）。仍缺对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号，以及 ENET0 的 PHY 复位/MDIO 归属。WSL Vivado/Vitis 2022.2 为主开发链；**Windows 2026.1 的 hw_server 因两次蓝屏已暂停，下载/调试改走 WSL**。`ready` 仍为 0：不能猜 DDR/MIO/PHY/时钟、复位未知设备或把 USB 调试误当整板供电。
+
+**2026-10-12 接管进度**：F0 完成；F1 由子 Agent 只读复核并由 main 复跑门禁确认（P4/P16 源集与 `PACKAGED_VARIANTS.txt` 一致、打包与卫生 PASS、P16 整机 LUT 先验约 33.9k）；F2 基本完成（来源表 + 候选 PS7 经 Vivado 2022.2 逐条验证，`ready=0`）；**F3 大部分通过**（`ps7_init`/`ps7_post_config` RC=0、DDR 0x10000000 起 1024 字写读 0 不符、PS UART 实测 = UART0/MIO14-15 → FT4232H 通道 C `/dev/ttyUSB2`），**但 ENET0/PHY 未通过**（MDIO 全地址无应答），故 F4～F8 仍被前置阻塞。详细判据见 [BKB220 来源表 §9](board/bkb220/migration-source-table.md)。
 
 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
@@ -50,8 +52,8 @@ Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日�
 |---|---|---|
 | F0 接管既有计划与现场核对 | main读取本计划、清单及当前文档，核对仓库/HEAD/脏文件/工具/设备和已有证据；按需分配子任务 | 确认已完成/需复核/未完成阶段、具体依赖、路径归属和资源；现成计划直接执行，仅因事实变化修订，不重写计划 |
 | F1 已有成果确认 | main对照07和三个benchmark；子Agent复核源集、API/制品、测试边界 | 必要短检查通过；已有长测来源可验证，不无故重跑；已知失败和阻塞有记录 |
-| F2 新板配置落实 | main/board先校验并阅读仓库内v1.1手册；board对照实物收集缺少的原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1 |
-| F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统 |
+| F2 新板配置落实 | main/board先校验并阅读仓库内v1.1手册；board对照实物收集缺少的原厂PS7及原理图；main给实际供电/USB/网线明确要求；verify核对工具目标 | PCB/完整part/DDR时序、PS时钟、UART MIO、GEM/PHY/reset、启动配置、XDC及source_refs表；获得可靠配置后才ready=1。**2026-10-12 进度**：来源表 + 候选 PS7 经 Vivado 2022.2 逐属性验证完成；PS_CLK/DDR/UART 已实测确定；**GEM/PHY/reset 与工业级料号未定，故 ready 仍为 0** |
+| F3 新板最小启动 | board准备最小同XSA软硬包；main持板卡锁运行；verify协助留证 | 唯一JTAG目标、实际PS串口、UART、DDR训练/安全区读写、容量、GEM链路、CAPS；失败先定位单项，不直接跑全系统。**2026-10-12 结果**：JTAG/UART/DDR 通过（[来源表 §9](board/bkb220/migration-source-table.md)），**GEM 链路与 CAPS 未通过**（MDIO 无 PHY 应答；CAPS 需 lwIP 固件） |
 | F4 新板P4基线 | board以WSL22完整生成SE150/P4/100MHz整机和同XSA软件包；rtl审查路由；main/verify执行板测 | route/DRC/约束合格；完整manifest通过；2048源读段、全量、四级DDR、最终SHA通过；冻结P4制品/输入/性能基线 |
 | F5 P16整机候选 | rtl审查正式P16依赖和关键路径，board按同板profile生成独立目录；改动按层级回归 | 150/50/807/957/64及16/1贯通；LC50真实接口PASS；WNS/WHS≥0、TNS/THS=0、失败端点0、DRC和路由合法、100MHz；完整新XSA软硬包 |
 | F6 P16正确性与工程回归 | main持板卡/串口，verify编排；先smoke再全量，再连续和故障恢复 | 全量≥3次哈希相同；full→2048→full及脏轮→干净轮通过；配置拒绝/断连/超时→正常任务恢复；不只靠一次下载PASS |
@@ -175,6 +177,8 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 
 主Agent按用户要求使用三个低等级gpt-6-luna子Agent完成docs-audit、tools-audit、env-audit两轮短任务，分别核对文档映射/提示词、脚本副作用/打包/47主机用例、实际设备/资料/配置门禁。main复查引用与差异、直接重复只读CIM设备核查并查看测试原始日志；子Agent不做Git写入。
 
-F0/F1审计与准备检查已执行：正式源SHA、fixture几何/内容、打包与47主机用例PASS。F2只做只读资料/设备与dry-run核查：bkb220 ready=0在create_project前拒绝，未创建工程；当前只有蓝牙COM，无FTDI/JTAG、无物理网口/对应原厂preset。资料搜索仅指定目录一层关键词及仓库文件名，不构成全磁盘不存在资料的证明。F3～F8真板依赖仍未关闭。
+~~F0/F1审计与准备检查已执行：…当前只有蓝牙COM，无FTDI/JTAG、无物理网口/对应原厂preset。~~（该段为 2026-10-10 快照，设备部分已被 2026-10-12 实测取代：FT4232H JTAG + COM9/10/11 已确认，见 §2 上方。）资料搜索仅指定目录一层关键词及仓库文件名，不构成全磁盘不存在资料的证明。
+
+**2026-10-12 回填**：F2 已从「只读 dry-run」推进到「Vivado 2022.2 catalog 逐属性验证 + 来源表」；F3 已在真板执行并大部分通过（DDR 读写、PS UART 归属），仅 ENET0/PHY 未通过。F4～F8 真板依赖**仍未关闭**，前置是 ENET0/PHY。
 
 后续资料/连接到位且必要MCP核查通过后，由main经 codex-luna MCP 固定 gpt-6-luna/max 按角色提示词派发board-migrate/rtl-16way/verify-system；当前审计助手已停写。索引、静态盘点和短检查可优先派发；生产RTL、时序、PS7及真板结论必须main审查，不仅依据子Agent的摘要。
