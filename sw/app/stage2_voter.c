@@ -10,6 +10,7 @@
 #include "ddr_layout.h"
 #include "xil_printf.h"
 #include "xil_cache.h"
+#include "prof.h"
 #include "sleep.h"
 #include "dna_time.h"
 
@@ -109,7 +110,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             u32 chunk = (task_in_bytes - inv_done > INV_CHUNK)
                         ? INV_CHUNK
                         : (task_in_bytes - inv_done);
-            Xil_DCacheInvalidateRange(VOTER_IN_TEMP + inv_done, chunk);
+            PROF_CACHE_INVALIDATE(VOTER_IN_TEMP + inv_done, chunk);
             inv_done += chunk;
         }
 
@@ -134,7 +135,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         /* -------------------- Pre-start Input Validation（全部字节视图） -------------------- */
         xil_printf("\n\r[STAGE2] Pre-start Input Validation:\n\r");
-        Xil_DCacheInvalidateRange(voter_in_addr, VOTER_INPUT_BYTES_PER_READ * 10U);
+        PROF_CACHE_INVALIDATE(voter_in_addr, VOTER_INPUT_BYTES_PER_READ * 10U);
         __asm__ volatile("dsb sy"); __asm__ volatile("isb");
 
         /* 统计前 10 个 read 的非零字节 */
@@ -351,7 +352,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         // ✅ 硬件写完后，只需单次 Invalidate 让 CPU 丢弃旧缓存行，从 DDR 重取真值
         xil_printf("[STAGE2] Making HW-written output visible to CPU (invalidate only)...\n\r");
-        Xil_DCacheInvalidateRange(voter_out_addr, VOTER_OUTPUT_BYTES);   // [FIX] 改为仅 Invalidate
+        PROF_CACHE_INVALIDATE(voter_out_addr, VOTER_OUTPUT_BYTES);   // [FIX] 改为仅 Invalidate
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
 
@@ -428,16 +429,20 @@ int apply_watermark_differential(void)
     const volatile u8 *wm = (const volatile u8 *)DDR_WATERMARK_BASE;
     u32 i;
 
-    Xil_DCacheInvalidateRange(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
-    Xil_DCacheInvalidateRange(DDR_WATERMARK_BASE, WM_PACKED_BYTES);
+    PROF_CACHE_INVALIDATE(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
+    PROF_CACHE_INVALIDATE(DDR_WATERMARK_BASE, WM_PACKED_BYTES);
     __asm__ volatile("dsb sy");
 
+    /* 当前 PS 路径没有单独的结果序列化器；这里计量共识结果到 Stage3
+     * 打包输入的逐字节差分转换循环，作为 serialize_ticks 的明确范围。 */
+    PROF_TIME_BEGIN(serialize);
     for (i = 0; i < WM_PACKED_BYTES; i++) {
         cons[i] = (u8)(cons[i] ^ wm[i]);
     }
+    PROF_TIME_END(serialize, serialize_ticks);
     /* 81,000 bit 不是 8 的整数倍余数为 0（10,125*8 = 81,000），无需处理尾部 */
 
-    Xil_DCacheFlushRange(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
+    PROF_CACHE_FLUSH(DDR_VOTER_OUT_BASE, VOTER_OUTPUT_BYTES);
     __asm__ volatile("dsb sy");
     __asm__ volatile("isb");
     xil_printf("[DIFF] Consensus XOR watermark done (%u bytes)\n\r",

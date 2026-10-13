@@ -9,6 +9,7 @@
 #include "fw_log.h"
 #include "xil_printf.h"
 #include "xil_cache.h"
+#include "prof.h"
 
 bdring_ctx_t g_bdring_ctx;
 
@@ -54,6 +55,7 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
                        const char *name,
                        xfer_kind_e kind)
 {
+    PROF_SUBMIT_BEGIN(submit);
     int Status;
     XAxiDma_Bd *BdPtr, *BdCurPtr;
 
@@ -86,12 +88,14 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
     u32 free_bd = XAxiDma_BdRingGetFreeCnt(RingPtr);
     if (free_bd < bd_count) {
         xil_printf("[ERROR] Not enough BDs (need %u, have %u)\n\r", bd_count, free_bd);
+        PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
 
     Status = XAxiDma_BdRingAlloc(RingPtr, bd_count, &BdPtr);
     if (Status != XST_SUCCESS) {
         xil_printf("[ERROR] BD alloc failed\n\r");
+        PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
 
@@ -126,7 +130,7 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
     {
         XAxiDma_Bd *FlushPtr = BdPtr;
         for (u32 i = 0; i < bd_count; i++) {
-            Xil_DCacheFlushRange((UINTPTR)FlushPtr, sizeof(XAxiDma_Bd));
+            PROF_CACHE_FLUSH_SAMPLED((UINTPTR)FlushPtr, sizeof(XAxiDma_Bd));
             FlushPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, FlushPtr);
         }
     }
@@ -134,8 +138,10 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
     Status = XAxiDma_BdRingToHw(RingPtr, bd_count, BdPtr);
     if (Status != XST_SUCCESS) {
         xil_printf("[ERROR] ToHw failed\n\r");
+        PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
+    PROF_SUBMIT_END(submit, bd_count);
     return bd_count;
 }
 
@@ -144,6 +150,7 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
  *============================================================================*/
 int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
 {
+    PROF_RECLAIM_BEGIN(reclaim);
     XAxiDma_Bd *BdPtr;
     int n = XAxiDma_BdRingFromHw(RingPtr, max_to_reclaim, &BdPtr);
     if (n > 0) {
@@ -158,11 +165,16 @@ int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
             u32 sts = XAxiDma_BdGetSts(CurPtr);
             if (sts & XAXIDMA_BD_STS_ALL_ERR_MASK) {
                 xil_printf("[ERROR] BD status error: 0x%08X (BD %d/%d)\n\r", sts, i, n);
+                PROF_RECLAIM_END(reclaim, 0U);
                 return -1;
             }
             CurPtr = (XAxiDma_Bd *)XAxiDma_BdRingNext(RingPtr, CurPtr);
         }
-        if (XAxiDma_BdRingFree(RingPtr, n, BdPtr) != XST_SUCCESS) return -1;
+        if (XAxiDma_BdRingFree(RingPtr, n, BdPtr) != XST_SUCCESS) {
+            PROF_RECLAIM_END(reclaim, 0U);
+            return -1;
+        }
     }
+    PROF_RECLAIM_END(reclaim, (n > 0) ? (u32)n : 0U);
     return n;
 }

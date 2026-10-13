@@ -24,6 +24,7 @@
 #include "echo.h"
 #include "sleep.h"
 #include "dna_time.h"
+#include "prof.h"
 
 /* 流水线运行期主循环每圈的休眠（us），0 = 不休眠。可用 -DPIPE_RUN_SLEEP_US=N 覆盖做对照实验。 */
 #ifndef PIPE_RUN_SLEEP_US
@@ -78,8 +79,8 @@ int force_decoder_to_idle(void) {
         p_in[i] = 0xAAAAAAAAAAAAAAAAULL;  // 填充测试数据
         p_out[i] = 0;
     }
-    Xil_DCacheFlushRange(dummy_in_addr, 128);
-    Xil_DCacheFlushRange(dummy_out_addr, 128);
+    PROF_CACHE_FLUSH(dummy_in_addr, 128);
+    PROF_CACHE_FLUSH(dummy_out_addr, 128);
 
     // 配置最小任务：8个输入beat，6个输出beat
     write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  dummy_in_addr);
@@ -304,7 +305,9 @@ int main(void)
     for (;;) {
         /* 1) 喂 lwIP 输入(高频) */
         if (echo_netif) {
+            PROF_NETIN_BEGIN(netin);
             xemacif_input(echo_netif);
+            PROF_NETIN_END(netin);
         }
 
         /* 2) 处理 lwIP 计时器(硬件Flag优先) */

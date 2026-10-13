@@ -10,13 +10,14 @@
 #include "xil_cache.h"
 #include "sleep.h"
 #include "dna_time.h"
+#include "prof.h"
 
 /* 与 stage2_voter.c 的 VOTER_WAIT_TIMEOUT_S 同理：超时按墙钟计，不随轮询节拍漂移。 */
 #define DECODER_WAIT_TIMEOUT_S 30U
 
 int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats)
 {
-    Xil_DCacheInvalidateRange(out_addr, total_beats * 8);
+    PROF_CACHE_INVALIDATE(out_addr, total_beats * 8);
     u64 *data = (u64*)out_addr;
 
     u32 sentinel_count = 0;   // 未写入(仍是哨兵值)
@@ -89,7 +90,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
         // ✅ Cache一致性修复
         xil_printf("[STAGE3] Invalidating input cache...\n\r");
-        Xil_DCacheInvalidateRange(DEC_IN_ADDR, DEC_IN_BEATS * 8);
+        PROF_CACHE_INVALIDATE(DEC_IN_ADDR, DEC_IN_BEATS * 8);
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
         xil_printf("[STAGE3] ✓ Cache invalidated\n\r");
@@ -119,7 +120,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         for (u32 i = 0; i < DEC_OUT_BEATS; i++) {
             out64[i] = DECODER_SENTINEL_U64;
         }
-        Xil_DCacheFlushRange(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
+        PROF_CACHE_FLUSH(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
         xil_printf("[STAGE3] Output area filled with sentinel values\n\r");
 
         // ✅ 关键修复：写配置前再次确认START=0
@@ -263,7 +264,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
         /* 条件2（旁证）：输出区哨兵是否已被全部覆盖。每 20 次轮询看一次 */
         if ((poll_count % 20u) == 0u) {
-            Xil_DCacheInvalidateRange(DDR_DECODER_OUT_BASE, DECODER_OUTPUT_BEATS * 8);
+            PROF_CACHE_INVALIDATE_SAMPLED(DDR_DECODER_OUT_BASE, DECODER_OUTPUT_BEATS * 8);
             volatile const u64 *p_out = (volatile const u64 *)DDR_DECODER_OUT_BASE;
             u32 written = 0;
             for (u32 i = 0; i < DECODER_OUTPUT_BEATS; i++) {
@@ -312,7 +313,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         xil_printf("[STAGE3] ========================================\n\r");
 
         // 最终验证
-        Xil_DCacheInvalidateRange(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
+        PROF_CACHE_INVALIDATE(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
 
         u32 final_written = 0;
         validate_decoder_written_beats(DEC_OUT_ADDR, DEC_OUT_BEATS, &final_written);

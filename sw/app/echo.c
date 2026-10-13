@@ -22,6 +22,7 @@
 #include "sleep.h"
 #include "xaxidma.h"
 #include "dna_time.h"
+#include "prof.h"
 #include "netif/xadapter.h"
 
 #define BIT_SET(val, bit)    ((val) |= (1ULL << (bit)))
@@ -288,6 +289,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
 
     switch (g_proc_state) {
     case PROC_REQUESTED:
+        prof_reset();
         pipeline_reset_counters(); pipeline_set_state(PIPE_WM_PREP);
         /* 【WM 批量化·留证】整条流水线一共占了几个 poll 步、走了多少墙钟时间。
          * 固定开销的量纲就是「poll 步数 × 250~500 ms」，把步数直接打出来，
@@ -396,8 +398,14 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
     case PROC_DONE:
         send_result(conn);
         g_proc_state = (conn->state == STATE_IDLE) ? PROC_IDLE : PROC_FAILED;
+        prof_dump_once();
         break;
-    case PROC_FAILED: xil_printf("[POST] Pipeline failed\n\r"); send_ack_byte(conn->tpcb, PKT_ERROR); g_proc_state = PROC_IDLE; break;
+    case PROC_FAILED:
+        xil_printf("[POST] Pipeline failed\n\r");
+        send_ack_byte(conn->tpcb, PKT_ERROR);
+        g_proc_state = PROC_IDLE;
+        prof_dump_once();
+        break;
     default: break;
     }
     return ERR_OK;
@@ -487,7 +495,7 @@ int process_watermark(dna_connection_t *conn, u8 *data, u32 len)
         return -1;
     }
     memcpy((void *)DDR_WATERMARK_BASE, data, len);
-    Xil_DCacheFlushRange(DDR_WATERMARK_BASE, len);
+    PROF_CACHE_FLUSH(DDR_WATERMARK_BASE, len);
     conn->watermark_size = len;
     xil_printf("[WM] Stored %u bytes (%u bits, %u symbols)\n\r",
                len, (u32)WM_TOTAL_BITS, (u32)WM_SYMBOLS);
@@ -517,7 +525,7 @@ int expand_watermark_regions(dna_connection_t *conn)
         return -1;
     }
 
-    Xil_DCacheInvalidateRange(DDR_WATERMARK_BASE, conn->watermark_size);
+    PROF_CACHE_INVALIDATE(DDR_WATERMARK_BASE, conn->watermark_size);
 
     /* 位序与几何由 wm_expand.h 统一定义，并在主机上用黄金向量单元测试
        （tools/test_wm_expand.c，见 tools/run_sim.sh） */
@@ -530,7 +538,7 @@ int expand_watermark_regions(dna_connection_t *conn)
     }
     (void)idx;
 
-    Xil_DCacheFlushRange(DDR_WM_REGIONS_BASE, WM_REGIONS_TOTAL_BYTES);
+    PROF_CACHE_FLUSH(DDR_WM_REGIONS_BASE, WM_REGIONS_TOTAL_BYTES);
     __asm__ volatile("dsb sy");
     xil_printf("[WM] Expanded to %u regions x %u symbols (%u bytes) @ 0x%08X\n\r",
                (u32)WM_NUM_LC, (u32)WM_REF_LEN,
@@ -640,6 +648,7 @@ void process_post(dna_connection_t *conn)
  *============================================================================*/
 void send_result(dna_connection_t *conn)
 {
+    PROF_TIME_BEGIN(sendres);
     u32 result_size = DECODER_OUTPUT_BYTES; /* 64800 (或 SE150 的 8100) */
     xil_printf("\n\r[RESULT] Sending %u bytes (initial sndbuf=%u)\n\r",
                result_size, tcp_sndbuf(conn->tpcb));
@@ -677,6 +686,7 @@ void send_result(dna_connection_t *conn)
             continue;
         }
         xil_printf("[ERROR] Header write failed: %d\n\r", e);
+        PROF_SEND_RESULT_END(sendres, 0U);
         return;
     }
     tcp_output(conn->tpcb);
@@ -717,6 +727,7 @@ void send_result(dna_connection_t *conn)
             usleep(1000);
         } else {
             xil_printf("[ERROR] Data write failed: %d @%u\n\r", e, sent);
+            PROF_SEND_RESULT_END(sendres, sent);
             return;
         }
     }
@@ -744,9 +755,11 @@ void send_result(dna_connection_t *conn)
 
     if (!delivery_settled) {
         xil_printf("[ERROR] Result delivery timeout; refusing to report success\n\r");
+        PROF_SEND_RESULT_END(sendres, sent);
         return;
     }
     conn->state = STATE_IDLE;
+    PROF_SEND_RESULT_END(sendres, sent);
 }
 
 /* validate_decoder_written_beats 已迁至 stage3_decoder.{c,h} */

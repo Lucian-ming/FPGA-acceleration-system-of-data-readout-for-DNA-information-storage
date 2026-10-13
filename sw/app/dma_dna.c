@@ -9,6 +9,7 @@
 #include "fw_log.h"
 #include "xil_printf.h"
 #include "xil_cache.h"
+#include "prof.h"
 #include "bsp_compat.h"
 #include "sleep.h"
 
@@ -110,7 +111,7 @@ int dna_submit_reads_chunk(dna_tx_state_t *st)
     u32 chunk_bytes = (u32)can_frames * FRAME_BYTES;
     u32 addr        = DDR_READS_BASE + st->frames_sent * FRAME_BYTES;
 
-    Xil_DCacheFlushRange(addr, chunk_bytes);
+    PROF_CACHE_FLUSH(addr, chunk_bytes);
 
     int bd = submit_bd_transfer(TxRingPtr, addr, chunk_bytes, TxMaxTransferLen,
                                 "TX-READS-CHUNK", XFER_TX_READS);

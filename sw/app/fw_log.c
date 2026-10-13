@@ -5,13 +5,14 @@
 #include "echo.h"
 #include "xil_printf.h"
 #include "xil_cache.h"
+#include "prof.h"
 #include "xaxidma.h"
 
 /* 打印一个 48B 的 read（Stage1/Stage2 输入），索引按 read 计数 */
 void fw_dump_read48(const void *base_addr, u32 read_index)
 {
     const UINTPTR addr = (UINTPTR)base_addr + (UINTPTR)read_index * 48U;
-    Xil_DCacheInvalidateRange(addr, 48U);
+    PROF_CACHE_INVALIDATE(addr, 48U);
     __asm__ volatile("dsb sy"); __asm__ volatile("isb");
 
     const volatile u8 *p = (const volatile u8 *)addr;
@@ -26,7 +27,7 @@ void fw_dump_read48(const void *base_addr, u32 read_index)
 void fw_dump_u64(const void *base_addr, u32 start_index, u32 count, const char *label)
 {
     const UINTPTR addr = (UINTPTR)base_addr + ((UINTPTR)start_index * 8U);
-    Xil_DCacheInvalidateRange(addr, 8U * count);
+    PROF_CACHE_INVALIDATE(addr, 8U * count);
     __asm__ volatile("dsb sy"); __asm__ volatile("isb");
 
     const volatile u8 *p = (const volatile u8 *)addr;

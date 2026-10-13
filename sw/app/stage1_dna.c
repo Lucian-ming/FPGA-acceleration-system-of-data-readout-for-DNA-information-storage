@@ -15,6 +15,7 @@
 #include "xil_cache.h"
 #include "sleep.h"
 #include "dna_time.h"
+#include "prof.h"
 
 /* 第一级计数 */
 static int wm_tx_expected = 0;
@@ -139,7 +140,11 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
     case PIPE_WM_PREP: {
         xil_printf("\n\r[STAGE1] WM_PREP: expanding watermark into %u regions\n\r",
                    (u32)WM_NUM_LC);
-        if (expand_watermark_regions(conn) != 0) {
+        int expand_rc;
+        PROF_TIME_BEGIN(wmx);
+        expand_rc = expand_watermark_regions(conn);
+        PROF_TIME_END(wmx, wmx_ticks);
+        if (expand_rc != 0) {
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -212,6 +217,8 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         if (wm_region >= WM_NUM_LC) {
             XTime t_end;
             XTime_GetTime(&t_end);
+            /* WM_PREP 记录起点；此处汇总到最后一个区域 DMA 预载完成。 */
+            PROF_ADD_TICKS(wmpre_ticks, (u64)(t_end - wm_t_start));
             u32 elapsed_ms = (u32)((t_end - wm_t_start) /
                                    (XTime)(COUNTS_PER_SECOND / 1000U));
             xil_printf("[STAGE1] WM preload done: %u regions x %u symbols, "
@@ -233,7 +240,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         /* 【B21】DNA 核每条记录一个 AXIS packet（TLAST），所以一个 BD 只收一条记录。
          * 需要收 total_reads 条 = total_reads 个 BD，而 ring 只有 1024 个，
          * 因此按 RX_OUTSTANDING_MAX 滚动补投，rx_expected 直接按条数计。 */
-        Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, out_size);
+        PROF_CACHE_INVALIDATE(DDR_DNA_ACC_OUT_BASE, out_size);
         rx_records_total     = total_reads;
         rx_records_submitted = 0;
         rx_expected          = (int)total_reads;
@@ -254,7 +261,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 
         u32 addr = DDR_READS_BASE;
         u32 len  = FRAME_BYTES;
-        Xil_DCacheFlushRange(addr, len);
+        PROF_CACHE_FLUSH(addr, len);
 
         int bd = submit_bd_transfer(TxRingPtr, addr, len, TxMaxTransferLen,
                                     "TX-PREFILL", XFER_TX_READS);
@@ -272,7 +279,10 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_TX_STREAM: {
+        PROF_TSTREAM_ENTER();
+        PROF_HELPER_BEGIN(ts_rx_reclaim, helper_rx_reclaim_calls);
         int got_rx = reclaim_some_bd(RxRingPtr, 512);
+        PROF_HELPER_END(ts_rx_reclaim);
         if (got_rx < 0) { dump_dma_regs("TX_STREAM reclaim RX failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
         if (got_rx > 0) {
             rx_done += got_rx;
@@ -280,28 +290,40 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         }
         /* 【B21】立刻补投 RX BD：一条记录一个 BD，ring 不能空，否则 S2MM 进 Idle
          * → 结果 FIFO 满 → 输入 FIFO 满 → S_AXIS_DATA_TREADY 拉低 → MM2S 永久停摆 */
-        if (submit_rx_records() < 0) { dump_dma_regs("RX resubmit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
+        PROF_HELPER_BEGIN(ts_rx_submit, helper_rx_submit_calls);
+        int rx_submit_rc = submit_rx_records();
+        PROF_HELPER_END(ts_rx_submit);
+        if (rx_submit_rc < 0) { dump_dma_regs("RX resubmit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
 
         int free_rx = XAxiDma_BdRingGetFreeCnt(RxRingPtr);
         if (free_rx < 100 && tx_frames_sent < tx_frames_total) {
+            PROF_TSTREAM_LOW_BEGIN(ts_lowwater);
             static u32 rx_stall_count = 0; rx_stall_count++;
             for (int i = 0; i < 5; i++) {
+                PROF_HELPER_BEGIN(ts_low_reclaim, helper_low_reclaim_calls);
                 got_rx = reclaim_some_bd(RxRingPtr, 512);
+                PROF_HELPER_END(ts_low_reclaim);
                 if (got_rx > 0) {
                     rx_done += got_rx;
                     free_rx = XAxiDma_BdRingGetFreeCnt(RxRingPtr);
                     if (free_rx >= 150) { rx_stall_count = 0; break; }
                 }
+                PROF_TSTREAM_USLEEP();
                 usleep(50);
             }
+            PROF_TIME_END(ts_lowwater, tstream_lowwater_ticks);
             if (rx_stall_count > 5000) { xil_printf("[WARN] RX recovery timeout, forcing TX continue\n\r"); rx_stall_count = 0; }
             else return PIPE_STEP_PROGRESS;
         }
 
+        PROF_HELPER_BEGIN(ts_read_submit, helper_read_submit_calls);
         int bd = submit_reads_chunk();
+        PROF_HELPER_END(ts_read_submit);
         if (bd < 0) { dump_dma_regs("TX_STREAM submit failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
 
+        PROF_HELPER_BEGIN(ts_tx_reclaim, helper_tx_reclaim_calls);
         int got_tx = reclaim_some_bd(TxRingPtr, 512);
+        PROF_HELPER_END(ts_tx_reclaim);
         if (got_tx < 0) { dump_dma_regs("TX_STREAM reclaim TX failed"); pipeline_set_state(PIPE_FAIL); return PIPE_STEP_FAIL; }
         if (got_tx > 0) { tx_done += got_tx; tx_frames_done = tx_done; }
 
@@ -383,7 +405,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
                                                 DNA_ACC_RESULT_PACKED_BYTES));
 
         /* 验证前 10 个 read 的数据新鲜度 */
-        Xil_DCacheInvalidateRange(DDR_DNA_ACC_OUT_BASE, DNA_ACC_RESULT_PACKED_BYTES * 10U);
+        PROF_CACHE_INVALIDATE(DDR_DNA_ACC_OUT_BASE, DNA_ACC_RESULT_PACKED_BYTES * 10U);
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
 
@@ -413,9 +435,9 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 
         /* 强制把数据刷新到 DDR（后续 Stage2 直接读取；[C1] 按实际条数） */
         xil_printf("\n\r[STAGE1] Flushing all output to DDR...\n\r");
-        Xil_DCacheFlushRange(DDR_DNA_ACC_OUT_BASE,
-                             (u32)ddr_layout_stage1_bytes(conn->total_reads_received,
-                                                           DNA_ACC_RESULT_PACKED_BYTES));
+        PROF_CACHE_FLUSH(DDR_DNA_ACC_OUT_BASE,
+                         (u32)ddr_layout_stage1_bytes(conn->total_reads_received,
+                                                       DNA_ACC_RESULT_PACKED_BYTES));
         __asm__ volatile("dsb sy");
         __asm__ volatile("isb");
         usleep(5000);
