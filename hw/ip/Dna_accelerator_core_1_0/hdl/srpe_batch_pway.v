@@ -21,6 +21,7 @@
 module `SRPE_BATCH_PWAY_MODNAME #(
     parameter integer P_WAYS    = 4,       // 并行滑窗位置数，2 的幂
     parameter integer PIPE_TREE = 0,       // 1 = 选优树逐级打拍（P>=8 在 100 MHz 下必需）
+    parameter integer BASES_PER_CYCLE = 1, // 每拍推进的碱基数（读段与水印均按此分 bank）
     parameter integer BATCH     = 64,
     parameter integer NUM_LC    = 50,      // 参考区域数量
     parameter integer STRIDE    = 807,     // 每区域可滑动位置数
@@ -59,8 +60,13 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     // 区域索引与水印存储几何
     localparam integer REGION_W = 6;                     // 0~49
     localparam integer WM_DEPTH = NUM_LC * REF_LEN;      // 50*957 or 50*1055
-    localparam integer WM_AW    = CLOG2(WM_DEPTH);
     localparam integer P_LOG    = CLOG2(P_WAYS);        // 选优树级数 / 位置序号位宽
+    localparam integer WM_BANK_DEPTH = (WM_DEPTH + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
+    localparam integer WM_BANK_AW    = CLOG2(WM_BANK_DEPTH);
+    localparam integer PLANE_BANK_DEPTH = (READ_BPS + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
+    localparam integer WM_WINDOW_SIZE = P_WAYS + BASES_PER_CYCLE - 1;
+    localparam integer RUN_GROUPS = (READ_BPS + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
+    localparam integer SCORE_INC_W = CLOG2(BASES_PER_CYCLE + 1);
 
     // ----------------------------------------------------------
     // 辅助函数
@@ -70,50 +76,99 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     end endfunction
 
     // ----------------------------------------------------------
-    // 水印 BRAM：NUM_LC * REF_LEN 个 2-bit 符号
+    // 水印 BRAM：按原扁平地址 (LC*REF_LEN+offset) mod K 分 bank，每 bank 一个同步读口。
     // ----------------------------------------------------------
-    (* ram_style="block", rom_style="block" *)
-    reg [1:0] wm_bram [0:WM_DEPTH-1];
+    wire [31:0] wm_wr_addr_lin = bram_sel * REF_LEN + bram_write_addr;
+    wire [31:0] wm_wr_addr_wide = wm_wr_addr_lin / BASES_PER_CYCLE;
+    wire [WM_BANK_AW-1:0] wm_wr_addr = wm_wr_addr_wide[WM_BANK_AW-1:0];
+    wire [31:0] wm_wr_bank = wm_wr_addr_lin % BASES_PER_CYCLE;
 
-    // 写地址：wm_wr_addr = bram_sel * REF_LEN + bram_write_addr
-    wire [15:0] wm_wr_addr_lin = bram_sel * REF_LEN + bram_write_addr;
-    wire [WM_AW-1:0] wm_wr_addr = wm_wr_addr_lin[WM_AW-1:0];
-
-    // 读地址与数据寄存器
     reg  [5:0]       lc_idx;
     reg  [15:0]      wm_rd_offset;
-    wire [15:0]      wm_rd_addr_lin = lc_idx * REF_LEN + wm_rd_offset;
-    wire [WM_AW-1:0] wm_rd_addr_d   = wm_rd_addr_lin[WM_AW-1:0];
+    reg  [WM_BANK_AW-1:0] wm_rd_addr_q [0:BASES_PER_CYCLE-1];
+    reg  [1:0]       wm_sym_q [0:BASES_PER_CYCLE-1];
+    reg  [15:0]      wm_tag_q, wm_tag_qq;
+    reg  [5:0]       wm_tag_lc_q, wm_tag_lc_qq;
 
-    reg  [WM_AW-1:0] wm_rd_addr_q;
-    reg  [1:0]       wm_sym_q;
+    genvar gb;
+    generate
+        for (gb=0; gb<BASES_PER_CYCLE; gb=gb+1) begin: gen_wm_bank
+            (* ram_style="block", rom_style="block" *)
+            reg [1:0] mem [0:WM_BANK_DEPTH-1];
+            // 本 bank 对应当前扁平连续地址区间中的一个符号地址。
+            wire [31:0] wm_rd_addr_lin = lc_idx * REF_LEN + wm_rd_offset;
+            wire [15:0] delta = (gb + BASES_PER_CYCLE -
+                                  (wm_rd_addr_lin % BASES_PER_CYCLE)) % BASES_PER_CYCLE;
+            wire [31:0] raw_symbol = wm_rd_offset + delta;
+            wire [15:0] bank_symbol = (raw_symbol >= REF_LEN) ? (REF_LEN-1) : raw_symbol[15:0];
+            wire [31:0] read_addr_wide = (lc_idx * REF_LEN + bank_symbol) /
+                                         BASES_PER_CYCLE;
+            wire [WM_BANK_AW-1:0] read_addr = read_addr_wide[WM_BANK_AW-1:0];
+            always @(posedge clk) begin
+                wm_rd_addr_q[gb] <= read_addr;
+                wm_sym_q[gb] <= mem[wm_rd_addr_q[gb]];
+                if (bram_write_en && wm_wr_bank == gb)
+                    mem[wm_wr_addr] <= bram_write_data;
+            end
+        end
+    endgenerate
 
-    // ----------------------------------------------------------
-    // 读段位平面 BRAM：READ_BPS 行，每行并行保存 64 条读段。
-    // Port A 用于比对同步读，Port B 用于装载/输出的读改写。
-    // ----------------------------------------------------------
-    (* ram_style = "block" *) reg [63:0] plane_lo [0:READ_BPS-1];
-    (* ram_style = "block" *) reg [63:0] plane_hi [0:READ_BPS-1];
-
-    // Port A：比对阶段同步读
-    reg [8:0]  a_addr;
-    reg [63:0] a_lo_q, a_hi_q;
+    // 地址标签与 BRAM 输出保持相同的两级同步延迟，用于预填窗口定位。
     always @(posedge clk) begin
-        a_lo_q <= plane_lo[a_addr];
-        a_hi_q <= plane_hi[a_addr];
+        wm_tag_q    <= wm_rd_offset;
+        wm_tag_qq   <= wm_tag_q;
+        wm_tag_lc_q  <= lc_idx;
+        wm_tag_lc_qq <= wm_tag_lc_q;
     end
 
-    // Port B：装载/输出阶段读改写
+    wire [1:0] wm_sym_lane [0:BASES_PER_CYCLE-1];
+    genvar gwl;
+    generate
+        for (gwl=0; gwl<BASES_PER_CYCLE; gwl=gwl+1) begin: gen_wm_lane
+            wire [15:0] source_addr = wm_tag_qq + gwl;
+            wire [31:0] source_abs_addr = wm_tag_lc_qq * REF_LEN +
+                ((source_addr >= REF_LEN) ? (REF_LEN-1) : source_addr);
+            wire [31:0] source_bank = source_abs_addr % BASES_PER_CYCLE;
+            assign wm_sym_lane[gwl] = wm_sym_q[source_bank];
+        end
+    endgenerate
+
+    // ----------------------------------------------------------
+    // 读段位平面：地址 addr mod K 选择 bank，bank 内地址为 addr / K。
+    // 每个 bank 各有 Port A 比对读口与 Port B 装载/输出读改写口；不复制整块 RAM。
+    // ----------------------------------------------------------
+    reg [8:0]  a_addr;
     reg [8:0]  b_addr;
-    reg [63:0] b_lo_q, b_hi_q;
     reg        b_we_lo, b_we_hi;
     reg [63:0] b_lo_d,  b_hi_d;
-    always @(posedge clk) begin
-        b_lo_q <= plane_lo[b_addr];
-        b_hi_q <= plane_hi[b_addr];
-        if (b_we_lo) plane_lo[b_addr] <= b_lo_d;
-        if (b_we_hi) plane_hi[b_addr] <= b_hi_d;
-    end
+    wire [63:0] a_lo_q [0:BASES_PER_CYCLE-1];
+    wire [63:0] a_hi_q [0:BASES_PER_CYCLE-1];
+    wire [63:0] plane_b_lo_q [0:BASES_PER_CYCLE-1];
+    wire [63:0] plane_b_hi_q [0:BASES_PER_CYCLE-1];
+    wire [63:0] b_lo_q = plane_b_lo_q[b_addr % BASES_PER_CYCLE];
+    wire [63:0] b_hi_q = plane_b_hi_q[b_addr % BASES_PER_CYCLE];
+    generate
+        for (gb=0; gb<BASES_PER_CYCLE; gb=gb+1) begin: gen_plane_bank
+            (* ram_style="block" *) reg [63:0] lo_mem [0:PLANE_BANK_DEPTH-1];
+            (* ram_style="block" *) reg [63:0] hi_mem [0:PLANE_BANK_DEPTH-1];
+            reg [63:0] a_lo_bank_q, a_hi_bank_q;
+            reg [63:0] b_lo_bank_q, b_hi_bank_q;
+            assign a_lo_q[gb] = a_lo_bank_q;
+            assign a_hi_q[gb] = a_hi_bank_q;
+            assign plane_b_lo_q[gb] = b_lo_bank_q;
+            assign plane_b_hi_q[gb] = b_hi_bank_q;
+            always @(posedge clk) begin
+                a_lo_bank_q <= lo_mem[a_addr / BASES_PER_CYCLE];
+                a_hi_bank_q <= hi_mem[a_addr / BASES_PER_CYCLE];
+                b_lo_bank_q <= lo_mem[b_addr / BASES_PER_CYCLE];
+                b_hi_bank_q <= hi_mem[b_addr / BASES_PER_CYCLE];
+                if (b_we_lo && (b_addr % BASES_PER_CYCLE) == gb)
+                    lo_mem[b_addr / BASES_PER_CYCLE] <= b_lo_d;
+                if (b_we_hi && (b_addr % BASES_PER_CYCLE) == gb)
+                    hi_mem[b_addr / BASES_PER_CYCLE] <= b_hi_d;
+            end
+        end
+    endgenerate
 
     // ----------------------------------------------------------
     // 状态机编码
@@ -160,7 +215,7 @@ module `SRPE_BATCH_PWAY_MODNAME #(
 
     // P_WAYS 路并行滑窗移位寄存器
     // wm_win[p] 对应位置 pos_base + p
-    reg [1:0] wm_win [0:P_WAYS-1];
+    reg [1:0] wm_win [0:WM_WINDOW_SIZE-1];
 
     // P_WAYS 组独立分数累加器：score[p][t]
     reg [SCORE_W-1:0] score [0:P_WAYS-1][0:BATCH-1];
@@ -180,11 +235,34 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     reg [CODEBITS-1:0]    stage1_cw    [0:BATCH-1];
 
     // 匹配比较矩阵：match_mask[p][t] 表示位置 p 对读段 t 的当前碱基是否完全一致
-    wire [63:0] match_mask [0:P_WAYS-1];
+    wire [63:0] match_mask [0:P_WAYS*BASES_PER_CYCLE-1];
     generate
         for (gv=0; gv<P_WAYS; gv=gv+1) begin: gen_match
-            assign match_mask[gv] = ~( (a_lo_q ^ {64{wm_win[gv][0]}}) |
-                                       (a_hi_q ^ {64{wm_win[gv][1]}}) );
+            genvar gmk;
+            for (gmk=0; gmk<BASES_PER_CYCLE; gmk=gmk+1) begin: gen_match_lane
+                assign match_mask[gv*BASES_PER_CYCLE+gmk] =
+                    ~( (a_lo_q[gmk] ^ {64{wm_win[gv+gmk][0]}}) |
+                       (a_hi_q[gmk] ^ {64{wm_win[gv+gmk][1]}}) );
+            end
+        end
+    endgenerate
+
+    // 每个候选位置/记录的 K 路匹配数；尾组无效 lane 被屏蔽。
+    wire [SCORE_INC_W-1:0] score_inc [0:P_WAYS*BATCH-1];
+    genvar gsp, gst;
+    generate
+        for (gsp=0; gsp<P_WAYS; gsp=gsp+1) begin: gen_score_pos
+            for (gst=0; gst<BATCH; gst=gst+1) begin: gen_score_record
+                wire [SCORE_INC_W-1:0] sum_lane [0:BASES_PER_CYCLE];
+                assign sum_lane[0] = {SCORE_INC_W{1'b0}};
+                genvar gsl;
+                for (gsl=0; gsl<BASES_PER_CYCLE; gsl=gsl+1) begin: gen_score_lane
+                    wire lane_valid = (run_cnt * BASES_PER_CYCLE + gsl < READ_BPS);
+                    assign sum_lane[gsl+1] = sum_lane[gsl] +
+                        (match_mask[gsp*BASES_PER_CYCLE+gsl][gst] && lane_valid);
+                end
+                assign score_inc[gsp*BATCH+gst] = sum_lane[BASES_PER_CYCLE];
+            end
         end
     endgenerate
 
@@ -237,16 +315,7 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     wire [15:0] region_mul_stride = best_region[emit_idx] * STRIDE;
     wire [POS_W-1:0] global_pos   = region_mul_stride + best_pos[emit_idx];
 
-    integer p, t;
-
-    // 水印 BRAM 同步读写
-    always @(posedge clk) begin
-        if (bram_write_en) begin
-            wm_bram[wm_wr_addr] <= bram_write_data;
-        end
-        wm_rd_addr_q <= wm_rd_addr_d;
-        wm_sym_q     <= wm_bram[wm_rd_addr_q];
-    end
+    integer p, t, k;
 
     // ----------------------------------------------------------
     // 主控制状态机
@@ -293,7 +362,7 @@ module `SRPE_BATCH_PWAY_MODNAME #(
                 stage1_cw[t]    <= {CODEBITS{1'b0}};
                 for (p=0; p<P_WAYS; p=p+1) score[p][t] <= {SCORE_W{1'b0}};
             end
-            for (p=0; p<P_WAYS; p=p+1) wm_win[p] <= 2'b00;
+            for (p=0; p<WM_WINDOW_SIZE; p=p+1) wm_win[p] <= 2'b00;
         end else begin
             cw_req  <= 1'b0;
             res_wr  <= 1'b0;
@@ -396,59 +465,70 @@ module `SRPE_BATCH_PWAY_MODNAME #(
                     for (t=0; t<BATCH; t=t+1) begin
                         for (p=0; p<P_WAYS; p=p+1) score[p][t] <= {SCORE_W{1'b0}};
                     end
-                    wm_rd_offset <= (pos_cnt >= REF_LEN) ? (REF_LEN-1) : pos_cnt;
+                    for (p=0; p<WM_WINDOW_SIZE; p=p+1) wm_win[p] <= 2'b00;
+                    wm_rd_offset <= pos_cnt;
                     st <= S_PREFILL;
                 end
 
-                // 预充填阶段：P_WAYS 拍移位寄存器装填（4-way 时各常数为 5/4/5/6）
+                // 预充填固定 18 拍。先按 K 符号组装初始窗口，末三拍预取 RUN 前两组。
                 S_PREFILL: begin
                     pre_cnt <= pre_cnt + 1'b1;
 
-                    if (pre_cnt < P_WAYS+1) begin
-                        wm_rd_offset <= ((pos_base + pre_cnt + 1) >= REF_LEN) ? 
-                                        (REF_LEN - 1) : (pos_base + pre_cnt + 1);
+                    if (wm_tag_lc_qq == lc_idx) begin
+                        for (k=0; k<BASES_PER_CYCLE; k=k+1) begin
+                            if ((wm_tag_qq + k >= pos_base) &&
+                                (wm_tag_qq + k < pos_base + WM_WINDOW_SIZE)) begin
+                                wm_win[wm_tag_qq + k - pos_base] <= wm_sym_lane[k];
+                            end
+                        end
                     end
 
-                    if (pre_cnt >= 2) begin
-                        for (p=0; p<P_WAYS-1; p=p+1) wm_win[p] <= wm_win[p+1];
-                        wm_win[P_WAYS-1] <= wm_sym_q;
+                    if (pre_cnt < P_WAYS-1) begin
+                        wm_rd_offset <= pos_base + (pre_cnt + 1) * BASES_PER_CYCLE;
+                    end else if (pre_cnt == P_WAYS-1) begin
+                        wm_rd_offset <= pos_base + WM_WINDOW_SIZE;
+                    end else if (pre_cnt == P_WAYS) begin
+                        wm_rd_offset <= pos_base + WM_WINDOW_SIZE + BASES_PER_CYCLE;
+                    end else if (pre_cnt == P_WAYS+1) begin
+                        wm_rd_offset <= pos_base + WM_WINDOW_SIZE + 2*BASES_PER_CYCLE;
                     end
 
                     if (pre_cnt == P_WAYS) begin
                         a_addr <= 9'd0;
                     end else if (pre_cnt == P_WAYS+1) begin
-                        a_addr <= 9'd1;
+                        a_addr <= BASES_PER_CYCLE;
                     end
 
                     if (pre_cnt == P_WAYS+1) begin
                         run_cnt <= 0;
-                        wm_rd_offset <= ((pos_base + P_WAYS + 2) >= REF_LEN) ? (REF_LEN - 1) : (pos_base + P_WAYS + 2);
                         st <= S_RUN;
                     end
                 end
 
-                // 比对运行阶段：持续 READ_BPS 拍
+                // 每拍比较 K 个连续碱基；最后一组的越界 lane 由 score_inc 屏蔽。
                 S_RUN: begin
                     run_cnt <= run_cnt + 1'b1;
 
                     for (p=0; p<P_WAYS; p=p+1) begin
                         if (pos_valid[p]) begin
                             for (t=0; t<BATCH; t=t+1) begin
-                                if (match_mask[p][t]) score[p][t] <= score[p][t] + 1'b1;
+                                score[p][t] <= score[p][t] + score_inc[p*BATCH+t];
                             end
                         end
                     end
 
-                    for (p=0; p<P_WAYS-1; p=p+1) wm_win[p] <= wm_win[p+1];
-                    wm_win[P_WAYS-1] <= wm_sym_q;
+                    for (p=0; p<WM_WINDOW_SIZE-BASES_PER_CYCLE; p=p+1)
+                        wm_win[p] <= wm_win[p+BASES_PER_CYCLE];
+                    for (k=0; k<BASES_PER_CYCLE; k=k+1)
+                        wm_win[WM_WINDOW_SIZE-BASES_PER_CYCLE+k] <= wm_sym_lane[k];
 
-                    if (run_cnt + 2 < READ_BPS) begin
-                        a_addr <= run_cnt + 2;
+                    if (run_cnt + 2 < RUN_GROUPS) begin
+                        a_addr <= (run_cnt + 2) * BASES_PER_CYCLE;
                     end
-                    wm_rd_offset <= ((pos_base + P_WAYS + 3 + run_cnt) >= REF_LEN) ?
-                                    (REF_LEN - 1) : (pos_base + P_WAYS + 3 + run_cnt);
+                    wm_rd_offset <= pos_base + WM_WINDOW_SIZE +
+                                    (run_cnt + 3) * BASES_PER_CYCLE;
 
-                    if (run_cnt == READ_BPS - 1) begin
+                    if (run_cnt == RUN_GROUPS - 1) begin
                         st <= S_UPD1;
                     end
                 end
