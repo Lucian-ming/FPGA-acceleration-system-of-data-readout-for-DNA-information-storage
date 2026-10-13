@@ -1,6 +1,6 @@
 # 技能包审阅与补齐记录
 
-审阅日期：2026-10-12。范围为本目录入口和 8 个技能包 README、两个随包脚本；事实核对以 `docs/03-status.md` 当前断点、`docs/board/bkb220/migration-source-table.md` §9–§15、`docs/benchmarks/bkb220-p4-p16-100mhz-build.md`、`docs/05-implementation-plan.md` 与 `tools/README.md` 为准。旧板记录作为历史保留，不覆盖当前 BKB220/P16 状态。
+审阅日期：2026-10-12。范围为本目录入口和 8 个技能包 README、两个随包脚本；事实核对以 `docs/03-status.md` 当前断点、`docs/board/bkb220/migration-source-table.md` §9–§15、`docs/benchmarks/bkb220-p4-p16-100mhz-build.md`、`docs/05-implementation-plan.md` 与 `tools/readme.md` 为准。旧板记录作为历史保留，不覆盖当前 BKB220/P16 状态。
 
 ## 逐包结论
 
@@ -75,7 +75,7 @@
 3. **中：OOC 资源预算没有自动红灯。** 脚本报告 LUT/FF/BRAM/DSP，但没有适用于所有项目的预算上限。使用者需给具体整机余量并将报告与该预算比较；不能只凭时序 exit 0 宣称“装得下”。
 4. **中：性能对照规则缺通用噪声阈值模板。** `bottleneck-attribution` 有重复和中位数建议，但“总时间不变”的等价判断应预先给绝对/相对误差区间，并固定测量端点、环境与输入；当前 BKB220 的六档矩阵尚未完成。
 5. **中：P16 的故障探针尚未闭环。** 新板 P16 的 smoke、全量三轮和状态复位已记录；配置守卫、断连畸变恢复和任务中途断网故障项仍按当前计划待跑。技能包只说明通用故障注入方法，不应写成 P16 全部回归已通过。
-6. **合规：文件名大小写。** 8 个技能 README 和入口文件均名为 `README.md`，违反严格“纯英文小写”命名要求；目录名及 `baremetal_baseline.tcl.in`、`ooc_probe.tcl` 为小写。另本次被明确要求创建的文件名 `AUDIT.md` 本身也有大写，需 main 决定如何与竞赛命名条款协调。按要求，本轮没有擅自改名。
+6. **合规：文件名大小写。** 8 个技能 README 和入口文件均名为 `readme.md`，违反严格“纯英文小写”命名要求；目录名及 `baremetal_baseline.tcl.in`、`ooc_probe.tcl` 为小写。另本次被明确要求创建的文件名 `audit.md` 本身也有大写，需 main 决定如何与竞赛命名条款协调。按要求，本轮没有擅自改名。
 
 ## 过时内容扫描
 

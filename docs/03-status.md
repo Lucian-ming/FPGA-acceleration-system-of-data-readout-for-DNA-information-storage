@@ -150,7 +150,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 |---|---|
 | **C2 泛化首测（重要）** | 用户外部数据包 **8 套全跑，8/8 成功** —— 4 张 SIPI 图 ×（干净 / 加 1% 替换噪声），**板端回传经 LDPC 重建的图片 SHA 全部与 manifest 的 payload SHA 逐字符相同**；**无需重建比特流**（水印随任务上传）。见[来源表 §16](board/bkb220/migration-source-table.md) |
 | 大模型协作出赛材料 | `docs/submission/ai-collaboration/`（含 `self-correction.md` 四条纠错轨迹） |
-| 技能包 | `docs/submission/skill/` 8 个包审阅补齐 + `AUDIT.md`；**修了一个真缺陷**：`ooc_probe.tcl` 原来 WNS 为负也 `exit 0`，现在会红 |
+| 技能包 | `docs/submission/skill/` 8 个包审阅补齐 + `audit.md`；**修了一个真缺陷**：`ooc_probe.tcl` 原来 WNS 为负也 `exit 0`，现在会红 |
 | 阶段总结 | `docs/reference/phase-summary-2026-10-12.md`（**非最终报告**） |
 | 计划重排 | [05 §7](05-implementation-plan.md)：按比赛评分表重排 + 单列项编入 |
 | 纪律补强 | `AGENTS.md` 新增：**子 agent 在沙箱内不要跑 `verify_repo_binding.sh`**（今晚因漏写这条白跑四个子任务） |
@@ -171,7 +171,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | 1. 补跑 C2 `--skip-dump` 无歧义留证 | ✅ 已完成（8/8 clean PASS） |
 | 2. C2 收尾 | 部分：**v2 challenge 集已上板**（见下）；`score_min=67` 与「每载荷四级黄金向量」仍未做 |
 | 3. C1 六档矩阵 | ✅ 已完成，正式口径见 [性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md) |
-| 4. P2 合规缺口 | 部分：**`LICENSE`（MIT）已入库**并写明第三方素材适用范围；Vivado 版本说明与大小写命名仍待处理 |
+| 4. P2 合规缺口 | 部分：**`LICENSE`（MIT）已入库**并写明第三方素材适用范围；**命名已下沉**——`docs/submission/**` 与 `docs/agent-prompts/**` 共 12 个文件改为小写（0 断链、卫生 PASS），`archive/**` 因有按路径 SHA 留证而故意不动；Vivado 版本说明仍待处理 |
 | 5. B2 剩余三个探针 | ✅ 已完成（P16 包：配置守卫 7/7、畸变包 30/30、中途断网 3/3，之后判据轮全量 `score_min=67` PASS）见 [探针 benchmark](benchmarks/bkb220-p16-fault-probes.md) |
 | 6. P3～P7 | 未开始；**P3 方向已于今日更正**，见下 |
 

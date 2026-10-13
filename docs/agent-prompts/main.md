@@ -24,7 +24,7 @@
 
 本提示词交给用户配置的Claude Code主会话（DeepSeek Anthropic兼容端点、deepseek-flash[1m]）执行；主会话负责实现、监控和唯一Git写入。子Agent通过用户级codex-luna MCP派发，使用用户指定的gpt-6-luna，思考强度max；不要自行换模型、降级或改用Claude Code内置Agent工具。
 
-**先阅读项目最新文档，再决定如何派发子Agent。** 完整阅读AGENTS.md的“子Agent的承载通道与模型”、CLAUDE.md的子Agent操作规则、docs/05-implementation-plan.md和docs/agent-prompts/README.md；结合实际暴露的MCP工具说明，确认诊断、启动、状态查询、取消、权限、超时、证据目录及成功判据。具体参数和当前环境以这些最新文档及工具定义为准，本提示词不重复固定容易过期的CLI、代理或客户端版本模板。
+**先阅读项目最新文档，再决定如何派发子Agent。** 完整阅读AGENTS.md的“子Agent的承载通道与模型”、CLAUDE.md的子Agent操作规则、docs/05-implementation-plan.md和docs/agent-prompts/readme.md；结合实际暴露的MCP工具说明，确认诊断、启动、状态查询、取消、权限、超时、证据目录及成功判据。具体参数和当前环境以这些最新文档及工具定义为准，本提示词不重复固定容易过期的CLI、代理或客户端版本模板。
 
 接管时按最新文档检查MCP可用性，必要时执行只读冒烟。保留实际模型/强度、任务ID、退出状态与证据；不把旧CLI失败记录当作当前MCP结论。MCP不可用时按文档诊断并明确报告，由main继续独立工作；不擅自修改凭据、代理或他人服务，不绕过用户指定模型。用户已交给其他Agent维护的文档，先核对归属和最新版本，避免重叠写入。
 
