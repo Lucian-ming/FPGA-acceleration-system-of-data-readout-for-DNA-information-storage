@@ -27,7 +27,7 @@
 
 ## 本轮证据与历史
 
-- [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)。
+- [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)、[同板P4/P16六档性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)（性能分正式口径）。
 - docs/board：对应资料和板测小证据；docs/benchmarks：可复查的性能/功能摘要。
 - [本次合并归档索引](archive/history/2026/pre-bkb220-handoff-2026-10-10/README.md)：旧20份文档、原名→当前入口、快照校验清单。
 - docs/archive/history/2026其余历史与docs/reference保留来源/负结果；docs/submission是参赛提交资产，不自动成为本项目任务指令。
