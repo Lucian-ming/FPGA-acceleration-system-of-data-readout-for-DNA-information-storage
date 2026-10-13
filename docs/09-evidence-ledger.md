@@ -71,7 +71,10 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | P4 | 演示规模端到端提速 **1.8x** | 2,048 源读段 7.315 s → 4.123 s | 同上 |
 | P5 | 4-Way 顶层加速比（生产几何仿真） | 3,229,621 → 1,674,217 周期 = **1.929x** | `logs/iverilog/run_20260909_005333_*` |
 | P6 | 4-Way 整机时序收敛 | WNS **+0.246 ns** @100 MHz，失败端点 0 | `logs/vivado/recovery_20260909/physopt/` |
-| P7 | 独立硬件周期实测拆解非 Stage1 耗时 | 4096 记录下 Voter 29.627 ms (0.93%)、Decoder 0.022 ms (0.0007%)，总 PL 硬件执行不足 30 ms；非 Stage1 耗时 62.9% 的 99% 以上是 PS 侧 lwIP poll 空等 (2,777 ms) 与 Cache 维护 (396 ms) | `docs/benchmarks/measured_p7_cycle_counters.md`、`g3_runs/20260911T140559Z/` |
+| P7 | 独立硬件周期实测拆解非 Stage1 耗时 | 4096 记录下 Voter 29.627 ms (0.93%)、Decoder 0.022 ms (0.0007%)，总 PL 硬件执行不足 30 ms；非 Stage1 耗时 62.9% 的 99% 以上是 PS 侧 lwIP poll 空等 (2,777 ms) 与 Cache 维护 (396 ms) | `docs/benchmarks/measured_p7_cycle_counters.md`、`g3_runs/20260911T140559Z/`。**⚠️ 时效**：该行测于 2026-09-11，**早于 P12-B 事件驱动改造**，「lwIP poll 空等 2,777 ms / Cache 维护 396 ms」**已不代表当前固件**——当前固件的 cache 维护实测 58 ms、lwIP 收包 7.7 ms（见 [时间预算](benchmarks/bkb220-p16-time-budget.md) §6） |
+| P8 | **读段上传段吞吐 7.76 Mbps → 125～177 Mbps（全量中位 4.27 s → 0.19 s，≈22×）** | 四档（2048/8192/32768/全量）× 3 次，两包各烧一次背靠背；参考包恒 7.76～7.80 Mbps，新包 125～177 Mbps。判据轮 SHA 逐位不变 | `logs/g3/speed-a-upload/sweep-{ref-wnd2048-idle1000,new-wnd32k-idle0}.tsv`、`full-{idle0,ref-control}-runs3.out`（G3 PASS）；`tools/run_g3.sh --full --runs 3 --strict-artifacts`；见 [上传段 benchmark](benchmarks/bkb220-p16-speed-a-upload.md) |
+| P8a | 上传段的限速器是 **`NO_SYS=1` 下一次 `xemacif_input()` 只取一帧** × 空闲主循环 `usleep(1000)`；`TCP_WND=2048` 是第二重 | 批次数 208→52 只降 6%（否掉「停等」猜测）；`TCP_WND` 单独 1.23×（4.18→3.22 s），去掉休眠后 15.5×（→0.27 s）；1514 B ÷ 1.18 ms ≈ 1.28 MB/s 与实测 8.4 Mbps 吻合 | 同上 + `logs/g3/speed-a-upload/offline-b1000.json`、`rtt-probe-baseline.json`；BSP `lwipopts.h` 与 `contrib/ports/xilinx/netif/xemacpsif.c` 的 `#if !NO_SYS` |
+| P8b | 全量整轮墙钟 **13.95 s → 10.27 s（同小时参考包对照，−26.4%）**；`t_result` 不变 | 同小时重测：参考 9.34 s vs 新包 9.33 s | 同上；⚠️ 今晨 `t_result` 是 8.68 s，**同一天内漂移 +7.5%，跨小时比较会把结论做反** |
 
 ### ⛔ 不能说的话（每条都有实测支撑其为假）
 
@@ -85,6 +88,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | 「误接受率低说明系统鲁棒」/「FAR 就是失败率」 | FAR 衡量的是**累加器污染程度**，不是任务成败：`D2_controlled_noise` 在板端 `score_min=65` 下 FAR **21.76%**，却 **3/3 逐位恢复** |
 | 「score_min=67 是最优阈值」 | 67 = `int(0.45×150)`，是设计时选的比例**不是测出来的**。纯替换场景实测 τ=70 才给 FAR=0%；但插删场景抬阈值换不来干净 |
 | 「8-way 还没做」 | 是**做不了**：4-way 已占 LUT 88.0%，8-way 外推 ~125% |
+| 「瓶颈在 PS 侧（lwIP poll 空等 / cache 维护）」 | **要分阶段说，不能一概而论。** 读段**上传段**确实是 PS 侧轮询周期限速（P8a，已修复，4.27→0.19 s）；但**处理段**里 PL 占 87.8%、PS 全部可归因工作只占 2.1%，把 PS 侧清零也只到 7.77 s。引用 P7 那句 PS 侧结论时必须同时写明它测于 2026-09-11、早于 P12-B，且只覆盖处理段 |
 | 「WNS +2.197 ns 说明整机时序好」 | 那是**单模块 OOC**；同一设计整机默认策略下是 **−0.252 ns 不收敛** |
 
 ---

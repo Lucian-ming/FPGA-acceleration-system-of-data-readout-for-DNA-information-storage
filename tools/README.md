@@ -73,6 +73,7 @@
 | --- | --- |
 | `run_cpu_benchmark.py` | CPU vs FPGA 公平基准，MEASURED/HISTORICAL/ESTIMATED 三级分型 |
 | `profile_host.py` | 上位机瓶颈剖析与端到端拆解 |
+| `profile_upload.py` | **读段上传段的三段拆分**：客户端预处理／本机回环停等对照／板端小包 RTT 探针（`--rtt-probe IP:PORT`）。用来判断"上传慢"到底出在客户端 CPU、协议停等还是板端收包速率；**不触板也能跑前两段**。见 `docs/benchmarks/bkb220-p16-speed-a-upload.md` |
 | `g3_timing_fit.py` | 从 `run_g3.sh` 的留证目录拟合「固定开销 + 每条成本」。**与 `board/g3_overhead_sweep.py` 功能重叠**：前者事后拟合既有留证，后者主动扫描并控制档位与重复次数；新测量用后者，回溯历史用前者 |
 | `bench_align.py` | Stage1 的 CPU 侧基准，**并含「精确种子法为何失效」的实证**：读段与水印在最佳位置最长连续精确匹配仅 5~7 nt，16-mer 命中概率 ≈ 1.5e-05。**任何基于精确种子的索引在本任务中不可用**（见 `docs/08` 的已证伪方向）。⚠️ 会在**当前工作目录**写出 `ref.bin` / `reads.bin`，跑完记得清理 |
 

@@ -368,3 +368,35 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 TX_STREAM 压缩**已尝试四次并放弃**，结论是「真正约束是**硬件处理每帧的墙钟时间**，原设计是**时间节拍器**而非容量节流器」；
 即便把 DMA/poll/回传全消掉，旧板 4096 记录档也只快 1.11×。本次的 PL/PS 分解与那条结论**方向一致**，
 所以不要再从 BD 环容量下手；正确定位是「PS 在等 PL，而 PL 每步偏慢」。
+
+### 2026-10-13 傍晚 P3 第一项完成：上传段 −22×（A 组），并给出 C 组的实施判据
+
+**A 组（上位机/协议）已落地一项，见 [上传段 benchmark](benchmarks/bkb220-p16-speed-a-upload.md)：**
+
+- 读段上传段 **4.27 s → 0.19 s（四档 × 3 次中位，≈22×）**，整轮 **13.95 → 10.27 s（−26.4%）**。
+- 根因不是「逐批 ACK 停等」（已实测否掉），而是 **`NO_SYS=1` 下一次 `xemacif_input()` 只取一个以太帧**
+  × **空闲主循环 `usleep(1000)`**；`TCP_WND=2048` 是第二重限制。
+- 改法：`sw/app/main.c` 加 `PIPE_IDLE_SLEEP_US`（默认 1000 µs 不变语义）；
+  派生包 `--lwip-opt TCP_WND=32768 --define PIPE_IDLE_SLEEP_US=0 --sync-src`。
+- **底稿 §5 第 1 项「上传与处理重叠」据此关闭**：上传只剩 0.19 s，重叠上限就是这 0.19 s，不值当动 POST 语义。
+- **底稿 §5 第 2 项「上传吞吐」据此关闭**（已完成）。
+- **第 3 项「LDPC 与下一轮重叠」仍开放**：0.653 s，占新口径整轮 6.4%。属调度改动，需改 `tools/run_g3.sh`
+  的逐轮循环（把 `ldpc_decode.py` 放后台、与下一轮 `first.py` 并行，循环尾 join）。
+  **注意它动的是验收脚本本身**，改动后必须重跑 ≥3 轮全量判据自证没改坏。**本轮未做。**
+
+**C 组（PL）已出设计与探针方案（只读子 Agent `stage1-multibase`），本轮未实施：**
+
+- 现状：`srpe_batch_pway.v` 的 `S_RUN` 每拍只推进**一个**碱基索引，并行比较 16 起点 × 64 记录 = 1024 个匹配位；
+  `score` 是寄存器数组；Stage1 OOC 基线 26,867 LUT / 8 RAMB36。
+- K=2：`S_RUN` 150→75 拍，每块 176→101 拍；整机外推 36k～40k LUT。
+- **K=4**：`S_RUN` 150→38 拍，每块 176→**64** 拍；整机外推 **40k～48k LUT**（上限 53,200，**高端只剩约 5.2k 余量**），
+  BRAM 需奇偶 bank 拆读段 + 4 bank 读水印；**全量估算 ≈ 3.91 s**（再与 7 拍选优排空重叠 ≈ **3.60 s**，目标 3.70 s）。
+- **时序是真正的门槛**：现 WNS 仅 **+0.617 ns**、最差路径 84.5% 是布线。**不能只看 LUT 预算下结论，必须先跑 OOC 探针。**
+- **探针入口**：`docs/submission/skill/fpga-timing-probe/ooc_probe.tcl`（`SYNTH_IMPL=1` 会真的 route；
+  **综合-only 的 WNS 不可作收敛判据**），先把 `BASES_PER_CYCLE` 参数化进 `srpe_batch_pway`，
+  再对 K=2/K=4 各跑一次，看 `util.rpt` / `util_hier.rpt` / `timing.rpt`。
+- **能变红的判据**：OOC —— WNS/WHS ≥ 0、失败端点 0、Stage1 LUT ≤ 40,000、K=4 RAMB36 ≤ 12；
+  整机 —— 完整 route、LUT ≤ 48,000、DRC 0 errors；上板 —— 全量 103,616 条 ≥3 轮
+  SHA 逐位 `fcd0cf90…b1f2c3`，且端到端低于 **3.70 s**。
+- **本轮未做，理由**：这是结构性 RTL 改动（参数化 → 接顶层/`component.xml`/`PACKAGED_VARIANTS.txt`
+  → OOC → 整机 route → 全量回归），本轮剩余时间无法既改完又验完；**改了不验的 RTL 不进主线**。
