@@ -19,6 +19,9 @@ module Dna_accelerator_core_v1_0 #(
     // 4/0: 已验证4路基线；16/1: 7020用逐级流水选优树。
     parameter integer C_STAGE1_P_WAYS    = 4,
     parameter integer C_STAGE1_PIPE_TREE = 0,
+    // Stage1 每拍推进的碱基数 K（只对 16/1 通路有效；见 srpe_batch_pway.v）。
+    // K=1 与未引入本参数时等价；K=2/4 用「读段与水印按地址 mod K 分 bank」换吞吐。
+    parameter integer C_STAGE1_BASES_PER_CYCLE = 1,
     // ===== Algorithm/Data params =====
     parameter integer READ_BPS  = 150,                     // bits per read (symbols*2)
     parameter integer CODEBITS  = READ_BPS*2,              // 300 for SE150
@@ -400,6 +403,7 @@ module Dna_accelerator_core_v1_0 #(
             srpe_batch_pway #(
             .P_WAYS   (C_STAGE1_P_WAYS),
             .PIPE_TREE(C_STAGE1_PIPE_TREE),
+            .BASES_PER_CYCLE(C_STAGE1_BASES_PER_CYCLE),
             .BATCH    (BATCH),
             .NUM_LC   (NUM_LC),
             .STRIDE   (STRIDE),
