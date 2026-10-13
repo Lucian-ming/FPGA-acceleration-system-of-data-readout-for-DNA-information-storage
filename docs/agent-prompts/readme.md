@@ -8,6 +8,7 @@
 | [board-migrate.md](board-migrate.md) | 主Agent派发板级配置、硬软构建和PS固件兼容任务 |
 | [rtl-16way.md](rtl-16way.md) | 主Agent派发正式P16、参数/打包/时序及相关RTL任务 |
 | [verify-system.md](verify-system.md) | 主Agent派发独立验证、制品门禁、性能/泛化/故障/长稳任务 |
+| [speed.md](speed.md) | **speed 主线主Agent**：迁移验收收口后，带队做时间消耗与资源优化（含精细时间预算、已证伪方向清单、判据与资源纪律） |
 
 板级资料入口为[docs/board/bkb220/](../board/bkb220/README.md)，用户提供的v1.1产品手册已入库且SHA校验通过。main和board-migrate先完整阅读并核对；派发板级阶段卡必须附手册/PDF校验路径及仍缺少的对应PCB原厂资料，不能把“手册已收录”写成“PS7配置已确认”。
 
