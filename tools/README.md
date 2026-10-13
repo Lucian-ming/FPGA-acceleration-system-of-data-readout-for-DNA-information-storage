@@ -45,6 +45,7 @@
 | `g3_xsdb.ps1` | Windows XSDB参数桥接，安装/留证路径含空格时分别传参，供G3调用 |
 | `generate_stage1_fixture.py` | 独立NumPy逐符号枚举Stage1 oracle；生产LC50与显式LC6短测，定向807/末区域/补零/并列向量 |
 | `g3_performance_matrix.py` | 同板P4/P16多规模≥3次性能矩阵；明确t_result/上传/LDPC/整轮边界，未采集硬件周期时null |
+| `g3_soak.py` | **新板长稳（2h/8h）编排**：按**实际墙钟**循环跑 `run_g3.sh` 完整判据轮（全量输入、`--skip-boot`、唯一判据 SHA），逐轮写 TSV，每 N 轮插一次畸变包恢复探针。**不烧录**——调用方须先真烧录本包并把包 SHA 记进 `--tag`；`hardware_cycles`/`power_w` 恒 null，板端耗时是客户端打印值，不得反推。墙钟达标≠全部轮次通过：有失败轮仍继续跑（观察能否恢复），但最终 verdict 会红 |
 | `g3_caps.py` / `g3_wait_ready.py` | 完整核对 CAPS 的 SE150 几何；探针要求显式 `--ip`。CAPS 不含 P_WAYS/PIPE_TREE，因此无法区分 P4/P16 |
 | `g3_overhead_sweep.py` | 固定开销尺寸扫描与模型拟合。**必须 `post=True`**，`--no-post` 是「不发 POST 触发」，板子根本不算 |
 | `g3_recovery_probe.py` / `g3_netfault_probe.py` | 畸变包 / 断网注入恢复探针 |
