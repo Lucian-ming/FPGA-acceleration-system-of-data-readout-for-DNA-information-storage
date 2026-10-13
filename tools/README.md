@@ -102,6 +102,7 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；显式board/part_name/独立build与export目录，未验证BKB220配置拒绝构建 |
+| `build_sw_variant.sh` | **PS 编译宏 A/B 的完整变体包构建器**：复制一份已验收包 → 只在新包副本的 Makefile 里追加 `-D` 宏 → 重建应用 ELF → 重打 BOOT.bin → 写 manifest 派生字段 → 重签并自检 SHA256SUMS。**核验并拒绝**新包 bit 与参考包不同（本脚本不改硬件制品）。存在理由：`run_g3.sh` 禁止 `--elf` 指向包外文件，所以任何 PS 侧编译期改动的 A/B 都必须有自己的完整包。只证明新包自洽且与参考包同源，**不证明**它在板上通过 |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
