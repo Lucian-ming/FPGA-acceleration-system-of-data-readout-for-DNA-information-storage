@@ -139,44 +139,6 @@ bsp config stdin $uart
 bsp config stdout $uart
 
 platform write
-
-# ---------- 提高 lwIP 接收窗口 TCP_WND ----------
-# 【2026-10-13】默认模板里是 `#define TCP_WND 2048`，把读段上传限在 ≈7.8 Mbps：
-# 接收窗口限速时吞吐 ≈ TCP_WND ÷ RTT，2048 B ÷ ~2 ms ≈ 1 MB/s，与实测吻合。
-# 提到 32768 后发送端才能一直有帧可飞；配合固件的「空闲多取帧」
-# （`PIPE_IDLE_FETCH_N`，见 sw/app/main.c）实测可到 ~170 Mbps。
-# 见 docs/benchmarks/bkb220-p16-speed-a-upload.md。
-#
-# 为什么必须在这里就地把头文件改掉，而不是 `bsp config` 一个参数：
-#   1) TCP_WND 是**编译进 liblwip4.a** 的（tcp_in.c/tcp_out.c 按它算窗口），
-#      应用侧再 `-D` 也改不了已编译的库；
-#   2) 现有 lwIP 版本的 lwipopts.h 由库自带模板**拷贝**而来，不是 BSP 元数据参数，
-#      所以没有对应的 `bsp config` 旋钮；
-#   3) 必须在 `platform generate`（它会编译 BSP 库）**之前**改，改完才会被编进去。
-# 找不到文件或找不到 `#define TCP_WND` 一律**报错退出**，不静默跳过 ——
-# 静默跳过会产出「TCP_WND 还是 2048」的包而没人发现。
-set tcp_wnd 32768
-set patched 0
-foreach lwipopts [glob -nocomplain \
-        "$ws/$plat/$proc_name/$dom/bsp/*/include/lwipopts.h" \
-        "$ws/$plat/$proc_name/$dom/bsp/*/libsrc/lwip*/src/contrib/ports/xilinx/include/lwipopts.h"] {
-  set fh [open $lwipopts r]
-  set body [read $fh]
-  close $fh
-  if {![regexp -line {^#define[ \t]+TCP_WND[ \t]+\S+} $body]} {
-    error "lwipopts.h 里没有 '#define TCP_WND'，拒绝凭空注入：$lwipopts"
-  }
-  regsub -line {^#define[ \t]+TCP_WND[ \t]+\S+} $body "#define TCP_WND $tcp_wnd" body
-  set fh [open $lwipopts w]
-  puts -nonewline $fh $body
-  close $fh
-  incr patched
-  puts "===> lwipopts.h TCP_WND -> $tcp_wnd : $lwipopts"
-}
-if {$patched == 0} {
-  error "找不到任何 lwipopts.h，无法设置 TCP_WND（BSP 未按预期生成？）"
-}
-
 platform generate
 
 # ---------- 应用 ----------

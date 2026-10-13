@@ -31,31 +31,11 @@
 #define PIPE_RUN_SLEEP_US 200U
 #endif
 
-/* 空闲（流水线未运行）时主循环每圈的休眠（us），0 = 不休眠。 */
+/* 空闲（流水线未运行）时主循环每圈的休眠（us），0 = 不休眠。
+   它同时决定**收包吞吐上限**：NO_SYS=1 下一个 xemacif_input() 只取一帧，
+   所以吞吐 ≈ 每帧字节数 ÷ 一圈耗时。理由详见主循环末尾的长注释。 */
 #ifndef PIPE_IDLE_SLEEP_US
 #define PIPE_IDLE_SLEEP_US 1000U
-#endif
-
-/* 空闲分支里每圈**连取几个以太帧**再睡（>=1）。
- *
- * 为什么要单独一个旋钮，而不是把上面的休眠改成 0：
- * BSP 是 NO_SYS=1 构建，Xilinx 的 `xemacpsif_input()` 那个「取到取不出为止」的
- * `while (1)` 整个包在 `#if !NO_SYS` 里 —— 裸机下一次 `xemacif_input()` **只取一个以太帧**。
- * 于是空闲期的收包吞吐 ≈ 每帧字节数 ÷ 一圈耗时，一圈被 `PIPE_IDLE_SLEEP_US` 钉死。
- * 把休眠改成 0 确实能拉满吞吐（实测读段上传 4.26 s → 0.19 s），但**代价是板子只要空闲
- * 就 100% 空转**，长期上电发热耗电。连取 N 帧再睡拿到同样的吞吐，而 CPU 仍有 97% 时间在睡：
- *   N=16 时 16×1514 B ÷ (1000+29) µs ≈ 23 MB/s，与「休眠归零」的 0.19 s 持平。
- *
- * **默认值取 16，这是一次有意的默认变更**，理由三条：
- *   1) 本仓库的既有先例是「默认值 = 出厂值」（`PIPE_RUN_SLEEP_US` 默认 200 就是出厂值）；
- *   2) **正式构建路径 `sw/scripts/create_vitis.tcl` 走的是 `app build`（XSCT 生成的
- *      编译命令），没有注入 `-D` 的口子** —— 默认取 1 的话，正式流程编出来的包会
- *      **悄悄退回慢配置**，转正就落空了；
- *   3) 冻结参考包本来就**早于**本次优化，转正的含义正是让权威源的默认行为变成新行为。
- * 取 1 可退回旧行为（一圈取一帧后睡 1000 µs），便于对照与排错。
- * 见 docs/benchmarks/bkb220-p16-speed-a-upload.md。 */
-#ifndef PIPE_IDLE_FETCH_N
-#define PIPE_IDLE_FETCH_N 16U
 #endif
 
 /* 注意：standalone BSP 的 sleep.h 已经声明并实现了 `void sleep(u32)`。
@@ -356,32 +336,24 @@ int main(void)
         /* 3) 主动推进流水线 (P12-B 事件驱动，消除 poll 白等) */
         echo_pipeline_poll();
 
-        /* 4) 节流休眠 + 空闲多取帧。
-         *
-         *    运行中：按 PIPE_RUN_SLEEP_US 微延（0 = 不休眠）。2026-09-22 板测：
+        /* 4) 节流休眠: 空闲时按 PIPE_IDLE_SLEEP_US 休眠（默认 1 ms，降 CPU 功耗）；
+         *    运行中按 PIPE_RUN_SLEEP_US 微延（0 = 不休眠）。2026-09-22 板测：
          *    运行期 [waiting] ≈ 主循环次数 × 200 us，每条记录的斜率由这一行决定，
          *    见 docs/03 P13。
          *
-         *    空闲中：**先连取 PIPE_IDLE_FETCH_N 帧再睡**。原因是 NO_SYS=1 构建下
-         *    Xilinx 的 `xemacpsif_input()` 每次调用**只取一个以太帧**（它那个
-         *    「取到取不出为止」的 `while (1)` 整个包在 `#if !NO_SYS` 里），
-         *    于是「主循环多久转一圈」直接就是收包吞吐的上限：眠 1000 us ⇒
-         *    1514 B / 1.18 ms ≈ 1.28 MB/s，与实测 8.4 Mbps 吻合。读段上传阶段
-         *    流水线还没起来，走的正是这一支，所以它曾拖着整轮 3.9 s。
+         *    【2026-10-13 上传段实测】为什么空闲休眠同时是**收包吞吐的上限**：
+         *    BSP 是 NO_SYS=1 构建，而 Xilinx 的 `xemacpsif_input()` 那个 `while (1)`
+         *    取包循环整个包在 `#if !NO_SYS` 里——裸机下一个 `xemacif_input()` 调用
+         *    **只取一个以太帧**。于是「主循环多久转一圈」直接就是吞吐上限：
+         *    眠 1000 us ⇒ 1514 B / 1.18 ms ≈ 1.28 MB/s，与实测 8.4 Mbps 吻合。
+         *    读段上传阶段流水线还没起来，走的正是这一支，所以它拖着整轮 3.9 s。
          *    见 docs/benchmarks/bkb220-p16-speed-a-upload.md。 */
         if (echo_pipeline_is_running()) {
             if (PIPE_RUN_SLEEP_US > 0U) {
                 usleep(PIPE_RUN_SLEEP_US);
             }
-        } else {
-            for (u32 i = 0U; i < PIPE_IDLE_FETCH_N; ++i) {
-                if (echo_netif) {
-                    xemacif_input(echo_netif);
-                }
-            }
-            if (PIPE_IDLE_SLEEP_US > 0U) {
-                usleep(PIPE_IDLE_SLEEP_US);
-            }
+        } else if (PIPE_IDLE_SLEEP_US > 0U) {
+            usleep(PIPE_IDLE_SLEEP_US);
         }
     }
 
