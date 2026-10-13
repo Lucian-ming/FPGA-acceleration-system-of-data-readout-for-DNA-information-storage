@@ -861,6 +861,22 @@ PASS  串口收到板端输出 — 7780 字符
 上表的 `G3 FAIL` 会误导读者。所以另跑一轮 `--skip-dump`（把不适用四级取证降为 SKIP）以获得**无歧义的 PASS/FAIL**，留证 `logs/g3/c2-sweep/SUMMARY-skipdump.tsv`。
 **注意**：`--skip-dump` **只跳过 DDR 取证，不改变判据本身**；端到端图片 SHA 仍是唯一权威判据，两轮都应给出同一结果。
 
+**2026-10-13 重跑结果（板子接回后补跑，8/8 全部无歧义 PASS）**：
+
+```
+dataset                         verdict    judge_sha16        matches
+D1_image_jellybeans             G3 PASS    650fc2224140741f   YES
+D1_image_mandrill               G3 PASS    2e3c7b450b57f8d2   YES
+D1_image_peppers                G3 PASS    e0e65925814e0737   YES
+D1_image_tree                   G3 PASS    69af770eea71b098   YES
+D2_image_jellybeans_sub1pct     G3 PASS    650fc2224140741f   YES
+D2_image_mandrill_sub1pct       G3 PASS    2e3c7b450b57f8d2   YES
+D2_image_peppers_sub1pct        G3 PASS    e0e65925814e0737   YES
+D2_image_tree_sub1pct           G3 PASS    69af770eea71b098   YES
+```
+留证 `logs/g3/c2-sweep/SUMMARY-skipdump.tsv` 与逐套 `sd-*.out`。
+**这一轮给出了与 §16.4 首轮完全一致的结论（同一批 SHA），但 verdict 是无歧义 PASS** —— 反证了 §16.7 那次失败纯属板子断电的环境问题。
+
 ### 16.6 结论与边界
 
 **可以对外说**：在 BKB220（xc7z020）P4 包上，**用户提供的 4 张独立图像（含 1% 替换噪声版本）共 8 套 SE150 数据，全部经真实板端回传、LDPC 译码后重建成功**，图片 SHA 与数据包 manifest 逐字符一致。**无需重建比特流**（水印随任务上传，且该包复用 R0.83 水印）。
