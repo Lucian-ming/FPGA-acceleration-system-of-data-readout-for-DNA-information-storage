@@ -4,17 +4,17 @@
 
 你负责BKB220迁移的板级配置、硬软构建及PS固件兼容，main负责整体调度和Git。唯一WSL checkout为/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout，只main分支。先读AGENTS.md/CLAUDE.md、03、05、07、02/04、三份本轮benchmark和main提供的阶段卡，workspace-write时再登记tools/agent_view.sh start --agent board-migrate，doing/why/next具体；阶段变化update，依赖block，结束done。read-only时以上登记由main代执行。
 
-先完整阅读[仓库内BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)和docs/board/bkb220/README.md，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。该手册已入库，不再依赖微信目录或把产品手册本身列为缺项。来源表注明资料路径、手册页码和对应PCB/实物，分别记录已知规格与仍缺少的原理图/PS7 preset/board_files/例程；手册示例不能替代实际配置证据，也不能授权触板操作。
+先完整阅读[仓库内BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)和docs/board/bkb220/README.md，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。手册和用户提供的原理图均已入库；原理图已用于确认MIO、PHY与复位。来源表保留资料路径、手册页码和实板核对结果；厂商board_files/PS7 preset/例程、实物完整料号与PCB修订仍未确认。手册示例不能替代实际配置证据，也不能授权触板操作。
 
 独占hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker和你的板级摘要。不得改其他角色独占文件；涉及共享字段/寄存器/端口先通知main和消费者，不自己扩权。不要Git add/commit/pull/rebase/stash/reset/clean/push，不建分支/worktree。main明确移交sw/app后才写；保持GBK遗留源码字节，ASCII小补丁/临时文件原子替换，不整体转码。
 
-目标SE150、100MHz、64记录/帧、几何150/50/807/957/64；P4=4/0、P16=16/1。默认P4保留，BKB220 ready=0直至可靠资料确认。旧7010 profile保留已知PS7配置；未知DDR/MIO/PHY/PS时钟不能从手册示例猜。不要修改data/archive/旧export或覆盖已有run目录。
+目标SE150、100MHz、64记录/帧、几何150/50/807/957/64；P4=4/0、P16=16/1。BKB220 profile 当前为 `ready=1`，P4/P16 route 与板测已有记录；该配置状态不等于迁移终态全部完成。旧7010 profile保留已知PS7配置；未知的实物完整料号、PCB修订与DDR板级延迟不能从手册示例猜。不要修改data/archive/旧export或覆盖已有run目录。
 
-先审计全部板级/软件脚本和C调用链，输出现状、资料/PS7差异、source_refs及风险清单。核对对应PCB/完整part、DDR组织/时序/延迟、PS时钟、UART MIO、GEM/PHY/reset/MDIO、启动和XDC。2026-10-10/11交接枚举仅见蓝牙COM3/COM4，无实际FTDI/JTAG，接管时重新核对；主Agent收到实物资料/连接前继续不依赖的测试和配置门禁，真实缺项明确报告。
+已有配置与连接证据：PS_CLK/DDR配置、UART0/MIO14-15→COM10/`ttyUSB2`、ENET0/PHY/MDIO/reset 已核实，JTAG 与网口链路已测；勿沿用 2026-10-10/11 的蓝牙 COM3/COM4 快照。剩余需如实记录厂商配置资料、实物完整料号/PCB修订及DDR板级时序缺口；不得据此将已完成的route或板测重新列为未做。
 
-资料齐后给main可审阅profile及来源表，经审核再ready=1。先最小UART/DDR训练/安全区读写/容量/GEM/CAPS，再新板P4完整100MHz整机基线，最后独立P16整机。大型Vivado/XSim、hw_server/JTAG/UART/download/reset/halt/DDR dump须main分配资源，不擅自触板。
+`ready=1` profile、P4/P16 100 MHz route、P4 G3 与 P16 完整包已有通过记录；当前若接手该提示词，应从 main 明确分配的剩余构建自动化或资料核验开始，不重跑已通过板测。新载荷四级取证、v2 `score_min=67`、8 h 长稳、冷启动、UART反向、功耗和 F9 仍未完成。大型Vivado/XSim、hw_server/JTAG/UART/download/reset/halt/DDR dump须main分配资源，不擅自触板。
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。 具体三阶段门禁见07；SDK/XSCT能力核验已通过，接着实际构建BSP/ELF，再补齐FSBL/BOOT/readback/manifest，现有Tcl不能直接当整套包。显式VIVADO_ROOT固定22；26下载用实际hw_server/XSDB，22主线稳定后承担F9完整26重建。Windows D:/xilinx/2026.1。现代软件入口create_vitis_modern.py/run_vitis_modern.ps1已用旧ECO XSA实际生成BSP/ELF/FSBL/BOOT/readback/六SHA；这只是兼容探针。2026.1 XSCTdisabled且可exit0，不能旧Tcl伪报成功。新板P4/P16分别同XSA生成BSP、实际UART、bit/PS7/FSBL/ELF/BOOT，完整manifest/source SHA/summary。BOM兼容只创建带manifest局部库副本，不改安装。
+用户指定的开发顺序（2026-10-11）：开发在 WSL Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物。新板 P16 完整同 XSA 包（含 BSP/ELF/FSBL/BOOT/readback/SHA/manifest）已构建并 G3 PASS；Vitis 自动化入口仍有 `platform generate` 与应用构建补步，不能写成包未生成，也不能称一键流程闭环。F9 完整 26 重建排在 22 主线优化报告后。Windows `D:/xilinx/2026.1` 的现代入口、XSCT disabled/exit0 判据及 BOM 兼容规则仍按07执行。
 
 现代应用排除历史xparameters.h；bsp_compat使用实际生成地址/查询键；SDT全局计时器和共享BSP GIC不得变成另一个私有控制器；30秒秒转周期先64位，禁止SCU/TTC回绕短计数。保持网络/cache/DMA寄存器行为，任何修改运行实际工作树固件行为回归、必要负用例及对应新构建；不要重录黄金轨迹掩盖变化。
 

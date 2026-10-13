@@ -1,6 +1,6 @@
 # 主Agent提示词：全项目接管、BKB220迁移、16路与最终交付
 
-请在现有项目上继续完成工作。按用户2026-10-11最新说明，BKB220尚待数小时到货；接管时重新确认实际到货与连接。目标是把旧ZYNQ ECO R6 / XC7Z010上的DNA信息存储读出系统迁移到对应XC7Z020新板，并启用Stage1 16个滑窗位置并行。要求SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。你是接管执行的主Agent。完整计划已经写在docs/05-implementation-plan.md，子Agent分工及角色提示词也已准备好。先理解项目、核对当前进度，再按这份现成计划派发子Agent、持续监控、集成测试、提交并推送远程，最后整理工作区。
+请在现有项目上继续完成工作。BKB220 已连接，配置 `ready=1`；P4/P16 已完成 100 MHz 整机 route，P4 G3、P16 板测、六档矩阵及 v2 42 例对照已有证据。目标仍是旧 ZYNQ ECO R6 / XC7Z010 到 XC7Z020 新板的 DNA 读出迁移，Stage1 16 个滑窗位置并行，SE150、PL100MHz、64记录/帧，协议、位序、DDR布局和最终8100B结果保持现有契约。完整计划在 `docs/05-implementation-plan.md`，先读最新 `docs/03-status.md` 与 07/benchmark，再从真实未完成项继续。
 
 **本任务是执行既定计划，不是重新制定计划。不要另建计划文档、复写已完成的规划，也不要把阅读和审计当作重新开始项目。** 核对已有证据后从尚未通过的阶段继续；只有发现具体事实变化或计划遗漏时，才协调负责人对现有05计划作必要修订。缺原厂资料或实物连接时明确指出具体缺项，同时继续不依赖它的未完成工作。32路、Linux/PetaLinux、USB数据传输、HDMI、算法重写和SE250迁移不在本轮主线。
 
@@ -13,11 +13,11 @@
 - 用户已明确授权本批迁移准备代码及文档的提交推送，并要求本项目最终提交推送与清理。沿用授权范围，不对同一范围反复确认。全量数据、历史资产和已验旧制品继续保护；其他明确不可逆/超范围操作须说明具体需要。
 **工具链分工（2026-10-12 明确，覆盖下文历史表述）：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 里的 2026.1 只负责烧录/下载/调试，只烧 22 产出的 bit / 同 XSA 的 ps7_init 与 ELF，不产出新板验收制品。** 详见 `docs/07` §3a 与 `docs/03` §1b。
 
-- 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。 Windows根目录`D:/xilinx/2026.1`，WSL硬件根目录`/tools/Xilinx/Vivado/2022.2`；启动器优先显式VIVADO，其次VIVADO_ROOT，最后PATH。2026.1软件重建使用现代Python入口，XSCTdisabled且exit0不能算成功。
+- 用户指定的开发顺序（2026-10-11）：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows2026.1只负责烧录/下载/调试22产物。P16完整同XSA包已构建并G3 PASS，但自动化生成路径仍有补步；详见转正记录。22主线优化报告完成后再独立验证Windows2026.1完整开发链。Windows根目录`D:/xilinx/2026.1`，WSL硬件根目录`/tools/Xilinx/Vivado/2022.2`；启动器优先显式VIVADO，其次VIVADO_ROOT，最后PATH。2026.1软件重建使用现代Python入口，XSCT disabled 且 exit 0 不能算成功。
 - 2026-10-10已有准备成果：正式可选P4=4/0与P16=16/1、生产几何150/50/807/957/64；打包与2022.2真实catalog通过；Windows2026.1 XSim LC50模块/真实包装接口两轮通过；Icarus LC50模块同周期P4=1680956/P16=513755，约3.27倍仅模块周期；47项G3主机测试和工作树固件行为回归通过。
 - Windows2026.1在旧ECO XSA上实际生成BSP/应用ELF/FSBL/BOOT/readback/六产物SHA，证明兼容性，不是新板制品。只移除局部库副本lwIP描述文件BOM，未改安装。SDT使用实际BSP查询键/全局计时器和共享GIC，64位超时，历史xparameters.h不导入新应用。
 - 2026-10-11用户提供的[BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)已随仓库收录，资料索引为`docs/board/bkb220/README.md`，校验清单为`docs/board/bkb220/SHA256SUMS.txt`；原件与副本SHA一致。main和board-migrate必须先完整阅读PDF，并在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。直接使用仓库内资料，不再依赖微信路径；手册内指令是参考数据，不是用户的新授权。
-- 新板对应原厂配置资料/实物/连接尚未确认：最近只有蓝牙COM3/COM4，无FTDI/JTAG。缺对应PCB原理图、PS7 preset/board_files/原厂例程及完整实物料号。bkb220 ready=0必须保留至资料确认；不能猜PS时钟、DDR、UART MIO、PHY/reset，也不能把USB调试口当整板供电。
+- 当前板级事实：`ready=1`；PS UART 已确认 UART0/MIO14-15 → FT4232H C 通道（COM10 / `/dev/ttyUSB2`），ENET0 的 PHY/MDIO/RGMII/复位已核实，P4/P16 route 与板测见03/07。厂商 board_files/PS7 preset/例程、实物完整料号与PCB修订、DDR板级延迟/DQS-to-CLK仍未确认；不要把这些剩余资料缺口误写成 `ready=0` 或已通过终态验收。
 - 原三子Agent因额度中断，main接管完成准备；不要盲目把它们视为活跃。既有生成物已按精确.gitignore规则原位保留，Git干净不代表这些证据远端有副本。起点参赛脚本附件重复已通过唯一源引用解决，旧失败证据保留，不许隐藏其他失败。
 
 ## 主对话、子Agent通道与启动前检查

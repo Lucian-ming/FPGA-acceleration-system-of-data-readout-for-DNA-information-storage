@@ -1,22 +1,22 @@
 # 07 · 板级配置、BKB220迁移与验收
 
-本文件合并原09板级入口与07板级迁移文档。全项目阶段F0～F9、角色分工和监控见[05执行计划](05-implementation-plan.md)，直接派发提示词见[Agent索引](agent-prompts/readme.md)。2026-10-10迁移准备有实际验证，新板验收仍待资料及连接。
+本文件合并原09板级入口与07板级迁移文档。全项目阶段F0～F9、角色分工和监控见[05执行计划](05-implementation-plan.md)，直接派发提示词见[Agent索引](agent-prompts/readme.md)。截至 2026-10-13，BKB220 `ready=1`，P4/P16 已完成 100 MHz 整机 route，P4 与 P16 均有板测；尚未完成项见 §5 和[03 当前状态](03-status.md)。
 
 ## 1. 旧基线与新板信息
 
 | 项目 | 旧ZYNQ ECO R6 | BKB220 |
 |---|---|---|
-| 器件 | xc7z010clg400-1，实际已有板测 | XC7Z020版本目标，候选xc7z020clg400-2；实物完整料号/PCB待核实 |
-| PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在docs/board/zynq-eco-7010/ | 必须使用对应原理图/PS7 preset确认组织、时序/延迟/容量；产品手册不足以生成配置 |
+| 器件 | xc7z010clg400-1，实际已有板测 | 已按 `xc7z020clg400-2` 完成构建与板测；芯片顶标、工业级温度等级和 PCB 修订仍未逐项核实 |
+| PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在docs/board/zynq-eco-7010/ | 原理图已入库，PS7 配置经 Vivado 2022.2 校验，DDR 写读及实板运行已通过；DDR 板级延迟与 DQS-to-CLK 仍未单独表征 |
 | 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
-| 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | 尚无新板完整包、整机时序、真实G3或性能结果 |
-| 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：板载 FT4232HL 提供 JTAG（链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A`，单目标 xc7z020/IDCODE `0x23727093`）+ 三串口（Windows COM9/10/11）。直通 WSL 后 `/dev/ttyUSB0`=JTAG、`1/2/3`=串口。ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`。**触板只允许走 WSL（见 §3a）**；PS UART 的 MIO、ENET0 的 PHY 仍未定 |
+| 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
+| 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H C 通道（Windows COM10 / WSL `/dev/ttyUSB2`）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |
 
-产品手册已收录：[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)，[资料来源与SHA校验](board/bkb220/README.md)。2026-10-11按用户提供文件原样复制，原件与副本SHA一致。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`；来源表记录仓库资料路径、手册页码及其对应的PCB/器件。对应原厂原理图/board_files/PS7 preset/例程及实物仍需确认，不把手册示例当实际参数或操作授权。
+产品手册与用户提供的原理图已收录：[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)、[原理图](board/bkb220/BK_B220_SchDoc.pdf)、[资料来源与SHA校验](board/bkb220/README.md)。原理图已用于核实 MIO、PHY 与复位配置；厂商 board_files/PS7 preset/例程及实物完整料号、PCB 修订仍未确认，手册示例不替代现场证据。
 
 ## 2. 配置与构建门禁
 
-hw/boards/load_board.tcl统一选profile。未知板、ready=0、缺uart/xdc/source_refs/ps7_properties均拒绝create_project。bkb220.tcl当前ready=0保持不变；资料确认并由main审核来源表后才可ready=1。
+hw/boards/load_board.tcl统一选profile。未知板、ready=0、缺uart/xdc/source_refs/ps7_properties均拒绝create_project。BKB220 profile 已由 main 审核来源表并置 `ready=1`；P4/P16 构建和实板判据见对应 benchmark。该值表示配置可用于构建，不代表所有迁移终态门禁已关闭。
 
 SE150生产：READ_BPS150、NUM_LC50、STRIDE807、REF_LEN957、BATCH64；PL100MHz；旧板/新板P4=4/0，P16=16/1，拒绝7010/P16或非法组合。每种板/路数/工具版本用独立build/export/report目录，不覆盖旧发布路径。构建后核对实际IP七参数，保存硬件summary、工具版本、完整器件/PCB与资料来源。
 
@@ -24,9 +24,9 @@ SE150生产：READ_BPS150、NUM_LC50、STRIDE807、REF_LEN957、BATCH64；PL100M
 
 ## 3. 工具链和同源制品
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，按下面三阶段门禁执行。
+用户指定的开发顺序（2026-10-11）：硬件与软件开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试 22 产物。P16 完整同 XSA 包已构建并通过 G3；构建路径包括 Vitis 生成与应用构建的补步，尚未形成完全自动化的一键链路。旧 ECO XSA 软件兼容探针继续保留；22 主线优化报告完成后再独立复核 Windows 2026.1 完整开发链，按下面三阶段门禁执行。
 
-1. **22主开发**：显式VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2，使用现有run_vivado_build.sh、XSim与独立build/export/report目录。Vitis2022.2/XSCT实际路径、版本、命令及ARM对象编译已通过；接着用同XSA生成BSP/应用；create_vitis.tcl当前只覆盖应用构建，board还必须核对并补齐FSBL/BOOT/readback/manifest整套链路，不能把历史旧BSP编译或一次exit0当完整重建。
+1. **22主开发**：显式VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2，使用现有run_vivado_build.sh、XSim与独立build/export/report目录。P16 同 XSA 的 bit、ps7_init、BSP、应用 ELF、FSBL、BOOT/readback、SHA 与 manifest 均已在完整包中核验并通过 G3；自动化入口仍需收敛生成步骤和异常回退，不能把一次 launcher exit 0 当成功。
 2. **26下载**：Windows实际hw_server/XSDB2026.1仅下载22产生的bit、同XSA的ps7_init和ELF。run_g3.sh显式--artifact-dir、--xsdb、--device、--uart-port和实际IP。Hardware Manager只下载PL不能证明PS软件就绪；混合版本下载兼容性必须经真实UART/CAPS/DDR/GEM/G3验证。
 3. **最后26开发复核**：22主线通过后，board在同一冻结HEAD/参数/输入上独立用Windows2026.1重建完整P4/P16硬件和同XSA软件包，rtl复核100MHz整机时序，verify复核功能/接口、新板G3、连续恢复、性能矩阵与长稳。独立目录及带SHA只读输入快照，不原地升级22工程；每包核验同源SHA，跨版本按功能/STA/统计比较，不能要求bit/ELF整文件SHA相等。未通过则保持22为发布主线并保存26失败，不能宣称26开发可靠。
 
@@ -88,24 +88,23 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | LC50模块与真实包装接口 | Windows2026.1 XSim两个case各两轮PASS，Icarus模块同周期；约3.27倍仅模块周期 |
 | G3严格制品选择、串口与性能入口 | 47项主机fixture/替身测试通过；[主机摘要](benchmarks/bkb220-host-verification.md) |
 | Windows2026.1软件路线 | 旧ECO XSA A14：BSP/应用/FSBL/BOOT/readback/六SHA PASS；不是新板制品 |
-| **BKB220 F4 整机 G3** | **PASS（7/7）**（[来源表 §13](board/bkb220/migration-source-table.md)）：P4/SE150/100MHz 同源包真实下载并端到端跑通，**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、CAPS READY、串口 7781 字符。走 Windows 2026.1 烧录 + COM10。**边界**：2048 源读段 smoke 档；全量/连续/恢复/性能/长稳未做（F6～F8）；**板上是 P4，P16 未上板** |
-| **BKB220 P4/P16 整机 100MHz 构建** | **PASS**（[benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md)）：均为 `Physopt postRoute`，P4 WNS+0.680/WHS+0.036、P16 WNS+0.617/WHS+0.017，**失败端点均 0**，DRC 各 **0 errors**，`clk_fpga_0`=100.000 MHz，XSA 内 `PART=xc7z020clg400-2`；P16 33,987 LUT（63.89%）。**未做**：板测与同 XSA 软件包 |
+| **BKB220 F4 整机 G3** | **P4 PASS（7/7）**（[来源表 §13](board/bkb220/migration-source-table.md)）：同源包真实下载并端到端跑通，**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、CAPS READY。后续 P16 smoke、全量三轮、连续/状态复位、故障探针及 v2 数据集对照已完成；正式 P16 上传配置包 G3 PASS，见相应 benchmark。 |
+| **BKB220 P4/P16 整机 100MHz 构建** | **PASS**（[benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md)）：均为 `Physopt postRoute`，P4 WNS+0.680/WHS+0.036、P16 WNS+0.617/WHS+0.017，**失败端点均 0**，DRC 各 **0 errors**，`clk_fpga_0`=100.000 MHz，XSA 内 `PART=xc7z020clg400-2`；P16 33,987 LUT（63.89%）。P4/P16 已有对应板测。 |
 | **BKB220 PS7 catalog 验证** | 29 属性经 Vivado 2022.2 逐条检查（[来源表 §8](board/bkb220/migration-source-table.md)）。`MT41K256M16TW-107` **被 catalog 拒绝**，改用 `Custom` + 自定义容量/时序；`xc7z020clg400-2` 在库中，但手册的工业级条目未确认 |
 | **BKB220 F3 实板最小启动** | **通过**（[来源表 §9](board/bkb220/migration-source-table.md)）：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 0 不符；PS UART = UART0/MIO14-15 → FT4232H 通道 C（`/dev/ttyUSB2`）115200 8N1 明文正确；PS_CLK 33.333 MHz、DDR 533.33 MHz、FCLK0 100 MHz；**ENET0 MDIO 通、PHY = RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4） |
 
-计划与索引曾先推送c4d7ad4；后续用户已明确授权代码和完整整理交付。原三子Agent额度中断后main接管。新板core门禁仍未关闭。
+计划与索引曾先推送c4d7ad4；后续用户已明确授权代码和完整整理交付。原三子Agent额度中断后 main 接管。上述构建、板测结果不代表所有剩余迁移门禁均已关闭。
 
 ## 5. 迁移顺序与真实验收
 
-1. 对应PCB/part/原理图/preset来源表核对；实际电源、USB调试和网口；确定唯一JTAG（**已实测**：`15051A` 单目标 xc7z020）、实际PS UART（**仍未定**：FT4232H 通道 B/C/D 对应 `/dev/ttyUSB1/2/3`，用最小 hello 固件逐一实测，不选蓝牙兜底）。
-2. 最小同XSA包验证UART、DDR训练/容量/安全区读写、GEM链路和CAPS；不要先跑整机来定位未知DDR。
-3. 新板P4/SE150/100MHz合法route及完整软件包；smoke2048、全量、四级DDR、最终SHA，冻结同板P4基线。
-4. P16/16/1正式LC50独立模块/真实包装PASS、完整route及完整同XSA软件包；smoke→全量≥3次→连续/脏干净/恢复。
-5. 同板P4/P16六档≥3次性能矩阵，相关泛化/鲁棒/长稳；功耗无仪器保持未测。完整样本和失败保留，详情在06/08。
-6. 22主线稳定后完成上述独立Windows2026.1硬件及软件开发可靠性比较；最终源/参数/工具/制品/SHA、报告、复现命令、限制和文档齐全，main按路径提交推送0/0，释放本任务资源并整理源码工作区。
+1. 配置与连接：`ready=1`；原理图、PS7 配置、JTAG、UART0/COM10、ENET0 PHY 与链路均已有核实记录。实物完整料号、PCB 修订、DDR 板级延迟/DQS-to-CLK 仍未确认。
+2. P4/P16 整机 100 MHz route、bit/XSA、完整 P16 同 XSA 包已构建；P4 G3、P16 smoke/全量/连续恢复/故障探针/性能矩阵已完成。
+3. 泛化边界：P4/P16 对 v2 42 例与软件验证器 42/42 判定一致；8 个 challenge 例仍失败（LDPC 不收敛），v2 `score_min=67` 未板测，新载荷四级逐级取证未完成。
+4. 后续门禁：8 h 长稳（2 h 已完成）、QSPI/SD 冷启动、UART 反向、实测功耗、F9 Windows 2026.1 完整开发链独立复核；Vitis 自动化构建路径还需收敛。
+5. 完整样本和失败保留，详情见 03、05、09 与对应 benchmark。迁移收尾时核对源/参数/工具/制品/SHA、复现命令、限制和文档。
 
 板端G3唯一入口是run_g3.sh --artifact-dir完整包，加显式XSDB/device/PS串口/IP；矩阵脚本不自动下载，先确认已加载对应包。JTAG成功不能证明SD/QSPI冷启动；BOOT打包不能当冷启动PASS，非易失介质出厂镜像不默认覆盖。
 
 ## 6. 完成定义和回退
 
-新板配置、P4基线、P16合法100MHz整机、同XSA软硬制品、全量/连续/恢复与公平性能均通过才能宣布迁移完成。旧SE250成功、P14 OOC、新准备仿真和A14兼容软件探针均不能替代。失败保留独立run和报告，退回已验P4，不覆盖历史数据、export或失败证据。
+P4/P16 配置、合法 100 MHz 整机 route、同源制品、全量/连续/恢复及六档矩阵已有通过记录；当前仍不能宣布全部迁移与交付终态完成，因 8 h 长稳、v2 新载荷 `score_min=67`、新载荷四级取证、冷启动、UART 反向、功耗和 F9 尚待完成。旧 SE250、P14 OOC、仿真与 A14 兼容探针均不能替代这些门禁。失败保留独立 run 和报告，不覆盖历史数据、export 或失败证据。

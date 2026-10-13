@@ -113,7 +113,7 @@
 
 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
-WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。Vitis22的实际XSCT能力已核验，`sw/scripts/create_vitis.tcl`是应用构建起点，完整FSBL/BOOT/readback/manifest须另补齐并实测；Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
+WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。BKB220 P16 完整同 XSA 包已构建，包含 FSBL/BOOT/readback/manifest，并通过 G3；留证见[上传转正记录](../docs/benchmarks/bkb220-p16-upload-promotion.md)。从 `create_vitis.tcl` 到完整包的可重复自动化路径仍需完善：记录中包含 `platform generate` 补步和应用构建回退，不能称为一键流程已闭环。Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
 
 Stage1生产P4/P16模块与真实包装接口：`bash tools/run_sim.sh stage1_production` 为LC6短测；`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full` 为LC50生产几何长测，日志和fixture保留在 `logs/iverilog/<run-id>/`。短测不替代生产几何或真板验收。
 

@@ -6,7 +6,7 @@
 
 独占hw/sim、tests、tools/board、run_sim/run_xsim/run_m2*/run_m3*/run_g3、性能/泛化/故障/压测入口，必要clients/python迁移测试修复及你的验证摘要。生产RTL/component.xml和sw/app/BD/profile归其他角色，不改被测对象；问题报告main并协调。不得Git写入、建分支/worktree、改data/archive/黄金参考来掩盖失败。大型仿真、JTAG/reset/download/halt/dump/串口须main明确资源分配。
 
-目标SE150、100MHz、150/50/807/957/64，P4=4/0、P16=16/1。已有LC50独立模块与真实AXI包装两轮XSim通过、47项G3主机测试与真实C工作树行为回归通过；不要重复覆盖成果。模块cycle约3.27倍不是板端倍率。BKB220 ready=0且资料/连接待确认，无新板route/G3。
+目标SE150、100MHz、150/50/807/957/64，P4=4/0、P16=16/1。BKB220 `ready=1`；P4/P16 100 MHz route、P4 G3、P16 全量/连续/故障探针、六档矩阵与 P4/P16 v2 42 例对照已有结果。8 个 challenge 例仍失败（LDPC 不收敛），v2 `score_min=67` 未板测，新载荷四级取证未完成；2 h 长稳完成、8 h 未做。V2数据与板端报告见03和来源表§17-18；P16仍慢于16线程CPU，Stage1 K2仍在进行阶段，不要写成已完成。
 
 旧stress_test_suite.py/switch_export.sh已成对原样归档至docs/archive/tools/2026/retired-20261011，不再作为现用入口。新板长稳以run_g3.sh --artifact-dir完整包、显式XSDB/device/实际PS串口和现用guard/recovery/netfault探针编排，保存逐轮证据，以实际墙钟时长验收2h/8h；禁止自动切SE250或覆盖旧export。
 
@@ -16,10 +16,10 @@
 
 独立Stage1 oracle逐符号枚举，不照抄RTL；涵盖末region、位置807/806等、末组有效lane、首并列pos、零分/补帧、正反向、两轮复位/重跑。真实包装验证AW/W分离、WSTRB、背压/TLAST、FIFO、START脉冲和输出顺序/拍数。LC6短与LC50正式分别标明，源manifest与打包一致；故障注入应真红。
 
-资料/制品到位后先只读g3_artifacts完整包核验（XSA内bit/part/HWH七参数、源/工具/六SHA），main持板执行P4基线和P16smoke→全量≥3→连续full/2048/full→低阈值充分弄脏/干净→配置/断连/超时恢复。CAPS/CONFIG理由码0才接受；每轮真实8100B→LDPC→D0 JPEG SHA fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3，四级DDR留证。测试工具失误与硬件故障分开。
+已完成包的 `g3_artifacts.py` 身份核验、P4 G3、P16 smoke/全量三轮/连续恢复及故障探针见对应 benchmark；不要把这些重复列为未启动的前置。若后续改包或需要复测，仍只读核验 XSA 内 bit/part/HWH 七参数、源/工具/六SHA，再由 main 持板按显式制品运行。新载荷四级DDR逐级黄金向量尚未完成；既有 R0.83 G3 四级证据不覆盖新载荷。测试工具失误与硬件故障分开。
 
-同板P4/P16各六档128/512/2048/8192/32768/full≥3次；矩阵不烧录，先main确认板已加载对应完整包。明确源读段/正反向/64补帧记录数、输入SHA、t_result/上传/LDPC/整轮边界、失败、median/min/max/stdev/拟合。全量功能失败必须红；小样本覆盖不足如实边界。硬件周期用本轮寄存器/唯一UART追加offset，未测Stage1和功耗null，禁止墙钟×时钟造计数。
+同板P4/P16六档128/512/2048/8192/32768/full矩阵已完成，正式结果见 `bkb220-p4-p16-performance-matrix.md`；矩阵不自动烧录的限制仍适用。最新同小时参考 P16 `t_result` 为 9.33 s；旧 8.61/8.9486 s 按各自矩阵/阶段时段标注。未测硬件周期和功耗保持 null，禁止墙钟×时钟造计数。
 
-相关泛化至少5独立payload复核，sub/ins/del×覆盖度×阈值×≥3种子；FAR真值来自合成header，D0不可报告FAR。先2h再计划8h新板长稳，恢复失败保存run和dump；SE250/功耗/材料/D0分发按实际门禁单列，不扩张主线。
+泛化当前证据范围为 v1 八套与 v2 42 例；v2 板端与软件验证器 42/42 一致，但 8 个 challenge 例仍失败，`score_min=67` 未板测。不得把它们汇总成“所有载荷通过”。2 h 长稳已通过，8 h 未完成；冷启动、UART反向、功耗及新载荷四级取证按03/07单列。FAR真值来自合成header，D0不可报告FAR；SE250/材料/D0分发按实际门禁单列，不扩张主线。
 
 出口报告每阶段路径/diff、真实命令/退出码、源/输入/制品SHA、工具/参数/run-id、PASS/FAIL/INTERRUPTED/未测、失败统计、原始日志和摘要。已有manifest且无相关变更不无故重跑长测；起点重复附件已收敛为唯一源码引用，旧失败日志保留，不改门禁隐藏。main收敛前停写、释放资源并确认，Git统一main完成。

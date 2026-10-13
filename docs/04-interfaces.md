@@ -133,7 +133,7 @@ AXI-Lite 控制口遵循 AW/W 独立握手：DNA、Voter、Desparsifier 三个�
 > （**2026-09-11 更正**：原写作 `echo.c:465-495`，该代码早已拆分到
 > `sw/app/stage1_dna.c` 的 `PIPE_WM_TX` 分支，echo.c 现只剩 740 行）对每个区域写入
 > `reg1=wm_sel`、DMA 957 个 32-bit 符号、退出 preload 后再切换下一区域；水印展开逻辑已通过
-> 47,850 符号主机单测。AXIS 时序与 BRAM 实际写入仍待顶层仿真或上板确认。
+> 47,850 符号主机单测。BKB220 G3 与 v2 全量任务已验证水印路径参与端到端处理；尚无逐拍 AXIS 波形或独立的 BRAM 写入信号级判据。
 
 ### 3.2 Differential Voter — `0x43C2_0000`
 
@@ -215,6 +215,6 @@ Stage1 输出直接作为 Stage2 输入、Stage2 输出直接作为 Stage3 输�
    （含 `SCORE_MIN=67`）→ 回读校验 → start → 轮询 done
 6. `PIPE_DONE_STAGE2`：invalidate Voter 输出 → `apply_watermark_differential()` 对 10,125 B 做
    LSB-first 逐字节 XOR → flush 回 DDR；Stage2 输出已有黄金 RTL 判据背书
-   （`run_sim.sh stage2`），整链端到端仍待上板。
+   （`run_sim.sh stage2`）。BKB220 G3 与 P4/P16 全量板测已通过端到端判据；新载荷四级逐级取证仍未完成。
 7. `PIPE_DEC_*`：配置 Decoder → start → 轮询 done → 校验写入拍数
 8. `send_result()`：invalidate → 通过 TCP 发 8,100 B

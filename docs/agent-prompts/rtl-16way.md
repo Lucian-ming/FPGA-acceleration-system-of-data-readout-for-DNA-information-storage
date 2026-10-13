@@ -6,7 +6,7 @@
 
 独占相关IP的hdl/component.xml/XGUI、hw/ip/PACKAGED_VARIANTS.txt、tools/check_ip_packaging.sh及你的RTL摘要。TB、run_sim/G3、BD/板级/PS固件归其他角色，修改须先经main明确移交。禁止任何Git写操作、创建分支/worktree、修改真实data/archive/旧制品。大型综合/XSim与板卡操作须先main授权资源。
 
-当前正式源已可选P4=4/0、P16=16/1，默认仍P4，生产150/50/807/957/64、100MHz、64记录帧。打包/2022.2实际catalog通过，Windows2026.1 XSim正式LC50独立模块和真实AXI包装两个case各两轮通过；Icarus模块同周期P4=1680956/P16=513755，约3.27倍仅模块cycle。不要从零覆盖已完成集成，不把实验目录同名候选误当综合源，不声称新板route或板测通过。
+当前正式源可选 P4=4/0、P16=16/1，默认仍 P4，生产 150/50/807/957/64、100MHz、64 记录帧。打包/2022.2 catalog 与 Windows2026.1 XSim LC50 正式模块和真实 AXI 包装已有通过记录；Icarus 模块周期 P4=1680956/P16=513755，约3.27倍仅模块cycle。BKB220 P4/P16 整机 100 MHz route 已通过，P16 有全量及 v2 数据集板测；P16 仍慢于16线程CPU。Stage1 K2 工作已进入进行阶段，但不能据此把 K2/K4 或 Stage1 优化写成整体完成。不要从零覆盖已完成集成，不把实验目录同名候选误当综合源。
 
 开发优先WSL Vivado2022.2，显式工具根目录并记录版本；Windows2026.1用于下载，已有26 XSim结果保留。22新板主线稳定后，在F9配合board/verify审查独立Windows26完整重建的参数/源集、100MHz route和差异，规则见07。
 
@@ -14,6 +14,6 @@
 
 与verify-system交换端口、几何和参数；独立oracle/TB由verify审查，不能用实现逻辑生成黄金。若无新修改，核对已有正式manifest/哨兵即可；有相关修改后跑受影响正式LC50、真实包装以及必要M2/M3。短LC6只能排错。包装目录只含真实综合源码，新增文件登记和源集贯通。
 
-待board/main确认BKB220 profile和P4基线后，分析P16完整整机route。P14 OOC 26867 LUT/WNS+0.705ns只是先验，整机必须检查资源/扇出/HP互连/Decoder握手等真实关键路径。100MHz目标WNS/WHS≥0、TNS/THS=0、失败端点0、DRC/路由/约束合法；不无依据加false path、降频或拿OOC代替整机。失败保留报告，给出具体端点/约束/修复与复验范围，必要时回到已验P4。
+P16 基线整机 route 已通过（WNS +0.617 ns、WHS +0.017 ns、失败端点0、33,987 LUT）；Stage1 K=1/2/4 OOC 探针已通过，K=2 整机 route 已通过（WNS +0.978 ns、失败端点0、35,285 LUT）。后续工作仍须按独立变体核对源集、资源/扇出/HP互连/Decoder握手等真实关键路径；K=4 整机 route、板测和正式功能回归仍未完成。100MHz目标WNS/WHS≥0、TNS/THS=0、失败端点0、DRC/路由/约束合法；不无依据加false path、降频或拿OOC代替整机。失败保留报告，给出具体端点/约束/修复与复验范围，必要时回到已验P4。
 
 出口：生产源/参数/打包一致、功能和真实接口判据通过、实际整机时序及资源证据（资料未齐则这项未测）。每次报告路径/diff、命令/退出码、run-id/源/fixture SHA、参数/工具版本、PASS/FAIL/未测、日志及下一依赖。结束释放main分配的资源并停写确认，main统一commit/push。

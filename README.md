@@ -9,13 +9,11 @@ PC FASTQ/水印 → TCP → PS裸机/lwIP/AXI-DMA
 → TCP回传8100 B → PC LDPC → 原始文件及SHA-256
 ```
 
-## 当前状态（2026-10-11）
+## 当前状态（2026-10-13）
 
-旧板 ZYNQ ECO R6 / XC7Z010 的 SE150 生产链路有历史真板闭环。当前任务是迁移到 BKB220 / XC7Z020，并启用 Stage1 16 个滑窗位置并行，PL 100 MHz、64记录/帧、协议及结果格式保持现有契约。交接快照中的新板完整料号、PS7/DDR/MIO/PHY资料与实际连接尚未确认，配置保持 `ready=0`；接管时重新核对实际资料与设备，不把旧枚举当当前现场。
+BKB220 配置已为 `ready=1`。P4/P16 均完成 100 MHz 整机 route、bit/XSA 构建；P4 完成 G3，P16 完成 smoke、全量、连续/状态复位、故障探针、六档矩阵及 42 例 v2 数据集板端对照。正式 P16 上传配置包已构建并 G3 PASS，上传为 0.40 s；完整软件包可用，但 Vitis 自动化构建路径仍有需补齐的步骤，详见[转正记录](docs/benchmarks/bkb220-p16-upload-promotion.md)。
 
-迁移准备已完成：正式可选P4/P16源集及参数、完整制品门禁、现代软件构建入口、独立oracle和AXI包装测试。正式LC50模块/包装接口在 Windows2026.1 XSim通过；47项G3主机用例和工作树固件行为回归通过；Windows2026.1使用旧ECO XSA实际完成BSP/ELF/FSBL/BOOT/readback/SHA核验。
-
-这些结果证明准备代码的相关检查通过。尚无新板bit/XSA、整机时序和新板G3结果。P4/P16模块周期约改善3.27倍，不能当作整机加速比。SE250、32路、能效和泛化结论分别需要对应制品和实测。
+当前剩余项：v2 的 `score_min=67` 尚未在板上测；8 个 challenge 例仍按软件验证器一致地以 LDPC 不收敛告失败；新载荷四级逐级取证、8 h 长稳（2 h 已完成）、QSPI/SD 冷启动、UART 反向、实测功耗和 F9 独立复核未完成。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，相关后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见[当前状态与证据边界](docs/03-status.md)。
 
 ## 许可
 
@@ -45,9 +43,9 @@ bash tools/run_sim.sh stage1_production
 
 **工具链分工（2026-10-12 明确）：开发全部在 WSL 用 Vivado/Vitis 2022.2（RTL/BD/约束/综合/实现/时序/bit/XSA/BSP/ELF/FSBL/BOOT）；Windows 里的 2026.1 只负责烧录/下载/调试，烧的是 22 产出的制品。** 见 [07 §3a](docs/07-board-build-and-acceptance.md)。
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+用户指定的开发顺序（2026-10-11）：开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试。P16 完整同源包已有构建及 G3 证据；`create_vitis.tcl` 到完整包的自动化路径仍有手动补步，限制见转正记录。F9 的 Windows 2026.1 独立完整开发链复核仍待 22 主线后续阶段。
 
-整机构建使用`VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2 bash tools/run_vivado_build.sh ...`。BKB220资料门禁通过后，独立P4/P16目录生成同XSA完整硬软包，经g3_artifacts.py和run_g3.sh --artifact-dir验收；22软件包补齐及最后26现代Python路线见[07](docs/07-board-build-and-acceptance.md)。
+整机构建使用`VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2 bash tools/run_vivado_build.sh ...`。P4/P16 独立目录的 bit/XSA 与板测记录见[07](docs/07-board-build-and-acceptance.md)及对应 benchmark；已通过的制品包与尚待完善的自动化构建链分别表述，不互相替代。
 
 ## 目录与保护范围
 
