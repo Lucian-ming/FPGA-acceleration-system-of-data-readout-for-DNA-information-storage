@@ -1,0 +1,38 @@
+MIT License
+
+Copyright (c) 2026 Lucian-ming
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## 适用范围说明（重要，不是许可证正文）
+
+本 MIT 许可证覆盖**本仓库作者原创的源码、脚本、测试与文档**。
+
+仓库内还包含**第三方素材**，它们**不适用**上面这份 MIT，各自保留原有条款，
+公开分享这些素材前须按各自来源的许可处理：
+
+- `data/R0.83_data/`：原始测序与水印数据（AGENTS.md 规定只读、不默认分发）。
+- `docs/board/zynq-eco-7010/`、`docs/board/bkb220/`：厂商板级资料（BKB220 手册与原理图）。
+- `docs/submission/`、`archive/`：参赛提交与历史资产，其中含第三方数据与图片。
+- `hw/build/export/`：历史发布制品（含第三方编码产出的镜像）。
+- 任何由 Xilinx/AMD 工具生成的 IP、BSP、FSBL、BOOT 等派生文件，其条款随上游工具。
+
+若本项目的下游使用者需要把这些第三方素材一并再分发，请自行取得对应授权。
