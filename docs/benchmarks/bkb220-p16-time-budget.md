@@ -161,3 +161,31 @@ bash logs/g3/p3-throttle-ab/run_ab.sh      # 三个包背靠背；或只跑 t0 �
 
 **边界**：本文所有板端耗时都是**客户端打印值或固件自报 tick**，**不是硬件周期计数器**；
 `hardware_cycles` 与 `power_w` 仍为 `null`（无外部 UART 周期采集、无功率计）。§3 的 PL/PS 分解是**推导值**，不得当直接测量引用。
+
+---
+
+## 8. 交接状态（2026-10-13 收工快照）
+
+**给接手者（speed 主线）：这份底稿是权威起点，开工前请先核对下面几项是否还有效。**
+
+| 项 | 状态 |
+| --- | --- |
+| 最后提交 | `39c51f9`（提示词回写）；`main...origin/main` = **0/0** |
+| Git 绑定门禁 | `tools/verify_repo_binding.sh --require-synced` **PASS** |
+| 工作区 | **干净**，无未提交改动 |
+| 后台进程 | **无**（板卡/长稳/EDA 都没有在跑）；`iptables` 无残留规则 |
+| 看板 | 无残留"进行中"条目 |
+| **板子当前固件** | **`hw/build/bkb220-p16-prof200-<ts>-board-migrate`**（出厂节流 + `-DPROF_ENABLE=1`，ELF `bccc8279…`）。**不是**冻结参考包——接手时若要用参考包，必须重新烧录 |
+| 板卡在线 | `192.168.1.10:7` 可达 |
+
+**冻结参考包（不得就地修改）**：
+- P16：`hw/build/bkb220-p16-enet0-software-20261012T144141Z-board-migrate`（ELF `595482d8…`）
+- P4：`hw/build/bkb220-p4-enet0-software-20261012T140800Z-board-migrate`
+
+**本轮新建的实验包**（可直接用于对照，非冻结）：
+- `bkb220-p16-sw-throttle{0,50}-20261013T053008Z-board-migrate`（节流 A/B 用）
+- `bkb220-p16-prof-20261013T080142Z-board-migrate`（`sleep=0` + PROF，**函数级数字不可用**，见 §6.1）
+- `bkb220-p16-prof200-20261013T081819Z-board-migrate`（出厂节流 + PROF，**函数级数字以此为准**）
+
+**下一步建议**：先做 §3 的 A 组（上传重叠 / 上传吞吐 / LDPC 并行），
+再动 C 组 PL（先用实现探针验证 100 MHz 与资源，再上板）。**B 组 PS 固件侧已实测关闭。**
