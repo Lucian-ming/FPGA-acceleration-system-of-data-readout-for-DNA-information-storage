@@ -74,7 +74,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | P7 | 独立硬件周期实测拆解非 Stage1 耗时 | 4096 记录下 Voter 29.627 ms (0.93%)、Decoder 0.022 ms (0.0007%)，总 PL 硬件执行不足 30 ms；非 Stage1 耗时 62.9% 的 99% 以上是 PS 侧 lwIP poll 空等 (2,777 ms) 与 Cache 维护 (396 ms) | `docs/benchmarks/measured_p7_cycle_counters.md`、`g3_runs/20260911T140559Z/`。**⚠️ 时效**：该行测于 2026-09-11，**早于 P12-B 事件驱动改造**，「lwIP poll 空等 2,777 ms / Cache 维护 396 ms」**已不代表当前固件**——当前固件的 cache 维护实测 58 ms、lwIP 收包 7.7 ms（见 [时间预算](benchmarks/bkb220-p16-time-budget.md) §6） |
 | P8 | **读段上传段吞吐 7.76 Mbps → 125～177 Mbps（全量中位 4.27 s → 0.19 s，≈22×）** | 四档（2048/8192/32768/全量）× 3 次，两包各烧一次背靠背；参考包恒 7.76～7.80 Mbps，新包 125～177 Mbps。判据轮 SHA 逐位不变 | `logs/g3/speed-a-upload/sweep-{ref-wnd2048-idle1000,new-wnd32k-idle0}.tsv`、`full-{idle0,ref-control}-runs3.out`（G3 PASS）；`tools/run_g3.sh --full --runs 3 --strict-artifacts`；见 [上传段 benchmark](benchmarks/bkb220-p16-speed-a-upload.md) |
 | P8a | 上传段的限速器是 **`NO_SYS=1` 下一次 `xemacif_input()` 只取一帧** × 空闲主循环 `usleep(1000)`；`TCP_WND=2048` 是第二重 | 批次数 208→52 只降 6%（否掉「停等」猜测）；`TCP_WND` 单独 1.23×（4.18→3.22 s），去掉休眠后 15.5×（→0.27 s）；1514 B ÷ 1.18 ms ≈ 1.28 MB/s 与实测 8.4 Mbps 吻合 | 同上 + `logs/g3/speed-a-upload/offline-b1000.json`、`rtt-probe-baseline.json`；BSP `lwipopts.h` 与 `contrib/ports/xilinx/netif/xemacpsif.c` 的 `#if !NO_SYS` |
-| P8b | 全量整轮墙钟 **13.95 s → 10.27 s（同小时参考包对照，−26.4%）**；`t_result` 不变 | 同小时重测：参考 9.34 s vs 新包 9.33 s | 同上；⚠️ 今晨 `t_result` 是 8.68 s，**同一天内漂移 +7.5%，跨小时比较会把结论做反** |
+| P8b | 全量整轮墙钟 **14.25 s → 10.18 s（同小时参考包对照，−28.6%）**；`t_result` 不变 | 同小时重测三段：参考 reads 4.26 s + result 9.34 s = 13.60 s vs 新包 0.20 + 9.33 = 9.53 s（各 3 轮） | 同上；⚠️ 今晨 `t_result` 是 8.68 s，**同一天内漂移 +7.5%，跨小时比较会把结论做反** |
 
 ### ⛔ 不能说的话（每条都有实测支撑其为假）
 
