@@ -158,6 +158,17 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
   脚本要写 `FETCH_HEAD` 必然报 `Read-only file system` 而失败。**这是沙箱特性，不是仓库故障**，据此阻塞等于白跑一轮。
   2026-10-12 一晚上因为这条（主会话漏写提醒）白跑过三次共四个子任务，故此条写在这里，**不依赖主会话每轮记得写**。
   需要确认绑定状态时，直接读 `docs/03-status.md` 的最新记录，或让 main 代跑。
+
+- **⚠️ 子 agent 在 codex 沙箱内也调不动 Windows 二进制**（`cmd.exe` / `powershell.exe` / `xsdb.bat`），
+  一律报 `<3>WSL (341 - ) ERROR: UtilBindVsockAnyPort:307: socket failed 1`——沙箱禁掉了 WSL↔Windows 的 vsock 互操作。
+  同一条命令在**主会话（不沙箱）里是正常的**。
+  **后果**：本项目的板级验收全走 **Windows XSDB + COM10**（WSL 侧没有 `/dev/ttyUSB*`），
+  而 `tools/run_g3.sh` 的 1/7 前置检查要 `cmd.exe /c "mkdir D:\<win-root>"` 建留证目录，
+  于是**沙箱里 G3 必在 XSDB 前置检查退出 2，板子根本没被访问**。
+  2026-10-13 实测代价：一个子任务把制品包建好、两处改动都逐项核验过了，
+  却卡在这一步没跑成板测，结论只能停在「构建已验、上板未验」。
+  **所以：凡是要上板的子任务（烧录 / G3 判据 / 泛化 / 长稳 / 上传扫描）一律由 main 自己做**，
+  子 agent 只派纯 EDA、纯主机、纯静态分析的活；派活前在 prompt 里写明「不要上板、不要跑 `run_g3.sh`」。
 - 走 codex 的子 agent 仍受本文件其余门禁约束：按上一节用 `tools/agent_view.sh` 登记
   （`--agent` 取任务短名，并行不重名），**不执行任何 Git 写操作**，产物交 main 审查后由 main 提交；
   只读任务的看板由 main 登记。
