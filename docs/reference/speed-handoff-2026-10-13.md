@@ -108,7 +108,7 @@ bash tools/run_g3.sh --artifact-dir <新包> \
   --full --runs 3
 
 # 四档 x 3 次上传扫描（两包各烧一次背靠背；--no-post，不触发流水线）
-bash logs/g3/speed-a-upload/upload_sweep.sh <tag>
+bash tools/board/g3_upload_sweep.sh <tag>
 
 # 纯上位机的两段（不触板）
 python3 tools/profile_upload.py --loopback
@@ -119,7 +119,7 @@ python3 tools/profile_upload.py --rtt-probe 192.168.1.10:7 --rtt-samples 300
 
 | 路径 | 内容 |
 | --- | --- |
-| `logs/g3/speed-a-upload/sweep-{ref-wnd2048-idle1000,new-wnd32k-idle0}.tsv` | §2.1 四档 × 3 次原始表 |
+| `tools/board/g3_upload_sweep.sh`（已登记进 `tools/README.md`）；本轮原始表在 `logs/g3/speed-a-upload/sweep-{ref-wnd2048-idle1000,new-wnd32k-idle0}.tsv` | §2.1 四档 × 3 次原始表 |
 | `logs/g3/speed-a-upload/full-idle0-runs3.out` / `full-ref-control-runs3.out` | 新包 / **同小时参考包**全量 `--runs 3`，均 G3 PASS |
 | `logs/g3/speed-a-upload/{offline-b1000,rtt-probe-baseline}.json` | 离线三段拆分与板端 RTT 探针 |
 | `D:\bkb220_board_speed\g3_runs\*` | 每轮 `first_run*.log` / `uart.log` / `artifact_selection.json` |

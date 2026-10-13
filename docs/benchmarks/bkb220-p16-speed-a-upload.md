@@ -154,7 +154,7 @@ BSP 是 `NO_SYS=1` 构建（`lwipopts.h` 里 `#define NO_SYS 1`）。而 Xilinx 
 
 ## 4. 四档 × 3 次上传扫描（正式口径）
 
-`logs/g3/speed-a-upload/upload_sweep.sh`，`--no-post`（只跑上传段，不触发流水线）。**两个包各烧一次板、
+`tools/board/g3_upload_sweep.sh`（已登记进 `tools/README.md`），其中 `first.py` 带 `--no-post`（只跑上传段，不触发流水线）。**两个包各烧一次板、
 背靠背测**，同一块板、同一份输入、同一个小时。
 
 | 源读段 | 负载字节 | 参考包（`WND=2048`，眠 1000 µs） | 新包（`WND=32768`，不休眠） | 加速 |
@@ -285,7 +285,7 @@ bash tools/run_g3.sh --artifact-dir <新包> \
   --full --runs 3
 
 # 四档 x 3 次上传扫描（两包各烧一次，背靠背）
-bash logs/g3/speed-a-upload/upload_sweep.sh <tag>
+bash tools/board/g3_upload_sweep.sh <tag>
 ```
 
 **留证**（`logs/` 不入库，文件保留）：
