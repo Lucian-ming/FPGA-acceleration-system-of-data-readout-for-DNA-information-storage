@@ -5,7 +5,7 @@
 # 为什么要有它
 # ------------
 # G3 在 2026-08-30 第五次上板闭环，但当时的验收是跨 Windows/WSL 的一串手工步骤：
-# 开串口抓取 → xsdb 烧录 → first.py 跑任务 → ldpc_decode.py 译码 → 比图片哈希 →
+# 开串口抓取 → xsdb 烧录 → first.py 跑任务 → ldpc_decode.py 译码 → 比载荷哈希 →
 # xsdb 只读导出四级 DDR → board_stage_check.py。**判据要能被一条命令复现，才算真的钉住。**
 # 这轮的教训正是「摸索过程本身就会引入错误」（B23~B27 五个缺陷在所有仿真里都是绿的，
 # 只有上板才暴露），所以复现路径本身不能再靠人记步骤。
@@ -13,8 +13,8 @@
 # 判据纪律（AGENTS.md「事实边界」）
 # --------------------------------
 # 界面成功、TCP 返回结果、四级取证全绿，**都不算 G3 通过**。
-# 唯一判据是板端真实回传经 tools/ldpc_decode.py 译码后重建的 JPEG 的 SHA-256。
-# 本脚本据此给出单一 PASS/FAIL 与非零退出码。
+# 默认判据是 JPEG 的 SHA-256；传 --input-bytes N 时按 N 字节写出任意载荷，
+# 通过 --expect-sha 比对其 SHA-256。两条路径都只对译码后的板端回传作判定。
 #
 # 制品选择与证据边界
 # ------------------
@@ -33,6 +33,8 @@
 #   tools/run_g3.sh --bit <path>                      # 仅兼容指定所选包内同一bit，禁止独立覆盖
 #   tools/run_g3.sh --elf <path>                      # 仅允许选中包内同一ELF；独立实验也要完整制品包
 #   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
+#   tools/run_g3.sh --input-bytes 3862 --expect-sha <SHA256> --reads <reads.fastq> --watermark <watermark.txt>
+#                                                     # 任意载荷按外部元数据字节数截断并比较 SHA
 #   tools/run_g3.sh --runs 2                          # 同一次上电内连续跑两次任务（状态复位判据）
 #   tools/run_g3.sh --runs 2 --first-run-score-min 0  # 第一轮弄脏 Voter 累加器，第二轮才是判据
 #   tools/run_g3.sh --runs 2 --first-run-limit full --first-run-score-min 0
@@ -73,6 +75,8 @@ ALLOW_UART_SKIP=0
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/07-board-build-and-acceptance.md和docs/04-interfaces.md。
 # ---------------------------------------------------------------------------
 EXPECT_SHA="fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
+INPUT_BYTES=""
+INPUT_BYTES_SET=0
 LIMIT=2048
 SCORE_MIN=67
 READ_BPS=150
@@ -169,6 +173,9 @@ while [[ $# -gt 0 ]]; do
         --reads)            READS_FILE="$2"; shift 2 ;;
         --watermark)        WM_FILE="$2"; shift 2 ;;
         --expect-sha)       EXPECT_SHA="$2"; shift 2 ;;
+        --input-bytes)
+            if [[ $# -lt 2 ]]; then echo "--input-bytes 需要一个字节数 N" >&2; exit 2; fi
+            INPUT_BYTES="$2"; INPUT_BYTES_SET=1; shift 2 ;;
         --stage1-records)   STAGE1_DUMP_RECORDS="$2"; shift 2 ;;
         --skip-boot)        DO_BOOT=0; shift ;;
         --elf)              ELF_OVERRIDE="$2"; shift 2 ;;
@@ -201,6 +208,11 @@ warn() { printf '\033[33m    %s\033[0m\n' "$*" >&2; }
 # 0. 参数推导
 # ---------------------------------------------------------------------------
 [[ "$RUNS" =~ ^[1-9][0-9]*$ ]] || die "--runs 必须为正整数"
+if (( INPUT_BYTES_SET )); then
+    [[ "$INPUT_BYTES" =~ ^[1-9][0-9]*$ ]] || die "--input-bytes 必须为 1..6750 的正整数"
+    (( ${#INPUT_BYTES} <= 4 )) || die "--input-bytes 必须为 1..6750，实得 $INPUT_BYTES"
+    (( INPUT_BYTES <= 6750 )) || die "--input-bytes 必须为 1..6750，实得 $INPUT_BYTES"
+fi
 [[ "$TAG" =~ ^[A-Za-z0-9_.-]*$ ]] || die "--tag 只允许字母/数字/点/横线/下划线"
 [[ "$ORIENT" == "both" || "$ORIENT" == "fwd" || "$ORIENT" == "rev" ]] || die "未知 orient"
 # xc7z020 是新板严格验收的明确标记；调用者也可在不传 --device 时显式收紧。
@@ -328,7 +340,8 @@ for (( r = 1; r <= RUNS; r++ )); do
     [[ "${RUN_SM[r-1]}" != "$SCORE_MIN" ]] && tag="  ← 弄脏轮（输出不作判据）"
     info "  第 $r 轮 : 源读段 $(printf '%8s' "${RUN_SR[r-1]}") 条 → $(printf '%7s' "${RUN_REC[r-1]}") 条记录，score_min=${RUN_SM[r-1]}，超时 ${RUN_TO[r-1]}s$tag"
 done
-info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次才比图片哈希）"
+info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次才比载荷哈希）"
+info "载荷输出模式 : $( [[ -n "$INPUT_BYTES" ]] && echo "原始字节截断（$INPUT_BYTES B）" || echo 'JPEG EOI 截断' )"
 info "判据哈希  : $EXPECT_SHA"
 info "留证目录  : $RUN_DIR"
 info "XSDB 模式 : $XSDB_MODE${HW_SERVER_URL:+，hw_server=$HW_SERVER_URL}"
@@ -646,7 +659,7 @@ fi
 # ---------------------------------------------------------------------------
 # 6. 逐轮任务：first.py → ldpc_decode.py → 比哈希
 # ---------------------------------------------------------------------------
-declare -a RUN_SHAS=()      # 只装**判据轮**的图片哈希
+declare -a RUN_SHAS=()      # 只装**判据轮**的解码载荷哈希
 declare -a RUN_ELAPSED=()   # 逐轮 first.py 墙钟耗时，用来看长时间连续运行有没有退化
 declare -a RUN_KIND=()      # judge / dirty
 RUNS_COMPLETED=0
@@ -654,7 +667,11 @@ if (( ! FAILED )); then
 say "6/7 下发任务并比对判据哈希（共 $RUNS 轮）"
 for (( r = 1; r <= RUNS; r++ )); do
     BITS_OUT="$RUN_DIR/dec_input_run$r.txt"
-    IMG_OUT="$RUN_DIR/decoded_run$r.jpg"
+    if [[ -n "$INPUT_BYTES" ]]; then
+        PAYLOAD_OUT="$RUN_DIR/decoded_run$r.payload"
+    else
+        PAYLOAD_OUT="$RUN_DIR/decoded_run$r.jpg"
+    fi
     CLI_LOG="$RUN_DIR/first_run$r.log"
 
     RUN_SCORE_MIN="${RUN_SM[r-1]}"
@@ -688,8 +705,13 @@ for (( r = 1; r <= RUNS; r++ )); do
     info "耗时 ${T_RUN}s；$RESULT_LINE"
 
     info "--- 第 $r/$RUNS 轮：ldpc_decode.py ---"
-    if ! python3 tools/ldpc_decode.py decode "$BITS_OUT" \
-            -o "$RUN_DIR/decoded_bits_run$r.txt" --image "$IMG_OUT" \
+    DECODE_ARGS=(decode "$BITS_OUT" -o "$RUN_DIR/decoded_bits_run$r.txt")
+    if [[ -n "$INPUT_BYTES" ]]; then
+        DECODE_ARGS+=(--payload "$PAYLOAD_OUT" --input-bytes "$INPUT_BYTES")
+    else
+        DECODE_ARGS+=(--image "$PAYLOAD_OUT")
+    fi
+    if ! python3 tools/ldpc_decode.py "${DECODE_ARGS[@]}" \
             > "$RUN_DIR/ldpc_run$r.log" 2>&1; then
         if (( DIRTY_RUN )); then
             # 弄脏轮的板端输出本来就可能是噪声，译不出来很正常，不是判据。
@@ -704,19 +726,19 @@ for (( r = 1; r <= RUNS; r++ )); do
     fi
     grep -E "失败校验|收敛|iter" "$RUN_DIR/ldpc_run$r.log" | head -4 | sed 's/^/    /'
 
-    GOT_SHA="$(sha256sum "$IMG_OUT" | awk '{print $1}')"
+    GOT_SHA="$(sha256sum "$PAYLOAD_OUT" | awk '{print $1}')"
     if (( DIRTY_RUN )); then
-        info "弄脏轮图片 SHA-256 = $GOT_SHA（不作判据）"
-        step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录，图片 $GOT_SHA（不作判据）"
+        info "弄脏轮载荷 SHA-256 = $GOT_SHA（不作判据）"
+        step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录，载荷 $GOT_SHA（不作判据）"
         RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
         continue
     fi
     RUN_SHAS+=("$GOT_SHA")
     if [[ "$GOT_SHA" == "$EXPECT_SHA" ]]; then
-        step_ok "第 $r 轮 唯一判据（图片 SHA-256）" "${RUN_REC[r-1]} 条记录：$GOT_SHA"
-        info "图片 SHA-256 = $GOT_SHA  ← 与判据逐位相同"
+        step_ok "第 $r 轮 唯一判据（载荷 SHA-256）" "${RUN_REC[r-1]} 条记录：$GOT_SHA"
+        info "载荷 SHA-256 = $GOT_SHA  ← 与判据逐位相同"
     else
-        step_bad "第 $r 轮 唯一判据（图片 SHA-256）" "实得 $GOT_SHA"
+        step_bad "第 $r 轮 唯一判据（载荷 SHA-256）" "实得 $GOT_SHA"
         info "实得 : $GOT_SHA"
         info "判据 : $EXPECT_SHA"
     fi
@@ -848,7 +870,8 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "时间(UTC)   : $STAMP"
     echo "命令        : tools/run_g3.sh $INVOCATION"
     echo "任务次数    : $RUNS（同一次上电内连续下发，中间不复位、不重烧）"
-    echo "判据阈值    : score_min=$SCORE_MIN（只有这个阈值的轮次才比图片哈希）"
+    echo "判据阈值    : score_min=$SCORE_MIN（只有这个阈值的轮次才比载荷哈希）"
+    echo "载荷字节数  : ${INPUT_BYTES:-JPEG EOI 截断}"
     echo "orient      : $ORIENT（both = 每条读段发正/反两条记录），记录数按 64 对齐"
     echo
     printf '%-4s %-10s %-9s %-9s %-7s %-8s %s\n' \
@@ -892,7 +915,7 @@ info "全部留证：$RUN_DIR"
 
 if (( FAILED )); then
     printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
-    printf '唯一判据是图片 SHA-256；上面第一个 FAIL 就是要定位的那一级。\n'
+    printf '唯一判据是译码载荷 SHA-256；上面第一个 FAIL 就是要定位的那一级。\n'
     exit 1
 fi
 # 没跑完所有轮次就谈不上 PASS —— 别让「一步都没做」被当成通过。
@@ -909,5 +932,5 @@ if (( ${#RUN_SHAS[@]} == 0 )); then
     exit 1
 fi
 printf '\n\033[32m######## G3 PASS ########\033[0m\n'
-printf '板端回传经 LDPC 译码后的图片 SHA-256 与判据逐位相同：%s\n' "$EXPECT_SHA"
+printf '板端回传经 LDPC 译码后的载荷 SHA-256 与判据逐位相同：%s\n' "$EXPECT_SHA"
 exit 0

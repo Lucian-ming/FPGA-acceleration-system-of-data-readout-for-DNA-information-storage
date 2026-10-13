@@ -20,7 +20,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → LDPC → 比图片哈希 → 四级 DDR 取证。`xc7z020` 自动启用严格制品门禁并要求显式 `--artifact-dir`、`--ip`；WSL XSDB 用 `--xsdb /tools/.../xsdb --hw-server TCP:127.0.0.1:3132 --win-root /绝对路径` 本地执行，串口必须收到输出才可验收 PASS。`--allow-uart-skip` 仅供排错并写入摘要 |
+| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → LDPC → 比解码载荷 SHA → 四级 DDR 取证；默认 JPEG 仍按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA` 按元数据长度写裸字节。`xc7z020` 自动启用严格制品门禁并要求显式 `--artifact-dir`、`--ip`；WSL XSDB 用 `--xsdb /tools/.../xsdb --hw-server TCP:127.0.0.1:3132 --win-root /绝对路径` 本地执行，串口必须收到输出才可验收 PASS。`--allow-uart-skip` 仅供排错并写入摘要 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
 | `verify_repo_binding.sh` | Git 绑定门禁，动手前必跑 |
@@ -34,6 +34,7 @@
 | `make_stage1_tie_golden.py` | Stage1 同分并列位置集。`stage1_fwd_expect.txt` 的位置在并列时由 FFT 浮点噪声决定，**不能按单值比相等** |
 | `golden_model.py` / `readout.py` | 纯软件参考实现（滑窗相关 → 投票 → 反稀疏化） |
 | `ldpc_decode.py` | 纯 Python DVB-S2 R=5/6 硬判决译码器 |
+| `repro_non_jpeg_decode_length.py` | 在外部 v2 数据包上用 54,000 bit 信息块复现旧 JPEG EOI 截断与 `input_bytes` 的长度差；只读外部数据并打印长度/SHA，不表示板端结果 |
 
 ## 板端诊断（`tools/board/`）
 

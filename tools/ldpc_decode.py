@@ -18,6 +18,7 @@ pchk 二进制格式（逆向自黄金数据，全部判据见 verify）：
 
 用法：
   python3 tools/ldpc_decode.py decode <输入0/1文本> [-o 输出bits] [--image 输出jpg]
+  python3 tools/ldpc_decode.py decode <输入0/1文本> --payload 输出文件 --input-bytes N
   python3 tools/ldpc_decode.py verify          # 用仓库内 R0.83 黄金向量自检
 """
 
@@ -39,11 +40,13 @@ from native_ldpc import (  # noqa: E402
     K_INFO,
     PARITY_COLS,
     bits_to_jpeg_bytes,
+    bits_to_payload_bytes,
     decode_file as decode_native_file,
     deinterleave,
     hard_decode,
     load_pchk,
     load_permutation,
+    validate_input_bytes,
 )
 
 
@@ -104,7 +107,11 @@ def cmd_decode(args) -> int:
     out = Path(args.output) if args.output else Path("TestBitStream.txt")
     out.write_text("".join("01"[b] for b in info), encoding="utf-8")
     print(f"[decode] 比特已写入 {out}")
-    if args.image:
+    if args.payload:
+        payload = bits_to_payload_bytes(info, args.input_bytes)
+        Path(args.payload).write_bytes(payload)
+        print(f"[decode] 原始载荷已写入 {args.payload} ({len(payload)} B)")
+    elif args.image:
         img = bits_to_jpeg_bytes(info)
         Path(args.image).write_bytes(img)
         print(f"[decode] 图像已写入 {args.image} ({len(img)} B)")
@@ -119,13 +126,26 @@ def main(argv=None) -> int:
     p = sub.add_parser("decode", help="译码 0/1 文本")
     p.add_argument("input")
     p.add_argument("-o", "--output", help="输出比特文件（默认 TestBitStream.txt）")
-    p.add_argument("--image", help="同时重建 JPEG")
+    outputs = p.add_mutually_exclusive_group()
+    outputs.add_argument("--image", help="同时重建 JPEG（沿用 EOI 截断）")
+    outputs.add_argument("--payload", help="同时写出任意原始载荷；必须同时指定 --input-bytes")
+    p.add_argument("--input-bytes", type=int, help="原始载荷的有效字节数（1..6750，不查找 JPEG 标记）")
     p.set_defaults(func=cmd_decode)
 
     p = sub.add_parser("verify", help="用 R0.83 黄金数据自检")
     p.set_defaults(func=cmd_verify)
 
     args = ap.parse_args(argv)
+    if args.cmd == "decode":
+        if args.payload and args.input_bytes is None:
+            ap.error("--payload 必须同时指定 --input-bytes N")
+        if args.input_bytes is not None and not args.payload:
+            ap.error("--input-bytes 只用于 --payload；JPEG 请使用 --image")
+        if args.input_bytes is not None:
+            try:
+                validate_input_bytes(args.input_bytes, K_INFO)
+            except ValueError as error:
+                ap.error(str(error))
     return args.func(args)
 
 

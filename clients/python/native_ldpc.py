@@ -12,6 +12,7 @@ M_ROWS = 10_800
 N_BITS = 64_800
 K_INFO = 54_000
 PARITY_COLS = 10_800
+MAX_PAYLOAD_BYTES = K_INFO // 8
 
 
 def load_pchk(path: Path):
@@ -116,13 +117,42 @@ def hard_decode(
     )
 
 
+def validate_input_bytes(input_bytes: int, available_bits: int | None = None) -> int:
+    if isinstance(input_bytes, bool) or not isinstance(input_bytes, (int, np.integer)):
+        raise ValueError("input_bytes 必须为 1..6750 的整数")
+    count = int(input_bytes)
+    if not 1 <= count <= MAX_PAYLOAD_BYTES:
+        raise ValueError(f"input_bytes 必须为 1..{MAX_PAYLOAD_BYTES}，实得 {count}")
+    if available_bits is not None and count * 8 > available_bits:
+        raise ValueError(
+            f"input_bytes={count} 需要 {count * 8} bit，当前只有 {available_bits} bit"
+        )
+    return count
+
+
+def bits_to_bytes(bits: np.ndarray, input_bytes: int) -> bytes:
+    """按 MSB-first 打包并截到指定字节数，不解释载荷格式。"""
+    input_bytes = validate_input_bytes(input_bytes, int(bits.size))
+    padding = (-bits.size) % 8
+    padded = np.concatenate([bits, np.zeros(padding, dtype=np.uint8)])
+    weights = np.array([128, 64, 32, 16, 8, 4, 2, 1], dtype=np.uint16)
+    data = (padded.reshape(-1, 8) @ weights).astype(np.uint8).tobytes()
+    return data[:input_bytes]
+
+
 def bits_to_jpeg_bytes(bits: np.ndarray) -> bytes:
+    """保留既有 JPEG EOI 截断语义，供 v1/R0.83 判据继续使用。"""
     padding = (-bits.size) % 8
     padded = np.concatenate([bits, np.zeros(padding, dtype=np.uint8)])
     weights = np.array([128, 64, 32, 16, 8, 4, 2, 1], dtype=np.uint16)
     data = (padded.reshape(-1, 8) @ weights).astype(np.uint8).tobytes()
     end = data.rfind(b"\xff\xd9")
     return data if end < 0 else data[:end + 2]
+
+
+def bits_to_payload_bytes(bits: np.ndarray, input_bytes: int | None = None) -> bytes:
+    """写任意载荷；未给长度时沿用原 JPEG EOI 截断，给长度时按字节截断。"""
+    return bits_to_jpeg_bytes(bits) if input_bytes is None else bits_to_bytes(bits, input_bytes)
 
 
 def read_bit_text(path: Path, expected_bits: int = N_BITS) -> str:
