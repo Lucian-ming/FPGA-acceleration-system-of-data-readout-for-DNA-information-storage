@@ -15,11 +15,11 @@
              块（PKT_BATCH），按批次流式写入板端接收 FIFO 与 DDR 缓冲区；
    - POST:   启动流水线。下发 PKT_POST 触发硬件加速执行，轮询阻塞等待板端完成 Stage1/2/3
              计算并回传 8,100 字节的 Stage3 反稀疏化码字流（PKT_RESULT）；
-   - LDPC:   极速软判/硬判译码。调用 C 原生扩展（c_ldpc / ldpc_pipeline）完成 DVB-S2
-             硬判决校验，消除残留误码并还原出 JPEG 图像字节流。
+   - LDPC:   FPGA 片上 LDPC 完成纠错并回传码字；PC 只检查 syndrome 并提取载荷，
+             不执行译码，也不在板端未收敛时兜底。
 3. 演示与闭环验证：
-   - 内置 GOLDEN_IMAGE_SHA256 对还原出的 JPEG 图像进行逐字节 SHA-256 校验；
-   - 现场直观呈现图像复原、误码收敛轮数、吞吐率与各级毫秒级度量指标。
+   - 对板端已纠正码字提取出的载荷计算 SHA-256，并与 R0.83 黄金载荷比较；
+   - 现场呈现图像预览或非图像文件信息、吞吐率与各级耗时指标。
 =============================================================================
 """
 
@@ -55,6 +55,7 @@ from first import (
     ClientConfig,
     MAX_TOTAL_READS,
     OperationCancelled,
+    PIPELINE_STAGE_TOKENS,
     ProgressCallbacks,
     ReadFileInfo,
     analyze_reads_file,
@@ -62,7 +63,8 @@ from first import (
     format_metric_report,
     run_client,
 )
-from ldpc_pipeline import LDPCResult, run_ldpc_decoder
+from ldpc_pipeline import BoardCodeRejected, BoardVerifyResult, verify_board_result
+from native_ldpc import MAX_PAYLOAD_BYTES
 from task_protocol import SUPPORTED_READ_BASES, default_score_min
 
 try:
@@ -71,16 +73,54 @@ except ImportError:
     Image = None
     ImageTk = None
 
-# R0.83 黄金图像哈希常数
-GOLDEN_IMAGE_SHA256 = "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
+# R0.83 黄金载荷哈希常数
+GOLDEN_PAYLOAD_SHA256 = "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
 
 PIPELINE_STAGES = [
     ("CONFIG", "1. 任务配置"),
     ("WM", "2. 水印预载"),
     ("UPLOAD", "3. 读段上传"),
     ("POST", "4. FPGA 加速"),
-    ("LDPC", "5. 极速译码"),
+    ("LDPC", "5. 片上 LDPC（板端）"),
 ]
+assert tuple(token for token, _ in PIPELINE_STAGES) == PIPELINE_STAGE_TOKENS
+
+
+def detect_payload_media_type(payload: bytes) -> str:
+    """根据载荷魔数识别常见媒体；无法确认时返回 binary。"""
+    if payload.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if payload.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if payload.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if payload.startswith(b"BM"):
+        return "image/bmp"
+    if payload.startswith((b"II*\x00", b"MM\x00*")):
+        return "image/tiff"
+    if payload.startswith(b"RIFF") and payload[8:12] == b"WAVE":
+        return "audio/wav"
+    if payload.startswith(b"ID3") or (
+        len(payload) >= 2 and payload[0] == 0xFF and payload[1] & 0xE0 == 0xE0
+    ):
+        return "audio/mpeg"
+    if payload.startswith(b"OggS"):
+        return "audio/ogg"
+    if payload.startswith(b"fLaC"):
+        return "audio/flac"
+    if payload[4:8] == b"ftyp":
+        return "video/mp4"
+    if payload.startswith(b"RIFF") and payload[8:12] == b"AVI ":
+        return "video/avi"
+    if payload.startswith(b"\x1a\x45\xdf\xa3"):
+        return "video/webm-or-matroska"
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return "binary"
+    if text and all(char.isprintable() or char in "\t\r\n" for char in text):
+        return "text"
+    return "binary"
 
 
 class DNAAcceleratorApp(tk.Tk):
@@ -99,10 +139,12 @@ class DNAAcceleratorApp(tk.Tk):
         self._log_queue: Queue[str] = Queue()
 
         self._read_info: Optional[ReadFileInfo] = None
-        self._last_ldpc_result: Optional[LDPCResult] = None
+        self._last_verify_result: Optional[BoardVerifyResult] = None
         self._preview_photo: Optional["ImageTk.PhotoImage"] = None
         self._start_time: float = 0.0
         self._is_running: bool = False
+        self._board_wait_started_at: Optional[float] = None
+        self._expected_hw_seconds: float = 0.0
 
         # Tk 变量 -------------------------------------------------------
         self.ip_var = tk.StringVar(value=self._defaults.ip)
@@ -112,6 +154,7 @@ class DNAAcceleratorApp(tk.Tk):
         self.watermark_var = tk.StringVar(value=str(self._defaults.watermark))
         self.reads_var = tk.StringVar(value=str(self._defaults.reads))
         self.output_var = tk.StringVar(value=str(self._defaults.out))
+        self.input_bytes_var = tk.StringVar(value="")
 
         # 几何与参数
         self.geom_mode_var = tk.StringVar(value="auto")
@@ -120,7 +163,6 @@ class DNAAcceleratorApp(tk.Tk):
         self.batch_var = tk.StringVar(value=str(self._defaults.batch))
         self.send_count_var = tk.IntVar(value=self._defaults.total or 4096)
         self.full_scale_var = tk.BooleanVar(value=False)
-        self.backend_var = tk.StringVar(value="auto")
 
         self.skip_wm_var = tk.BooleanVar(value=False)
         self.post_var = tk.BooleanVar(value=True)
@@ -139,9 +181,9 @@ class DNAAcceleratorApp(tk.Tk):
         # 毫秒级指标度量
         self.metric_upload_var = tk.StringVar(value="--")
         self.metric_fpga_var = tk.StringVar(value="--")
-        self.metric_ldpc_var = tk.StringVar(value="--")
+        self.metric_verify_var = tk.StringVar(value="--")
         self.metric_total_var = tk.StringVar(value="--")
-        self.image_hash_var = tk.StringVar(value="--")
+        self.payload_hash_var = tk.StringVar(value="--")
 
         # 界面构建
         self._setup_styles()
@@ -164,6 +206,8 @@ class DNAAcceleratorApp(tk.Tk):
         style.configure("Timer.TLabel", font=("Courier", 14, "bold"), foreground="#1565c0")
         style.configure("MetricVal.TLabel", font=("Helvetica", 11, "bold"), foreground="#2e7d32")
         style.configure("Accent.TButton", font=("Helvetica", 10, "bold"))
+        style.configure("Failure.TLabel", foreground="#c62828")
+        style.configure("Success.TLabel", foreground="#2e7d32")
 
     def _build_ui(self) -> None:
         container = ttk.Frame(self, padding=8)
@@ -307,16 +351,13 @@ class DNAAcceleratorApp(tk.Tk):
         )
         self.full_cb.pack(side="left", padx=(6, 0))
 
-        # LDPC 译码后端
-        ttk.Label(g, text="LDPC 后端:").grid(row=2, column=2, sticky="w", pady=3)
-        backend_cb = ttk.Combobox(
-            g,
-            textvariable=self.backend_var,
-            values=["auto (极速C优先)", "c_accel (C原生加速)", "native (纯Python)", "external (外部EXE)"],
-            state="readonly",
-            width=12,
+        ttk.Label(g, text="载荷字节数:").grid(row=3, column=0, sticky="w", pady=3)
+        ttk.Entry(g, textvariable=self.input_bytes_var, width=10).grid(
+            row=3, column=1, sticky="w", padx=(4, 8), pady=3
         )
-        backend_cb.grid(row=2, column=3, sticky="w", padx=4, pady=3)
+        ttk.Label(g, text=f"留空按 JPEG EOI 截断（1..{MAX_PAYLOAD_BYTES}）").grid(
+            row=3, column=2, columnspan=2, sticky="w", padx=4, pady=3
+        )
 
         # 复选框选项
         chk_box = ttk.Frame(card)
@@ -348,13 +389,6 @@ class DNAAcceleratorApp(tk.Tk):
             state="disabled",
         )
         self.stop_button.pack(side="left", padx=4, ipady=6)
-
-        self.ldpc_only_button = ttk.Button(
-            card,
-            text="⚡  仅重跑 LDPC 译码",
-            command=self._run_ldpc_only,
-        )
-        self.ldpc_only_button.pack(side="left", padx=(6, 0), ipady=6)
 
     def _add_file_row(
         self,
@@ -405,7 +439,12 @@ class DNAAcceleratorApp(tk.Tk):
 
         hint_box = ttk.Frame(card)
         hint_box.pack(fill="x")
-        ttk.Label(hint_box, textvariable=self.status_var, font=("Helvetica", 10, "bold")).pack(side="left")
+        self.status_label = ttk.Label(
+            hint_box,
+            textvariable=self.status_var,
+            font=("Helvetica", 10, "bold"),
+        )
+        self.status_label.pack(side="left")
         ttk.Label(hint_box, textvariable=self.upload_hint_var, foreground="#555").pack(side="right")
 
         # 3. 毫秒级性能指标表格
@@ -417,26 +456,26 @@ class DNAAcceleratorApp(tk.Tk):
         ttk.Label(metrics, text="上行传输:").grid(row=0, column=0, sticky="w")
         ttk.Label(metrics, textvariable=self.metric_upload_var, style="MetricVal.TLabel").grid(row=0, column=1, sticky="w")
 
-        ttk.Label(metrics, text="FPGA 运算:").grid(row=0, column=2, sticky="w")
+        ttk.Label(metrics, text="板端运算与回传:").grid(row=0, column=2, sticky="w")
         ttk.Label(metrics, textvariable=self.metric_fpga_var, style="MetricVal.TLabel").grid(row=0, column=3, sticky="w")
 
-        ttk.Label(metrics, text="LDPC 译码:").grid(row=1, column=0, sticky="w", pady=(4, 0))
-        ttk.Label(metrics, textvariable=self.metric_ldpc_var, style="MetricVal.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 0))
+        ttk.Label(metrics, text="PC 端校验:").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(metrics, textvariable=self.metric_verify_var, style="MetricVal.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 0))
 
         ttk.Label(metrics, text="总端到端:").grid(row=1, column=2, sticky="w", pady=(4, 0))
         ttk.Label(metrics, textvariable=self.metric_total_var, style="MetricVal.TLabel").grid(row=1, column=3, sticky="w", pady=(4, 0))
 
     def _build_preview_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="图像还原与黄金校验结果", padding=8)
+        card = ttk.LabelFrame(parent, text="板端结果校验与载荷展示", padding=8)
         card.pack(fill="x", pady=(0, 6))
 
         top_bar = ttk.Frame(card)
         top_bar.pack(fill="x", pady=(0, 4))
 
-        ttk.Label(top_bar, text="图片 SHA-256:").pack(side="left")
+        ttk.Label(top_bar, text="载荷 SHA-256:").pack(side="left")
         self.hash_label = ttk.Label(
             top_bar,
-            textvariable=self.image_hash_var,
+            textvariable=self.payload_hash_var,
             font=("Courier", 9, "bold"),
             foreground="#333",
         )
@@ -449,7 +488,7 @@ class DNAAcceleratorApp(tk.Tk):
 
         self.preview_label = ttk.Label(
             self.preview_container,
-            text="[暂无图像 - 完成任务后自动渲染预览]",
+            text="[完成板端结果校验后显示载荷信息]",
             anchor="center",
         )
         self.preview_label.pack(expand=True, fill="both")
@@ -459,7 +498,13 @@ class DNAAcceleratorApp(tk.Tk):
         action_bar.pack(fill="x", pady=(4, 0))
 
         ttk.Button(action_bar, text="打开输出目录", command=self._open_output_dir).pack(side="left")
-        ttk.Button(action_bar, text="全尺寸查看图像", command=self._open_image_external).pack(side="left", padx=6)
+        self.open_payload_button = ttk.Button(
+            action_bar,
+            text="用系统默认程序打开",
+            command=self._open_payload_external,
+            state="disabled",
+        )
+        self.open_payload_button.pack(side="left", padx=6)
 
     def _build_log_card(self, parent: ttk.Frame) -> None:
         card = ttk.LabelFrame(parent, text="运行诊断日志", padding=6)
@@ -477,7 +522,7 @@ class DNAAcceleratorApp(tk.Tk):
         self.log_text.tag_configure("WARN", foreground="#e65100")
         self.log_text.tag_configure("ERROR", foreground="#c62828")
         self.log_text.tag_configure("FPGA", foreground="#0277bd")
-        self.log_text.tag_configure("LDPC", foreground="#6a1b9a")
+        self.log_text.tag_configure("VERIFY", foreground="#6a1b9a")
         self.log_text.tag_configure("GOLDEN", foreground="#1565c0", font=("Courier", 9, "bold"))
 
     # ----------------------------------------------------------- 交互与自适应
@@ -530,7 +575,7 @@ class DNAAcceleratorApp(tk.Tk):
                 "batch": self.batch_var.get(),
                 "send_count": self.send_count_var.get(),
                 "full_scale": self.full_scale_var.get(),
-                "backend": self.backend_var.get(),
+                "input_bytes": self.input_bytes_var.get(),
                 "skip_watermark": self.skip_wm_var.get(),
                 "post": self.post_var.get(),
             },
@@ -583,7 +628,16 @@ class DNAAcceleratorApp(tk.Tk):
             batch = read_integer("batch")
             send_count = read_integer("send_count")
             full_scale = values["full_scale"]
-            backend = values["backend"]
+            input_bytes_raw = values.get("input_bytes", "")
+            if input_bytes_raw is None:
+                input_bytes_raw = ""
+            if isinstance(input_bytes_raw, bool):
+                raise ValueError("input_bytes 必须为空或为整数")
+            if isinstance(input_bytes_raw, int):
+                input_bytes_raw = str(input_bytes_raw)
+            if not isinstance(input_bytes_raw, str):
+                raise ValueError("input_bytes 必须为空或为整数")
+            input_bytes = input_bytes_raw.strip()
             skip_watermark = values["skip_watermark"]
             post = values["post"]
 
@@ -601,13 +655,11 @@ class DNAAcceleratorApp(tk.Tk):
                 raise ValueError("batch 必须为正整数")
             if not 0 < send_count <= MAX_TOTAL_READS:
                 raise ValueError(f"send_count 必须在 1..{MAX_TOTAL_READS}")
-            if backend not in (
-                "auto (极速C优先)",
-                "c_accel (C原生加速)",
-                "native (纯Python)",
-                "external (外部EXE)",
+            if input_bytes and (
+                not input_bytes.isdigit()
+                or not 1 <= int(input_bytes) <= MAX_PAYLOAD_BYTES
             ):
-                raise ValueError("backend 无效")
+                raise ValueError(f"input_bytes 必须为空或在 1..{MAX_PAYLOAD_BYTES}")
             if not all(isinstance(flag, bool) for flag in (full_scale, skip_watermark, post)):
                 raise ValueError("full_scale、skip_watermark 和 post 必须是布尔值")
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
@@ -622,7 +674,7 @@ class DNAAcceleratorApp(tk.Tk):
         self.batch_var.set(str(batch))
         self.send_count_var.set(send_count)
         self.full_scale_var.set(full_scale)
-        self.backend_var.set(backend)
+        self.input_bytes_var.set(input_bytes)
         self.skip_wm_var.set(skip_watermark)
         self.post_var.set(post)
         self.send_spin.configure(state="disabled" if full_scale else "normal")
@@ -707,7 +759,7 @@ class DNAAcceleratorApp(tk.Tk):
             count = int(self.send_count_var.get())
             orient = "both" if "both" in self.orient_var.get() else "forward"
             sec = estimate_processing_time(count, orient=orient)
-            self.est_time_var.set(f"~{sec:.1f} 秒 (模型估算)")
+            self.est_time_var.set(f"~{sec:.1f} 秒（两点实测粗估）")
         except Exception:
             self.est_time_var.set("--")
 
@@ -766,6 +818,19 @@ class DNAAcceleratorApp(tk.Tk):
             messagebox.showerror("参数错误", "发送条数必须是正整数。")
             return
 
+        input_bytes_raw = self.input_bytes_var.get().strip()
+        input_bytes: Optional[int]
+        if not input_bytes_raw:
+            input_bytes = None
+        elif not input_bytes_raw.isdigit() or not 1 <= int(input_bytes_raw) <= MAX_PAYLOAD_BYTES:
+            messagebox.showerror(
+                "参数错误",
+                f"载荷字节数必须留空，或输入 1..{MAX_PAYLOAD_BYTES} 的整数。",
+            )
+            return
+        else:
+            input_bytes = int(input_bytes_raw)
+
         watermark_path = Path(self.watermark_var.get()).expanduser()
         reads_path = Path(self.reads_var.get()).expanduser()
         output_path = Path(self.output_var.get()).expanduser()
@@ -787,6 +852,11 @@ class DNAAcceleratorApp(tk.Tk):
         score_min_raw = self.score_min_var.get().strip()
         score_min = int(score_min_raw) if score_min_raw.isdigit() else default_score_min(read_bps)
         orient = "both" if "both" in self.orient_var.get() else "forward"
+        effective_source_reads = min(send_count, self._read_info.total_reads)
+        self._expected_hw_seconds = estimate_processing_time(
+            effective_source_reads,
+            orient=orient,
+        )
 
         config = ClientConfig(
             ip=self.ip_var.get().strip() or self._defaults.ip,
@@ -803,7 +873,10 @@ class DNAAcceleratorApp(tk.Tk):
             orient=orient,
             read_bps=read_bps,
             score_min=score_min,
-            result_timeout=max(180.0, estimate_processing_time(send_count, orient=orient) * 2.0 + 30.0),
+            result_timeout=max(
+                180.0,
+                estimate_processing_time(effective_source_reads, orient=orient) * 2.0 + 30.0,
+            ),
         )
 
         self._reset_progress()
@@ -813,14 +886,17 @@ class DNAAcceleratorApp(tk.Tk):
 
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
-        self.ldpc_only_button.configure(state="disabled")
 
         self._start_time = time.perf_counter()
         self._is_running = True
         self._update_timer()
 
         self._stop_event = threading.Event()
-        self._worker = threading.Thread(target=self._run_client_task, args=(config,), daemon=True)
+        self._worker = threading.Thread(
+            target=self._run_client_task,
+            args=(config, input_bytes),
+            daemon=True,
+        )
         self._worker.start()
 
     def stop_processing(self) -> None:
@@ -829,7 +905,7 @@ class DNAAcceleratorApp(tk.Tk):
         self._append_log("[INFO] 收到用户中止请求，正在通知后台任务 ...")
         self._stop_event.set()
 
-    def _run_client_task(self, config: ClientConfig) -> None:
+    def _run_client_task(self, config: ClientConfig, input_bytes: Optional[int]) -> None:
         def log_fn(message: str) -> None:
             self._log_queue.put(message)
 
@@ -840,7 +916,6 @@ class DNAAcceleratorApp(tk.Tk):
         )
 
         try:
-            self.after(0, self._set_active_stage, "CONFIG")
             stats = run_client(config, log=log_fn, progress=callbacks, stop_event=self._stop_event)
             log_fn(format_metric_report(stats))
 
@@ -848,23 +923,29 @@ class DNAAcceleratorApp(tk.Tk):
             self.after(0, lambda: self.metric_upload_var.set(f"{stats.t_batches:.2f} s"))
             self.after(0, lambda: self.metric_fpga_var.set(f"{stats.t_result:.2f} s"))
 
-            # 进入 LDPC 译码阶段
-            self.after(0, self._set_active_stage, "LDPC")
-            self.after(0, self._update_status, "执行 LDPC 极速译码 ...")
+            if not config.post:
+                self.after(0, self._on_run_complete, True, None)
+                return
 
-            backend = self._resolve_backend_mode()
-            t_ldpc_start = time.perf_counter()
-            ldpc_result = run_ldpc_decoder(
-                Path(config.out),
-                output_dir=Path(config.out).resolve().parent,
-                backend=backend,
-                log=log_fn,
-            )
-            t_ldpc = (time.perf_counter() - t_ldpc_start) * 1000
-            self.after(0, lambda: self.metric_ldpc_var.set(f"{t_ldpc:.1f} ms ({ldpc_result.backend})"))
+            self.after(0, self._update_status, "正在校验板端回传码字与载荷...")
+            verify_started = time.perf_counter()
+            try:
+                result = verify_board_result(
+                    Path(config.out),
+                    Path(config.out).resolve().parent,
+                    input_bytes=input_bytes,
+                    log=log_fn,
+                )
+            except BoardCodeRejected as exc:
+                elapsed_ms = (time.perf_counter() - verify_started) * 1000
+                self.after(0, lambda: self.metric_verify_var.set(f"{elapsed_ms:.1f} ms"))
+                self.after(0, self._show_board_code_rejected, exc)
+                self.after(0, self._on_run_complete, False, "BoardCodeRejected")
+                return
 
-            # 完成
-            self.after(0, self._handle_ldpc_result, ldpc_result)
+            elapsed_ms = (time.perf_counter() - verify_started) * 1000
+            self.after(0, lambda: self.metric_verify_var.set(f"{elapsed_ms:.1f} ms"))
+            self.after(0, self._handle_board_verify_result, result)
             self.after(0, self._on_run_complete, True, None)
         except OperationCancelled:
             log_fn("[INFO] 任务已被用户取消")
@@ -873,65 +954,36 @@ class DNAAcceleratorApp(tk.Tk):
             log_fn(f"[ERROR] {exc}")
             self.after(0, self._on_run_complete, False, str(exc))
 
-    def _resolve_backend_mode(self) -> str:
-        b = self.backend_var.get()
-        if "c_accel" in b:
-            return "c_accel"
-        if "native" in b:
-            return "native"
-        if "external" in b:
-            return "external"
-        return "auto"
-
-    def _run_ldpc_only(self) -> None:
-        out_file = Path(self.output_var.get()).expanduser()
-        if not out_file.is_file():
-            messagebox.showerror("文件不存在", f"结果文件未找到: {out_file}\n请先运行全流水线或指定已有 dec_input.txt。")
-            return
-
-        backend = self._resolve_backend_mode()
-        self._set_active_stage("LDPC")
-        self._append_log(f"[INFO] 启动单独 LDPC 译码: {out_file} (模式: {backend})")
-
-        def do_decode():
-            def log_fn(message: str) -> None:
-                self._log_queue.put(message)
-
-            t0 = time.perf_counter()
-            try:
-                res = run_ldpc_decoder(out_file, output_dir=out_file.parent, backend=backend, log=log_fn)
-                dt_ms = (time.perf_counter() - t0) * 1000
-                self.after(0, lambda: self.metric_ldpc_var.set(f"{dt_ms:.1f} ms ({res.backend})"))
-                self.after(0, self._handle_ldpc_result, res)
-                self.after(0, lambda: messagebox.showinfo("LDPC 译码完成", f"译码成功！耗时: {dt_ms:.1f} ms"))
-            except Exception as exc:
-                log_fn(f"[LDPC-ERROR] {exc}")
-                self.after(0, lambda: messagebox.showerror("LDPC 失败", str(exc)))
-            finally:
-                self.after(0, self._set_active_stage, "")
-
-        threading.Thread(target=do_decode, daemon=True).start()
-
     # ------------------------------------------------------------- 回调与状态
     def _on_run_complete(self, success: bool, error: Optional[str]) -> None:
         self._is_running = False
         self.start_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
-        self.ldpc_only_button.configure(state="normal")
         self._set_active_stage("")
 
         dt_total = time.perf_counter() - self._start_time
         self.metric_total_var.set(f"{dt_total:.2f} s")
 
         if success:
-            self._append_log(f"[INFO] 全流水线处理完成！总耗时: {dt_total:.2f}s")
-            self._update_status("全流程运行完成")
+            if self._last_verify_result is not None:
+                self._append_log(f"[INFO] 板端结果校验完成！总耗时: {dt_total:.2f}s")
+                self._update_status(
+                    f"✓ 板端已纠对（{self._last_verify_result.total_rows} 条校验行全零）；"
+                    "PC 端未做译码",
+                    success=True,
+                )
+            else:
+                self._append_log(f"[INFO] 上传流程完成，未触发板端处理。总耗时: {dt_total:.2f}s")
+                self._update_status("上传完成（未触发 POST）")
         else:
             if error == "Operation cancelled":
                 self._append_log("[INFO] 任务已取消")
                 self._update_status("任务已取消")
+            elif error == "BoardCodeRejected":
+                # 具体失败数由 _show_board_code_rejected 显示；不弹出可被误读成警告的提示框。
+                pass
             else:
-                self._update_status("运行异常终止")
+                self._update_status("运行失败", failed=True)
                 messagebox.showerror("运行失败", error or "未知错误")
 
         self._worker = None
@@ -947,27 +999,67 @@ class DNAAcceleratorApp(tk.Tk):
             else:
                 lbl.configure(background="#f0f0f0", foreground="#333", font=("Helvetica", 9))
 
-    def _update_status(self, message: str) -> None:
+        if stage_token == "LDPC":
+            if self._board_wait_started_at is None:
+                self._board_wait_started_at = time.perf_counter()
+            self.upload_bar.stop()
+            self.upload_bar.configure(mode="indeterminate")
+            self.upload_bar.start(12)
+            self.upload_percent_var.set("运行中")
+            self._update_board_wait_progress()
+        else:
+            self._board_wait_started_at = None
+            self.upload_bar.stop()
+            self.upload_bar.configure(mode="determinate")
+
+    def _update_board_wait_progress(self) -> None:
+        if self.active_stage_var.get() != "LDPC" or self._board_wait_started_at is None:
+            return
+        elapsed = time.perf_counter() - self._board_wait_started_at
+        self.upload_hint_var.set(
+            f"已等待 {elapsed:.0f} 秒 / 预计约 {self._expected_hw_seconds:.1f} 秒（粗估）"
+        )
+        if self._is_running:
+            self.after(1000, self._update_board_wait_progress)
+
+    def _update_status(
+        self,
+        message: str,
+        *,
+        failed: bool = False,
+        success: bool = False,
+    ) -> None:
         self.status_var.set(message)
+        style = "Failure.TLabel" if failed else ("Success.TLabel" if success else "TLabel")
+        self.status_label.configure(style=style)
 
     def _update_upload_progress(self, sent: int, total: int) -> None:
         total = max(total, 1)
         percent = int((sent / total) * 100)
         percent = max(0, min(100, percent))
+        self.upload_bar.stop()
+        self.upload_bar.configure(mode="determinate")
         self.upload_bar.configure(value=percent)
         self.upload_percent_var.set(f"{percent}%")
         self.upload_hint_var.set(f"已发送 {sent:,}/{total:,} 条读段")
 
     def _reset_progress(self) -> None:
-        self.upload_bar.configure(value=0)
+        self.upload_bar.stop()
+        self.upload_bar.configure(mode="determinate", value=0)
+        self._board_wait_started_at = None
         self.upload_percent_var.set("0%")
         self.upload_hint_var.set("等待传输")
         self.metric_upload_var.set("--")
         self.metric_fpga_var.set("--")
-        self.metric_ldpc_var.set("--")
+        self.metric_verify_var.set("--")
         self.metric_total_var.set("--")
-        self.image_hash_var.set("--")
+        self.payload_hash_var.set("--")
         self.hash_label.configure(foreground="#333")
+        self._update_status("就绪")
+        self._last_verify_result = None
+        self._preview_photo = None
+        self.preview_label.configure(image="", text="[完成板端结果校验后显示载荷信息]")
+        self.open_payload_button.configure(state="disabled")
 
     def _update_timer(self) -> None:
         if self._is_running:
@@ -977,48 +1069,82 @@ class DNAAcceleratorApp(tk.Tk):
             self.timer_var.set(f"{mins:02d}:{secs:02d}")
             self.after(500, self._update_timer)
 
-    # ------------------------------------------------------------- 图像与输出
-    def _handle_ldpc_result(self, result: LDPCResult) -> None:
-        self._last_ldpc_result = result
-        img_bytes = result.image_path.read_bytes()
-        sha256 = hashlib.sha256(img_bytes).hexdigest()
+    # ------------------------------------------------------------- 载荷与输出
+    def _show_board_code_rejected(self, error: BoardCodeRejected) -> None:
+        self._last_verify_result = None
+        self._preview_photo = None
+        self.payload_hash_var.set("板端结果校验失败")
+        self.hash_label.configure(foreground="#c62828")
+        self.preview_label.configure(image="", text="板端未纠对；未生成或展示载荷。")
+        self.open_payload_button.configure(state="disabled")
+        self._update_status(
+            f"✗ 板端未纠对：{error.failed_rows}/{error.total_rows} 条校验行非零 —— 本用例失败",
+            failed=True,
+        )
 
-        # 校验哈希并高亮
-        is_golden = (sha256 == GOLDEN_IMAGE_SHA256)
-        status_txt = f"{sha256[:16]}...{sha256[-8:]}" + (" [PASS 逐位吻合]" if is_golden else " [可还原]")
-        self.image_hash_var.set(status_txt)
+    def _handle_board_verify_result(self, result: BoardVerifyResult) -> None:
+        self._last_verify_result = result
+        payload = result.payload_path.read_bytes()
+        sha256 = hashlib.sha256(payload).hexdigest()
+        is_golden = sha256 == GOLDEN_PAYLOAD_SHA256
+        status_txt = f"{sha256[:16]}...{sha256[-8:]}" + (
+            " [R0.83 逐字节吻合]" if is_golden else " [板端校验通过]"
+        )
+        self.payload_hash_var.set(status_txt)
         self.hash_label.configure(foreground="#2e7d32" if is_golden else "#1565c0")
-
-        self._append_log(f"[LDPC] 解码图像 SHA-256: {sha256}")
+        media_type = detect_payload_media_type(payload)
+        self._append_log(f"[VERIFY] 载荷 SHA-256: {sha256}；类型: {media_type}")
         if is_golden:
-            self._append_log("[GOLDEN] 恭喜！板端回传还原图像与 R0.83 黄金基线 100% 逐位吻合！")
+            self._append_log("[GOLDEN] 载荷与 R0.83 黄金基线逐字节吻合。")
 
-        # 渲染缩略图
-        if Image is not None and ImageTk is not None:
-            try:
-                im = Image.open(result.image_path)
-                # 保持纵横比缩放到 120px 高度
-                w, h = im.size
-                scale = min(220 / max(w, 1), 120 / max(h, 1))
-                new_w = max(1, int(w * scale))
-                new_h = max(1, int(h * scale))
-                im_thumb = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                self._preview_photo = ImageTk.PhotoImage(im_thumb)
-                self.preview_label.configure(image=self._preview_photo, text="")
-            except Exception as exc:
-                self.preview_label.configure(image="", text=f"预览加载失败: {exc}")
+        media_labels = {
+            "audio/mpeg": "音频 MP3",
+            "audio/wav": "音频 WAV",
+            "audio/ogg": "音频 Ogg",
+            "audio/flac": "音频 FLAC",
+            "video/mp4": "视频 MP4",
+            "video/avi": "视频 AVI",
+            "video/webm-or-matroska": "视频 WebM/Matroska",
+            "text": "文本",
+            "binary": "二进制",
+        }
+        if media_type.startswith("image/"):
+            if Image is not None and ImageTk is not None:
+                try:
+                    with Image.open(result.payload_path) as im:
+                        im.load()
+                        w, h = im.size
+                        scale = min(220 / max(w, 1), 120 / max(h, 1))
+                        thumbnail = im.resize(
+                            (max(1, int(w * scale)), max(1, int(h * scale))),
+                            Image.Resampling.LANCZOS,
+                        )
+                    self._preview_photo = ImageTk.PhotoImage(thumbnail)
+                    self.preview_label.configure(image=self._preview_photo, text="")
+                except Exception:
+                    self._show_saved_payload(result, "二进制（无法预览）")
+            else:
+                self._show_saved_payload(result, "图片（PIL 不可用，按文件打开）")
         else:
-            self.preview_label.configure(image="", text=f"图像已保存至 {result.image_path.name}")
+            self._show_saved_payload(result, media_labels.get(media_type, "二进制"))
+        self.open_payload_button.configure(state="normal")
+
+    def _show_saved_payload(self, result: BoardVerifyResult, media_label: str) -> None:
+        self._preview_photo = None
+        self.preview_label.configure(
+            image="",
+            text=f"已保存到 {result.payload_path}，{result.payload_bytes} 字节\n载荷类型：{media_label}",
+        )
 
     def _open_output_dir(self) -> None:
         out_dir = Path(self.output_var.get()).expanduser().parent
         self._open_path(out_dir)
 
-    def _open_image_external(self) -> None:
-        if self._last_ldpc_result and self._last_ldpc_result.image_path.is_file():
-            self._open_path(self._last_ldpc_result.image_path)
+    def _open_payload_external(self) -> None:
+        if self._last_verify_result and self._last_verify_result.payload_path.is_file():
+            self._open_path(self._last_verify_result.payload_path)
         else:
-            messagebox.showinfo("提示", "尚未生成还原图像文件。")
+            messagebox.showinfo("提示", "尚未生成已校验的载荷文件。")
 
     def _open_path(self, path: Path) -> None:
         try:
@@ -1043,12 +1169,12 @@ class DNAAcceleratorApp(tk.Tk):
             tag = "INFO"
         elif text.startswith("[WARN]"):
             tag = "WARN"
-        elif text.startswith("[ERROR]") or text.startswith("[LDPC-ERROR]"):
+        elif text.startswith("[ERROR]"):
             tag = "ERROR"
         elif text.startswith("[FPGA]"):
             tag = "FPGA"
-        elif text.startswith("[LDPC]"):
-            tag = "LDPC"
+        elif text.startswith("[VERIFY]"):
+            tag = "VERIFY"
 
         if tag:
             self.log_text.insert("end", text, tag)

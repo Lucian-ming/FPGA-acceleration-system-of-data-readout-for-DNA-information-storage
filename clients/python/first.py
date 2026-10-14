@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import socket
 import struct
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -65,7 +66,7 @@ DEFAULT_PORT = 7
 
 DEFAULT_WATERMARK_FILE = "watermark.txt"
 DEFAULT_READS_FILE = "read.fastq"
-# 默认将服务器返回的比特流保存为解码输入 dec_input.txt
+# 默认将板端返回的比特流保存为 syndrome 校验输入 dec_input.txt
 DEFAULT_OUTPUT_FILE = "dec_input.txt"
 
 DEFAULT_FORMAT = "auto"
@@ -78,6 +79,9 @@ DEFAULT_BATCH_SIZE = 1_000
 RESULT_BYTES = 8_100
 MAX_WATERMARK = 10_128
 WM_ALIGN = 8
+
+# 与 GUI 共用，避免进度回调的阶段 token 与状态步进条脱节。
+PIPELINE_STAGE_TOKENS = ("CONFIG", "WM", "UPLOAD", "POST", "LDPC")
 
 BASE2BITS = {
     "A": "00",
@@ -93,7 +97,7 @@ BASE2BITS = {
 }
 
 # 反向互补：A<->T, G<->C。测序数据里约一半读段是反向的（docs/03-status.md D1），
-# 不处理的话即使用满全部读段也无法译码。
+# 不处理的话即使用满全部读段也无法恢复原载荷。
 #
 # 注意 N 映射到 T 而不是 N：整条流水线只认 2-bit 符号，而 BASE2BITS["N"] == "00"，
 # 即 N 在编码阶段就已经被当成 A；既然如此，反向互补也必须按 A 处理（A→T）。
@@ -208,6 +212,10 @@ class ProgressCallbacks:
             self.update_upload(sent, total)
 
     def set_stage(self, stage: str) -> None:
+        if stage not in PIPELINE_STAGE_TOKENS:
+            raise ValueError(
+                f"未知流水线阶段 {stage!r}；允许值为 {PIPELINE_STAGE_TOKENS}"
+            )
         if self.update_stage_label:
             self.update_stage_label(stage)
 
@@ -279,9 +287,16 @@ def inspect_reads_file(reads_file: Path, format_type: str = "auto") -> tuple[int
 
 
 def estimate_processing_time(total_reads: int, orient: str = "both") -> float:
-    """基于板端实测模型 t = 4.93s + 0.9396ms * 记录数，预估处理耗时 (秒)。"""
+    """用 K=2 + 片上 LDPC 当前两点实测粗估板端耗时（秒）。
+
+    2026-10-14 的点为 4,096 条板端记录约 0.65 s、103,616 条约 5.89 s，
+    线性近似 t ≈ 0.43 + 0.0526 ms × 记录数。此前
+    旧架构公式 t = 4.93 s + 0.9396 ms × 记录数在这两点会估成 8.78 s 和
+    102.24 s；若按旧函数把 4,096 个源读段按 both 展开为 8,192 条记录，则会估成
+    12.63 s。它与当前约 0.65 s 的实测不符，故作废。这里只有两个测量点，属于粗估。
+    """
     records = total_reads * 2 if orient == "both" else total_reads
-    return 4.93 + 0.0009396 * records
+    return 0.43 + 0.0000526 * records
 
 
 def analyze_reads_file(path: Path, format_hint: str = "auto") -> ReadFileInfo:
@@ -363,7 +378,7 @@ def iter_reads(
     `orient="both"` 时每条源读段发两份：正向 + 反向互补。
     板端 Stage1 会分别给两份打分，Voter 按分数丢掉方向错的那份
     （docs/05-implementation-plan.md P1）。这是必需的：测序数据里约一半读段
-    是反向互补的，不发的话即使用满全部读段也无法译码。
+    是反向互补的，不发的话即使用满全部读段也无法恢复原载荷。
     """
     if orient not in {"both", "forward"}:
         raise ValueError(f"未知 orient={orient!r}")
@@ -580,6 +595,7 @@ def run_client(
         t_start = perf_counter()
 
         # 【P3】先查能力再下发配置（严格拒绝模式：不匹配直接失败）
+        progress.set_stage("CONFIG")
         caps = query_caps(sock, stats)
         log_info(log, f"[CAPS] v{caps.version} read_bps={caps.read_bps} "
                       f"num_lc={caps.num_lc} stride={caps.stride} "
@@ -587,6 +603,7 @@ def run_client(
         task.validate_caps(caps)
         send_config(sock, stats, task, log=log)
 
+        progress.set_stage("WM")
         if config.skip_wm:
             log_info(log, "[1/4] Skipping watermark upload (user request)")
         else:
@@ -645,8 +662,11 @@ def run_client(
         if stop_requested():
             raise OperationCancelled("Operation cancelled")
 
-        progress.set_status("接收结果...")
-        progress.set_stage("RESULT")
+        progress.set_stage("LDPC")
+        expected = estimate_processing_time(source_reads, orient=config.orient)
+        progress.set_status(
+            f"等待板端片上 LDPC 运算与结果回传（预计约 {expected:.1f} 秒）..."
+        )
         t0 = perf_counter()
         result_size = recv_result(sock, stats, output_path, timeout=config.result_timeout)
         stats.t_result = perf_counter() - t0
@@ -723,11 +743,25 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--result-timeout", type=float, default=180.0,
                         help="等待板端结果的超时（秒）。板端处理期间静默，"
                              "所以这是整条流水线的时长上限；条数越多必须调得越大（默认 180）")
+    parser.add_argument(
+        "--input-bytes",
+        type=int,
+        default=None,
+        help="载荷字节数（1..6750）；省略时沿用 JPEG EOI 截断",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> None:
     args = _parse_args(argv)
+
+    if args.input_bytes is not None:
+        from native_ldpc import validate_input_bytes
+
+        try:
+            validate_input_bytes(args.input_bytes)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
 
     config = ClientConfig(
         ip=args.ip,
@@ -748,10 +782,36 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         result_timeout=args.result_timeout,
     )
 
-    stats = run_client(config, log=lambda msg: print(msg))
+    progress = ProgressCallbacks(
+        update_status=lambda message: print(f"[状态] {message}"),
+    )
+    stats = run_client(config, log=lambda msg: print(msg), progress=progress)
     print(format_metric_report(stats))
-    if not config.dry_run:
-        print(f"\n结果已保存到: {Path(config.out).resolve()}")
+    if config.dry_run or not config.post:
+        if not config.dry_run:
+            print("\n上传完成；未触发板端处理与结果校验。")
+        return
+
+    from ldpc_pipeline import BoardCodeRejected, verify_board_result
+
+    try:
+        verified = verify_board_result(
+            Path(config.out),
+            Path(config.out).resolve().parent,
+            input_bytes=args.input_bytes,
+            log=lambda message: print(message),
+        )
+    except BoardCodeRejected as exc:
+        print(
+            f"✗ 板端未纠对：{exc.failed_rows}/{exc.total_rows} 条校验行非零 —— 本用例失败",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    print(
+        f"✓ 板端已纠对（{verified.total_rows} 条校验行全零）；PC 端未做译码。"
+    )
+    print(f"载荷已保存到: {verified.payload_path}（{verified.payload_bytes} 字节）")
 
 
 if __name__ == "__main__":

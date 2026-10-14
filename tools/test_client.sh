@@ -6,9 +6,9 @@ cd "$REPO"
 
 CLIENT_DIR="$REPO/clients/python"
 TEST_DIR="$CLIENT_DIR/tests"
-MIN_TESTS=31
-# 25 个 P0 基线用例 + 本轮 3 个读出等价用例和 3 个真实 LDPC 后端判据 = 31。
-# 每次新增客户端测试都要同步提高该下限，防止新用例未被 discovery 收集。
+MIN_TESTS=28
+# unittest discovery 当前实测收集 28 项（含本轮 3 个板端校验/载荷判据）；
+# 此数来自最终输出的 “Ran 28 tests”，新增用例后须同步提高下限。
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT

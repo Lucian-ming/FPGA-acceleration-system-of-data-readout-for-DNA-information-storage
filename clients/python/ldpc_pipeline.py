@@ -1,44 +1,98 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""LDPC 译码流水线：默认原生 Python，外部 EXE 仅显式启用。"""
+"""板端片上 LDPC 结果的**校验与载荷提取** —— PC 端不做译码。
+
+架构决定（用户 2026-10-14，覆盖此前"多后端"的一切设计）
+--------------------------------------------------------
+**LDPC 译码全部由 FPGA 片上完成。PC 端若还需要"再译一次"，就说明板端没纠对，
+那是失败，不是让 PC 兜底。**
+
+因此本模块只做三件事，**没有任何迭代译码、没有任何后端可选**：
+
+  1. 把板端回传的结果解包（每字节 LSB 先）并**解交织**到自然序；
+  2. **校验 syndrome**：全部校验行 XOR 为 0 ⇒ 板端已把码字纠对，通过；
+     只要有一条非零 ⇒ 抛 BoardCodeRejected（板端未纠对，本用例失败）；
+  3. 从合法码字里取出信息位（natural[PARITY_COLS:]，54,000 bit），
+     按调用方给的字节数打包成载荷。
+
+为什么「校验不过就失败」是对的
+------------------------------
+片上译码器**只在 syndrome 全零时才收敛**（`ldpc_decoder_p1.v` 的
+`iteration_q >= MAX_ITER` 分支就是失败出口）；不收敛时固件**原样保留 Stage3 的输出**
+（`sw/app/ldpc_onchip.c`）。所以：
+
+    syndrome == 0   ⟺   板端确实把码字纠对了
+
+反过来，PC 拿到一个 syndrome 非零的缓冲还想"救一救"，那正是被明令禁止的兜底。
+
+为什么去掉 `hard_decode` 不改变任何结果
+---------------------------------------
+板端收敛时，`hard_decode` 本来就返回输入本身（0 轮迭代）——实测留证
+`g3_runs/20261014T113108Z/ldpc_run1.log` 记「起始失败校验 0，0 轮收敛」。
+逐位核对过：`natural[PARITY_COLS:]` ≡ `hard_decode` 输出的信息位 ≡ 当时落盘的
+`decoded_bits`。⇒ 本模块把"再译一遍"换成"校验一遍"，**载荷逐位不变，只是不再兜底**。
+
+`native_ldpc.hard_decode` 仍然存在——**离线工具**（数据集生成、黄金向量、
+`tools/ldpc_decode.py`）在用，但**不在客户端运行路径上**。
+"""
 
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
-from c_ldpc import (
-    decode_bits_c,
-    is_c_accel_available,
-    warn_windows_c_accel_unavailable,
+from native_ldpc import (
+    K_INFO,
+    N_BITS,
+    PARITY_COLS,
+    bits_to_payload_bytes,
+    deinterleave,
+    load_pchk,
+    load_permutation,
+    read_bit_text,
+    validate_input_bytes,
 )
-from native_ldpc import bits_to_jpeg_bytes, decode_file, read_bit_text
 
-DECODER_EXE = "R5_6_LDPC_hard_decoder.exe"
 DECODER_PCHK = "dvb_s2_r5_6.pchk"
 DECODER_PERM = "permutation64800"
-DECODER_DLLS = ("libstdc++-6.dll", "libgcc_s_seh-1.dll", "libwinpthread-1.dll")
 DEC_INPUT_NAME = "dec_input.txt"
-DECODER_OUTPUT_BITS = "TestBitStream.txt"
-DECODER_OUTPUT_IMAGE = "image.jpg"
-SUPPORTED_BACKENDS = ("auto", "c_accel", "native", "external")
+DECODED_BITS_NAME = "decoded_bits.txt"
+# 载荷不再叫 .jpg —— 它可能是图像、音频、视频、文本或任意二进制（见 docs 的 kind 分布）。
+PAYLOAD_NAME = "decoded_payload.bin"
+
+
+class BoardCodeRejected(RuntimeError):
+    """板端回传的不是合法码字 ⇒ 片上 LDPC 没纠对。**这是失败，不是让 PC 兜底。**"""
+
+    def __init__(self, failed_rows: int, total_rows: int) -> None:
+        self.failed_rows = failed_rows
+        self.total_rows = total_rows
+        super().__init__(
+            f"板端回传的码字校验不过：{failed_rows}/{total_rows} 条校验行非零。"
+            "片上 LDPC 没有收敛（固件此时原样保留 Stage3 的输出）。"
+            "按既定架构，PC 端不做译码兜底 —— 本用例判为失败。"
+        )
 
 
 @dataclass
-class LDPCResult:
-    """译码输出及实际使用的后端。"""
+class BoardVerifyResult:
+    """一次板端结果的校验与提取结果。"""
 
     result_path: Path
     dec_input_path: Path
     decoded_bits_path: Path
-    image_path: Path
-    backend: str
+    payload_path: Path
+    payload_bytes: int
+    failed_rows: int
+    total_rows: int
+
+    @property
+    def verified(self) -> bool:
+        return self.failed_rows == 0
 
 
 def _bundle_root() -> Path:
@@ -69,187 +123,91 @@ def _copy_resource(target_dir: Path, filename: str) -> Path:
     return target
 
 
-def _write_dec_input(result_bits_path: Path, output_dir: Path) -> tuple[str, Path]:
-    bits = read_bit_text(result_bits_path)
+def row_index(rows) -> tuple[np.ndarray, np.ndarray]:
+    """把稀疏校验矩阵压平成 (列号, 各段起点)，供一次 reduceat 算完全部校验行。"""
+    lengths = np.fromiter((len(r) for r in rows), dtype=np.int64, count=len(rows))
+    flat = np.concatenate([np.asarray(r, dtype=np.int64) for r in rows])
+    starts = np.zeros(len(rows), dtype=np.int64)
+    np.cumsum(lengths[:-1], out=starts[1:])
+    return flat, starts
+
+
+def syndrome_failures(natural: np.ndarray, flat: np.ndarray, starts: np.ndarray) -> int:
+    """返回非零校验行的条数。0 表示这是一个合法码字（板端已纠对）。"""
+    parity = np.bitwise_xor.reduceat(natural[flat], starts)
+    return int(np.count_nonzero(parity))
+
+
+def verify_board_result(
+    result_bits_path: Path,
+    output_dir: Path,
+    input_bytes: Optional[int] = None,
+    log: Optional[Callable[[str], None]] = None,
+) -> BoardVerifyResult:
+    """校验板端回传的码字并提取载荷。
+
+    :param result_bits_path: 板端回传解包后的 64,800 个 0/1 位（即 dec_input.txt）
+    :param input_bytes: 载荷字节数。给了按此截断；不给按 JPEG EOI 截断（沿用 R0.83 判据）。
+    :raises BoardCodeRejected: syndrome 非零 —— 板端没纠对，本用例失败。
+    """
+    emit = log or (lambda _msg: None)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    bits = read_bit_text(result_bits_path, expected_bits=N_BITS)
+    rx = np.frombuffer(bits.encode("ascii"), dtype=np.uint8) - ord("0")
+
     if result_bits_path.name == DEC_INPUT_NAME and result_bits_path.parent.resolve() == output_dir.resolve():
         dec_input_path = result_bits_path
     else:
         dec_input_path = output_dir / DEC_INPUT_NAME
         dec_input_path.write_text(bits, encoding="utf-8")
-    return bits, dec_input_path
 
+    permutation = load_permutation(resource_path(DECODER_PERM))
+    rows = load_pchk(resource_path(DECODER_PCHK))
+    flat, starts = row_index(rows)
 
-def _run_native(
-    result_bits_path: Path,
-    output_dir: Path,
-    dec_input_path: Path,
-    log: Callable[[str], None],
-) -> LDPCResult:
-    pchk = resource_path(DECODER_PCHK)
-    permutation = resource_path(DECODER_PERM)
-    info, _codeword, failed, iterations = decode_file(
-        dec_input_path, pchk, permutation
-    )
+    natural = deinterleave(rx, permutation)
 
-    decoded_bits_path = output_dir / "decoded_bits.txt"
-    image_path = output_dir / "decoded_image.jpg"
-    decoded_bits_path.write_text("".join("01"[int(bit)] for bit in info), encoding="utf-8")
-    image_path.write_bytes(bits_to_jpeg_bytes(info))
-    log(f"[LDPC] native 收敛：起始失败校验 {failed}，迭代 {iterations} 轮")
-    log(f"[LDPC] 已保存解码比特 {decoded_bits_path}")
-    log(f"[LDPC] 已保存图像 {image_path}")
-    return LDPCResult(
+    failed = syndrome_failures(natural, flat, starts)
+    if failed:
+        emit(f"[板端校验] ✗ 校验行非零 {failed}/{len(rows)} —— 片上 LDPC 未纠对")
+        raise BoardCodeRejected(failed, len(rows))
+    emit(f"[板端校验] ✓ {len(rows)} 条校验行全为零 —— 板端已纠对；PC 端不做任何译码")
+
+    info = natural[PARITY_COLS:]
+    if input_bytes is not None:
+        validate_input_bytes(input_bytes, int(info.size))
+
+    decoded_bits_path = output_dir / DECODED_BITS_NAME
+    decoded_bits_path.write_text("".join("01"[int(b)] for b in info), encoding="utf-8")
+
+    payload = bits_to_payload_bytes(info, input_bytes)
+    payload_path = output_dir / PAYLOAD_NAME
+    payload_path.write_bytes(payload)
+    emit(f"[板端校验] 已保存信息位 {decoded_bits_path}（{K_INFO} bit）")
+    emit(f"[板端校验] 已保存载荷 {payload_path}（{len(payload)} 字节）")
+
+    return BoardVerifyResult(
         result_path=result_bits_path,
         dec_input_path=dec_input_path,
         decoded_bits_path=decoded_bits_path,
-        image_path=image_path,
-        backend="native",
+        payload_path=payload_path,
+        payload_bytes=len(payload),
+        failed_rows=0,
+        total_rows=len(rows),
     )
 
 
-def _run_c_accel(
-    result_bits_path: Path,
-    output_dir: Path,
-    dec_input_path: Path,
-    log: Callable[[str], None],
-) -> LDPCResult:
-    pchk = resource_path(DECODER_PCHK)
-    permutation = resource_path(DECODER_PERM)
-    bits = read_bit_text(dec_input_path)
-    rx = np.frombuffer(bits.encode("ascii"), dtype=np.uint8) - ord("0")
-
-    info, failed, iterations = decode_bits_c(rx, pchk, permutation)
-
-    decoded_bits_path = output_dir / "decoded_bits.txt"
-    image_path = output_dir / "decoded_image.jpg"
-    decoded_bits_path.write_text("".join("01"[int(bit)] for bit in info), encoding="utf-8")
-    image_path.write_bytes(bits_to_jpeg_bytes(info))
-    log(f"[LDPC] c_accel 极速收敛：起始失败校验 {failed}，迭代 {iterations} 轮")
-    log(f"[LDPC] 已保存解码比特 {decoded_bits_path}")
-    log(f"[LDPC] 已保存图像 {image_path}")
-    return LDPCResult(
-        result_path=result_bits_path,
-        dec_input_path=dec_input_path,
-        decoded_bits_path=decoded_bits_path,
-        image_path=image_path,
-        backend="c_accel",
-    )
-
-
-def _run_external(
-    result_bits_path: Path,
-    output_dir: Path,
-    dec_input_path: Path,
-    bits: str,
-    log: Callable[[str], None],
-) -> LDPCResult:
-    workspace = Path(tempfile.mkdtemp(prefix="ldpc_", dir=output_dir))
-    log(f"[LDPC] external 工作目录: {workspace}")
+if __name__ == "__main__":  # pragma: no cover - 便于手工排查
+    if len(sys.argv) < 2:
+        print("用法: ldpc_pipeline.py <dec_input.txt> [输出目录] [载荷字节数]", file=sys.stderr)
+        raise SystemExit(2)
+    _src = Path(sys.argv[1])
+    _out = Path(sys.argv[2]) if len(sys.argv) > 2 else _src.parent
+    _n = int(sys.argv[3]) if len(sys.argv) > 3 else None
     try:
-        decoder_exe = _copy_resource(workspace, DECODER_EXE)
-        _copy_resource(workspace, DECODER_PCHK)
-        _copy_resource(workspace, DECODER_PERM)
-        missing_dlls = []
-        for name in DECODER_DLLS:
-            try:
-                resource_path(name)
-            except FileNotFoundError:
-                missing_dlls.append(name)
-        if missing_dlls:
-            raise FileNotFoundError(
-                "external LDPC 缺少 MinGW 运行时: " + ", ".join(missing_dlls)
-            )
-        for dll in DECODER_DLLS:
-            _copy_resource(workspace, dll)
-
-        (workspace / DEC_INPUT_NAME).write_text(bits, encoding="utf-8")
-        command = [
-            str(decoder_exe),
-            DEC_INPUT_NAME,
-            DECODER_OUTPUT_BITS,
-            DECODER_OUTPUT_IMAGE,
-            "H",
-        ]
-        log(f"[LDPC] 运行 external 后端: {' '.join(command)}")
-        try:
-            process = subprocess.run(
-                command,
-                cwd=workspace,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except OSError as exc:
-            raise RuntimeError(f"external LDPC 无法启动: {exc}") from exc
-        if process.returncode != 0:
-            detail = process.stderr.strip() or process.stdout.strip()
-            raise RuntimeError(f"external LDPC 失败 (exit={process.returncode}): {detail}")
-
-        decoded_source = workspace / DECODER_OUTPUT_BITS
-        image_source = workspace / DECODER_OUTPUT_IMAGE
-        if not decoded_source.is_file() or not image_source.is_file():
-            raise RuntimeError("external LDPC 已退出但未生成解码比特或图像")
-
-        decoded_bits_path = output_dir / "decoded_bits.txt"
-        image_path = output_dir / "decoded_image.jpg"
-        shutil.copy2(decoded_source, decoded_bits_path)
-        shutil.copy2(image_source, image_path)
-        return LDPCResult(
-            result_path=result_bits_path,
-            dec_input_path=dec_input_path,
-            decoded_bits_path=decoded_bits_path,
-            image_path=image_path,
-            backend="external",
-        )
-    finally:
-        shutil.rmtree(workspace, ignore_errors=True)
-
-
-def run_ldpc_decoder(
-    result_bits_path: Path,
-    *,
-    output_dir: Path,
-    backend: str = "auto",
-    log: Optional[Callable[[str], None]] = None,
-) -> LDPCResult:
-    """译码板端回传。
-
-    auto 与 native 都使用仓库内的可审计 Python 实现；只有显式指定
-    external 才会运行 Windows EXE，绝不静默回退。
-    """
-    if backend not in SUPPORTED_BACKENDS:
-        raise ValueError(f"未知 LDPC backend={backend!r}，可选 {SUPPORTED_BACKENDS}")
-    if not result_bits_path.is_file():
-        raise FileNotFoundError(f"结果文件不存在: {result_bits_path}")
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    emit = log or (lambda _message: None)
-    bits, dec_input_path = _write_dec_input(result_bits_path, output_dir)
-
-    windows_c_accel_missing = False
-    if backend == "auto":
-        c_accel_available = is_c_accel_available()
-        selected = "c_accel" if c_accel_available else "native"
-        windows_c_accel_missing = sys.platform == "win32" and not c_accel_available
-        if windows_c_accel_missing:
-            warn_windows_c_accel_unavailable(log)
-    else:
-        selected = backend
-
-    emit(f"[LDPC] 后端: {selected} (请求模式: {backend})")
-    emit(f"[LDPC] 输入: {result_bits_path} ({len(bits)} bit)")
-
-    if selected == "c_accel":
-        try:
-            return _run_c_accel(result_bits_path, output_dir, dec_input_path, emit)
-        except Exception as exc:
-            if backend == "auto":
-                emit(f"[LDPC] 警告: c_accel 运行异常 ({exc})，自动降级至 native 解释执行")
-                return _run_native(result_bits_path, output_dir, dec_input_path, emit)
-            raise
-    elif selected == "native":
-        result = _run_native(result_bits_path, output_dir, dec_input_path, emit)
-        if windows_c_accel_missing:
-            result.backend = "native (Windows c_accel unavailable)"
-        return result
-    return _run_external(result_bits_path, output_dir, dec_input_path, bits, emit)
+        _res = verify_board_result(_src, _out, _n, log=lambda m: print(m))
+    except BoardCodeRejected as _exc:
+        print(f"FAIL: {_exc}", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"OK: 载荷 {_res.payload_bytes} 字节 -> {_res.payload_path}")

@@ -10,7 +10,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 REPO = Path(__file__).resolve().parents[3]
 CLIENT = REPO / "clients" / "python"
@@ -169,33 +168,70 @@ class NetworkProtocolTests(unittest.TestCase):
         self.assertEqual(config_sock.sent[2], protocol.PKT_CONFIG)
 
 
-class LDPCBackendTests(unittest.TestCase):
-    def test_auto_selects_native_only(self) -> None:
+class BoardLDPCVerificationTests(unittest.TestCase):
+    """板端必须完成 LDPC；PC 端只验证 syndrome 并提取载荷。"""
+
+    PASS_RESULT = Path(
+        "/mnt/d/bkb220_board_smoke/g3_runs/20261014T113108Z/dec_input_run1.txt"
+    )
+    REJECT_RESULT = Path(
+        "/mnt/d/bkb220_board_smoke/g3_runs/20261014T110319Z/dec_input_run1.txt"
+    )
+    EXPECTED_PAYLOAD_SHA256 = (
+        "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
+    )
+
+    def _require_board_evidence(self, path: Path, label: str) -> Path:
+        try:
+            if not path.is_file() or not path.stat().st_size:
+                raise OSError("文件不存在或为空")
+            with path.open("rb") as evidence:
+                evidence.read(1)
+        except OSError as exc:
+            reason = f"板端留证不可用，跳过 {label}：{path}（{exc}）"
+            print(f"SKIP: {reason}", flush=True)
+            self.skipTest(reason)
+        return path
+
+    def test_board_corrected_code_passes_and_extracts_reference_payload(self) -> None:
+        source = self._require_board_evidence(self.PASS_RESULT, "板端已纠对判据")
+        with tempfile.TemporaryDirectory() as directory:
+            result = ldpc_pipeline.verify_board_result(source, Path(directory))
+            payload = result.payload_path.read_bytes()
+
+        self.assertTrue(result.verified)
+        self.assertEqual(result.failed_rows, 0)
+        self.assertEqual(result.payload_bytes, len(payload))
+        self.assertTrue(payload.endswith(b"\xff\xd9"), "无 input_bytes 时应按 JPEG EOI 截断")
+        self.assertEqual(
+            hashlib.sha256(payload).hexdigest(), self.EXPECTED_PAYLOAD_SHA256
+        )
+
+    def test_board_uncorrected_code_is_rejected_without_host_fallback(self) -> None:
+        source = self._require_board_evidence(self.REJECT_RESULT, "板端未纠对判据")
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ldpc_pipeline.BoardCodeRejected) as raised:
+                ldpc_pipeline.verify_board_result(source, Path(directory))
+
+        self.assertEqual(raised.exception.failed_rows, 332)
+        self.assertGreater(raised.exception.total_rows, 332)
+
+    def test_input_bytes_truncates_payload_and_omission_keeps_jpeg_eoi(self) -> None:
+        source = self._require_board_evidence(self.PASS_RESULT, "载荷字节数判据")
+        requested_bytes = 37
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            source = root / "result.txt"
-            source.write_text("0" * 64_800, encoding="utf-8")
-            expected_c = ldpc_pipeline.LDPCResult(
-                source, root / "dec_input.txt", root / "decoded_bits.txt",
-                root / "decoded_image.jpg", "c_accel"
+            jpeg_result = ldpc_pipeline.verify_board_result(source, root / "jpeg")
+            jpeg_payload = jpeg_result.payload_path.read_bytes()
+            binary_result = ldpc_pipeline.verify_board_result(
+                source, root / "binary", input_bytes=requested_bytes
             )
-            expected_native = ldpc_pipeline.LDPCResult(
-                source, root / "dec_input.txt", root / "decoded_bits.txt",
-                root / "decoded_image.jpg", "native"
-            )
-            # 1. 当 C 加速器存在时，auto 优先选用 c_accel
-            with mock.patch.object(ldpc_pipeline, "is_c_accel_available", return_value=True), \
-                    mock.patch.object(ldpc_pipeline, "_run_c_accel", return_value=expected_c) as run_c:
-                res_c = ldpc_pipeline.run_ldpc_decoder(source, output_dir=root, backend="auto")
-                self.assertEqual(res_c.backend, "c_accel")
-                run_c.assert_called_once()
+            binary_payload = binary_result.payload_path.read_bytes()
 
-            # 2. 当 C 加速器缺失时，auto 优雅降级至 native
-            with mock.patch.object(ldpc_pipeline, "is_c_accel_available", return_value=False), \
-                    mock.patch.object(ldpc_pipeline, "_run_native", return_value=expected_native) as run_nat:
-                res_nat = ldpc_pipeline.run_ldpc_decoder(source, output_dir=root, backend="auto")
-                self.assertEqual(res_nat.backend, "native")
-                run_nat.assert_called_once()
+        self.assertTrue(jpeg_payload.endswith(b"\xff\xd9"))
+        self.assertEqual(binary_result.payload_bytes, requested_bytes)
+        self.assertEqual(len(binary_payload), requested_bytes)
+        self.assertEqual(binary_payload, jpeg_payload[:requested_bytes])
 
 
 class ReadoutEquivalenceTests(unittest.TestCase):
@@ -354,106 +390,6 @@ class ReadoutEquivalenceTests(unittest.TestCase):
             )
 
 
-class LDPCBackendCrossCheckTests(unittest.TestCase):
-    """用仓库黄金输入实际运行可用后端并比较解码载荷 SHA-256。"""
-
-    DEC_INPUT = REPO / "tests" / "golden" / "se250" / "dec_input.txt"
-    RESOURCE_DIR = CLIENT / "resources"
-    EXTERNAL_FILES = (
-        "R5_6_LDPC_hard_decoder.exe",
-        "libstdc++-6.dll",
-        "libgcc_s_seh-1.dll",
-        "libwinpthread-1.dll",
-    )
-
-    @staticmethod
-    def _decoded_payload(path: Path) -> bytes:
-        """将文本位串或 0/1 字节载荷规范化为逐位 ASCII 载荷。"""
-        raw = path.read_bytes()
-        text_chars = set(b"01 \t\r\n")
-        if set(raw).issubset(text_chars):
-            payload = bytes(value for value in raw if value in (ord("0"), ord("1")))
-        elif set(raw).issubset({0, 1}):
-            payload = bytes(value + ord("0") for value in raw)
-        else:
-            raise AssertionError(
-                f"无法识别 {path} 的解码载荷格式（{len(raw)} bytes）"
-            )
-        if len(payload) != 54_000:
-            raise AssertionError(
-                f"{path} 应有 54,000 个解码位，实得 {len(payload)}"
-            )
-        return payload
-
-    def _run_backend(self, backend: str, output_dir: Path) -> str:
-        result = ldpc_pipeline.run_ldpc_decoder(
-            self.DEC_INPUT,
-            output_dir=output_dir,
-            backend=backend,
-        )
-        self.assertEqual(result.backend, backend)
-        payload = self._decoded_payload(result.decoded_bits_path)
-        digest = hashlib.sha256(payload).hexdigest()
-        print(
-            f"PASS: LDPC backend={backend} payload_bits={len(payload)} "
-            f"sha256={digest}"
-        )
-        return digest
-
-    def test_native_backend_runs_on_golden_input(self) -> None:
-        self.assertTrue(self.DEC_INPUT.is_file(), f"缺少 LDPC 黄金输入: {self.DEC_INPUT}")
-        input_sha = hashlib.sha256(self.DEC_INPUT.read_bytes()).hexdigest()
-        print(f"LDPC cross-check input={self.DEC_INPUT.name} sha256={input_sha}")
-        with tempfile.TemporaryDirectory() as directory:
-            self._run_backend("native", Path(directory) / "native")
-
-    def test_c_accel_payload_sha_matches_native_when_library_exists(self) -> None:
-        c_library = self.RESOURCE_DIR / "libc_ldpc.so"
-        if not c_library.is_file():
-            reason = f"缺少 {c_library}"
-            print(f"SKIP: LDPC backend=c_accel：{reason}")
-            self.skipTest(reason)
-
-        self.assertTrue(
-            ldpc_pipeline.is_c_accel_available(),
-            "libc_ldpc.so 存在但 c_accel 无法加载，必须修复而不能跳过",
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            native_sha = self._run_backend("native", root / "native")
-            c_sha = self._run_backend("c_accel", root / "c_accel")
-        self.assertEqual(
-            c_sha, native_sha,
-            "真实 c_accel 与 native 解码载荷 SHA-256 不同",
-        )
-
-    def test_external_payload_sha_matches_native_when_runnable(self) -> None:
-        missing = [
-            name for name in self.EXTERNAL_FILES
-            if not (self.RESOURCE_DIR / name).is_file()
-        ]
-        if missing:
-            reason = "resources 不完整，缺少 " + ", ".join(missing)
-            print(f"SKIP: LDPC backend=external：{reason}")
-            self.skipTest(reason)
-        if sys.platform != "win32":
-            reason = (
-                f"当前宿主为 {sys.platform}，resources 中是 Windows PE EXE；"
-                "该执行环境不能直接启动此 EXE"
-            )
-            print(f"SKIP: LDPC backend=external：{reason}")
-            self.skipTest(reason)
-
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            native_sha = self._run_backend("native", root / "native")
-            external_sha = self._run_backend("external", root / "external")
-        self.assertEqual(
-            external_sha, native_sha,
-            "真实 external 与 native 解码载荷 SHA-256 不同",
-        )
-
-
 class SE250GeometryTests(unittest.TestCase):
     """SE250（64,800 条 × 250 bp）的主机侧支持。
 
@@ -602,45 +538,9 @@ class SE250GeometryTests(unittest.TestCase):
             self.assertEqual(encoded[63], 0)
 
 
-class CLDPCAndAdaptivityTests(unittest.TestCase):
-    GOLDEN_SE250 = REPO / "tests" / "golden" / "se250"
+class ClientAdaptivityTests(unittest.TestCase):
     SE150_FASTQ = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
     SE250_FASTQ = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE250.fastq"
-
-    def test_c_accel_availability_and_bit_exactness(self) -> None:
-        """C 加速器必须可用且译码结果与黄金图片哈希 100% 逐位吻合。"""
-        import c_ldpc
-        self.assertTrue(c_ldpc.is_c_accel_available(), "libc_ldpc.so 应该存在且可被加载")
-
-        pchk = CLIENT / "resources" / "dvb_s2_r5_6.pchk"
-        perm = CLIENT / "resources" / "permutation64800"
-        dec_input = self.GOLDEN_SE250 / "dec_input.txt"
-
-        bits_str = ldpc_pipeline.read_bit_text(dec_input)
-        import numpy as np
-        rx = np.frombuffer(bits_str.encode("ascii"), dtype=np.uint8) - ord("0")
-
-        info, failed, iters = c_ldpc.decode_bits_c(rx, pchk, perm)
-        self.assertEqual(len(info), 54_000)
-        self.assertEqual(failed, 141)
-        self.assertEqual(iters, 45)
-
-        jpeg = ldpc_pipeline.bits_to_jpeg_bytes(info)
-        sha = hashlib.sha256(jpeg).hexdigest()
-        self.assertEqual(
-            sha,
-            "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3",
-            "C 加速器译码图片哈希必须与 R0.83 黄金标准完全逐位相同",
-        )
-
-    def test_ldpc_pipeline_auto_selects_c_accel(self) -> None:
-        """ldpc_pipeline 在 auto 模式下优先选用 c_accel。"""
-        dec_input = self.GOLDEN_SE250 / "dec_input.txt"
-        with tempfile.TemporaryDirectory() as tmpdir:
-            res = ldpc_pipeline.run_ldpc_decoder(dec_input, output_dir=Path(tmpdir), backend="auto")
-            self.assertEqual(res.backend, "c_accel")
-            self.assertTrue(res.decoded_bits_path.is_file())
-            self.assertTrue(res.image_path.is_file())
 
     @unittest.skipUnless(SE150_FASTQ.exists() and SE250_FASTQ.exists(), "缺少 data/R0.83_data 时跳过")
     def test_reads_adaptive_detection_and_estimation(self) -> None:
@@ -649,13 +549,13 @@ class CLDPCAndAdaptivityTests(unittest.TestCase):
         self.assertEqual(info150.total_reads, 51_781)
         self.assertEqual(info150.detected_read_bps, 150)
         self.assertEqual(info150.suggested_score_min, 67)
-        self.assertAlmostEqual(info150.estimated_seconds, 102.24, delta=0.5)
+        self.assertAlmostEqual(info150.estimated_seconds, 5.877, delta=0.01)
 
         info250 = first.analyze_reads_file(self.SE250_FASTQ)
         self.assertEqual(info250.total_reads, 64_800)
         self.assertEqual(info250.detected_read_bps, 250)
         self.assertEqual(info250.suggested_score_min, 112)
-        self.assertAlmostEqual(info250.estimated_seconds, 126.70, delta=0.5)
+        self.assertAlmostEqual(info250.estimated_seconds, 7.247, delta=0.001)
 
 
 if __name__ == "__main__":
