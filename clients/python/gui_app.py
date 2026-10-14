@@ -35,7 +35,12 @@ import threading
 import time
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional
+
+# 确保脚本所在目录位于模块搜索路径首位，方便引用同级模块
+CLIENTS_PY_DIR = Path(__file__).resolve().parent
+if str(CLIENTS_PY_DIR) not in sys.path:
+    sys.path.insert(0, str(CLIENTS_PY_DIR))
 
 try:
     import tkinter as tk
@@ -66,6 +71,50 @@ from first import (
 from ldpc_pipeline import BoardCodeRejected, BoardVerifyResult, verify_board_result
 from native_ldpc import MAX_PAYLOAD_BYTES
 from task_protocol import SUPPORTED_READ_BASES, default_score_min
+
+from ui_theme import (
+    COLOR_BORDER,
+    COLOR_BORDER_LIGHT,
+    COLOR_CARD_ALT,
+    COLOR_CARD_BG,
+    COLOR_DANGER,
+    COLOR_DANGER_BG,
+    COLOR_DANGER_BORDER,
+    COLOR_DANGER_HOVER,
+    COLOR_DANGER_TEXT,
+    COLOR_HEADER_BG,
+    COLOR_INFO,
+    COLOR_INFO_BG,
+    COLOR_PRIMARY,
+    COLOR_PRIMARY_BG,
+    COLOR_PRIMARY_BORDER,
+    COLOR_PRIMARY_HOVER,
+    COLOR_SUCCESS,
+    COLOR_SUCCESS_BG,
+    COLOR_SUCCESS_BORDER,
+    COLOR_SUCCESS_TEXT,
+    COLOR_TEXT_MUTED,
+    COLOR_TEXT_PRIMARY,
+    COLOR_TEXT_SECONDARY,
+    COLOR_WARNING,
+    COLOR_WARNING_BG,
+    COLOR_WARNING_TEXT,
+    COLOR_WINDOW_BG,
+    LOG_TAG_COLORS,
+    LOG_TERMINAL_BG,
+    LOG_TERMINAL_FG,
+    LOG_TERMINAL_SELECT,
+    STEP_PALETTE,
+    FontRegistry,
+    RoundedButton,
+    RoundedCard,
+    RoundedMetricTile,
+    RoundedPill,
+    RoundedStatusBanner,
+    apply_modern_theme,
+    center_window,
+    draw_rounded_rect,
+)
 
 try:
     from PIL import Image, ImageTk
@@ -124,13 +173,11 @@ def detect_payload_media_type(payload: bytes) -> str:
 
 
 class DNAAcceleratorApp(tk.Tk):
-    """工业级 DNA 加速系统控制台主窗口。"""
+    """工业级 DNA 加速系统控制台主窗口 (现代化柔和圆角视觉与交互系统)。"""
 
     def __init__(self) -> None:
         super().__init__()
         self.title("FPGA DNA 数据读出硬件加速系统 - 工业控制台")
-        self.geometry("1180x820")
-        self.minsize(980, 720)
 
         # 运行时状态 ----------------------------------------------------
         self._defaults = ClientConfig()
@@ -185,8 +232,14 @@ class DNAAcceleratorApp(tk.Tk):
         self.metric_total_var = tk.StringVar(value="--")
         self.payload_hash_var = tk.StringVar(value="--")
 
+        # 步进器标题缓存
+        self._step_titles: Dict[str, str] = {token: title for token, title in PIPELINE_STAGES}
+
+        # 现代化主题、字体注册与高分屏居中初始化
+        self.fonts: FontRegistry = apply_modern_theme(self)
+        center_window(self, width=1240, height=860)
+
         # 界面构建
-        self._setup_styles()
         self._build_ui()
         self._process_log_queue()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -194,71 +247,154 @@ class DNAAcceleratorApp(tk.Tk):
         # 启动后尝试探测默认文件
         self.after(300, self._auto_detect_default_reads)
 
-    def _setup_styles(self) -> None:
-        style = ttk.Style(self)
-        # 支持的主题回退
-        themes = style.theme_names()
-        if "clam" in themes:
-            style.theme_use("clam")
-
-        style.configure("Header.TLabel", font=("Helvetica", 11, "bold"))
-        style.configure("Badge.TLabel", font=("Helvetica", 10, "bold"), foreground="#0d47a1")
-        style.configure("Timer.TLabel", font=("Courier", 14, "bold"), foreground="#1565c0")
-        style.configure("MetricVal.TLabel", font=("Helvetica", 11, "bold"), foreground="#2e7d32")
-        style.configure("Accent.TButton", font=("Helvetica", 10, "bold"))
-        style.configure("Failure.TLabel", foreground="#c62828")
-        style.configure("Success.TLabel", foreground="#2e7d32")
-
     def _build_ui(self) -> None:
-        container = ttk.Frame(self, padding=8)
+        """构建整体用户界面布局。"""
+        container = ttk.Frame(self, style="Window.TFrame", padding=10)
         container.pack(fill="both", expand=True)
 
-        # 左右分栏
+        # 顶部品牌标头栏
+        self._build_header_bar(container)
+
+        # 左右分栏面板
         paned = ttk.PanedWindow(container, orient="horizontal")
         paned.pack(fill="both", expand=True)
 
-        # 左侧控制面板
-        left_frame = ttk.Frame(paned, padding=6)
+        # 左侧控制面板 (权重 3)
+        left_frame = ttk.Frame(paned, style="Window.TFrame", padding=4)
         paned.add(left_frame, weight=3)
 
-        # 右侧结果与监控面板
-        right_frame = ttk.Frame(paned, padding=6)
+        # 右侧结果与监控面板 (权重 4)
+        right_frame = ttk.Frame(paned, style="Window.TFrame", padding=4)
         paned.add(right_frame, weight=4)
 
-        # 构建左侧
+        # 构建左侧各功能卡片
         self._build_conn_card(left_frame)
         self._build_files_card(left_frame)
         self._build_params_card(left_frame)
         self._build_action_card(left_frame)
 
-        # 构建右侧
+        # 构建右侧各监控卡片
         self._build_pipeline_card(right_frame)
         self._build_preview_card(right_frame)
         self._build_log_card(right_frame)
 
+        # 确保初始分栏比例协调 (左侧 ~490px, 右侧充分展示流水线与日志)
+        self.after(50, lambda: paned.sashpos(0, 490))
+
+    def _build_header_bar(self, parent: ttk.Frame) -> None:
+        """顶部现代化系统标头栏，展现产品标识与实时总览状态。"""
+        header_card = RoundedCard(
+            parent,
+            title="",
+            radius=12,
+            bg_color=COLOR_HEADER_BG,
+            border_color=COLOR_BORDER_LIGHT,
+            auto_height=True,
+            padding=10,
+        )
+        header_card.pack(fill="x", pady=(0, 8))
+
+        inner = header_card.inner
+
+        # 左侧标题与副标题
+        left_box = tk.Frame(inner, bg=COLOR_HEADER_BG)
+        left_box.pack(side="left")
+
+        title_lbl = tk.Label(
+            left_box,
+            text="FPGA DNA 数据读出硬件加速系统",
+            bg=COLOR_HEADER_BG,
+            fg=COLOR_TEXT_PRIMARY,
+            font=self.fonts.app_title,
+        )
+        title_lbl.pack(anchor="w")
+
+        sub_lbl = tk.Label(
+            left_box,
+            text="上位机控制台 | SE150 / SE250 双几何自适应流水线 · 软硬件全流程闭环验证",
+            bg=COLOR_HEADER_BG,
+            fg=COLOR_TEXT_SECONDARY,
+            font=self.fonts.caption,
+        )
+        sub_lbl.pack(anchor="w")
+
+        # 右侧状态徽章 (柔和圆角胶囊组件)
+        right_box = tk.Frame(inner, bg=COLOR_HEADER_BG)
+        right_box.pack(side="right", fill="y")
+
+        self.top_status_badge = RoundedPill(
+            right_box,
+            text="系统就绪",
+            bg_color=COLOR_CARD_ALT,
+            fg_color=COLOR_TEXT_SECONDARY,
+            border_color=COLOR_BORDER_LIGHT,
+            font=self.fonts.body_bold,
+            radius=10,
+            height=28,
+            width=116,
+        )
+        self.top_status_badge.pack(side="right", padx=(8, 0))
+
+        profile_badge = RoundedPill(
+            right_box,
+            text="R0.83 Baseline",
+            bg_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_PRIMARY,
+            border_color=COLOR_PRIMARY_BORDER,
+            font=self.fonts.caption_bold,
+            radius=10,
+            height=28,
+            width=110,
+        )
+        profile_badge.pack(side="right")
+
     # ------------------------------------------------------------- 左侧构建
     def _build_conn_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="板端连接配置", padding=8)
+        card = RoundedCard(parent, title="板端连接配置", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
-        row1 = ttk.Frame(card)
+        row1 = ttk.Frame(card.inner)
         row1.pack(fill="x")
 
         ttk.Label(row1, text="IP 地址:").pack(side="left")
-        ttk.Entry(row1, textvariable=self.ip_var, width=16).pack(side="left", padx=(4, 12))
+        ttk.Entry(row1, textvariable=self.ip_var, width=15).pack(side="left", padx=(4, 10))
 
         ttk.Label(row1, text="端口:").pack(side="left")
-        ttk.Entry(row1, textvariable=self.port_var, width=8).pack(side="left", padx=(4, 12))
+        ttk.Entry(row1, textvariable=self.port_var, width=7).pack(side="left", padx=(4, 10))
 
-        ttk.Button(row1, text="测试连接", command=self._test_connection).pack(side="left", padx=4)
-        ttk.Label(row1, textvariable=self.conn_status_var, font=("Helvetica", 9)).pack(side="left", padx=6)
+        RoundedButton(
+            row1,
+            text="测试连接",
+            command=self._test_connection,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=80,
+            height=28,
+            font=self.fonts.body,
+        ).pack(side="left", padx=(0, 6))
+
+        self.conn_badge = RoundedPill(
+            row1,
+            text="未检测连接",
+            bg_color=COLOR_CARD_ALT,
+            fg_color=COLOR_TEXT_SECONDARY,
+            border_color=COLOR_BORDER_LIGHT,
+            font=self.fonts.caption,
+            radius=8,
+            height=26,
+            width=92,
+        )
+        self.conn_badge.pack(side="left", padx=2)
 
     def _build_files_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="数据源与自适应探测", padding=8)
+        card = RoundedCard(parent, title="数据源与自适应探测", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
         # 文件选择网格
-        grid = ttk.Frame(card)
+        grid = ttk.Frame(card.inner)
         grid.pack(fill="x")
         grid.columnconfigure(1, weight=1)
 
@@ -266,35 +402,79 @@ class DNAAcceleratorApp(tk.Tk):
         self._add_file_row(grid, 1, "测序 Reads", self.reads_var, self._choose_reads)
         self._add_file_row(grid, 2, "输出目录", self.output_var, self._choose_output)
 
-        # 探测结果徽章横幅
-        badge_box = ttk.Frame(card, padding=(4, 6, 4, 4))
-        badge_box.pack(fill="x", pady=(6, 0))
-
-        ttk.Label(badge_box, text="数据规格:").grid(row=0, column=0, sticky="w")
-        ttk.Label(badge_box, textvariable=self.spec_badge_var, style="Badge.TLabel").grid(
-            row=0, column=1, sticky="w", padx=(6, 0)
+        # 探测结果现代柔和圆角横幅
+        badge_box = RoundedCard(
+            card.inner,
+            title="",
+            radius=8,
+            bg_color=COLOR_PRIMARY_BG,
+            border_color=COLOR_PRIMARY_BORDER,
+            auto_height=True,
+            padding=8,
         )
+        badge_box.pack(fill="x", pady=(8, 0))
+        badge_inner = badge_box.inner
+        badge_inner.columnconfigure(1, weight=1)
 
-        ttk.Label(badge_box, text="预计硬件耗时:").grid(row=1, column=0, sticky="w", pady=(4, 0))
-        ttk.Label(badge_box, textvariable=self.est_time_var, font=("Helvetica", 9, "bold")).grid(
-            row=1, column=1, sticky="w", padx=(6, 0), pady=(4, 0)
-        )
+        tk.Label(
+            badge_inner,
+            text="数据规格:",
+            bg=COLOR_PRIMARY_BG,
+            fg=COLOR_PRIMARY,
+            font=self.fonts.body_bold,
+        ).grid(row=0, column=0, sticky="w", padx=(6, 4), pady=(4, 2))
 
-        btn_box = ttk.Frame(badge_box)
-        btn_box.grid(row=0, column=2, rowspan=2, sticky="e", padx=(10, 0))
-        ttk.Button(btn_box, text="重新探测", command=self._manual_detect_reads).pack(side="right")
+        tk.Label(
+            badge_inner,
+            textvariable=self.spec_badge_var,
+            bg=COLOR_PRIMARY_BG,
+            fg=COLOR_PRIMARY,
+            font=self.fonts.body_bold,
+        ).grid(row=0, column=1, sticky="w", padx=4, pady=(4, 2))
+
+        tk.Label(
+            badge_inner,
+            text="预计硬件耗时:",
+            bg=COLOR_PRIMARY_BG,
+            fg=COLOR_TEXT_SECONDARY,
+            font=self.fonts.caption,
+        ).grid(row=1, column=0, sticky="w", padx=(6, 4), pady=(0, 4))
+
+        tk.Label(
+            badge_inner,
+            textvariable=self.est_time_var,
+            bg=COLOR_PRIMARY_BG,
+            fg=COLOR_TEXT_PRIMARY,
+            font=self.fonts.caption_bold,
+        ).grid(row=1, column=1, sticky="w", padx=4, pady=(0, 4))
+
+        btn_box = tk.Frame(badge_inner, bg=COLOR_PRIMARY_BG)
+        btn_box.grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 4))
+        RoundedButton(
+            btn_box,
+            text="重新探测",
+            command=self._manual_detect_reads,
+            bg_color=COLOR_CARD_BG,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_PRIMARY,
+            border_color=COLOR_PRIMARY_BORDER,
+            radius=6,
+            width=76,
+            height=28,
+            font=self.fonts.caption_bold,
+        ).pack(side="right")
 
     def _build_params_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="自适应流水线参数", padding=8)
+        card = RoundedCard(parent, title="自适应流水线参数", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
-        g = ttk.Frame(card)
+        g = ttk.Frame(card.inner)
         g.pack(fill="x")
         g.columnconfigure(1, weight=1)
         g.columnconfigure(3, weight=1)
 
         # 几何模式与读长
-        ttk.Label(g, text="几何规格:").grid(row=0, column=0, sticky="w", pady=3)
+        ttk.Label(g, text="几何规格:").grid(row=0, column=0, sticky="w", pady=4)
         geom_cb = ttk.Combobox(
             g,
             textvariable=self.geom_mode_var,
@@ -302,18 +482,30 @@ class DNAAcceleratorApp(tk.Tk):
             state="readonly",
             width=14,
         )
-        geom_cb.grid(row=0, column=1, sticky="w", padx=(4, 8), pady=3)
+        geom_cb.grid(row=0, column=1, sticky="w", padx=(4, 8), pady=4)
         geom_cb.bind("<<ComboboxSelected>>", self._on_geom_changed)
 
         # 匹配阈值
-        ttk.Label(g, text="分数阈值:").grid(row=0, column=2, sticky="w", pady=3)
+        ttk.Label(g, text="分数阈值:").grid(row=0, column=2, sticky="w", pady=4)
         sbox = ttk.Frame(g)
-        sbox.grid(row=0, column=3, sticky="w", padx=4, pady=3)
+        sbox.grid(row=0, column=3, sticky="w", padx=4, pady=4)
         ttk.Entry(sbox, textvariable=self.score_min_var, width=8).pack(side="left")
-        ttk.Button(sbox, text="推荐", width=4, command=self._apply_recommended_score).pack(side="left", padx=2)
+        RoundedButton(
+            sbox,
+            text="推荐",
+            command=self._apply_recommended_score,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=46,
+            height=26,
+            font=self.fonts.caption,
+        ).pack(side="left", padx=2)
 
         # 测序方向与批大小
-        ttk.Label(g, text="测序方向:").grid(row=1, column=0, sticky="w", pady=3)
+        ttk.Label(g, text="测序方向:").grid(row=1, column=0, sticky="w", pady=4)
         orient_cb = ttk.Combobox(
             g,
             textvariable=self.orient_var,
@@ -321,16 +513,16 @@ class DNAAcceleratorApp(tk.Tk):
             state="readonly",
             width=14,
         )
-        orient_cb.grid(row=1, column=1, sticky="w", padx=(4, 8), pady=3)
+        orient_cb.grid(row=1, column=1, sticky="w", padx=(4, 8), pady=4)
         orient_cb.bind("<<ComboboxSelected>>", lambda e: self._refresh_estimate())
 
-        ttk.Label(g, text="传输批大小:").grid(row=1, column=2, sticky="w", pady=3)
-        ttk.Entry(g, textvariable=self.batch_var, width=8).grid(row=1, column=3, sticky="w", padx=4, pady=3)
+        ttk.Label(g, text="传输批大小:").grid(row=1, column=2, sticky="w", pady=4)
+        ttk.Entry(g, textvariable=self.batch_var, width=8).grid(row=1, column=3, sticky="w", padx=4, pady=4)
 
         # 发送条数与全量选择
-        ttk.Label(g, text="发送条数:").grid(row=2, column=0, sticky="w", pady=3)
+        ttk.Label(g, text="发送条数:").grid(row=2, column=0, sticky="w", pady=4)
         cnt_box = ttk.Frame(g)
-        cnt_box.grid(row=2, column=1, sticky="w", padx=(4, 8), pady=3)
+        cnt_box.grid(row=2, column=1, sticky="w", padx=(4, 8), pady=4)
         self.send_spin = ttk.Spinbox(
             cnt_box,
             from_=1,
@@ -351,44 +543,81 @@ class DNAAcceleratorApp(tk.Tk):
         )
         self.full_cb.pack(side="left", padx=(6, 0))
 
-        ttk.Label(g, text="载荷字节数:").grid(row=3, column=0, sticky="w", pady=3)
+        ttk.Label(g, text="载荷字节数:").grid(row=3, column=0, sticky="w", pady=4)
         ttk.Entry(g, textvariable=self.input_bytes_var, width=10).grid(
-            row=3, column=1, sticky="w", padx=(4, 8), pady=3
+            row=3, column=1, sticky="w", padx=(4, 8), pady=4
         )
-        ttk.Label(g, text=f"留空按 JPEG EOI 截断（1..{MAX_PAYLOAD_BYTES}）").grid(
-            row=3, column=2, columnspan=2, sticky="w", padx=4, pady=3
-        )
+        ttk.Label(
+            g,
+            text=f"留空按 JPEG EOI 截断（1..{MAX_PAYLOAD_BYTES}）",
+            style="Muted.TLabel",
+        ).grid(row=3, column=2, columnspan=2, sticky="w", padx=4, pady=4)
 
         # 复选框选项
-        chk_box = ttk.Frame(card)
+        chk_box = ttk.Frame(card.inner)
         chk_box.pack(fill="x", pady=(6, 0))
-        ttk.Checkbutton(chk_box, text="跳过水印预载 (仅调试)", variable=self.skip_wm_var).pack(side="left", padx=(0, 12))
+        ttk.Checkbutton(chk_box, text="跳过水印预载 (仅调试)", variable=self.skip_wm_var).pack(side="left", padx=(0, 14))
         ttk.Checkbutton(chk_box, text="发送 POST 触发硬件流水线", variable=self.post_var).pack(side="left")
 
-        preset_bar = ttk.Frame(card)
-        preset_bar.pack(fill="x", pady=(6, 0))
-        ttk.Button(preset_bar, text="保存参数预设...", command=self._save_parameter_preset).pack(side="left")
-        ttk.Button(preset_bar, text="加载参数预设...", command=self._load_parameter_preset).pack(side="left", padx=6)
+        preset_bar = ttk.Frame(card.inner)
+        preset_bar.pack(fill="x", pady=(8, 0))
+        RoundedButton(
+            preset_bar,
+            text="保存参数预设...",
+            command=self._save_parameter_preset,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=110,
+            height=28,
+            font=self.fonts.body,
+        ).pack(side="left")
+        RoundedButton(
+            preset_bar,
+            text="加载参数预设...",
+            command=self._load_parameter_preset,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=110,
+            height=28,
+            font=self.fonts.body,
+        ).pack(side="left", padx=6)
 
     def _build_action_card(self, parent: ttk.Frame) -> None:
-        card = ttk.Frame(parent, padding=8)
+        card = ttk.Frame(parent, style="Window.TFrame", padding=(2, 6))
         card.pack(fill="x", pady=(4, 0))
 
-        self.start_button = ttk.Button(
+        self.start_button = RoundedButton(
             card,
             text="▶  启动硬件加速全流水线",
             command=self.start_processing,
-            style="Accent.TButton",
+            bg_color=COLOR_PRIMARY,
+            hover_color=COLOR_PRIMARY_HOVER,
+            fg_color="#ffffff",
+            radius=10,
+            height=42,
+            font=self.fonts.card_header,
         )
-        self.start_button.pack(side="left", fill="x", expand=True, padx=(0, 6), ipady=6)
+        self.start_button.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
-        self.stop_button = ttk.Button(
+        self.stop_button = RoundedButton(
             card,
             text="⏹  停止任务",
             command=self.stop_processing,
-            state="disabled",
+            bg_color=COLOR_DANGER,
+            hover_color=COLOR_DANGER_HOVER,
+            fg_color="#ffffff",
+            radius=10,
+            height=42,
+            font=self.fonts.card_header,
         )
-        self.stop_button.pack(side="left", padx=4, ipady=6)
+        self.stop_button.configure(state="disabled")
+        self.stop_button.pack(side="left", padx=2)
 
     def _add_file_row(
         self,
@@ -398,132 +627,220 @@ class DNAAcceleratorApp(tk.Tk):
         variable: tk.StringVar,
         command: Callable[[], None],
     ) -> None:
-        ttk.Label(parent, text=f"{label}:").grid(row=row, column=0, sticky="w", pady=2)
-        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", padx=6, pady=2)
-        ttk.Button(parent, text="浏览...", width=7, command=command).grid(row=row, column=2, sticky="e", pady=2)
+        ttk.Label(parent, text=f"{label}:").grid(row=row, column=0, sticky="w", pady=3)
+        ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", padx=6, pady=3)
+        RoundedButton(
+            parent,
+            text="浏览...",
+            command=command,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=64,
+            height=26,
+            font=self.fonts.body,
+        ).grid(row=row, column=2, sticky="e", pady=3)
 
     # ------------------------------------------------------------- 右侧构建
     def _build_pipeline_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="硬件流水线状态与性能指标", padding=8)
+        card = RoundedCard(parent, title="硬件流水线状态与性能指标", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
-        # 1. 五段式步进标签
-        stepper = ttk.Frame(card)
-        stepper.pack(fill="x", pady=(0, 6))
+        # 1. 现代柔和圆角胶囊步进器 (Capsule Stepper)
+        stepper = tk.Frame(card.inner, bg=COLOR_CARD_BG)
+        stepper.pack(fill="x", pady=(0, 8))
         self.step_labels = {}
-        for idx, (token, title) in enumerate(PIPELINE_STAGES):
-            lbl = ttk.Label(
+        for token, title in PIPELINE_STAGES:
+            pill = RoundedPill(
                 stepper,
-                text=f" {title} ",
-                relief="groove",
-                padding=(4, 2),
-                font=("Helvetica", 9),
+                text=f"○ {title}",
+                bg_color=STEP_PALETTE["idle"]["bg"],
+                fg_color=STEP_PALETTE["idle"]["fg"],
+                border_color=STEP_PALETTE["idle"]["border"],
+                font=self.fonts.caption,
+                radius=10,
+                height=30,
             )
-            lbl.pack(side="left", expand=True, fill="x", padx=1)
-            self.step_labels[token] = lbl
+            pill.pack(side="left", expand=True, fill="x", padx=3)
+            self.step_labels[token] = pill
 
         # 2. 进度条与实时计时器
-        prog_box = ttk.Frame(card)
-        prog_box.pack(fill="x", pady=(2, 4))
+        prog_box = ttk.Frame(card.inner)
+        prog_box.pack(fill="x", pady=(2, 6))
         prog_box.columnconfigure(0, weight=1)
 
         self.upload_bar = ttk.Progressbar(prog_box, maximum=100)
         self.upload_bar.grid(row=0, column=0, sticky="ew")
 
-        ttk.Label(prog_box, textvariable=self.upload_percent_var, width=6, font=("Helvetica", 10, "bold")).grid(
-            row=0, column=1, sticky="e", padx=(6, 8)
+        ttk.Label(
+            prog_box,
+            textvariable=self.upload_percent_var,
+            width=6,
+            font=self.fonts.body_bold,
+        ).grid(row=0, column=1, sticky="e", padx=(8, 10))
+
+        ttk.Label(
+            prog_box,
+            textvariable=self.timer_var,
+            style="Timer.TLabel",
+        ).grid(row=0, column=2, sticky="e")
+
+        # 3. 动态柔和圆角状态横幅 (随运行与判据结果动态平滑变色)
+        self.status_banner = RoundedStatusBanner(
+            card.inner,
+            status_var=self.status_var,
+            hint_var=self.upload_hint_var,
+            fonts=self.fonts,
+            radius=8,
+            height=38,
         )
-        ttk.Label(prog_box, textvariable=self.timer_var, style="Timer.TLabel").grid(
-            row=0, column=2, sticky="e"
-        )
+        self.status_banner.pack(fill="x", pady=(0, 6))
 
-        hint_box = ttk.Frame(card)
-        hint_box.pack(fill="x")
-        self.status_label = ttk.Label(
-            hint_box,
-            textvariable=self.status_var,
-            font=("Helvetica", 10, "bold"),
-        )
-        self.status_label.pack(side="left")
-        ttk.Label(hint_box, textvariable=self.upload_hint_var, foreground="#555").pack(side="right")
+        # 4. 毫秒级性能指标微卡片 (2x2 网格圆角微卡片)
+        metrics_box = ttk.Frame(card.inner)
+        metrics_box.pack(fill="x", pady=(2, 0))
+        for col in range(2):
+            metrics_box.columnconfigure(col, weight=1)
 
-        # 3. 毫秒级性能指标表格
-        metrics = ttk.Frame(card, padding=(0, 6, 0, 0))
-        metrics.pack(fill="x")
-        for i in range(4):
-            metrics.columnconfigure(i, weight=1)
+        t1 = RoundedMetricTile(metrics_box, "上行传输耗时 (Tx)", self.metric_upload_var, self.fonts, radius=8, height=52)
+        t1.grid(row=0, column=0, sticky="nsew", padx=3, pady=3)
 
-        ttk.Label(metrics, text="上行传输:").grid(row=0, column=0, sticky="w")
-        ttk.Label(metrics, textvariable=self.metric_upload_var, style="MetricVal.TLabel").grid(row=0, column=1, sticky="w")
+        t2 = RoundedMetricTile(metrics_box, "板端运算与回传 (HW)", self.metric_fpga_var, self.fonts, radius=8, height=52)
+        t2.grid(row=0, column=1, sticky="nsew", padx=3, pady=3)
 
-        ttk.Label(metrics, text="板端运算与回传:").grid(row=0, column=2, sticky="w")
-        ttk.Label(metrics, textvariable=self.metric_fpga_var, style="MetricVal.TLabel").grid(row=0, column=3, sticky="w")
+        t3 = RoundedMetricTile(metrics_box, "PC 端校验耗时 (Verify)", self.metric_verify_var, self.fonts, radius=8, height=52)
+        t3.grid(row=1, column=0, sticky="nsew", padx=3, pady=3)
 
-        ttk.Label(metrics, text="PC 端校验:").grid(row=1, column=0, sticky="w", pady=(4, 0))
-        ttk.Label(metrics, textvariable=self.metric_verify_var, style="MetricVal.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 0))
-
-        ttk.Label(metrics, text="总端到端:").grid(row=1, column=2, sticky="w", pady=(4, 0))
-        ttk.Label(metrics, textvariable=self.metric_total_var, style="MetricVal.TLabel").grid(row=1, column=3, sticky="w", pady=(4, 0))
+        t4 = RoundedMetricTile(metrics_box, "端到端总耗时 (E2E)", self.metric_total_var, self.fonts, radius=8, height=52)
+        t4.grid(row=1, column=1, sticky="nsew", padx=3, pady=3)
 
     def _build_preview_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="板端结果校验与载荷展示", padding=8)
+        card = RoundedCard(parent, title="板端结果校验与载荷展示", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
-        top_bar = ttk.Frame(card)
+        top_bar = ttk.Frame(card.inner)
         top_bar.pack(fill="x", pady=(0, 4))
 
         ttk.Label(top_bar, text="载荷 SHA-256:").pack(side="left")
-        self.hash_label = ttk.Label(
+        self.hash_label = tk.Label(
             top_bar,
             textvariable=self.payload_hash_var,
-            font=("Courier", 9, "bold"),
-            foreground="#333",
+            font=self.fonts.mono_body,
+            bg=COLOR_CARD_BG,
+            fg=COLOR_TEXT_PRIMARY,
         )
-        self.hash_label.pack(side="left", padx=(4, 0))
+        self.hash_label.pack(side="left", padx=(6, 0))
 
-        # 图像预览画布 / Label
-        self.preview_container = ttk.Frame(card, height=130, relief="sunken")
-        self.preview_container.pack(fill="x", pady=4)
-        self.preview_container.pack_propagate(False)
+        # 图像预览容器 (柔和圆角卡片)
+        self.preview_container = RoundedCard(
+            card.inner,
+            title="",
+            radius=8,
+            bg_color=COLOR_CARD_ALT,
+            border_color=COLOR_BORDER_LIGHT,
+            auto_height=False,
+            height=130,
+            padding=6,
+        )
+        self.preview_container.pack(fill="x", pady=6)
 
-        self.preview_label = ttk.Label(
-            self.preview_container,
+        self.preview_label = tk.Label(
+            self.preview_container.inner,
             text="[完成板端结果校验后显示载荷信息]",
+            bg=COLOR_CARD_ALT,
+            fg=COLOR_TEXT_SECONDARY,
+            font=self.fonts.body,
             anchor="center",
         )
         self.preview_label.pack(expand=True, fill="both")
 
         # 按钮条
-        action_bar = ttk.Frame(card)
+        action_bar = ttk.Frame(card.inner)
         action_bar.pack(fill="x", pady=(4, 0))
 
-        ttk.Button(action_bar, text="打开输出目录", command=self._open_output_dir).pack(side="left")
-        self.open_payload_button = ttk.Button(
+        RoundedButton(
+            action_bar,
+            text="打开输出目录",
+            command=self._open_output_dir,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=96,
+            height=28,
+            font=self.fonts.body,
+        ).pack(side="left")
+
+        self.open_payload_button = RoundedButton(
             action_bar,
             text="用系统默认程序打开",
             command=self._open_payload_external,
-            state="disabled",
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=134,
+            height=28,
+            font=self.fonts.body,
         )
+        self.open_payload_button.configure(state="disabled")
         self.open_payload_button.pack(side="left", padx=6)
 
     def _build_log_card(self, parent: ttk.Frame) -> None:
-        card = ttk.LabelFrame(parent, text="运行诊断日志", padding=6)
-        card.pack(fill="both", expand=True)
+        card = RoundedCard(
+            parent,
+            title="运行诊断日志",
+            radius=10,
+            auto_height=False,
+            title_font=self.fonts.card_header,
+        )
+        card.pack(fill="both", expand=True, pady=(0, 6))
 
-        tool_bar = ttk.Frame(card)
+        tool_bar = ttk.Frame(card.inner)
         tool_bar.pack(fill="x", pady=(0, 4))
-        ttk.Button(tool_bar, text="清空日志", command=self._clear_logs).pack(side="right")
 
-        self.log_text = ScrolledText(card, height=10, state="disabled", font=("Courier", 9))
+        lbl_hint = ttk.Label(tool_bar, text="实时通信与协议诊断输出", style="Muted.TLabel")
+        lbl_hint.pack(side="left")
+
+        RoundedButton(
+            tool_bar,
+            text="清空日志",
+            command=self._clear_logs,
+            bg_color=COLOR_CARD_ALT,
+            hover_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_TEXT_PRIMARY,
+            border_color=COLOR_BORDER_LIGHT,
+            radius=6,
+            width=70,
+            height=26,
+            font=self.fonts.caption,
+        ).pack(side="right")
+
+        self.log_text = ScrolledText(
+            card.inner,
+            height=10,
+            state="disabled",
+            font=self.fonts.mono_body,
+            bg=LOG_TERMINAL_BG,
+            fg=LOG_TERMINAL_FG,
+            insertbackground="#ffffff",
+            selectbackground=LOG_TERMINAL_SELECT,
+            selectforeground="#ffffff",
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=6,
+        )
         self.log_text.pack(fill="both", expand=True)
 
         # 配置日志颜色高亮标签
-        self.log_text.tag_configure("INFO", foreground="#2e7d32")
-        self.log_text.tag_configure("WARN", foreground="#e65100")
-        self.log_text.tag_configure("ERROR", foreground="#c62828")
-        self.log_text.tag_configure("FPGA", foreground="#0277bd")
-        self.log_text.tag_configure("VERIFY", foreground="#6a1b9a")
-        self.log_text.tag_configure("GOLDEN", foreground="#1565c0", font=("Courier", 9, "bold"))
+        for tag, cfg in LOG_TAG_COLORS.items():
+            font = self.fonts.mono_bold if cfg.get("bold") else self.fonts.mono_body
+            self.log_text.tag_configure(tag, foreground=cfg["fg"], font=font)
 
     # ----------------------------------------------------------- 交互与自适应
     def _choose_watermark(self) -> None:
@@ -772,6 +1089,12 @@ class DNAAcceleratorApp(tk.Tk):
             return
 
         self.conn_status_var.set("正在连接...")
+        self.conn_badge.set_visuals(
+            text="正在连接...",
+            bg_color=COLOR_PRIMARY_BG,
+            fg_color=COLOR_PRIMARY,
+            border_color=COLOR_PRIMARY_BORDER,
+        )
         self.update_idletasks()
 
         def do_ping():
@@ -781,9 +1104,21 @@ class DNAAcceleratorApp(tk.Tk):
                 s.close()
                 dt_ms = (time.perf_counter() - t0) * 1000
                 self.after(0, lambda: self.conn_status_var.set(f"🟢 在线 ({dt_ms:.1f} ms)"))
+                self.after(0, lambda: self.conn_badge.set_visuals(
+                    text=f"🟢 在线 ({dt_ms:.1f} ms)",
+                    bg_color=COLOR_SUCCESS_BG,
+                    fg_color=COLOR_SUCCESS_TEXT,
+                    border_color=COLOR_SUCCESS_BORDER,
+                ))
                 self.after(0, lambda: self._append_log(f"[INFO] 成功连通板端 {ip}:{port} (RTT {dt_ms:.1f} ms)"))
             except Exception as exc:
                 self.after(0, lambda: self.conn_status_var.set("🔴 离线 / 拒绝"))
+                self.after(0, lambda: self.conn_badge.set_visuals(
+                    text="🔴 离线 / 拒绝",
+                    bg_color=COLOR_DANGER_BG,
+                    fg_color=COLOR_DANGER_TEXT,
+                    border_color=COLOR_DANGER_BORDER,
+                ))
                 self.after(0, lambda: self._append_log(f"[WARN] 无法连接到 {ip}:{port}: {exc}"))
 
         threading.Thread(target=do_ping, daemon=True).start()
@@ -955,7 +1290,25 @@ class DNAAcceleratorApp(tk.Tk):
             self.after(0, self._on_run_complete, False, str(exc))
 
     # ------------------------------------------------------------- 回调与状态
+    def _update_step_capsule(self, token: str, state: str) -> None:
+        """更新单个步进胶囊的视觉状态 (idle / active / done / failed)。"""
+        pill = self.step_labels.get(token)
+        if not pill:
+            return
+        palette = STEP_PALETTE.get(state, STEP_PALETTE["idle"])
+        title = self._step_titles.get(token, token)
+        prefix = palette["prefix"]
+        font = self.fonts.caption_bold if state != "idle" else self.fonts.caption
+        pill.set_visuals(
+            text=f"{prefix} {title}",
+            bg_color=palette["bg"],
+            fg_color=palette["fg"],
+            border_color=palette["border"],
+            font=font,
+        )
+
     def _on_run_complete(self, success: bool, error: Optional[str]) -> None:
+        active_stage = self.active_stage_var.get()
         self._is_running = False
         self.start_button.configure(state="normal")
         self.stop_button.configure(state="disabled")
@@ -965,13 +1318,19 @@ class DNAAcceleratorApp(tk.Tk):
         self.metric_total_var.set(f"{dt_total:.2f} s")
 
         if success:
-            if self._last_verify_result is not None:
+            if self._last_verify_result is not None and self._last_verify_result.verified:
+                for token, _ in PIPELINE_STAGES:
+                    self._update_step_capsule(token, "done")
                 self._append_log(f"[INFO] 板端结果校验完成！总耗时: {dt_total:.2f}s")
                 self._update_status(
                     f"✓ 板端已纠对（{self._last_verify_result.total_rows} 条校验行全零）；"
                     "PC 端未做译码",
                     success=True,
                 )
+            elif self._last_verify_result is not None:
+                self._update_step_capsule("LDPC", "failed")
+                self._append_log("[ERROR] 板端 syndrome 非零，不能报告校验通过。")
+                self._update_status("板端结果校验未通过", failed=True)
             else:
                 self._append_log(f"[INFO] 上传流程完成，未触发板端处理。总耗时: {dt_total:.2f}s")
                 self._update_status("上传完成（未触发 POST）")
@@ -983,6 +1342,9 @@ class DNAAcceleratorApp(tk.Tk):
                 # 具体失败数由 _show_board_code_rejected 显示；不弹出可被误读成警告的提示框。
                 pass
             else:
+                # 标记当前执行中的阶段失败
+                if active_stage in self.step_labels:
+                    self._update_step_capsule(active_stage, "failed")
                 self._update_status("运行失败", failed=True)
                 messagebox.showerror("运行失败", error or "未知错误")
 
@@ -993,11 +1355,16 @@ class DNAAcceleratorApp(tk.Tk):
         stage_token = (stage or "").upper()
         self.active_stage_var.set(stage_token)
 
-        for token, lbl in self.step_labels.items():
-            if token == stage_token:
-                lbl.configure(background="#1976d2", foreground="white", font=("Helvetica", 9, "bold"))
-            else:
-                lbl.configure(background="#f0f0f0", foreground="#333", font=("Helvetica", 9))
+        stage_order = [token for token, _ in PIPELINE_STAGES]
+        if stage_token in stage_order:
+            curr_idx = stage_order.index(stage_token)
+            for idx, token in enumerate(stage_order):
+                if idx < curr_idx:
+                    self._update_step_capsule(token, "done")
+                elif idx == curr_idx:
+                    self._update_step_capsule(token, "active")
+                else:
+                    self._update_step_capsule(token, "idle")
 
         if stage_token == "LDPC":
             if self._board_wait_started_at is None:
@@ -1030,8 +1397,38 @@ class DNAAcceleratorApp(tk.Tk):
         success: bool = False,
     ) -> None:
         self.status_var.set(message)
-        style = "Failure.TLabel" if failed else ("Success.TLabel" if success else "TLabel")
-        self.status_label.configure(style=style)
+        if failed:
+            self.status_banner.set_theme_mode("failed")
+            self.top_status_badge.set_visuals(
+                text="✗ 校验未通过",
+                bg_color=COLOR_DANGER_BG,
+                fg_color=COLOR_DANGER_TEXT,
+                border_color=COLOR_DANGER_BORDER,
+            )
+        elif success:
+            self.status_banner.set_theme_mode("success")
+            self.top_status_badge.set_visuals(
+                text="✓ 板端纠对通过",
+                bg_color=COLOR_SUCCESS_BG,
+                fg_color=COLOR_SUCCESS_TEXT,
+                border_color=COLOR_SUCCESS_BORDER,
+            )
+        elif self._is_running:
+            self.status_banner.set_theme_mode("running")
+            self.top_status_badge.set_visuals(
+                text="● 硬件运行中",
+                bg_color=COLOR_PRIMARY_BG,
+                fg_color=COLOR_PRIMARY,
+                border_color=COLOR_PRIMARY_BORDER,
+            )
+        else:
+            self.status_banner.set_theme_mode("idle")
+            self.top_status_badge.set_visuals(
+                text="系统就绪",
+                bg_color=COLOR_CARD_ALT,
+                fg_color=COLOR_TEXT_SECONDARY,
+                border_color=COLOR_BORDER_LIGHT,
+            )
 
     def _update_upload_progress(self, sent: int, total: int) -> None:
         total = max(total, 1)
@@ -1054,12 +1451,15 @@ class DNAAcceleratorApp(tk.Tk):
         self.metric_verify_var.set("--")
         self.metric_total_var.set("--")
         self.payload_hash_var.set("--")
-        self.hash_label.configure(foreground="#333")
+        self.hash_label.configure(fg=COLOR_TEXT_PRIMARY)
         self._update_status("就绪")
+        self.status_banner.set_theme_mode("idle")
         self._last_verify_result = None
         self._preview_photo = None
         self.preview_label.configure(image="", text="[完成板端结果校验后显示载荷信息]")
         self.open_payload_button.configure(state="disabled")
+        for token, _ in PIPELINE_STAGES:
+            self._update_step_capsule(token, "idle")
 
     def _update_timer(self) -> None:
         if self._is_running:
@@ -1074,9 +1474,17 @@ class DNAAcceleratorApp(tk.Tk):
         self._last_verify_result = None
         self._preview_photo = None
         self.payload_hash_var.set("板端结果校验失败")
-        self.hash_label.configure(foreground="#c62828")
+        self.hash_label.configure(fg=COLOR_DANGER_TEXT)
         self.preview_label.configure(image="", text="板端未纠对；未生成或展示载荷。")
         self.open_payload_button.configure(state="disabled")
+
+        # 将 LDPC 阶段标红，前序阶段保持已完成绿
+        for token, _ in PIPELINE_STAGES:
+            if token == "LDPC":
+                self._update_step_capsule(token, "failed")
+            else:
+                self._update_step_capsule(token, "done")
+
         self._update_status(
             f"✗ 板端未纠对：{error.failed_rows}/{error.total_rows} 条校验行非零 —— 本用例失败",
             failed=True,
@@ -1091,7 +1499,7 @@ class DNAAcceleratorApp(tk.Tk):
             " [R0.83 逐字节吻合]" if is_golden else " [板端校验通过]"
         )
         self.payload_hash_var.set(status_txt)
-        self.hash_label.configure(foreground="#2e7d32" if is_golden else "#1565c0")
+        self.hash_label.configure(fg=COLOR_SUCCESS_TEXT if is_golden else COLOR_PRIMARY)
         media_type = detect_payload_media_type(payload)
         self._append_log(f"[VERIFY] 载荷 SHA-256: {sha256}；类型: {media_type}")
         if is_golden:
