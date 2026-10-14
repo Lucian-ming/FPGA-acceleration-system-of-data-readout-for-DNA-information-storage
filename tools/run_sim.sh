@@ -135,10 +135,12 @@ fi
 # SIM_CASE_TIMEOUT=3600；默认 all 只跑 LC6 快速模块/接口测试。
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_production" ] \
    || [ "$WHICH" = "stage1_production_full" ]; then
+    # 2026-10-14 起 Stage1 P16 每拍推进的碱基数已写死为 2（见 RTL 内 localparam
+    # BASES_PER_CYCLE），不再是构建期参数，故本入口就是 K=2 的判据，无需额外档位。
     PROD_LC=6
     [[ "$WHICH" == stage1_production_full ]] && PROD_LC=50
-    echo "生产配置: READ_BPS=150 NUM_LC=$PROD_LC STRIDE=807 REF_LEN=957 BATCH=64 P4=4/0 P16=16/1"
-    printf 'read_bps=150\nnum_lc=%s\nstride=807\nref_len=957\nbatch=64\np4=4/0\np16=16/1\n' \
+    echo "生产配置: READ_BPS=150 NUM_LC=$PROD_LC STRIDE=807 REF_LEN=957 BATCH=64 P4=4/0 P16=16/1 (K=2 写死)"
+    printf 'read_bps=150\nnum_lc=%s\nstride=807\nref_len=957\nbatch=64\np4=4/0\np16=16/1\nbases_per_cycle=2\n' \
         "$PROD_LC" >> "$BUILD/run-config.txt"
     FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
     printf '%q ' python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \

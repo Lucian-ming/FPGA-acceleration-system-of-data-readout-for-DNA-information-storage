@@ -102,20 +102,15 @@ set ip3 [create_bd_cell -type ip -vlnv xilinx.com:user:desparsification_decoder:
 # Stage1 可选生产参数：默认保留 ECO P4/组合树；P16 必须显式选择。
 set stage1_p_ways 4
 set stage1_pipe_tree 0
-# Stage1 每拍推进的碱基数 K（只对 16/1 通路有效）。默认 1 = 与未引入本参数时等价。
-set stage1_bases_per_cycle 1
 if {[info exists ::dna_stage1_p_ways]} {set stage1_p_ways $::dna_stage1_p_ways}
 if {[info exists ::dna_stage1_pipe_tree]} {set stage1_pipe_tree $::dna_stage1_pipe_tree}
-if {[info exists ::dna_stage1_bases_per_cycle]} {set stage1_bases_per_cycle $::dna_stage1_bases_per_cycle}
 set_property -dict [list \
   CONFIG.C_STAGE1_P_WAYS $stage1_p_ways \
   CONFIG.C_STAGE1_PIPE_TREE $stage1_pipe_tree \
-  CONFIG.C_STAGE1_BASES_PER_CYCLE $stage1_bases_per_cycle \
   CONFIG.READ_BPS 150 CONFIG.NUM_LC 50 CONFIG.STRIDE 807 CONFIG.REF_LEN 957 CONFIG.BATCH 64] $ip1
 # 取实际 IP CONFIG 值；不能靠摘要中的硬编码证明几何正确。
 set ::dna_stage1_actual [dict create]
 foreach {key expected} [list C_STAGE1_P_WAYS $stage1_p_ways C_STAGE1_PIPE_TREE $stage1_pipe_tree \
-  C_STAGE1_BASES_PER_CYCLE $stage1_bases_per_cycle \
   READ_BPS 150 NUM_LC 50 STRIDE 807 REF_LEN 957 BATCH 64] {
   set actual [get_property CONFIG.$key $ip1]
   if {$actual ne "$expected"} {error "生产Stage1参数 $key=$actual，期望$expected"}

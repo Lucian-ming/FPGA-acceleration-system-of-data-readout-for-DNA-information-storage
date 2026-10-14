@@ -3,6 +3,9 @@
 `define CFG_NUM_LC 50
 `endif
 // 正式生产两个实现，逐位等价并对独立符号滑窗oracle校验，绝不读实验源。
+// 本 TB 有意**不知道**每拍碱基数 K：K 不改变正确性（正确的 K=4 同样会过 oracle），
+// 它只改变吞吐与资源。K 的取值由 RTL 内的 localparam 写死，并由证据目录里的
+// 源码 SHA256 锁定；本 TB 不另立一个会漂移的 K 副本。
 module tb_dna_stage1_p16_equivalence;
   localparam LC=`CFG_NUM_LC;
   reg clk=0,rst=0,start=0; always #5 clk=~clk;

@@ -5,6 +5,9 @@
 // 【生产P路变体】由2026-09-22 XC7Z020候选纳入正式IP，实验原件保留供追溯。
 // 顶层 Dna_accelerator_core_v1_0 用 C_STAGE1_P_WAYS=16 / C_STAGE1_PIPE_TREE=1 选择。
 // 默认几何为SE150；顶层仍显式透传全部几何参数。
+// 2026-10-14：每拍碱基数 K 已由可配置参数**写死为 2**（见下方 localparam BASES_PER_CYCLE）。
+//   写死前 K 是 parameter，顶层/BD/component/xgui 均有传参通道，现已全部撤销；
+//   K=2 已由 tb_dna_stage1_p16_equivalence.v 以「生产P4 + 独立oracle」双重逐位判定通过。
 // 左>=右取左，保证并列取低位置；pos_valid在S_LAUNCH寄存且包含STRIDE边界；
 // PIPE_TREE=1逐级打拍，S_UPD1等待log2(P)拍，保留同步BRAM装载/输出协议。
 // 历史OOC: docs/benchmarks/stage1-pway-7020-probe.md；不是新板整机时序证据。
@@ -21,7 +24,6 @@
 module `SRPE_BATCH_PWAY_MODNAME #(
     parameter integer P_WAYS    = 4,       // 并行滑窗位置数，2 的幂
     parameter integer PIPE_TREE = 0,       // 1 = 选优树逐级打拍（P>=8 在 100 MHz 下必需）
-    parameter integer BASES_PER_CYCLE = 1, // 每拍推进的碱基数（读段与水印均按此分 bank）
     parameter integer BATCH     = 64,
     parameter integer NUM_LC    = 50,      // 参考区域数量
     parameter integer STRIDE    = 807,     // 每区域可滑动位置数
@@ -56,6 +58,13 @@ module `SRPE_BATCH_PWAY_MODNAME #(
 
     localparam integer CODEBITS = READ_BPS*2;
     localparam integer RESULT_W = CODEBITS + POS_W + SCORE_W;
+
+    // 2026-10-14 冻结：每拍推进 2 个碱基。原为可配置 parameter（支持 1/2/4），
+    // 整机 route 实测 K=4 硬失败（LUT 63,246 > 容量 53,200），K=2 通过
+    // （35,702 LUT / WNS +0.313 / 0 失败端点），故写死为 2 并撤销全部构建期传参通道。
+    // 依据与判据见 docs/benchmarks/stage1-multibase-ooc-probe.md。
+    // 读段 150 个碱基被 K 整除（150/2=75），故 score_inc 的末组掩码路径在本配置下恒为真。
+    localparam integer BASES_PER_CYCLE = 2;
 
     // 区域索引与水印存储几何
     localparam integer REGION_W = 6;                     // 0~49

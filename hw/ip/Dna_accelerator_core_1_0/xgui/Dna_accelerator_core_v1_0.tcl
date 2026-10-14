@@ -4,7 +4,6 @@ proc init_gui { IPINST } {
   set Stage1 [ipgui::add_page $IPINST -name "Stage1"]
   ipgui::add_param $IPINST -name "C_STAGE1_P_WAYS" -parent $Stage1 -widget comboBox
   ipgui::add_param $IPINST -name "C_STAGE1_PIPE_TREE" -parent $Stage1 -widget comboBox
-  ipgui::add_param $IPINST -name "C_STAGE1_BASES_PER_CYCLE" -parent $Stage1 -widget comboBox
   #Adding Page
   set Page_0 [ipgui::add_page $IPINST -name "Page 0"]
   ipgui::add_param $IPINST -name "C_S_AXI_LITE_CTRL_DATA_WIDTH" -parent ${Page_0} -widget comboBox
@@ -234,16 +233,4 @@ proc update_MODELPARAM_VALUE.C_STAGE1_P_WAYS { MODELPARAM_VALUE.C_STAGE1_P_WAYS 
 }
 proc update_MODELPARAM_VALUE.C_STAGE1_PIPE_TREE { MODELPARAM_VALUE.C_STAGE1_PIPE_TREE PARAM_VALUE.C_STAGE1_PIPE_TREE } {
     set_property value [get_property value ${PARAM_VALUE.C_STAGE1_PIPE_TREE}] ${MODELPARAM_VALUE.C_STAGE1_PIPE_TREE}
-}
-# K=1/2/4：每拍推进的碱基数。K>1 只对 16/1 通路有效（几何见 srpe_batch_pway.v）。
-proc update_PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE { PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE } {}
-proc validate_PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE { PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE PARAM_VALUE.C_STAGE1_P_WAYS } {
-    set k    [get_property value ${PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE}]
-    set ways [get_property value ${PARAM_VALUE.C_STAGE1_P_WAYS}]
-    if {$k != 1 && $k != 2 && $k != 4} { return 0 }
-    if {$k != 1 && $ways != 16} { return 0 }
-    return 1
-}
-proc update_MODELPARAM_VALUE.C_STAGE1_BASES_PER_CYCLE { MODELPARAM_VALUE.C_STAGE1_BASES_PER_CYCLE PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE } {
-    set_property value [get_property value ${PARAM_VALUE.C_STAGE1_BASES_PER_CYCLE}] ${MODELPARAM_VALUE.C_STAGE1_BASES_PER_CYCLE}
 }

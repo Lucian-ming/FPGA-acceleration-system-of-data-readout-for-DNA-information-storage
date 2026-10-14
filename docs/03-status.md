@@ -211,7 +211,38 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 **任何 A/B 必须同小时重测参考包**，否则会把结论做反。详见
 [上传段 benchmark](benchmarks/bkb220-p16-speed-a-upload.md)。
 
-**P3 剩余方向**：PL 侧（板端 9.33 s 里 PL 约 8.2 s）。早期 `S_RUN` 多碱基并行（K=2/4）的资源与耗时数字是设计阶段估算；后续 K=1/2/4 的 OOC 探针已通过，K=2 整机 route 也已通过（35,285 LUT、WNS +0.978 ns、失败端点 0）。K=4 整机 route、板测与正式功能回归仍未完成，Stage1 优化整体仍在进行；详见[speed交接](reference/speed-handoff-2026-10-13.md)及探针报告。
+**P3 剩余方向**：PL 侧（板端 9.33 s 里 PL 约 8.2 s）。
+
+> **勘误（2026-10-14）**：本段上一版写「K=2 整机 route 也已通过（**35,285 LUT、WNS +0.978 ns**）」，
+> **那是已作废的构建**——参数当时没进 HDL，K=2 与 K=4 两次实际都编成了 K=1（两次产物逐字节相同）。
+> 有效的 K=2 整机是 **35,702 LUT、WNS +0.313 ns**。
+
+**K 已定：K=2，并已于 2026-10-14 写死。** 判据是器件容量而非价值判断——
+K=4 整机实测 63,246 LUT（合计）/ 54,164（组合）**超过 XC7Z020 的 53,200**，`place_design` 硬失败；
+K=2 通过（35,702 LUT、WNS +0.313 / WHS +0.036、失败端点 0、DRC 0 Error）。
+K 已由 `parameter` 改为 RTL 内 `localparam BASES_PER_CYCLE = 2`，全部构建期传参通道撤销。
+
+**K=2 功能判据**（2026-10-14）：
+
+- `tb_dna_stage1_p16_equivalence.v` 以「生产 P4 + 独立符号滑窗 oracle」对 P16 做
+  score/pos/cw **三重逐位**比对，**CL6 通过**；且写死前后**周期数逐位相同**
+  （258,875 / 95,873）⇒ 写死未改变行为。
+- **全量回归 `bash tools/run_sim.sh all`：25 项通过、0 项失败**（日志 `logs/iverilog/`，`logs/` 已忽略）。
+  覆盖 `srpe_batch` / `4way` / `pway`(p4+p16) / `dna_stage1`(等价+接口) / `accelerator_core_4way` /
+  `ingress` / `dna_axil` / `voter` / 主机单元测试 / 三顶层语法检查。
+- **LC50 生产几何判据运行中**（该档仿真量约为 LC6 的 8 倍，估约 75 min；
+  **未出结果前不得记为通过**）。注：板端跑的就是 LC=50 生产几何 + 真实数据，
+  板测通过时其证据强度高于本仿真档。
+- 打包门禁已按约定**显式替换**（旧的 P14 字节等价 → 源码 SHA 冻结 + 行为判据）并 PASS。
+- **整机重建**：35,702 LUT / RAMB36 48 / DSP 5、WNS +0.313 / WHS +0.036、
+  **0 失败端点（共 88,748）、DRC 0 Error**，与写死前逐项相同。
+- **板端验收 G3 PASS（2026-10-14，生产几何全量）**：103,616 条记录、`score_min=67`，
+  判据 `fcd0cf90…b1f2c3` **逐位相同**；载荷回传段实测 **6.06 s**。
+  包 `hw/build/bkb220-p16-k2freeze-20261014T000848Z-board-migrate`。
+  ⚠️ K=1 的 9.33 s 是异时段值，**不得据此算加速比**（见下「测量纪律」）。
+
+**K=4 已关闭**（不是「未完成」）。Stage1 优化整体仍在进行；详见
+[多碱基探针报告](benchmarks/stage1-multibase-ooc-probe.md)及[speed交接](reference/speed-handoff-2026-10-13.md)。
 
 1. **B2**：P16 配置守卫 7/7、断连畸变恢复 30/30、中途断网 3/3 已通过；当时使用的 `sudo iptables` 只在 `finally` 清理，操作要求见对应探针记录。
 2. **C1 性能矩阵**：同板 P4/P16 六档（128/512/2048/8192/32768/full）各 ≥3 次已完成，正式结果见[性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)。

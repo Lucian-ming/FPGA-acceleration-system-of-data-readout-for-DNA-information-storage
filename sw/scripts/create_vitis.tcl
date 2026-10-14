@@ -166,7 +166,18 @@ foreach lwipopts [glob -nocomplain \
   if {![regexp -line {^#define[ \t]+TCP_WND[ \t]+\S+} $body]} {
     error "lwipopts.h 里没有 '#define TCP_WND'，拒绝凭空注入：$lwipopts"
   }
-  regsub -line {^#define[ \t]+TCP_WND[ \t]+\S+} $body "#define TCP_WND $tcp_wnd" body
+  # 2026-10-14 修正：原替换模式末尾是 `\S+`，只吃掉值的**第一个 token**。
+  # Vitis 2022.2 的原始模板是 `#define TCP_WND                 6 * 1024`（两个 token），
+  # 于是产出 `#define TCP_WND 32768 * 1024`（= 33,554,432）——是错的，
+  # 而且它看起来像"补丁打过了"，不会有人再去看。冻结包里的正确值 `32768`
+  # 并非这条路径产出，说明该改动的可复现性当时并未真正闭合。
+  # 改为吃掉整行剩余部分，并在替换后**回读断言**，让错值必然变红。
+  regsub -line {^#define[ \t]+TCP_WND[ \t]+[^\r\n]*} $body "#define TCP_WND $tcp_wnd" body
+  set want "#define TCP_WND $tcp_wnd"
+  # 允许行尾可选 CR，避免把 CRLF 行尾误判成替换失败
+  if {![regexp -line "^${want}\r?\[ \t\]*\$" $body]} {
+    error "TCP_WND 替换后回读不符（期望 '$want'）：$lwipopts"
+  }
   set fh [open $lwipopts w]
   puts -nonewline $fh $body
   close $fh

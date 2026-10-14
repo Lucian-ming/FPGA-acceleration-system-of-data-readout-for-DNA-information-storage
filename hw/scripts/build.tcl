@@ -4,7 +4,7 @@
 set _here [file normalize [file dirname [info script]]]
 set repo_root [file normalize [file join $_here ../..]]
 set opts [dict create proj_name dna_accel board zynq_eco_7010 part_name {} clk_mhz 100 \
-  build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 stage1_bases_per_cycle 1 jobs 8 dry_run 0]
+  build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 jobs 8 dry_run 0]
 foreach arg $::argv {
   if {![regexp {^([a-z0-9_]+)=(.*)$} $arg -> key value] || ![dict exists $opts $key]} {
     error "未知构建参数 '$arg'；器件参数应为 part_name，不是 part"
@@ -13,14 +13,12 @@ foreach arg $::argv {
 }
 dict for {key value} $opts {set $key $value}
 if {![regexp {^[A-Za-z][A-Za-z0-9_]*$} $proj_name]} {error "非法 proj_name"}
-foreach key {stage1_p_ways stage1_pipe_tree stage1_bases_per_cycle jobs dry_run} {
+foreach key {stage1_p_ways stage1_pipe_tree jobs dry_run} {
   if {![string is integer -strict [set $key]]} {error "$key 必须为整数"}
 }
 if {$stage1_p_ways ni {4 16} || $stage1_pipe_tree ni {0 1}} {error "本轮只支持 stage1_p_ways=4|16、stage1_pipe_tree=0|1"}
 if {$stage1_p_ways == 16 && $stage1_pipe_tree != 1} {error "P16 必须启用流水选优树 stage1_pipe_tree=1"}
 if {$stage1_p_ways == 4 && $stage1_pipe_tree != 0} {error "P4 基线必须使用 stage1_pipe_tree=0"}
-if {$stage1_bases_per_cycle ni {1 2 4}} {error "stage1_bases_per_cycle 只支持 1|2|4（每拍推进的碱基数）"}
-if {$stage1_bases_per_cycle != 1 && $stage1_p_ways != 16} {error "K>1 只对 16/1 通路有效；P4 请保持 stage1_bases_per_cycle=1"}
 if {$jobs < 1 || $jobs > 64 || $dry_run ni {0 1}} {error "jobs/dry_run 超出合法范围"}
 if {![string is double -strict $clk_mhz] || $clk_mhz != 100} {error "本轮生产 PL 频率固定为100MHz"}
 source [file join $repo_root hw boards load_board.tcl]
@@ -59,7 +57,6 @@ set xsa_out [file join $export_dir ${proj_name}.xsa]
 set ip_repo [file join $repo_root hw ip]
 set ::dna_stage1_p_ways $stage1_p_ways
 set ::dna_stage1_pipe_tree $stage1_pipe_tree
-set ::dna_stage1_bases_per_cycle $stage1_bases_per_cycle
 puts "===> board=$board part=$part_name clk=${clk_mhz}MHz Stage1=$stage1_p_ways/$stage1_pipe_tree"
 puts "===> root=$repo_root build_dir=$proj_wk export_dir=$export_dir report_dir=$report_dir"
 if {$dry_run} {puts "BUILD_CONFIG_PASS (仅配置检查，未构建)"; exit 0}
@@ -172,7 +169,6 @@ set cfg [open [file join $export_dir hardware_build_config.txt] w]
 foreach pair [list [list board_id $board] [list part $part_name] [list tool_version [version -short]] \
   [list C_STAGE1_P_WAYS [dict get $::dna_stage1_actual C_STAGE1_P_WAYS]] \
   [list C_STAGE1_PIPE_TREE [dict get $::dna_stage1_actual C_STAGE1_PIPE_TREE]] \
-  [list C_STAGE1_BASES_PER_CYCLE [dict get $::dna_stage1_actual C_STAGE1_BASES_PER_CYCLE]] \
   [list READ_BPS [dict get $::dna_stage1_actual READ_BPS]] [list NUM_LC [dict get $::dna_stage1_actual NUM_LC]] \
   [list STRIDE [dict get $::dna_stage1_actual STRIDE]] [list REF_LEN [dict get $::dna_stage1_actual REF_LEN]] \
   [list BATCH [dict get $::dna_stage1_actual BATCH]] \

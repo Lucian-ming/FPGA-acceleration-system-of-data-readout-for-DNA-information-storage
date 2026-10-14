@@ -4,7 +4,8 @@
 //       - 参考：生产实现 srpe_batch_4way.v（component.xml 打包、进比特流的那份）
 //       - 被测：srpe_batch_pway #(.P_WAYS(`CFG_P_WAYS))
 //       - 100% 逐位校验 score、global_pos 与 cw（选优语义相同，并列也须相同）
-//       - CFG_P_WAYS=4 时额外要求周期数与生产 4-way 完全相同（机械推广无副作用）
+//       - CFG_P_WAYS=4 时额外要求**严格快于**生产 4-way（K=2 减半滑窗段；
+//         旧的「周期数完全相同」断言是 K=1 时代的前提，2026-10-14 写死 K=2 后作废）
 //       - 当 NUM_LC=50 时，同步比对 tests/golden/stage1_fwd_expect.txt
 //       用法: iverilog -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=8 ...
 // =============================================================
@@ -290,8 +291,14 @@ module tb_srpe_batch_pway;
         $display("  加速比 (参考 / P路): %0.3fx", (cycles_2w * 1.0) / cycles_4w);
         $display("  P_WAYS = %0d", P_WAYS);
         $display("  PIPE_TREE = %0d", PIPE_TREE);
-        if (P_WAYS == 4 && PIPE_TREE == 0 && cycles_4w != cycles_2w) begin
-            $display("[TB P-WAY] ✗ FAIL: P_WAYS=4 周期数 %0d 与生产 4-way %0d 不同", cycles_4w, cycles_2w);
+        // 2026-10-14：P16 每拍推进的碱基数已写死为 2（原为可配置参数）。
+        // 因此 P_WAYS=4 的周期数**不再**等于生产 4-way——旧的「机械推广无副作用」
+        // 断言前提已作废，若沿用会无意义变红。换成一条仍有牙齿的断言：
+        // K=2 把滑窗 run 段减半，P 路必须**严格快于**同 P_WAYS 的生产 4-way；
+        // 若不再更快，说明 K 被改回 1 或 run 段退化，这里会立刻红。
+        if (P_WAYS == 4 && PIPE_TREE == 0 && cycles_4w >= cycles_2w) begin
+            $display("[TB P-WAY] ✗ FAIL: P_WAYS=4 周期数 %0d 未快于生产 4-way %0d（K=2 应减半滑窗段）",
+                     cycles_4w, cycles_2w);
             $fatal(1);
         end
         $display("----------------------------------------------------------------");

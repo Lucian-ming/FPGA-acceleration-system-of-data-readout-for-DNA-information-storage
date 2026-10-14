@@ -206,6 +206,7 @@ done
 if python3 - <<'PY'
 from pathlib import Path
 import re
+import hashlib
 import xml.etree.ElementTree as ET
 
 base = Path("hw/ip/Dna_accelerator_core_1_0")
@@ -253,19 +254,39 @@ for gname, module in [("g_stage1_p4", "srpe_batch"), ("g_stage1_pway", "srpe_bat
 assert "STAGE1_CONFIGURATION_MUST_BE_P4_OR_P16_PIPELINED" in top, "非法配置缺少展开失败判据"
 assert "stage1_production_full" in runner and "tb_dna_stage1_p16_equivalence.v" in runner and "tb_dna_stage1_p16_interface.v" in runner, "真实生产回归入口缺失"
 
-# 本轮迁移只允许改变说明/SE150默认，算法体应与已验证P14候选相同。
-# 历史实验文件不参与生产回归；未来修改算法时需同时更新本门禁的迁移约定。
+# ---------------------------------------------------------------- 迁移契约：已按约定撤销
+# 原契约断言「生产 P-way 算法体（去注释去空白后）逐字节等于 hw/experimental/srpe_batch_pway.v」，
+# 用途是证明 2026-09-22 那次从 P14 候选到正式 IP 的搬运**没有夹带算法改动**。该搬运早已完成。
+# 原注释本身写明：「未来修改算法时需同时更新本门禁的迁移约定」——现在是那个时候。
+#
+# 2026-10-14：每拍碱基数 K 被**有意**写死为 2（原为可配置 parameter）。
+# 这是算法变更不是迁移误差：同一模组整机 LUT 由 33,987（K=1）变为 35,702（K=2），
+# K=4 更是 63,246 > 器件容量 53,200 而 place 失败。继续保留逐字节断言，
+# 只会逼出一个与生产文件逐字节相同的实验副本，那是个没有信息量的复制品。
+#
+# 取代它的是**两道更强的门禁**，故这是替换而非放宽：
+#   1) 源码 SHA 冻结 —— 下面 pin 住生产 RTL 的 SHA256。任何源码改动都必须显式更新本行，
+#      使「出片源码变了」在 Git diff 里必然可见（本仓库对微架构变更的一贯要求）。
+#   2) 行为判据 —— tb_dna_stage1_p16_equivalence.v 用「生产 P4 + 独立符号滑窗 oracle」
+#      对 P16 做 score/pos/cw **三重逐位**比对，LC6 与 LC50 两档都跑。
+#      与独立 oracle 的行为等价，强于与一个旧文件的字节等价。
+PRODUCTION_PWAY_SHA256 = "cefe308735eb1e51b579024c60a0c415ebeb93bd9441ecbc78d0af2934d46366"
+_sha = hashlib.sha256((base / "hdl/srpe_batch_pway.v").read_bytes()).hexdigest()
+assert _sha == PRODUCTION_PWAY_SHA256, (
+    "生产 P-way 源码 SHA 与冻结值不符：\n"
+    "  实测 %s\n  冻结 %s\n"
+    "这是**有意的源码变更**。确认：(a) 已跑过 tb_dna_stage1_p16_equivalence.v（LC6 与 LC50）；"
+    "(b) 改动理由已写进 docs/benchmarks/stage1-multibase-ooc-probe.md；"
+    "然后才同步更新本门禁的 PRODUCTION_PWAY_SHA256。" % (_sha, PRODUCTION_PWAY_SHA256))
 production = (base / "hdl/srpe_batch_pway.v").read_text()
-historical = Path("hw/experimental/srpe_batch_pway.v").read_text()
-def algorithm(text):
-    text = re.sub(r"/\*.*?\*/|//[^\n]*", "", text, flags=re.S)
-    for name in ["STRIDE", "REF_LEN", "READ_BPS"]:
-        text = re.sub(r"(parameter\s+integer\s+" + name + r"\s*=)\s*\d+", r"\1 MIGRATION_DEFAULT", text)
-    return re.sub(r"\s+", "", text)
-assert algorithm(production) == algorithm(historical), "生产Pway算法与本轮P14机械迁移契约不符"
 for name, default in {"READ_BPS": 150, "REF_LEN": 957, "STRIDE": 807, "NUM_LC": 50, "BATCH": 64}.items():
     assert re.search(r"parameter\s+integer\s+" + name + r"\s*=\s*" + str(default) + r"\s*,", production), f"Pway生产默认{name}错误"
-print("    Stage1: P4=4/0, P16=16/1；六文件源集与参数对齐；P14算法体等价")
+# K 必须是写死的 localparam 2，且不得再作为 parameter 出现在参数表里
+assert re.search(r"localparam\s+integer\s+BASES_PER_CYCLE\s*=\s*2\s*;", production), \
+    "每拍碱基数应写死为 localparam BASES_PER_CYCLE = 2（K=4 整机 LUT 超容量）"
+assert not re.search(r"parameter\s+integer\s+BASES_PER_CYCLE", production), \
+    "BASES_PER_CYCLE 不得再是可配置 parameter——构建期传参通道应已全部撤销"
+print("    Stage1: P4=4/0, P16=16/1；六文件源集与参数对齐；生产源码 SHA 已冻结；K 写死为 2")
 PY
 then
     ok "Stage1生产参数、静态选择、源集与迁移算法契约一致"
