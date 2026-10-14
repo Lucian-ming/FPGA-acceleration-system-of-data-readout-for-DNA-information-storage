@@ -44,6 +44,34 @@ PY
 )"
 printf '实际收集用例数：%s（下限：%d）\n' "$ACTUAL_TESTS" "$MIN_TESTS"
 
+python3 - "$TEST_LOG" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+output = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+summary = re.findall(r"^(?:OK|FAILED)(?: \(([^)]*)\))?$", output, flags=re.MULTILINE)
+if not summary:
+    print("测试统计：通过=未知，失败=未知，跳过=未知（无法解析 unittest 摘要）")
+    raise SystemExit(0)
+
+ran = re.findall(r"^Ran (\d+) tests? in .+$", output, flags=re.MULTILINE)
+total = int(ran[-1]) if ran else 0
+counts = {
+    name: int(value)
+    for name, value in re.findall(r"(failures|errors|skipped)=(\d+)", summary[-1])
+}
+failures = counts.get("failures", 0)
+errors = counts.get("errors", 0)
+skipped = counts.get("skipped", 0)
+failed = failures + errors
+passed = max(0, total - failed - skipped)
+print(
+    f"测试统计：通过={passed}，失败={failed}（failures={failures}, errors={errors}），"
+    f"跳过={skipped}"
+)
+PY
+
 if ((ACTUAL_TESTS < MIN_TESTS)); then
     echo "FAIL: 收集到的客户端测试少于登记下限 $MIN_TESTS"
     exit 1

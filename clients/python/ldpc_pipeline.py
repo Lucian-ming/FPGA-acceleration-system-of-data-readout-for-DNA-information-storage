@@ -38,7 +38,6 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -113,14 +112,6 @@ def resource_path(name: str) -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError(f"无法找到资源文件: {name}")
-
-
-def _copy_resource(target_dir: Path, filename: str) -> Path:
-    source = resource_path(filename)
-    target = target_dir / filename
-    if source.resolve() != target.resolve():
-        shutil.copy2(source, target)
-    return target
 
 
 def row_index(rows) -> tuple[np.ndarray, np.ndarray]:

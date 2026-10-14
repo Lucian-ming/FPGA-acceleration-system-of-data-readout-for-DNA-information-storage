@@ -1112,6 +1112,7 @@ class DNAAcceleratorApp(tk.Tk):
                 ))
                 self.after(0, lambda: self._append_log(f"[INFO] 成功连通板端 {ip}:{port} (RTT {dt_ms:.1f} ms)"))
             except Exception as exc:
+                error_text = str(exc)
                 self.after(0, lambda: self.conn_status_var.set("🔴 离线 / 拒绝"))
                 self.after(0, lambda: self.conn_badge.set_visuals(
                     text="🔴 离线 / 拒绝",
@@ -1119,7 +1120,9 @@ class DNAAcceleratorApp(tk.Tk):
                     fg_color=COLOR_DANGER_TEXT,
                     border_color=COLOR_DANGER_BORDER,
                 ))
-                self.after(0, lambda: self._append_log(f"[WARN] 无法连接到 {ip}:{port}: {exc}"))
+                self.after(0, lambda error_text=error_text: self._append_log(
+                    f"[WARN] 无法连接到 {ip}:{port}: {error_text}"
+                ))
 
         threading.Thread(target=do_ping, daemon=True).start()
 

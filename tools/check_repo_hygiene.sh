@@ -47,7 +47,7 @@ fi
 # --- 2. tools/ 下每个脚本都必须可被发现 --------------------------------------
 # 「一个无人可见的脚本，等于它得出的结论不存在」——不是比喻，已付过一次代价。
 UNDOC=""
-for f in tools/*.py tools/*.sh tools/board/*.py tools/board/*.tcl; do
+for f in tools/*.py tools/*.sh tools/*.ps1 tools/board/*.py tools/board/*.tcl tools/board/*.ps1; do
     [[ -f "$f" ]] || continue
     bn="$(basename "$f")"
     grep -q "$bn" tools/README.md 2>/dev/null || UNDOC+=" $bn"

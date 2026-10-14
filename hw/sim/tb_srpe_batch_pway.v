@@ -1,13 +1,13 @@
 // =============================================================
 // File: tb_srpe_batch_pway.v
-// Desc: 参数化 P 路 Stage1（hw/experimental/srpe_batch_pway.v）对照生产 4-way
-//       - 参考：生产实现 srpe_batch_4way.v（component.xml 打包、进比特流的那份）
-//       - 被测：srpe_batch_pway #(.P_WAYS(`CFG_P_WAYS))
+// Desc: 参数化 P 路 Stage1 与生产 4-way 对照
+//       - 参考：hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_4way.v
+//       - 被测：hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_pway.v 中的 srpe_batch_pway
 //       - 100% 逐位校验 score、global_pos 与 cw（选优语义相同，并列也须相同）
 //       - CFG_P_WAYS=4 时额外要求**严格快于**生产 4-way（K=2 减半滑窗段；
 //         旧的「周期数完全相同」断言是 K=1 时代的前提，2026-10-14 写死 K=2 后作废）
 //       - 当 NUM_LC=50 时，同步比对 tests/golden/stage1_fwd_expect.txt
-//       用法: iverilog -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=8 ...
+//       用法: bash tools/run_sim.sh stage1_pway
 // =============================================================
 `timescale 1ns/1ps
 
@@ -68,7 +68,7 @@ module tb_srpe_batch_pway;
     wire                busy_4w, done_4w;
 
     // ----------------------------------------------------------
-    // 实例化 4-Way(生产) 基线 (来自 srpe_batch_4way.v)
+    // 实例化 4-Way(生产) 基线（来自 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_4way.v）
     // ----------------------------------------------------------
     srpe_batch_4way #(
         .BATCH(BATCH), .NUM_LC(NUM_LC), .STRIDE(STRIDE),
@@ -84,7 +84,7 @@ module tb_srpe_batch_pway;
     );
 
     // ----------------------------------------------------------
-    // 实例化 P-Way 被测 (来自 hw/experimental/srpe_batch_pway.v)
+    // 实例化 P-Way 被测（来自 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_pway.v）
     // ----------------------------------------------------------
     srpe_batch_pway #(
         .P_WAYS(P_WAYS), .PIPE_TREE(PIPE_TREE),

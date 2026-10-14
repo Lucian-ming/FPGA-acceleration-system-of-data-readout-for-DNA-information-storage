@@ -21,11 +21,10 @@
 //   3) done/idle 状态位、调试寄存器（写拍数/首写地址/错误标志）正确；
 //   4) SCORE_MIN 可从 AXI-Lite 0x30 读回。
 //
-// 运行：
-//   iverilog -g2005 -o /tmp/tb_voter \
-//       hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v \
-//       hw/ip/differential_voter_1_0/hdl/tb_differential_voter.v
-//   vvp /tmp/tb_voter            # +dump_bram 可转储累加器做逐位置 diff
+// 运行：bash tools/run_sim.sh stage2
+// 回归从 hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v 编译生产模块，
+// 并使用本文件 hw/sim/ip_tb/tb_differential_voter.v 作为 testbench。
+// 需要 +dump_bram 时可在对应仿真入口传入 plusarg，转储累加器做逐位置 diff。
 // =============================================================
 `timescale 1ns/1ps
 
