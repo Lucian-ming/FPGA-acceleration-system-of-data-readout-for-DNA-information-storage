@@ -66,6 +66,15 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     // 读段 150 个碱基被 K 整除（150/2=75），故 score_inc 的末组掩码路径在本配置下恒为真。
     localparam integer BASES_PER_CYCLE = 2;
 
+    // 【压缩项 A，2026-10-14】预充填只需发出「返回后会落进窗口」的那几组地址。
+    // 窗口 17 深、每拍进 K 个；S_LAUNCH 已用 pos_cnt 那一个地址覆盖了窗口的前 K 项，
+    // 故还差 ceil((WM_WINDOW_SIZE-K)/K) 组。原写法按 P_WAYS-1 = 15 组发，其中
+    // 7 组返回的 tag 落在窗口外、被位置守卫丢弃 —— 实测：18 拍预充填里只有
+    // 9.02 拍真正写窗口（docs/benchmarks/stage1-block-overhead-plan.md §2.1）。
+    // 本式在 K=2 下为 8，要求 WM_WINDOW_SIZE >= BASES_PER_CYCLE。
+    localparam integer PREFILL_BODY =
+        (WM_WINDOW_SIZE - BASES_PER_CYCLE + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
+
     // 区域索引与水印存储几何
     localparam integer REGION_W = 6;                     // 0~49
     localparam integer WM_DEPTH = NUM_LC * REF_LEN;      // 50*957 or 50*1055
@@ -479,7 +488,8 @@ module `SRPE_BATCH_PWAY_MODNAME #(
                     st <= S_PREFILL;
                 end
 
-                // 预充填固定 18 拍。先按 K 符号组装初始窗口，末三拍预取 RUN 前两组。
+                // 预充填 PREFILL_BODY+3 拍（K=2 时 11 拍，原为 18 拍）：组装初始窗口，
+                // 末三拍预取 RUN 前两组。地址序列的首尾两段与改前逐项相同。
                 S_PREFILL: begin
                     pre_cnt <= pre_cnt + 1'b1;
 
@@ -492,23 +502,23 @@ module `SRPE_BATCH_PWAY_MODNAME #(
                         end
                     end
 
-                    if (pre_cnt < P_WAYS-1) begin
+                    if (pre_cnt < PREFILL_BODY) begin
                         wm_rd_offset <= pos_base + (pre_cnt + 1) * BASES_PER_CYCLE;
-                    end else if (pre_cnt == P_WAYS-1) begin
+                    end else if (pre_cnt == PREFILL_BODY) begin
                         wm_rd_offset <= pos_base + WM_WINDOW_SIZE;
-                    end else if (pre_cnt == P_WAYS) begin
+                    end else if (pre_cnt == PREFILL_BODY+1) begin
                         wm_rd_offset <= pos_base + WM_WINDOW_SIZE + BASES_PER_CYCLE;
-                    end else if (pre_cnt == P_WAYS+1) begin
+                    end else if (pre_cnt == PREFILL_BODY+2) begin
                         wm_rd_offset <= pos_base + WM_WINDOW_SIZE + 2*BASES_PER_CYCLE;
                     end
 
-                    if (pre_cnt == P_WAYS) begin
+                    if (pre_cnt == PREFILL_BODY+1) begin
                         a_addr <= 9'd0;
-                    end else if (pre_cnt == P_WAYS+1) begin
+                    end else if (pre_cnt == PREFILL_BODY+2) begin
                         a_addr <= BASES_PER_CYCLE;
                     end
 
-                    if (pre_cnt == P_WAYS+1) begin
+                    if (pre_cnt == PREFILL_BODY+2) begin
                         run_cnt <= 0;
                         st <= S_RUN;
                     end
