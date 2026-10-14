@@ -254,12 +254,16 @@ fi
 # 注意：测试数据集（tests/datasets/）、测试黄金向量（tests/golden/）、
 # 压测留证（tests/stress_results/）与图像验证留证（docs/images/）包含独立基准包
 # 或跨几何黄金断言，各自有独立 SHA256SUMS 清单或运行日志，予以排除。
+# 另排除 docs/submission/llm-collaboration/ —— 竞赛要求的 LLM 交互**逐字**记录：
+# 两次不同调用产出相同文字是**事实**，删掉一份就等于篡改留证。A1 抓的是
+# 「同一份源码被误复制成多份」，与"历史记录里恰好有重复"是两回事。
 DUP_TRACKED="$(python3 -c "
 import subprocess, hashlib, os, sys
 files = subprocess.check_output(['git', 'ls-files']).decode().splitlines()
 hashes = {}
 for f in files:
-    if f.startswith(('tests/datasets/', 'tests/golden/', 'tests/stress_results/', 'docs/images/')):
+    if f.startswith(('tests/datasets/', 'tests/golden/', 'tests/stress_results/', 'docs/images/',
+                        'docs/submission/llm-collaboration/')):
         continue
     if os.path.isfile(f):
         h = hashlib.sha256(open(f, 'rb').read()).hexdigest()
