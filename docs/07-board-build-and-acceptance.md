@@ -24,9 +24,9 @@ SE150生产：READ_BPS150、NUM_LC50、STRIDE807、REF_LEN957、BATCH64；PL100M
 
 ## 3. 工具链和同源制品
 
-用户指定的开发顺序（2026-10-11）：硬件与软件开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试 22 产物。P16 完整同 XSA 包已构建并通过 G3；构建路径包括 Vitis 生成与应用构建的补步，尚未形成完全自动化的一键链路。旧 ECO XSA 软件兼容探针继续保留；22 主线优化报告完成后再独立复核 Windows 2026.1 完整开发链，按下面三阶段门禁执行。
+用户指定的开发顺序（2026-10-11）：硬件与软件开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试 22 产物。P16 完整同 XSA 包已有 G3 记录；从硬件包到软件验收包的补步现已收敛到 `tools/rebuild_software_package.py`。2026-10-14 从当天硬件包实际重建后，SHA 与 `run_g3.sh --strict-artifacts --plan-only` 均通过；XSCT `app create` 的 socket 错误由同树 ARM GCC 回退处理。该次为只读制品门禁，不表示新重建包已上板。复现步骤与完整边界见[制品复现说明](submission/reproduce-artifacts.md)和[任务报告](../logs/submission/vitis-chain.md)。旧 ECO XSA 软件兼容探针继续保留；22 主线优化报告完成后再独立复核 Windows 2026.1 完整开发链，按下面三阶段门禁执行。
 
-1. **22主开发**：显式VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2，使用现有run_vivado_build.sh、XSim与独立build/export/report目录。P16 同 XSA 的 bit、ps7_init、BSP、应用 ELF、FSBL、BOOT/readback、SHA 与 manifest 均已在完整包中核验并通过 G3；自动化入口仍需收敛生成步骤和异常回退，不能把一次 launcher exit 0 当成功。
+1. **22主开发**：显式VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2，使用现有run_vivado_build.sh、XSim与独立build/export/report目录。已有 P16 同 XSA 包及本次重建包均覆盖 bit、ps7_init、BSP、应用 ELF、FSBL、BOOT/readback、SHA 与 manifest；本次自动化入口已实际验证平台/BSP生成、socket回退和 plan-only 门禁。托管式 `app create` 本机限制仍保留为已知偏差；不把一次 launcher exit 0 当成功，也不把 plan-only 写成板端通过。
 2. **26下载**：Windows实际hw_server/XSDB2026.1仅下载22产生的bit、同XSA的ps7_init和ELF。run_g3.sh显式--artifact-dir、--xsdb、--device、--uart-port和实际IP。Hardware Manager只下载PL不能证明PS软件就绪；混合版本下载兼容性必须经真实UART/CAPS/DDR/GEM/G3验证。
 3. **最后26开发复核**：22主线通过后，board在同一冻结HEAD/参数/输入上独立用Windows2026.1重建完整P4/P16硬件和同XSA软件包，rtl复核100MHz整机时序，verify复核功能/接口、新板G3、连续恢复、性能矩阵与长稳。独立目录及带SHA只读输入快照，不原地升级22工程；每包核验同源SHA，跨版本按功能/STA/统计比较，不能要求bit/ELF整文件SHA相等。未通过则保持22为发布主线并保存26失败，不能宣称26开发可靠。
 

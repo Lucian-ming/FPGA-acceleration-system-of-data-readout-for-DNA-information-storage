@@ -110,14 +110,15 @@
 | `test_ldpc_perm.sh` | **PS 侧位级置换的主机单元测试**（不需要板子）。重新生成并校验 `sw/app/ldpc_perm_table.c` → 用 gcc 编 `sw/app/ldpc_perm.c` + 生成的表 → 与 `native_ldpc.deinterleave` 在**板端真实回传样本**与随机/全 0/全 1/交替模式上**逐位比对**，含往返还原。存在理由：板上缺解交织只表现为「核不收敛」，信号弱、定位慢；置换是纯数据变换，可以在主机上被穷尽核验。**只证明 C 实现 == Python 参考，不证明板上正确**（那要 G3 + 串口出现 `converged=1`） |
 | `gen_ldpc_perm_table.py` | 从 `clients/python/resources/permutation64800` 生成 `sw/app/ldpc_perm_table.c`（`inv` 表，语义 `natural[c] = rx[inv[c]]`，u16×64800 = 126.6 KiB）。生成前断言输入是排列，生成后断言逆变换正确且与 `deinterleave` 逐位一致。`--check` 只校验现有文件是否最新（**检入的门禁用法**：手改或源表变更会被抓出来） |
 | `write_source_manifest.py` | 为制品包写/刷新 `reports/source_manifest.json`（`files`: 源码相对路径 → SHA256）并同步 `manifest.json` 的 `source_manifest.sha256`；`--resign` 会顺带重签并自检 SHA256SUMS。范围固定为「决定 bit 与 ELF 的源」。存在理由：**没有它，包里 bit/ELF 出自哪份源码就只剩人嘴说**；`g3_artifacts.py` 只校验这份清单的**格式**，查不出「清单与包内源码不一致」——`build_sw_variant.sh --sync-src` 以前正是这个隐患（已由本工具接入修掉） |
+| `rebuild_software_package.py` | 从 `hw/build/` 下含 XSA 的硬件包生成独立软件验收包：用 Vitis 2022.2 XSCT 生成平台/BSP/FSBL，先 `platform generate` 物化 BSP 头，再设置并复核 `TCP_WND=32768`；仅在 XSCT `app create` 命中已知 socket 错误时，显式回落同安装树 ARM GCC 直编；随后生成 ELF/BOOT/readback/manifest/SHA256SUMS 并运行 G3 strict `--plan-only`。只读输入硬件包，不连板、不烧录。完整实测命令和环境边界见 [`docs/submission/reproduce-artifacts.md`](../docs/submission/reproduce-artifacts.md) |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
 | `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
 
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；完整同XSA软件包仍待迁移阶段重建验证。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；`rebuild_software_package.py` 已从当日 BKB220 P16 XSA 实际重建软件包并通过 SHA 与 G3 plan-only 门禁。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
-WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。BKB220 P16 完整同 XSA 包已构建，包含 FSBL/BOOT/readback/manifest，并通过 G3；留证见[上传转正记录](../docs/benchmarks/bkb220-p16-upload-promotion.md)。从 `create_vitis.tcl` 到完整包的可重复自动化路径仍需完善：记录中包含 `platform generate` 补步和应用构建回退，不能称为一键流程已闭环。Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
+WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。BKB220 P16 完整同 XSA 包已有 G3 记录，自动软件打包入口已从当日硬件包重建并通过只读制品门禁；留证见[制品复现说明](../docs/submission/reproduce-artifacts.md)和[任务报告](../logs/submission/vitis-chain.md)。`create_vitis.tcl` 的首次 `platform generate` 与第二次 BSP 生成已由新入口调用和校验；XSCT `app create` 的 socket 错误由同树 ARM GCC 明示回退。新重建包尚无板端 G3 证据。Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
 
 Stage1生产P4/P16模块与真实包装接口：`bash tools/run_sim.sh stage1_production` 为LC6短测；`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full` 为LC50生产几何长测，日志和fixture保留在 `logs/iverilog/<run-id>/`。短测不替代生产几何或真板验收。
 

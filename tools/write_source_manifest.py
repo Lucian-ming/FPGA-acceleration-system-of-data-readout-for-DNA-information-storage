@@ -18,7 +18,8 @@ bit/ELF 到底出自哪份源码就只剩人嘴说。
 ----------------------
 只收**决定这份 bit 与这份 ELF 的源**：
   sw/app/*.{c,h}（排除生成的 xparameters.h）、sw/linker、sw/scripts、
-  hw/ip/**、hw/boards、hw/constr、hw/scripts、tools/run_vivado_build.sh、tools/board
+  hw/ip/**、hw/boards、hw/constr、hw/scripts、tools/run_vivado_build.sh、
+  tools/rebuild_software_package.py、tools/board
 `hw/build/`、`logs/`、`tests/` 等测试与留证区**不进清单**——它们不是制品来源。
 
 用法
@@ -59,6 +60,7 @@ def collect(repo: Path) -> list[str]:
         for p in (repo / sub).rglob("*"):
             add(p)
     add(repo / "tools" / "run_vivado_build.sh")
+    add(repo / "tools" / "rebuild_software_package.py")
     for p in (repo / "tools" / "board").rglob("*"):
         add(p)
     return sorted(paths)
