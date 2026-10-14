@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "description": "客户端 LDPC 资源清单。二进制哈希记录清单创建时的现状；来源未知项明确标注，不代表可复现构建。",
+  "resources": [
+    {
+      "file": "R5_6_LDPC_hard_decoder.exe",
+      "sha256": "ceadd2f55445ebae8c042922f047777f4351cb2b9a186c1178279350ba9a7d71",
+      "upstream_source_file": "未记录；docs/01-architecture.md 说明仓库不含该外部解码器源码",
+      "build_command": "未记录；仓库中没有上游源码或构建脚本",
+      "platform": "Windows x86-64 PE32+ 控制台程序"
+    },
+    {
+      "file": "dvb_s2_r5_6.pchk",
+      "sha256": "9b33ea42f3334e5fbc2aa3cb4b76d968a184da591c9dcb0284a29b3964c407dc",
+      "upstream_source_file": "外部 LDPC 解码器资源；精确上游地址/版本未记录",
+      "build_command": "不适用：预编译校验矩阵数据，仓库内无生成器",
+      "platform": "平台无关数据文件"
+    },
+    {
+      "file": "libc_ldpc.so",
+      "sha256": "ce92dcc1026cb4e36b9dd9092c703e428f9ab59e4a4037ca4051e85688cb67a6",
+      "upstream_source_file": "clients/python/c_ldpc_accel.c",
+      "build_command": "gcc -O3 -fPIC -shared -Wall -Wextra c_ldpc_accel.c -o resources/libc_ldpc.so",
+      "platform": "Linux x86-64 ELF shared library"
+    },
+    {
+      "file": "libgcc_s_seh-1.dll",
+      "sha256": "438ae82ffd621a2413199155574cc85681f8986f05420b1485aa4be936c3bc0b",
+      "upstream_source_file": "archive/submission_2025-11-07/演示文件/gui_app.exe（历史 PyInstaller 包内的提取来源；见 docs/archive/tools/2026/retired-20261011/extract_ldpc_dlls.py）",
+      "build_command": "从历史 PyInstaller CArchive 提取；MinGW-w64 GCC runtime 的原始构建命令/发行版未记录",
+      "platform": "Windows x86-64 PE32+ DLL"
+    },
+    {
+      "file": "libstdc++-6.dll",
+      "sha256": "72ce15df7c50e8d0ca57701b0b37394942e5348654505fcb993873b515dfd1d0",
+      "upstream_source_file": "archive/submission_2025-11-07/演示文件/gui_app.exe（历史 PyInstaller 包内的提取来源；见 docs/archive/tools/2026/retired-20261011/extract_ldpc_dlls.py）",
+      "build_command": "从历史 PyInstaller CArchive 提取；MinGW-w64 C++ runtime 的原始构建命令/发行版未记录",
+      "platform": "Windows x86-64 PE32+ DLL"
+    },
+    {
+      "file": "libwinpthread-1.dll",
+      "sha256": "5bbef249a0d00e2d32c699d0bbe89f714ebeb872b3990a5cbeccb1d89f63e5e8",
+      "upstream_source_file": "archive/submission_2025-11-07/演示文件/gui_app.exe（历史 PyInstaller 包内的提取来源；见 docs/archive/tools/2026/retired-20261011/extract_ldpc_dlls.py）",
+      "build_command": "从历史 PyInstaller CArchive 提取；MinGW-w64 winpthreads runtime 的原始构建命令/发行版未记录",
+      "platform": "Windows x86-64 PE32+ DLL"
+    },
+    {
+      "file": "permutation64800",
+      "sha256": "42f751c6d95c782ccaa3171aacf354435f77bc4186e433f52e89827995416742",
+      "upstream_source_file": "外部 LDPC 解码器资源；精确上游地址/版本未记录；tools/gen_ldpc_perm_table.py 仅消费此表而不生成它",
+      "build_command": "不适用：预编译长度 64800 的置换表，仓库内无原始生成器",
+      "platform": "平台无关数据文件"
+    },
+    {
+      "file": "readme.txt",
+      "sha256": "a27142d56688adab8da1df8506543283975f7cd8ed488902f9f1495d54133f74",
+      "upstream_source_file": "本文件；外部来源未记录",
+      "build_command": "不适用：静态说明文本",
+      "platform": "平台无关文本"
+    }
+  ]
+}

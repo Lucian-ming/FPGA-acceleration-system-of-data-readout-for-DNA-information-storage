@@ -96,3 +96,9 @@ tests/stress_results/**/dec_run_*.txt
 /tests/stress_results/g6_config_guard_20260911T035705Z/
 /tests/stress_results/g6_continuous_20260908T121731Z/
 /tests/stress_results/g6_postfault_20260908T165423Z/
+
+# PyInstaller 产物：31 MB 单文件 exe，按用户 2026-10-14 指示不入库
+# （只提交 spec 与打包方法；exe 在 Windows 侧现打）
+clients/dist/
+clients/python/build/
+__pycache__/

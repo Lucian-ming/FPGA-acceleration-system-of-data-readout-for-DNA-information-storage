@@ -17,6 +17,7 @@ CLIENT = REPO / "clients" / "python"
 sys.path.insert(0, str(CLIENT))
 
 import first  # noqa: E402
+import fast_readout  # noqa: E402
 import ldpc_pipeline  # noqa: E402
 import protocol  # noqa: E402
 import task_protocol  # noqa: E402
@@ -195,6 +196,262 @@ class LDPCBackendTests(unittest.TestCase):
                 res_nat = ldpc_pipeline.run_ldpc_decoder(source, output_dir=root, backend="auto")
                 self.assertEqual(res_nat.backend, "native")
                 run_nat.assert_called_once()
+
+
+class ReadoutEquivalenceTests(unittest.TestCase):
+    """比较 first.py 的逐读路径与 fast_readout 的向量化线上输出。"""
+
+    SE150_FASTQ = (
+        REPO / "data" / "R0.83_data" / "Sequencing data"
+        / "DNA-40.5Kb-MC-SE150.fastq"
+    )
+    SEND_TOTAL = 64
+    BATCH_SIZE = 13
+
+    @staticmethod
+    def _first_wire_bytes(
+        path: Path,
+        source_reads: int,
+        *,
+        format_type: str,
+        orient: str,
+        read_bps: int,
+    ) -> bytes:
+        """用 first.py 的逐读记录编码，按 PKT_BATCH 头部序列化线上字节。"""
+        read_size = task_protocol.read_size_bytes(read_bps)
+        records = list(first.iter_reads(
+            path, source_reads, format_type, orient, read_bps
+        ))[:ReadoutEquivalenceTests.SEND_TOTAL]
+        records.extend(
+            [b"\x00" * read_size]
+            * (ReadoutEquivalenceTests.SEND_TOTAL - len(records))
+        )
+
+        packets = []
+        offset = 0
+        while offset < ReadoutEquivalenceTests.SEND_TOTAL:
+            count = min(
+                ReadoutEquivalenceTests.BATCH_SIZE,
+                ReadoutEquivalenceTests.SEND_TOTAL - offset,
+            )
+            chunk = b"".join(records[offset : offset + count])
+            packets.append(struct.pack(">I", count) + chunk)
+            offset += count
+        return b"".join(packets)
+
+    def _assert_wire_matches(
+        self,
+        path: Path,
+        source_reads: int,
+        *,
+        format_type: str,
+        orient: str,
+        read_bps: int,
+        label: str,
+    ) -> None:
+        first_wire = self._first_wire_bytes(
+            path,
+            source_reads,
+            format_type=format_type,
+            orient=orient,
+            read_bps=read_bps,
+        )
+        fast_wire = b"".join(fast_readout.fast_iter_read_batches(
+            path,
+            source_reads,
+            self.SEND_TOTAL,
+            batch_size=self.BATCH_SIZE,
+            format_type=format_type,
+            orient=orient,
+            read_bps=read_bps,
+        ))
+        if first_wire != fast_wire:
+            offset = next(
+                (i for i, (left, right) in enumerate(zip(first_wire, fast_wire))
+                 if left != right),
+                min(len(first_wire), len(fast_wire)),
+            )
+            first_byte = first_wire[offset] if offset < len(first_wire) else None
+            fast_byte = fast_wire[offset] if offset < len(fast_wire) else None
+            self.fail(
+                f"{label}: FAIL；首个不符的线上字节偏移={offset}，"
+                f"first.py={first_byte!r}，fast_readout={fast_byte!r}，"
+                f"长度分别为 {len(first_wire)} / {len(fast_wire)}"
+            )
+
+    @unittest.skipUnless(SE150_FASTQ.is_file(), "缺少真实 SE150 FASTQ 样本")
+    def test_real_fastq_wire_bytes_match(self) -> None:
+        """以仓库外置 R0.83 FASTQ 的前三条真实读段核对线上字节。"""
+        self.assertEqual(
+            len(list(first.iter_source_seqs(self.SE150_FASTQ, 3, "fastq"))), 3
+        )
+        self._assert_wire_matches(
+            self.SE150_FASTQ,
+            3,  # 3 条不是 4 的整数倍；both 后仍由 64 条线上帧补零
+            format_type="fastq",
+            orient="both",
+            read_bps=150,
+            label="R0.83 SE150 FASTQ / both",
+        )
+
+    def test_plain_n_mixed_case_both_orientations_and_two_lengths(self) -> None:
+        """覆盖 plain、N、大小写、非 4 倍数，以及两种方向和读长。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = (
+                ("plain150", 150, ["acgtn" * 30, "TgCaN" * 30, "N" * 150]),
+                ("plain250", 250, ["aCGtn" * 50, "cGATn" * 50, "N" * 250]),
+            )
+            for stem, read_bps, seqs in cases:
+                reads = root / f"{stem}.txt"
+                reads.write_text("\n".join(seqs) + "\n", encoding="ascii")
+                self.assertEqual(len(list(first.iter_source_seqs(
+                    reads, 4, "plain"
+                ))), 3)
+                for orient in ("both", "forward"):
+                    with self.subTest(read_bps=read_bps, orient=orient):
+                        self._assert_wire_matches(
+                            reads,
+                            3,
+                            format_type="plain",
+                            orient=orient,
+                            read_bps=read_bps,
+                            label=f"plain SE{read_bps} / {orient}",
+                        )
+
+    def test_empty_and_single_record_inputs(self) -> None:
+        """空文件不产生伪记录；单条极小批次仍逐字节等价。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            empty = root / "empty.fastq"
+            empty.write_text("", encoding="ascii")
+            self.assertEqual(list(first.iter_source_seqs(empty, 1, "fastq")), [])
+            self.assertEqual(fast_readout.fast_iter_source_seqs(
+                empty, 1, "fastq"
+            ), [])
+            # 请求一条而文件为空时两条生产批处理入口都必须拒绝，不能补成有效读段。
+            for iterator in (first.iter_read_batches,
+                             fast_readout.fast_iter_read_batches):
+                with self.assertRaisesRegex(ValueError, "读段文件提前结束"):
+                    list(iterator(
+                        empty, 1, self.SEND_TOTAL, batch_size=self.BATCH_SIZE,
+                        format_type="fastq", orient="forward", read_bps=150,
+                    ))
+
+            tiny = root / "tiny.fastq"
+            sequence = "AcgTN" * 30
+            tiny.write_text(
+                f"@tiny\n{sequence}\n+\n{'I' * len(sequence)}\n",
+                encoding="ascii",
+            )
+            self._assert_wire_matches(
+                tiny,
+                1,
+                format_type="fastq",
+                orient="forward",
+                read_bps=150,
+                label="one-record FASTQ / forward",
+            )
+
+
+class LDPCBackendCrossCheckTests(unittest.TestCase):
+    """用仓库黄金输入实际运行可用后端并比较解码载荷 SHA-256。"""
+
+    DEC_INPUT = REPO / "tests" / "golden" / "se250" / "dec_input.txt"
+    RESOURCE_DIR = CLIENT / "resources"
+    EXTERNAL_FILES = (
+        "R5_6_LDPC_hard_decoder.exe",
+        "libstdc++-6.dll",
+        "libgcc_s_seh-1.dll",
+        "libwinpthread-1.dll",
+    )
+
+    @staticmethod
+    def _decoded_payload(path: Path) -> bytes:
+        """将文本位串或 0/1 字节载荷规范化为逐位 ASCII 载荷。"""
+        raw = path.read_bytes()
+        text_chars = set(b"01 \t\r\n")
+        if set(raw).issubset(text_chars):
+            payload = bytes(value for value in raw if value in (ord("0"), ord("1")))
+        elif set(raw).issubset({0, 1}):
+            payload = bytes(value + ord("0") for value in raw)
+        else:
+            raise AssertionError(
+                f"无法识别 {path} 的解码载荷格式（{len(raw)} bytes）"
+            )
+        if len(payload) != 54_000:
+            raise AssertionError(
+                f"{path} 应有 54,000 个解码位，实得 {len(payload)}"
+            )
+        return payload
+
+    def _run_backend(self, backend: str, output_dir: Path) -> str:
+        result = ldpc_pipeline.run_ldpc_decoder(
+            self.DEC_INPUT,
+            output_dir=output_dir,
+            backend=backend,
+        )
+        self.assertEqual(result.backend, backend)
+        payload = self._decoded_payload(result.decoded_bits_path)
+        digest = hashlib.sha256(payload).hexdigest()
+        print(
+            f"PASS: LDPC backend={backend} payload_bits={len(payload)} "
+            f"sha256={digest}"
+        )
+        return digest
+
+    def test_native_backend_runs_on_golden_input(self) -> None:
+        self.assertTrue(self.DEC_INPUT.is_file(), f"缺少 LDPC 黄金输入: {self.DEC_INPUT}")
+        input_sha = hashlib.sha256(self.DEC_INPUT.read_bytes()).hexdigest()
+        print(f"LDPC cross-check input={self.DEC_INPUT.name} sha256={input_sha}")
+        with tempfile.TemporaryDirectory() as directory:
+            self._run_backend("native", Path(directory) / "native")
+
+    def test_c_accel_payload_sha_matches_native_when_library_exists(self) -> None:
+        c_library = self.RESOURCE_DIR / "libc_ldpc.so"
+        if not c_library.is_file():
+            reason = f"缺少 {c_library}"
+            print(f"SKIP: LDPC backend=c_accel：{reason}")
+            self.skipTest(reason)
+
+        self.assertTrue(
+            ldpc_pipeline.is_c_accel_available(),
+            "libc_ldpc.so 存在但 c_accel 无法加载，必须修复而不能跳过",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            native_sha = self._run_backend("native", root / "native")
+            c_sha = self._run_backend("c_accel", root / "c_accel")
+        self.assertEqual(
+            c_sha, native_sha,
+            "真实 c_accel 与 native 解码载荷 SHA-256 不同",
+        )
+
+    def test_external_payload_sha_matches_native_when_runnable(self) -> None:
+        missing = [
+            name for name in self.EXTERNAL_FILES
+            if not (self.RESOURCE_DIR / name).is_file()
+        ]
+        if missing:
+            reason = "resources 不完整，缺少 " + ", ".join(missing)
+            print(f"SKIP: LDPC backend=external：{reason}")
+            self.skipTest(reason)
+        if sys.platform != "win32":
+            reason = (
+                f"当前宿主为 {sys.platform}，resources 中是 Windows PE EXE；"
+                "该执行环境不能直接启动此 EXE"
+            )
+            print(f"SKIP: LDPC backend=external：{reason}")
+            self.skipTest(reason)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            native_sha = self._run_backend("native", root / "native")
+            external_sha = self._run_backend("external", root / "external")
+        self.assertEqual(
+            external_sha, native_sha,
+            "真实 external 与 native 解码载荷 SHA-256 不同",
+        )
 
 
 class SE250GeometryTests(unittest.TestCase):

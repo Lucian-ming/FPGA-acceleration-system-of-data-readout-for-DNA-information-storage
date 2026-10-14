@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import numpy as np
-from c_ldpc import decode_bits_c, is_c_accel_available
+from c_ldpc import (
+    decode_bits_c,
+    is_c_accel_available,
+    warn_windows_c_accel_unavailable,
+)
 from native_ldpc import bits_to_jpeg_bytes, decode_file, read_bit_text
 
 DECODER_EXE = "R5_6_LDPC_hard_decoder.exe"
@@ -222,8 +226,13 @@ def run_ldpc_decoder(
     emit = log or (lambda _message: None)
     bits, dec_input_path = _write_dec_input(result_bits_path, output_dir)
 
+    windows_c_accel_missing = False
     if backend == "auto":
-        selected = "c_accel" if is_c_accel_available() else "native"
+        c_accel_available = is_c_accel_available()
+        selected = "c_accel" if c_accel_available else "native"
+        windows_c_accel_missing = sys.platform == "win32" and not c_accel_available
+        if windows_c_accel_missing:
+            warn_windows_c_accel_unavailable(log)
     else:
         selected = backend
 
@@ -239,5 +248,8 @@ def run_ldpc_decoder(
                 return _run_native(result_bits_path, output_dir, dec_input_path, emit)
             raise
     elif selected == "native":
-        return _run_native(result_bits_path, output_dir, dec_input_path, emit)
+        result = _run_native(result_bits_path, output_dir, dec_input_path, emit)
+        if windows_c_accel_missing:
+            result.backend = "native (Windows c_accel unavailable)"
+        return result
     return _run_external(result_bits_path, output_dir, dec_input_path, bits, emit)

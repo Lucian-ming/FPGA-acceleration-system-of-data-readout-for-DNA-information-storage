@@ -26,6 +26,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import socket
 import subprocess
@@ -323,6 +324,11 @@ class DNAAcceleratorApp(tk.Tk):
         ttk.Checkbutton(chk_box, text="跳过水印预载 (仅调试)", variable=self.skip_wm_var).pack(side="left", padx=(0, 12))
         ttk.Checkbutton(chk_box, text="发送 POST 触发硬件流水线", variable=self.post_var).pack(side="left")
 
+        preset_bar = ttk.Frame(card)
+        preset_bar.pack(fill="x", pady=(6, 0))
+        ttk.Button(preset_bar, text="保存参数预设...", command=self._save_parameter_preset).pack(side="left")
+        ttk.Button(preset_bar, text="加载参数预设...", command=self._load_parameter_preset).pack(side="left", padx=6)
+
     def _build_action_card(self, parent: ttk.Frame) -> None:
         card = ttk.Frame(parent, padding=8)
         card.pack(fill="x", pady=(4, 0))
@@ -502,6 +508,126 @@ class DNAAcceleratorApp(tk.Tk):
         )
         if path:
             self.output_var.set(path)
+
+    def _save_parameter_preset(self) -> None:
+        path = filedialog.asksaveasfilename(
+            title="保存参数预设",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialfile="client-preset.json",
+        )
+        if not path:
+            return
+
+        preset = {
+            "schema_version": 1,
+            "parameters": {
+                "ip": self.ip_var.get(),
+                "port": self.port_var.get(),
+                "geom_mode": self.geom_mode_var.get(),
+                "score_min": self.score_min_var.get(),
+                "orient": self.orient_var.get(),
+                "batch": self.batch_var.get(),
+                "send_count": self.send_count_var.get(),
+                "full_scale": self.full_scale_var.get(),
+                "backend": self.backend_var.get(),
+                "skip_watermark": self.skip_wm_var.get(),
+                "post": self.post_var.get(),
+            },
+        }
+        try:
+            Path(path).write_text(
+                json.dumps(preset, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            messagebox.showerror("保存失败", f"无法写入参数预设: {exc}")
+            return
+
+        self._append_log(f"[INFO] 参数预设已保存: {path}")
+        messagebox.showinfo("保存完成", f"参数预设已保存到:\n{path}")
+
+    def _load_parameter_preset(self) -> None:
+        path = filedialog.askopenfilename(
+            title="加载参数预设",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+
+        try:
+            preset = json.loads(Path(path).read_text(encoding="utf-8"))
+            if not isinstance(preset, dict):
+                raise ValueError("预设文件顶层必须是 JSON 对象")
+            if preset.get("schema_version") != 1:
+                raise ValueError("不支持的参数预设版本")
+            values = preset.get("parameters")
+            if not isinstance(values, dict):
+                raise ValueError("缺少 parameters 对象")
+
+            def read_integer(key: str) -> int:
+                raw = values[key]
+                if isinstance(raw, bool):
+                    raise ValueError(f"{key} 必须是整数")
+                if isinstance(raw, int):
+                    return raw
+                if isinstance(raw, str) and raw.isdigit():
+                    return int(raw)
+                raise ValueError(f"{key} 必须是整数")
+
+            ip = values["ip"]
+            port = read_integer("port")
+            geom_mode = values["geom_mode"]
+            score_min = str(values["score_min"])
+            orient = values["orient"]
+            batch = read_integer("batch")
+            send_count = read_integer("send_count")
+            full_scale = values["full_scale"]
+            backend = values["backend"]
+            skip_watermark = values["skip_watermark"]
+            post = values["post"]
+
+            if not isinstance(ip, str):
+                raise ValueError("ip 必须是字符串")
+            if not 0 < port < 65536:
+                raise ValueError("port 必须在 1..65535")
+            if geom_mode not in ("auto (自适应)", "150 (SE150)", "250 (SE250)"):
+                raise ValueError("geom_mode 无效")
+            if score_min and (not score_min.isdigit() or int(score_min) > 1023):
+                raise ValueError("score_min 必须为空或在 0..1023")
+            if orient not in ("both (正反双向-必需)", "forward (仅正向)"):
+                raise ValueError("orient 无效")
+            if batch <= 0:
+                raise ValueError("batch 必须为正整数")
+            if not 0 < send_count <= MAX_TOTAL_READS:
+                raise ValueError(f"send_count 必须在 1..{MAX_TOTAL_READS}")
+            if backend not in (
+                "auto (极速C优先)",
+                "c_accel (C原生加速)",
+                "native (纯Python)",
+                "external (外部EXE)",
+            ):
+                raise ValueError("backend 无效")
+            if not all(isinstance(flag, bool) for flag in (full_scale, skip_watermark, post)):
+                raise ValueError("full_scale、skip_watermark 和 post 必须是布尔值")
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            messagebox.showerror("加载失败", f"参数预设无效或无法读取:\n{exc}")
+            return
+
+        self.ip_var.set(ip)
+        self.port_var.set(str(port))
+        self.geom_mode_var.set(geom_mode)
+        self.score_min_var.set(score_min)
+        self.orient_var.set(orient)
+        self.batch_var.set(str(batch))
+        self.send_count_var.set(send_count)
+        self.full_scale_var.set(full_scale)
+        self.backend_var.set(backend)
+        self.skip_wm_var.set(skip_watermark)
+        self.post_var.set(post)
+        self.send_spin.configure(state="disabled" if full_scale else "normal")
+        self._refresh_estimate()
+        self._append_log(f"[INFO] 参数预设已加载: {path}")
 
     def _auto_detect_default_reads(self) -> None:
         path = Path(self.reads_var.get()).expanduser()

@@ -5,8 +5,11 @@
 from __future__ import annotations
 
 import ctypes
+import hashlib
+import json
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -25,6 +28,7 @@ class CLDPCDecoder:
     """C 原生 LDPC 译码器生命周期与调用封装。"""
 
     def __init__(self, lib_path: Path, pchk_path: Path, perm_path: Path):
+        verify_c_library(lib_path)
         self._lib = ctypes.CDLL(str(lib_path))
 
         # 声明 C 函数原型
@@ -105,7 +109,7 @@ class CLDPCDecoder:
 
 
 def find_c_library() -> Optional[Path]:
-    """在资源路径中查找编译好的 C 动态库。"""
+    """查找并校验当前平台的 C 动态库；哈希不符时立即报错。"""
     candidates = []
     base_dirs = [
         Path(__file__).resolve().parent / "resources",
@@ -115,15 +119,95 @@ def find_c_library() -> Optional[Path]:
         base_dirs.insert(0, Path(sys._MEIPASS) / "resources")  # type: ignore
         base_dirs.insert(0, Path(sys._MEIPASS))  # type: ignore
 
-    names = ["libc_ldpc.so", "c_ldpc.dll", "libc_ldpc.dll"]
+    # Windows 不能把 ELF .so 当作可用候选，否则 auto 会误选后再静默回退。
+    names = (
+        ["c_ldpc.dll", "libc_ldpc.dll"]
+        if os.name == "nt"
+        else ["libc_ldpc.so"]
+    )
     for b in base_dirs:
         for name in names:
             candidates.append(b / name)
 
     for cand in candidates:
         if cand.is_file():
+            verify_c_library(cand)
             return cand
     return None
+
+
+def verify_c_library(lib_path: Path) -> str:
+    """依据同目录 SOURCES.json 校验动态库，返回实际 SHA-256。
+
+    清单缺失、未登记或哈希不符都视为硬错误，不能继续载入二进制。
+    """
+    manifest_candidates = [
+        lib_path.parent / "SOURCES.json",
+        lib_path.parent / "resources" / "SOURCES.json",
+    ]
+    manifest_path = next((path for path in manifest_candidates if path.is_file()), None)
+    if manifest_path is None:
+        raise RuntimeError(
+            f"LDPC C 动态库缺少 SOURCES.json，拒绝载入: {lib_path}"
+        )
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"无法读取 LDPC 资源清单 {manifest_path}: {exc}"
+        ) from exc
+
+    entry = next(
+        (
+            item
+            for item in manifest.get("resources", [])
+            if item.get("file") == lib_path.name
+        ),
+        None,
+    )
+    if entry is None:
+        raise RuntimeError(
+            f"LDPC C 动态库未登记在 {manifest_path}: {lib_path.name}"
+        )
+    expected = entry.get("sha256", "")
+    if (
+        not isinstance(expected, str)
+        or len(expected) != 64
+        or any(char not in "0123456789abcdefABCDEF" for char in expected)
+    ):
+        raise RuntimeError(
+            f"LDPC 资源清单中的 SHA-256 格式无效: {manifest_path} / {lib_path.name}"
+        )
+
+    digest = hashlib.sha256()
+    with lib_path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    actual = digest.hexdigest()
+    if actual.lower() != expected.lower():
+        raise RuntimeError(
+            "LDPC C 动态库 SHA-256 不匹配，拒绝载入: "
+            f"{lib_path} expected={expected.lower()} actual={actual}"
+        )
+    return actual
+
+
+def warn_windows_c_accel_unavailable(log=None) -> bool:
+    """Windows 缺少 C DLL 时向调用者可见地报告，并返回是否发出警告。"""
+    if os.name != "nt" or find_c_library() is not None:
+        return False
+
+    message = (
+        "Windows C 加速不可用：resources/ 中没有 c_ldpc.dll 或 libc_ldpc.dll；"
+        "本次 auto 将使用较慢的 native Python 后端。"
+        "当前仓库只提供 Linux libc_ldpc.so。"
+    )
+    if log is not None:
+        log(f"[WARN] {message}")
+    else:
+        warnings.warn(message, RuntimeWarning, stacklevel=2)
+    return True
 
 
 def is_c_accel_available() -> bool:
@@ -144,7 +228,10 @@ def get_cached_decoder(pchk_path: Path, perm_path: Path) -> CLDPCDecoder:
 
     lib_path = find_c_library()
     if not lib_path:
-        raise FileNotFoundError("未找到 LDPC C 动态库 (libc_ldpc.so / c_ldpc.dll)")
+        raise FileNotFoundError(
+            "未找到当前平台的 LDPC C 动态库 "
+            "(Linux: libc_ldpc.so；Windows: c_ldpc.dll)"
+        )
 
     _CACHED_DECODER = CLDPCDecoder(lib_path, pchk_path, perm_path)
     return _CACHED_DECODER
