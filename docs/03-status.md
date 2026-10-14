@@ -69,7 +69,7 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 
 本轮是旧 ZYNQ ECO R6 / XC7Z010 到 BKB220 / XC7Z020 的 SE150、PL 100 MHz 迁移，Stage1 使用 16 滑窗位置并行。生产几何 150/50/807/957/64、64 记录/帧、线上协议和 8100 B 结果格式不变。BKB220 配置为 `ready=1`；P4/P16 完成整机 route 与 bit/XSA 构建，P4 G3 和 P16 多项板测已有记录。P16 六档矩阵、42 例 v2 数据集板测对照、故障探针和 2 h 长稳已完成。
 
-当前未完成项：v2 的 `score_min=67` 尚未板测；8 个 challenge 例仍以 LDPC 不收敛失败；新载荷四级逐级取证、8 h 长稳、QSPI/SD 冷启动、UART 反向、功耗及 F9 独立复核未完成。完整 P16 包已构建并 G3 PASS，但从 `create_vitis.tcl` 到完整包的自动化路径仍有手动补步。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见下文和对应 benchmark。
+当前未完成项：v2 的 `score_min=67` 尚未板测；8 个 challenge 例仍以 LDPC 不收敛失败；新载荷四级逐级取证、8 h 长稳、QSPI/SD 冷启动、**UART 反向（✅ 2026-10-14 已实测通过，见 [UART 反向实测](benchmarks/bkb220-uart-reverse.md)）**、功耗及 F9 独立复核未完成。完整 P16 包已构建并 G3 PASS，但从 `create_vitis.tcl` 到完整包的自动化路径仍有手动补步。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见下文和对应 benchmark。
 
 工具链按用户指定分工：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 2026.1 只负责烧录、下载和调试。22 主线稳定并完成优化报告后，再做 Windows 2026.1 完整开发链独立复核，规则见 05/07。
 
