@@ -237,7 +237,6 @@
         <spirit:fileSetRef>
           <spirit:localName>xilinx_verilogsynthesis_view_fileset</spirit:localName>
         </spirit:fileSetRef>
-        <spirit:parameters/>
       </spirit:view>
       <spirit:view>
         <spirit:name>xilinx_verilogbehavioralsimulation</spirit:name>
@@ -248,7 +247,6 @@
         <spirit:fileSetRef>
           <spirit:localName>xilinx_verilogbehavioralsimulation_view_fileset</spirit:localName>
         </spirit:fileSetRef>
-        <spirit:parameters/>
       </spirit:view>
       <spirit:view>
         <spirit:name>xilinx_xpgui</spirit:name>
@@ -257,7 +255,6 @@
         <spirit:fileSetRef>
           <spirit:localName>xilinx_xpgui_view_fileset</spirit:localName>
         </spirit:fileSetRef>
-        <spirit:parameters/>
       </spirit:view>
     </spirit:views>
     <spirit:ports>
@@ -584,6 +581,7 @@
   </spirit:choices>
   <spirit:fileSets>
     <spirit:fileSet>
+      <spirit:name>xilinx_verilogsynthesis_view_fileset</spirit:name>
       <spirit:file>
         <spirit:name>hdl/ldpc_decoder_p1.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
@@ -592,17 +590,9 @@
         <spirit:name>hdl/ldpc_decoder_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
-      <spirit:file>
-        <spirit:name>data/bt_col_by_res.hex</spirit:name>
-        <spirit:fileType>memoryInitialization</spirit:fileType>
-      </spirit:file>
-      <spirit:file>
-        <spirit:name>data/bt_res_off.hex</spirit:name>
-        <spirit:fileType>memoryInitialization</spirit:fileType>
-      </spirit:file>
-      <spirit:name>xilinx_verilogsynthesis_view_fileset</spirit:name>
     </spirit:fileSet>
     <spirit:fileSet>
+      <spirit:name>xilinx_verilogbehavioralsimulation_view_fileset</spirit:name>
       <spirit:file>
         <spirit:name>hdl/ldpc_decoder_p1.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
@@ -611,15 +601,6 @@
         <spirit:name>hdl/ldpc_decoder_v1_0.v</spirit:name>
         <spirit:fileType>verilogSource</spirit:fileType>
       </spirit:file>
-      <spirit:file>
-        <spirit:name>data/bt_col_by_res.hex</spirit:name>
-        <spirit:fileType>memoryInitialization</spirit:fileType>
-      </spirit:file>
-      <spirit:file>
-        <spirit:name>data/bt_res_off.hex</spirit:name>
-        <spirit:fileType>memoryInitialization</spirit:fileType>
-      </spirit:file>
-      <spirit:name>xilinx_verilogbehavioralsimulation_view_fileset</spirit:name>
     </spirit:fileSet>
     <spirit:fileSet>
       <spirit:name>xilinx_xpgui_view_fileset</spirit:name>
@@ -628,7 +609,6 @@
         <spirit:fileType>tclSource</spirit:fileType>
         <spirit:userFileType>XGUI_VERSION_2</spirit:userFileType>
       </spirit:file>
-      <spirit:name>xilinx_verilogbehavioralsimulation_view_fileset</spirit:name>
     </spirit:fileSet>
   </spirit:fileSets>
   <spirit:description>片上 DVB-S2 R=5/6 LDPC 译码器 AXI4-Lite 控制 IP</spirit:description>
