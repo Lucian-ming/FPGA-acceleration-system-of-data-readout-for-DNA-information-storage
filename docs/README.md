@@ -24,6 +24,7 @@
 - [逐文件清单](reference/project-inventory-2026-10-10.tsv)：源码、脚本、配置、测试、文档与资产职责。
 - [本轮工具整理与开发路线](reference/tool-cleanup-2026-10-11.md)：6个历史脚本原样归档、启动器选择修正、22开发/26下载及最终26复核。
 - [工作区整理记录](reference/workspace-cleanup-2026-10-10.md)：精确忽略/原位保留范围与已知卫生告警。
+- [片上 LDPC 交接](reference/ldpc-onchip-handoff-2026-10-14.md)：**LDPC 上 PL 的接手入口**——用户已按「展示/集成」立项；L0/L1 已证、L2 为静态估算、**L3（bank 地址转换）未开始**；含硬事实、封停方向与板端现场状态。
 
 ## 本轮证据与历史
 

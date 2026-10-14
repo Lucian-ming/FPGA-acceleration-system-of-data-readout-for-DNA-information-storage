@@ -240,6 +240,14 @@ K 已由 `parameter` 改为 RTL 内 `localparam BASES_PER_CYCLE = 2`，全部构
   判据 `fcd0cf90…b1f2c3` **逐位相同**；载荷回传段实测 **6.06 s**。
   包 `hw/build/bkb220-p16-k2freeze-20261014T000848Z-board-migrate`。
   ⚠️ K=1 的 9.33 s 是异时段值，**不得据此算加速比**（见下「测量纪律」）。
+  同小时背靠背 A/B 已做：K=1 参照包 **9.08 s** → K=2 **6.06 s**，**快 1.50×**。
+  **K=2 已并入 main**（`main == origin/main == b9813c3`）。
+
+**片上 LDPC：用户 2026-10-14 按「展示/集成」定位立项，后续交回 main 对话。**
+接手入口见[片上 LDPC 交接](reference/ldpc-onchip-handoff-2026-10-14.md)：
+L0（矩阵身份）与 L1（定点正确性）**已证**，L2（存储/读端口）为静态估算，
+**L3（bank 地址转换 + 写回调度）未开始，是当前最大未知**。
+**定位是集成度不是提速**——性能上已被证伪（重叠后稳态省 ≈0）。
 
 **K=4 已关闭**（不是「未完成」）。Stage1 优化整体仍在进行；详见
 [多碱基探针报告](benchmarks/stage1-multibase-ooc-probe.md)及[speed交接](reference/speed-handoff-2026-10-13.md)。
