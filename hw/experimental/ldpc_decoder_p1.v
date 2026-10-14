@@ -6,7 +6,7 @@ module ldpc_decoder_p1 #(
     parameter integer N_BITS = 64800,
     parameter integer M_ROWS = 10800,
     parameter integer MAX_ITER = 50,
-    parameter BT_ROM_FILE = "logs/ldpc/golden/bt_by_res.hex",
+    parameter BT_ROM_FILE = "logs/ldpc/golden/bt_col_by_res.hex",
     parameter BT_OFF_FILE = "logs/ldpc/golden/bt_res_off.hex"
 ) (
     input  wire              clk,
@@ -52,9 +52,9 @@ module ldpc_decoder_p1 #(
     (* ram_style = "block" *) reg                  decoded_mem [0:N_BITS-1];
 
     // B_t 转置桶：每桶 20 项；主表同步读，供 BRAM ROM 推断。
-    (* rom_style = "block" *) reg [23:0] bt_rom [0:599];
+    (* rom_style = "block" *) reg [31:0] bt_rom [0:599];
     (* rom_style = "distributed" *) reg [11:0] bt_off_rom [0:30];
-    reg [23:0] bt_data_q;
+    reg [31:0] bt_data_q;
     reg [11:0] bucket_start_q;
 
     initial begin
@@ -67,6 +67,7 @@ module ldpc_decoder_p1 #(
     reg [4:0]  edge_slot_q;
     reg [4:0]  emit_slot_q;
     reg [16:0] scan_idx_q;
+    reg [9:0]  row_a_q;                // row_q / 30，每行算一次
     reg [13:0] failed_checks_q;
     reg [5:0]  iteration_q;
     reg        initial_check_q;
@@ -95,28 +96,20 @@ module ldpc_decoder_p1 #(
     wire [11:0] bt_index_full = bucket_start_q + info_slot_index;
     wire [9:0] bt_index = bt_index_full[9:0];
 
-    wire [13:0] base_x = bt_data_q[21:8];
-    wire [7:0] group_t = bt_data_q[7:0];
-    wire [14:0] row_plus_mod = {1'b0, row_q} + 15'd10800;
-    wire [13:0] delta_x = (row_q >= base_x) ?
-                          (row_q - base_x) :
-                          (row_plus_mod - {1'b0, base_x});
-    // ÷30 改用「乘倒数 + 右移」：Vivado 把常量除法 /30 展开成 11 级进位链，是 WNS 主因
-    // （布线后 -1.663 ns、20 级逻辑、11 个 CARRY4）。
-    // ⚠️ 乘数必须取 ceil(2^S/30)，不能取 floor——floor 版在 30 的整数倍上会少 1
-    //    （30*4369 = 131070 < 2^17 ⇒ 30/30 算成 0）。本处 K=17477、S=19 已在
-    //    delta_x ∈ [0,10800) **全范围**穷举核对与 n/30 精确相等（非仅 30 的倍数）。
-    wire [28:0] info_m_mul = delta_x * 15'd17477;
-    wire [9:0]  info_m = info_m_mul[28:19];              // ≤ 359
-    wire [13:0] info_m_x30 = (info_m << 5) - (info_m << 1);  // 30*m，用于等价复检余数
-    wire [16:0] group_t_ext = {9'd0, group_t};
-    wire [16:0] group_offset = group_t_ext * 17'd360;
-    wire [16:0] info_column = 17'd10800 + group_offset + info_m;
-    // 等价于原来的 (delta_x % 30 == 0) && (info_m < 360)，但不算取模。
-    wire info_addr_valid = (bt_index_full < 12'd600) &&
-                           (group_t < 8'd150) &&
-                           (info_m < 10'd360) &&
-                           (info_m_x30 == delta_x);
+    // ---- 地址计算：用结构关系消掉除法/乘法/取模（2026-10-14） ----
+    // 行 r 与基地址 x 同属 r mod 30 桶。写 r = 30a + ρ、x = 30b + ρ，则
+    //   x + 30m ≡ r (mod 10800)  ⟺  b + m ≡ a (mod 360)  ⟺  m = (a − b) mod 360
+    // 于是列地址 = base_col + m，其中 base_col = 10800 + 360t 与 b 都**预存在表里**。
+    // 这条式子已在 Python 里对全部 10800 行逐行核对（零不一致）。
+    // 上一版用「乘倒数 ÷30」，路径仍有 7 个 CARRY4 + 1 个 DSP（11 ns）；本版每边只剩
+    // 一次 9 位减、一次条件 +360、一次 17 位加。
+    wire [8:0]  base_b     = bt_data_q[8:0];        // b = x/30
+    wire [16:0] info_base  = bt_data_q[25:9];       // 10800 + 360t
+    wire [9:0]  info_m_raw = {1'b0, row_a_q} - {1'b0, base_b};
+    wire [9:0]  info_m     = (row_a_q >= base_b) ? info_m_raw : (info_m_raw + 10'd360);
+    wire [16:0] info_column = info_base + {7'd0, info_m};
+
+    wire info_addr_valid = (bt_index_full < 12'd600);
 
     wire [16:0] check_column = (edge_slot_q == 5'd0) ?
                                ((row_q == 14'd0) ? 17'd0 :
@@ -167,7 +160,7 @@ module ldpc_decoder_p1 #(
     // 同步读口：主 B_t ROM、LLR、聚合和输入位均按周期读取。
     always @(posedge clk) begin
         if (rst) begin
-            bt_data_q      <= 24'd0;
+            bt_data_q      <= 32'd0;
             llr_rd_q       <= 6'sd0;
             llr_addr_q     <= 17'd0;
             sum_rd_q       <= 12'sd0;
@@ -206,6 +199,15 @@ module ldpc_decoder_p1 #(
     wire [16:0] llr_wr_addr = llr_wr_load ? load_addr : sum_addr_q;
     wire [5:0]  llr_wr_data = llr_wr_load ? (load_bit ? 6'sd6 : -6'sd6) : update_llr;
     wire        dec_wr_data = llr_wr_load ? load_bit : ($signed(update_llr) > 0);
+
+    // row_a_q 跟随 row_q（1 拍延迟）。row_q 在整行内不变，而 ROM 数据也需 1 拍才到，
+    // 故算首条边的列地址时 row_a_q 已有效。÷30 用精确乘倒数（K=17477/S=19 已全范围核对）。
+    always @(posedge clk) begin
+        if (rst) row_a_q <= 10'd0;
+        // ⚠️ 乘法必须显式拓宽：Verilog 里 `a * b` 的结果宽度取两操作数的**较大者**，
+        // 写成 (row_q * 15'd17477) 会截成 15 位，再 >>19 恒为 0（踩过一次）。
+        else     row_a_q <= (row_q * 29'd17477) >> 19;
+    end
 
     always @(posedge clk) begin
         if (llr_wr_load || llr_wr_upd) begin
