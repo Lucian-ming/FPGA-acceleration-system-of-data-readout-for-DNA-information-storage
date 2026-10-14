@@ -8,6 +8,7 @@
 | [board-migrate.md](board-migrate.md) | 主Agent派发板级配置、硬软构建和PS固件兼容任务 |
 | [rtl-16way.md](rtl-16way.md) | 主Agent派发正式P16、参数/打包/时序及相关RTL任务 |
 | [verify-system.md](verify-system.md) | 主Agent派发独立验证、制品门禁、性能/泛化/故障/长稳任务 |
+| [ui-modernize.md](ui-modernize.md) | **给「另一个 agent」的独立提示词**（不是本项目角色）：把上位机界面做现代化。**自包含**，含防冲突硬规则——动手前先 `git status` 确认没人正在改 `gui_app.py`、**只许改这一个文件**、**禁止一切 Git 写操作**、看板名固定 `ui-modernize`。附本机 GUI 验证方法（tkinter/xvfb/imagemagick 已装，可截图） |
 | [client.md](client.md) | 主Agent派发**上位机客户端**（`clients/python/`）的优化/改进/补齐：先修「一半测试静默不跑」与「无测试入口」，再补 `fast_readout` vs `first.py` 逐位等价、三后端真实交叉、预编译二进制同源校验与使用文档。含已确认缺口清单（都带实测依据）与明确不做清单 |
 | [speed.md](speed.md) | **speed 主线主Agent**：迁移验收收口后，带队做时间消耗与资源优化（含精细时间预算、已证伪方向清单、判据与资源纪律） |
 
