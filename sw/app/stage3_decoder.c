@@ -354,8 +354,8 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
         xil_printf("[CLEANUP] ✓ Decoder ready for next run\n\r");
 
-        // 准备发送结果
-        pipeline_set_state(PIPE_SEND_RESULT);
+        // Stage3 输出先交给片上 LDPC；最终仍沿用原 SEND_RESULT 协议。
+        pipeline_set_state(PIPE_LDPC_PREP);
         return PIPE_STEP_PROGRESS;
     }
     default:

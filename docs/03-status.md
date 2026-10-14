@@ -247,11 +247,16 @@ K 已由 `parameter` 改为 RTL 内 `localparam BASES_PER_CYCLE = 2`，全部构
   同小时背靠背 A/B 已做：K=1 参照包 **9.08 s** → K=2 **6.06 s**，**快 1.50×**。
   **K=2 已并入 main**（`main == origin/main == b9813c3`）。
 
-**片上 LDPC：用户 2026-10-14 按「展示/集成」定位立项，后续交回 main 对话。**
-接手入口见[片上 LDPC 交接](reference/ldpc-onchip-handoff-2026-10-14.md)：
-L0（矩阵身份）与 L1（定点正确性）**已证**，L2（存储/读端口）为静态估算，
-**L3（bank 地址转换 + 写回调度）未开始，是当前最大未知**。
+**片上 LDPC：L0–L6 已完成，L7（上板）是当前唯一未完成的一步。**
+接手入口见[片上 LDPC 交接](reference/ldpc-onchip-handoff-2026-10-14.md)，集成记录见
+[L6 集成](benchmarks/ldpc-onchip-integration.md)。
+L0（矩阵身份）、L1（定点正确性）**已证**；L4 译码器**对黄金逐位相同**、OOC 布线后 WNS +0.444 ns；
+L5 内层优化**累计周期 4.42×**；L6 已把 AXI 包装 IP 并入整机
+（**整机布线后 WNS +0.334 ns**，`ldpc_decoder_0` 855 LUT/41 BRAM）并交付可构建的软件包。
 **定位是集成度不是提速**——性能上已被证伪（重叠后稳态省 ≈0）。
+⚠️ **L7 未做的三件事**：① 整机 route 通过**不代表**片上 LDPC 在板上跑通；
+② **AXI 边界位序没有仿真覆盖**（L4 是核级仿真，`ldpc_decoder_v1_0.v` 无 testbench），
+L7 若载荷 SHA 不符**第一优先怀疑这里**；③ K=2 板端数值需复测，确认 Stage1 未回退。
 
 **K=4 已关闭**（不是「未完成」）。Stage1 优化整体仍在进行；详见
 [多碱基探针报告](benchmarks/stage1-multibase-ooc-probe.md)及[speed交接](reference/speed-handoff-2026-10-13.md)。

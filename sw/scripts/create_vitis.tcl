@@ -140,6 +140,12 @@ bsp config stdout $uart
 
 platform write
 
+# 新建 workspace 的 BSP include 目录要到首次 platform generate 才会出现。
+# 先生成一次以物化 lwipopts.h；随后下方将 TCP_WND 改为目标值，再生成一次，
+# 让该配置进入 lwIP 库。直接复用已有 BSP 时第一次生成是增量操作。
+puts "===> Initial platform generate (materialize BSP headers)"
+platform generate
+
 # ---------- 提高 lwIP 接收窗口 TCP_WND ----------
 # 【2026-10-13】默认模板里是 `#define TCP_WND 2048`，把读段上传限在 ≈7.8 Mbps：
 # 接收窗口限速时吞吐 ≈ TCP_WND ÷ RTT，2048 B ÷ ~2 ms ≈ 1 MB/s，与实测吻合。

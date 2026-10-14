@@ -15,6 +15,7 @@
 #include "stage1_dna.h"
 #include "stage2_voter.h"
 #include "stage3_decoder.h"
+#include "ldpc_onchip.h"
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
@@ -121,6 +122,9 @@ static const char *pipe_state_name(int st)
     case PIPE_DECODER_START: return "DECODER_START";
     case PIPE_DECODER_WAIT:  return "DECODER_WAIT";
     case PIPE_DONE_STAGE3:   return "DONE_STAGE3";
+    case PIPE_LDPC_PREP:     return "LDPC_PREP";
+    case PIPE_LDPC_RUN:      return "LDPC_RUN";
+    case PIPE_LDPC_READBACK: return "LDPC_READBACK";
     default:                 return "FAIL";
     }
 }
@@ -154,6 +158,8 @@ int run_processing_pipeline(dna_connection_t *conn)
         rc = pipeline_step_stage2(conn);
     } else if (pipe_state >= PIPE_DECODER_PREP && pipe_state <= PIPE_DONE_STAGE3) {
         rc = pipeline_step_stage3(conn);
+    } else if (pipe_state >= PIPE_LDPC_PREP && pipe_state <= PIPE_LDPC_READBACK) {
+        rc = pipeline_step_ldpc();
     } else {
         rc = PIPE_STEP_FAIL;
     }
@@ -345,7 +351,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
 
             if (pipe_state == PIPE_FAIL) { g_proc_state = PROC_FAILED; break; }
 
-            if (pipe_state == PIPE_DONE_STAGE3 && st == XST_SUCCESS) {
+            if (pipe_state == PIPE_SEND_RESULT && st == XST_SUCCESS) {
                 XTime t_end;
                 XTime_GetTime(&t_end);
                 xil_printf("[PIPE] total %u steps in %u callbacks, %u ms "

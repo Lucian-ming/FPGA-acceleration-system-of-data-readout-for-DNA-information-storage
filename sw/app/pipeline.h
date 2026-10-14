@@ -40,6 +40,11 @@ typedef enum {
     PIPE_DECODER_WAIT,
     PIPE_DONE_STAGE3,
 
+    /* 片上 LDPC：装载码字、轮询译码、按字读回收敛结果 */
+    PIPE_LDPC_PREP,
+    PIPE_LDPC_RUN,
+    PIPE_LDPC_READBACK,
+
     PIPE_FAIL
 } pipe_state_e;
 
