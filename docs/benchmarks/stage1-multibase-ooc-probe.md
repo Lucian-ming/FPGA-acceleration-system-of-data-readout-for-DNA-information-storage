@@ -553,5 +553,10 @@ L=4 余量更紧、地址转换更贵、且要一次做对更多东西；**L=2 �
      `stage1_production_full`（LC50），均 `[PRODUCTION EQ] PASS`；
   3. **独立验收员**另做了差分仿真：3,264 块级样本 score/pos/cw **0/0/0 不符**，
      并做**反证**（把组数改成 7 与 9 都必须变红，实测都红）；
-  4. **板端**：`run_g3.sh` 判据 SHA `fcd0cf90…b1f2c3` **逐位不变**。
+  4. **板端**：`run_g3.sh` 判据 SHA `fcd0cf90…b1f2c3` **逐位不变**；该轮**架构判据
+     （板端 syndrome）也通过**（留证 `…/g3_runs/20261014T142107Z`，0/10800），
+     即"逐位不变"不是主机译码兜底得来的。
+     ⚠️ **范围**：那次上板的 bit（`8d17d17e…`）出自**本改动之后、声明顺序修复之前**的源码，
+     **且不含 Stage2 流水化** ⇒ **不能用它证明当前源码**。详见
+     [`stage1-block-overhead-plan.md`](stage1-block-overhead-plan.md) 的 §6。
 - **细节与边界**：见 [`stage1-block-overhead-plan.md`](stage1-block-overhead-plan.md)。

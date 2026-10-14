@@ -20,9 +20,9 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → LDPC → 比解码载荷 SHA → 四级 DDR 取证；默认 JPEG 仍按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA` 按元数据长度写裸字节。`xc7z020` 自动启用严格制品门禁并要求显式 `--artifact-dir`、`--ip`；WSL XSDB 用 `--xsdb /tools/.../xsdb --hw-server TCP:127.0.0.1:3132 --win-root /绝对路径` 本地执行，串口必须收到输出才可验收 PASS。`--allow-uart-skip` 仅供排错并写入摘要 |
+| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
-| `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际收集数不少于 25 |
+| `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际收集数不少于 28；该数是 unittest 收集总数，包含跳过用例 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
 | `verify_repo_binding.sh` | Git 绑定门禁，动手前必跑 |
 | `agent_view.sh` | 多 agent 看板；**禁止手工编辑 `view.md`** |
@@ -42,6 +42,7 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `g3_artifacts.py` | 完整制品目录、SHA、XSA内bit/器件/生产几何与manifest核验；只读预检，不将哈希自洽当作源码因果证明 |
+| `g3_judge.py` | G3 三层判据：复用客户端 syndrome 校验，保留 `ldpc_decode.py` 旧口径诊断；`run_g3.sh --offline-recheck <run-dir>` 可只读复算历史留证，不接触硬件 |
 | `g3_uart_cap.ps1` / `g3_uart_cap.py` | Windows COM 与 WSL `/dev/ttyUSBn` 串口采集器；端口必须显式传入，记录接收量，禁止默认 COM6 |
 | `g3_xsdb.ps1` | Windows XSDB参数桥接，安装/留证路径含空格时分别传参，供G3调用 |
 | `generate_stage1_fixture.py` | 独立NumPy逐符号枚举Stage1 oracle；生产LC50与显式LC6短测，定向807/末区域/补零/并列向量 |
@@ -113,7 +114,7 @@
 | `rebuild_software_package.py` | 从 `hw/build/` 下含 XSA 的硬件包生成独立软件验收包：用 Vitis 2022.2 XSCT 生成平台/BSP/FSBL，先 `platform generate` 物化 BSP 头，再设置并复核 `TCP_WND=32768`；仅在 XSCT `app create` 命中已知 socket 错误时，显式回落同安装树 ARM GCC 直编；随后生成 ELF/BOOT/readback/manifest/SHA256SUMS 并运行 G3 strict `--plan-only`。只读输入硬件包，不连板、不烧录。完整实测命令和环境边界见 [`docs/submission/reproduce-artifacts.md`](../docs/submission/reproduce-artifacts.md) |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
-| `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
+| `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记（含 `.ps1`）、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
 
 
 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；`rebuild_software_package.py` 已从当日 BKB220 P16 XSA 实际重建软件包并通过 SHA 与 G3 plan-only 门禁。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。

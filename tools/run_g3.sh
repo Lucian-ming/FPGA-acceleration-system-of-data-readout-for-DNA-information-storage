@@ -5,7 +5,7 @@
 # 为什么要有它
 # ------------
 # G3 在 2026-08-30 第五次上板闭环，但当时的验收是跨 Windows/WSL 的一串手工步骤：
-# 开串口抓取 → xsdb 烧录 → first.py 跑任务 → ldpc_decode.py 译码 → 比载荷哈希 →
+# 开串口抓取 → xsdb 烧录 → first.py 跑任务 → 板端 syndrome 判据 + 系统 SHA + 主机诊断 →
 # xsdb 只读导出四级 DDR → board_stage_check.py。**判据要能被一条命令复现，才算真的钉住。**
 # 这轮的教训正是「摸索过程本身就会引入错误」（B23~B27 五个缺陷在所有仿真里都是绿的，
 # 只有上板才暴露），所以复现路径本身不能再靠人记步骤。
@@ -13,8 +13,17 @@
 # 判据纪律（AGENTS.md「事实边界」）
 # --------------------------------
 # 界面成功、TCP 返回结果、四级取证全绿，**都不算 G3 通过**。
-# 默认判据是 JPEG 的 SHA-256；传 --input-bytes N 时按 N 字节写出任意载荷，
-# 通过 --expect-sha 比对其 SHA-256。两条路径都只对译码后的板端回传作判定。
+#
+# 三层判据（2026-10-14 更正：**架构与系统都须过**才判 G3 通过）
+#   · 架构判据：板端回传码字的 syndrome 是否全零 —— 回答「板端到底纠对了没有」。
+#     它挡住的是**主机译码兜底**：板端没纠对，靠 PC 补出来也算过。
+#   · 系统判据：从板端合法码字直接载荷出的字节 SHA 是否等于期望 ——
+#     回答「载荷出来的就是期望的那一份吗」。它挡住的是**合法但错误的码字**：
+#     syndrome 全零、架构 PASS，可是载荷不是期望的。
+#   · 诊断层：主机译码 + SHA 的旧口径，**只记录**，任何情况下都不参与裁决。
+# ⚠️ 早先的写法只让架构判据决定裁决。那比旧口径（「只对译码后的板端回传作判定」）
+#    **更宽**——上面第二类错误会被判 PASS，所以已经改掉。反过来，系统判据也**不能**
+#    在架构 FAIL 时独自救场，那正是要杜绝的 PC 兜底。
 #
 # 制品选择与证据边界
 # ------------------
@@ -45,6 +54,8 @@
 #                                                     # 逐轮指定条数与阈值（'-' = 用全局默认，'full' = 全量）
 #   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67 --plan-only
 #                                                     # 只打印逐轮计划，不碰板子（自查参数）
+#   tools/run_g3.sh --offline-recheck <已有 G3 留证目录>
+#                                                     # 只读复算三层判据，不访问硬件
 #   tools/run_g3.sh --ready-deadline 150              # 板端就绪探针（CAPS 握手）多等一会儿
 #
 # 旧ECO默认环境（新板按docs/07-board-build-and-acceptance.md和实际目标核对）
@@ -116,6 +127,7 @@ LIMIT_RUN1=""
 # 「弄脏强度」硬校验：弄脏轮的 score_min 必须**低于**判据轮的，理由见下面的 dirty_strength 检查。
 ALLOW_WEAK_DIRTY=0
 PLAN_ONLY=0                  # 只打印逐轮计划就退出，不碰板子（用来自查参数表）
+OFFLINE_RECHECK_DIR=""      # 只读复算既有留证；绝不执行烧录/串口/TCP/XSDB 流程
 READS_FILE="data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM_FILE="data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 
@@ -163,6 +175,7 @@ while [[ $# -gt 0 ]]; do
         --run-score-mins)   RUN_SCORE_MINS="$2"; shift 2 ;;
         --allow-weak-dirty) ALLOW_WEAK_DIRTY=1; shift ;;
         --plan-only)        PLAN_ONLY=1; shift ;;
+        --offline-recheck)  OFFLINE_RECHECK_DIR="$2"; shift 2 ;;
         --orient)           ORIENT="$2"; shift 2 ;;
         --result-timeout)   RESULT_TIMEOUT="$2"; shift 2 ;;
         --ready-deadline)   READY_DEADLINE="$2"; shift 2 ;;
@@ -188,6 +201,14 @@ while [[ $# -gt 0 ]]; do
         *) echo "未知参数：$1" >&2; usage 2 ;;
     esac
 done
+
+# 离线复算入口必须在任何路径转换、工具/串口检查和 run 目录创建之前分流。
+# g3_judge.py 的中间产物只落在临时目录；历史留证目录保持只读。
+if [[ -n "$OFFLINE_RECHECK_DIR" ]]; then
+    RECHECK_ARGS=(--offline-recheck "$OFFLINE_RECHECK_DIR" --expect-sha "$EXPECT_SHA")
+    [[ -n "$INPUT_BYTES" ]] && RECHECK_ARGS+=(--input-bytes "$INPUT_BYTES")
+    exec python3 tools/board/g3_judge.py "${RECHECK_ARGS[@]}"
+fi
 
 # ---------------------------------------------------------------------------
 # 记账：每一步的 PASS/FAIL 都登记，最后统一裁决。
@@ -340,9 +361,9 @@ for (( r = 1; r <= RUNS; r++ )); do
     [[ "${RUN_SM[r-1]}" != "$SCORE_MIN" ]] && tag="  ← 弄脏轮（输出不作判据）"
     info "  第 $r 轮 : 源读段 $(printf '%8s' "${RUN_SR[r-1]}") 条 → $(printf '%7s' "${RUN_REC[r-1]}") 条记录，score_min=${RUN_SM[r-1]}，超时 ${RUN_TO[r-1]}s$tag"
 done
-info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次才比载荷哈希）"
+info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次作为判据轮）"
 info "载荷输出模式 : $( [[ -n "$INPUT_BYTES" ]] && echo "原始字节截断（$INPUT_BYTES B）" || echo 'JPEG EOI 截断' )"
-info "判据哈希  : $EXPECT_SHA"
+info "系统 SHA  : $EXPECT_SHA（架构判据与系统判据都须过才是 G3 通过）"
 info "留证目录  : $RUN_DIR"
 info "XSDB 模式 : $XSDB_MODE${HW_SERVER_URL:+，hw_server=$HW_SERVER_URL}"
 
@@ -423,7 +444,8 @@ fi
 # ---------------------------------------------------------------------------
 say "1/7 前置检查"
 
-for f in "$READS_FILE" "$WM_FILE" tools/ldpc_decode.py tools/board_stage_check.py \
+for f in "$READS_FILE" "$WM_FILE" tools/ldpc_decode.py tools/board/g3_judge.py \
+         clients/python/ldpc_pipeline.py tools/board_stage_check.py \
          clients/python/first.py tools/board/g3_wait_ready.py tools/board/g3_xsdb.ps1 \
          "$ARTIFACT_DIR/SHA256SUMS"; do
     [[ -e "$f" ]] || die "缺少 $f"
@@ -657,14 +679,29 @@ if (( FAILED )); then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. 逐轮任务：first.py → ldpc_decode.py → 比哈希
+# 6. 逐轮任务：first.py → syndrome 架构判据 + 系统 SHA + 主机译码诊断
 # ---------------------------------------------------------------------------
-declare -a RUN_SHAS=()      # 只装**判据轮**的解码载荷哈希
+declare -a RUN_SHAS=()      # 判据轮的系统载荷 SHA（并行记录）
 declare -a RUN_ELAPSED=()   # 逐轮 first.py 墙钟耗时，用来看长时间连续运行有没有退化
 declare -a RUN_KIND=()      # judge / dirty
+declare -a RUN_LAYER_REPORTS=()
 RUNS_COMPLETED=0
+json_field() {
+    python3 - "$1" "$2" <<'PYJSON'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    value = json.load(stream).get(sys.argv[2])
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif value is None:
+    print("")
+else:
+    print(value)
+PYJSON
+}
 if (( ! FAILED )); then
-say "6/7 下发任务并比对判据哈希（共 $RUNS 轮）"
+say "6/7 下发任务并记录三层判据（共 $RUNS 轮）"
 for (( r = 1; r <= RUNS; r++ )); do
     BITS_OUT="$RUN_DIR/dec_input_run$r.txt"
     if [[ -n "$INPUT_BYTES" ]]; then
@@ -677,13 +714,13 @@ for (( r = 1; r <= RUNS; r++ )); do
     RUN_SCORE_MIN="${RUN_SM[r-1]}"
     RUN_THIS_LIMIT="${RUN_LIMIT[r-1]}"
     # 「弄脏轮」= score_min 与判据轮不同的轮次：它只为在 Voter 累加器里留下
-    # 与判据轮不同向的残差，其自身输出不作判据（低阈值必然放进大量错配读段）。
+    # 与判据轮不同向的残差，其自身输出不作旧多轮系统 SHA 一致性比较。
     DIRTY_RUN=0
     [[ "$RUN_SCORE_MIN" != "$SCORE_MIN" ]] && DIRTY_RUN=1
     RUN_KIND+=("$( (( DIRTY_RUN )) && echo dirty || echo judge )")
 
     info "--- 第 $r/$RUNS 轮：first.py（源读段 ${RUN_SR[r-1]} → ${RUN_REC[r-1]} 条记录，score_min=$RUN_SCORE_MIN）---"
-    (( DIRTY_RUN )) && info "本轮是「弄脏轮」：score_min=$RUN_SCORE_MIN（与判据轮的 $SCORE_MIN 不同），其输出不作判据"
+    (( DIRTY_RUN )) && info "本轮是「弄脏轮」：score_min=$RUN_SCORE_MIN（与判据轮的 $SCORE_MIN 不同），其系统 SHA 仅记录"
     FIRST_ARGS=(--ip "$BOARD_IP" --port "$BOARD_PORT"
                 --reads "$READS_FILE" --watermark "$WM_FILE"
                 --output "$BITS_OUT" --orient "$ORIENT"
@@ -693,54 +730,83 @@ for (( r = 1; r <= RUNS; r++ )); do
     FIRST_ARGS+=(--score-min "$RUN_SCORE_MIN")
 
     T0=$SECONDS
-    if ! python3 clients/python/first.py "${FIRST_ARGS[@]}" > "$CLI_LOG" 2>&1; then
-        step_bad "第 $r 轮 first.py" "非零退出，见 $CLI_LOG"
-        tail -20 "$CLI_LOG"
-        break
+    if python3 clients/python/first.py "${FIRST_ARGS[@]}" > "$CLI_LOG" 2>&1; then
+        FIRST_RC=0
+    else
+        FIRST_RC=$?
     fi
     T_RUN=$(( SECONDS - T0 ))
     RUN_ELAPSED+=("$T_RUN")
     RESULT_LINE="$(grep -E '^\s+Result:' "$CLI_LOG" | tail -1)"
-    step_ok "第 $r 轮 first.py" "${RUN_REC[r-1]} 条记录 / score_min=$RUN_SCORE_MIN / ${T_RUN}s；$RESULT_LINE"
-    info "耗时 ${T_RUN}s；$RESULT_LINE"
-
-    info "--- 第 $r/$RUNS 轮：ldpc_decode.py ---"
-    DECODE_ARGS=(decode "$BITS_OUT" -o "$RUN_DIR/decoded_bits_run$r.txt")
-    if [[ -n "$INPUT_BYTES" ]]; then
-        DECODE_ARGS+=(--payload "$PAYLOAD_OUT" --input-bytes "$INPUT_BYTES")
+    if (( FIRST_RC == 0 )); then
+        step_ok "第 $r 轮 first.py 原始回传" "${RUN_REC[r-1]} 条记录 / score_min=$RUN_SCORE_MIN / ${T_RUN}s；$RESULT_LINE"
+    elif [[ -s "$BITS_OUT" ]] && grep -Eq '板端未纠对|校验行非零' "$CLI_LOG"; then
+        # first.py 在保存原始码字后会因 BoardCodeRejected 退出 1。
+        # 这是架构判据失败，不是传输失败；仍跑主机诊断以保留旧口径可比性。
+        step_ok "第 $r 轮 first.py 原始回传" "TCP 结果已留存；客户端发现 syndrome 非零并退出 1，见 $CLI_LOG"
     else
-        DECODE_ARGS+=(--image "$PAYLOAD_OUT")
-    fi
-    if ! python3 tools/ldpc_decode.py "${DECODE_ARGS[@]}" \
-            > "$RUN_DIR/ldpc_run$r.log" 2>&1; then
-        if (( DIRTY_RUN )); then
-            # 弄脏轮的板端输出本来就可能是噪声，译不出来很正常，不是判据。
-            info "弄脏轮 LDPC 未能译出（预期之内，不作判据）"
-            step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录"
-            RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
-            continue
-        fi
-        step_bad "第 $r 轮 LDPC 译码" "非零退出，见 $RUN_DIR/ldpc_run$r.log"
-        tail -20 "$RUN_DIR/ldpc_run$r.log"
+        step_bad "第 $r 轮 first.py" "非零退出码 $FIRST_RC，未发现可复算的板端 syndrome 拒绝；见 $CLI_LOG"
+        tail -20 "$CLI_LOG"
         break
     fi
-    grep -E "失败校验|收敛|iter" "$RUN_DIR/ldpc_run$r.log" | head -4 | sed 's/^/    /'
+    info "耗时 ${T_RUN}s；${RESULT_LINE:-客户端未报告 Result 行}"
 
-    GOT_SHA="$(sha256sum "$PAYLOAD_OUT" | awk '{print $1}')"
-    if (( DIRTY_RUN )); then
-        info "弄脏轮载荷 SHA-256 = $GOT_SHA（不作判据）"
-        step_ok "第 $r 轮 弄脏轮已执行" "score_min=$RUN_SCORE_MIN，${RUN_REC[r-1]} 条记录，载荷 $GOT_SHA（不作判据）"
-        RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
-        continue
-    fi
-    RUN_SHAS+=("$GOT_SHA")
-    if [[ "$GOT_SHA" == "$EXPECT_SHA" ]]; then
-        step_ok "第 $r 轮 唯一判据（载荷 SHA-256）" "${RUN_REC[r-1]} 条记录：$GOT_SHA"
-        info "载荷 SHA-256 = $GOT_SHA  ← 与判据逐位相同"
+    LAYER_DIR="$RUN_DIR/g3_layers_run$r"
+    LAYER_JSON="$RUN_DIR/g3_layers_run$r.json"
+    LAYER_REPORT="$RUN_DIR/g3_layers_run$r.txt"
+    JUDGE_ARGS=(--bits "$BITS_OUT" --output-dir "$LAYER_DIR" --json-out "$LAYER_JSON"
+                --expect-sha "$EXPECT_SHA"
+                --host-bits-out "$RUN_DIR/decoded_bits_run$r.txt"
+                --host-payload-out "$PAYLOAD_OUT"
+                --host-log-out "$RUN_DIR/ldpc_run$r.log")
+    [[ -n "$INPUT_BYTES" ]] && JUDGE_ARGS+=(--input-bytes "$INPUT_BYTES")
+    if python3 tools/board/g3_judge.py "${JUDGE_ARGS[@]}" > "$LAYER_REPORT" 2>"$RUN_DIR/g3_judge_run$r.err"; then
+        JUDGE_RC=0
     else
-        step_bad "第 $r 轮 唯一判据（载荷 SHA-256）" "实得 $GOT_SHA"
-        info "实得 : $GOT_SHA"
-        info "判据 : $EXPECT_SHA"
+        JUDGE_RC=$?
+    fi
+    if [[ ! -s "$LAYER_JSON" ]]; then
+        step_bad "第 $r 轮三层判据计算" "工具退出码 $JUDGE_RC，见 $RUN_DIR/g3_judge_run$r.err"
+        cat "$RUN_DIR/g3_judge_run$r.err" >&2
+        break
+    fi
+
+    ARCH_STATUS="$(json_field "$LAYER_JSON" architecture_status)"
+    ARCH_FAILED_ROWS="$(json_field "$LAYER_JSON" syndrome_failed_rows)"
+    ARCH_TOTAL_ROWS="$(json_field "$LAYER_JSON" syndrome_total_rows)"
+    SYSTEM_STATUS="$(json_field "$LAYER_JSON" system_status)"
+    SYSTEM_SHA="$(json_field "$LAYER_JSON" system_sha256)"
+    SYSTEM_SOURCE="$(json_field "$LAYER_JSON" system_source)"
+    DIAGNOSTIC_NOTE="$(json_field "$LAYER_JSON" diagnostic_decoder)"
+    DIAGNOSTIC_SHA="$(json_field "$LAYER_JSON" diagnostic_sha256)"
+    LEGACY_STATUS="$(json_field "$LAYER_JSON" legacy_status)"
+    PC_FALLBACK="$(json_field "$LAYER_JSON" pc_fallback_recovered_expected_sha)"
+    RUN_LAYER_REPORTS+=("$LAYER_REPORT")
+
+    if [[ "$ARCH_STATUS" == "PASS" ]]; then
+        step_ok "第 $r 轮架构判据（板端 syndrome 全零）" "$ARCH_FAILED_ROWS/$ARCH_TOTAL_ROWS 条非零校验行"
+    else
+        step_bad "第 $r 轮架构判据（板端 syndrome 全零）" \
+            "架构判据未过：板端未纠对，$ARCH_FAILED_ROWS/$ARCH_TOTAL_ROWS 条非零校验行"
+    fi
+    # 系统判据：架构过、但板端码字载荷出的字节不是期望的那一份 ⇒ 结果是错的，判 FAIL。
+    # 架构没过时系统判据取的是 PC 诊断译码，那种情形下它只作比较，由上面那条架构判据定成败。
+    if [[ "$ARCH_STATUS" == "PASS" ]]; then
+        if [[ "$SYSTEM_STATUS" == "PASS" ]]; then
+            step_ok "第 $r 轮系统判据（板端码字载荷 SHA）" "来源=$SYSTEM_SOURCE"
+        else
+            step_bad "第 $r 轮系统判据（板端码字载荷 SHA）" \
+                "系统判据未过：板端码字合法但载荷不是期望的那一份（SHA=${SYSTEM_SHA:-无载荷}，期望 $EXPECT_SHA）"
+        fi
+    else
+        info "系统判据（架构未过，取主机诊断译码，仅供比较）: $SYSTEM_STATUS；SHA=${SYSTEM_SHA:-无载荷}；来源=$SYSTEM_SOURCE"
+    fi
+    info "诊断层（不参与判定）: $DIAGNOSTIC_NOTE；主机译码 SHA=${DIAGNOSTIC_SHA:-不可用}；旧口径=$LEGACY_STATUS"
+    [[ "$PC_FALLBACK" == "true" ]] && info "PC兜底告警：系统 SHA 通过但架构判据未过，旧口径依赖主机译码"
+    [[ "$(json_field "$LAYER_JSON" verdict)" == "PASS" ]] || info "本轮三层裁决：FAIL"
+    sed 's/^/    /' "$LAYER_REPORT"
+    if [[ "${RUN_KIND[r-1]}" == "judge" && -n "$SYSTEM_SHA" ]]; then
+        RUN_SHAS+=("$SYSTEM_SHA")
     fi
     RUNS_COMPLETED=$(( RUNS_COMPLETED + 1 ))
 done
@@ -769,13 +835,12 @@ for (( r = 2; r <= RUNS_COMPLETED; r++ )); do
     fi
 done
 
-# 多轮一致性：所有**判据轮**必须拿到同一张图片。各轮哈希都对时这条自然成立，
-# 但若判据哈希本身换过（--expect-sha），这条仍然能独立抓出「后面某轮状态没复位」。
+# 多轮一致性：记录所有判据轮的系统载荷 SHA，作为并行诊断信息。
 if (( ${#RUN_SHAS[@]} > 1 )); then
     if [[ "$(printf '%s\n' "${RUN_SHAS[@]}" | sort -u | wc -l)" == "1" ]]; then
-        step_ok "多轮一致性（${#RUN_SHAS[@]} 个判据轮同一张图片）"
+        step_ok "多轮系统 SHA 一致性（仅记录）" "${#RUN_SHAS[@]} 个判据轮哈希相同"
     else
-        step_bad "多轮一致性（${#RUN_SHAS[@]} 个判据轮同一张图片）" "$(printf '%s ' "${RUN_SHAS[@]}")"
+        step_skip "多轮系统 SHA 一致性（仅记录）" "各轮哈希不同：$(printf '%s ' "${RUN_SHAS[@]}")；不参与三层裁决"
     fi
 fi
 
@@ -870,7 +935,7 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "时间(UTC)   : $STAMP"
     echo "命令        : tools/run_g3.sh $INVOCATION"
     echo "任务次数    : $RUNS（同一次上电内连续下发，中间不复位、不重烧）"
-    echo "判据阈值    : score_min=$SCORE_MIN（只有这个阈值的轮次才比载荷哈希）"
+    echo "判据阈值    : score_min=$SCORE_MIN（该阈值标识常规判据轮；每轮架构 syndrome 均判定）"
     echo "载荷字节数  : ${INPUT_BYTES:-JPEG EOI 截断}"
     echo "orient      : $ORIENT（both = 每条读段发正/反两条记录），记录数按 64 对齐"
     echo
@@ -899,8 +964,14 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "串口接收量  : $(tr -d '\r' < "$RUN_DIR/uart_cap.out" 2>/dev/null | sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' | tail -1)"
     echo "串口        : ${UART_PORT:-未抓取}"
     echo "制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）"
-    echo "判据哈希    : $EXPECT_SHA"
+    echo "期望系统 SHA: $EXPECT_SHA（系统判据；架构判据与它都须过才是 G3 通过）"
     echo
+    echo "三层判据（架构与系统都须过；主机译码仅作诊断，不参与裁决）"
+    for layer_report in "${RUN_LAYER_REPORTS[@]}"; do
+        [[ -f "$layer_report" ]] || continue
+        cat "$layer_report"
+        echo
+    done
     printf '%-6s  %s\n' "结果" "步骤"
     for i in "${!STEP_NAMES[@]}"; do
         printf '%-6s  %s%s\n' "${STEP_STATES[$i]}" "${STEP_NAMES[$i]}" \
@@ -915,11 +986,11 @@ info "全部留证：$RUN_DIR"
 
 if (( FAILED )); then
     printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
-    printf '唯一判据是译码载荷 SHA-256；上面第一个 FAIL 就是要定位的那一级。\n'
+    printf '本次架构判据或既有流程步骤失败；系统 SHA 与主机译码诊断不会覆盖 syndrome 失败。\n'
     exit 1
 fi
 # 没跑完所有轮次就谈不上 PASS —— 别让「一步都没做」被当成通过。
-# 注意用 RUNS_COMPLETED 而不是 ${#RUN_SHAS[@]}：弄脏轮跑完了但不产出判据哈希。
+# 注意用 RUNS_COMPLETED 而不是 ${#RUN_SHAS[@]}：弄脏轮跑完了也不计入判据轮 SHA 汇总。
 if (( RUNS_COMPLETED < RUNS )); then
     printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
     printf '预期 %d 轮，实际只完成 %d 轮。\n' "$RUNS" "$RUNS_COMPLETED"
@@ -928,9 +999,9 @@ fi
 # 判据轮一个都没有也不能算通过。
 if (( ${#RUN_SHAS[@]} == 0 )); then
     printf '\n\033[31m######## G3 FAIL ########\033[0m\n'
-    printf '没有任何一轮产出判据哈希。\n'
+    printf '没有任何一轮产出判据轮的系统 SHA。\n'
     exit 1
 fi
 printf '\n\033[32m######## G3 PASS ########\033[0m\n'
-printf '板端回传经 LDPC 译码后的载荷 SHA-256 与判据逐位相同：%s\n' "$EXPECT_SHA"
+printf '板端回传 syndrome 全零；系统 SHA 与旧口径诊断结果见 summary.txt（不改变架构判据裁决）。\n'
 exit 0
