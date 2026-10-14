@@ -197,10 +197,6 @@ class LDPCBackendTests(unittest.TestCase):
                 run_nat.assert_called_once()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class SE250GeometryTests(unittest.TestCase):
     """SE250（64,800 条 × 250 bp）的主机侧支持。
 
@@ -403,3 +399,7 @@ class CLDPCAndAdaptivityTests(unittest.TestCase):
         self.assertEqual(info250.detected_read_bps, 250)
         self.assertEqual(info250.suggested_score_min, 112)
         self.assertAlmostEqual(info250.estimated_seconds, 126.70, delta=0.5)
+
+
+if __name__ == "__main__":
+    unittest.main()
