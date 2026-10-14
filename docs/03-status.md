@@ -230,9 +230,11 @@ K 已由 `parameter` 改为 RTL 内 `localparam BASES_PER_CYCLE = 2`，全部构
 - **全量回归 `bash tools/run_sim.sh all`：25 项通过、0 项失败**（日志 `logs/iverilog/`，`logs/` 已忽略）。
   覆盖 `srpe_batch` / `4way` / `pway`(p4+p16) / `dna_stage1`(等价+接口) / `accelerator_core_4way` /
   `ingress` / `dna_axil` / `voter` / 主机单元测试 / 三顶层语法检查。
-- **LC50 生产几何判据运行中**（该档仿真量约为 LC6 的 8 倍，估约 75 min；
-  **未出结果前不得记为通过**）。注：板端跑的就是 LC=50 生产几何 + 真实数据，
-  板测通过时其证据强度高于本仿真档。
+- **LC50 生产几何判据也已通过**（`stage1_production_full` 的等价用例）：
+  同样是「生产 P4 + 独立 oracle」score/pos/cw 三重逐位，两轮均 PASS；
+  周期比 **5.21×**（1,680,956 → 322,507）。**该倍数与 LC6 的 2.70× 不是同一口径**，
+  因为 P4 的周期随 NUM_LC 扩张更快。
+  （该入口的第二个用例 `dna_stage1_p16_interface` 在同一轮里接续运行。）
 - 打包门禁已按约定**显式替换**（旧的 P14 字节等价 → 源码 SHA 冻结 + 行为判据）并 PASS。
 - **整机重建**：35,702 LUT / RAMB36 48 / DSP 5、WNS +0.313 / WHS +0.036、
   **0 失败端点（共 88,748）、DRC 0 Error**，与写死前逐项相同。

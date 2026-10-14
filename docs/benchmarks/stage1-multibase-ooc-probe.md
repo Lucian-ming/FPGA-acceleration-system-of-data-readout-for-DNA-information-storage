@@ -305,7 +305,19 @@ banking 都未证；`column mod bank_count` 的实测统计是 4 bank 时每行�
 | **冻结版（`localparam` = 2）** | **258,875** | **95,873** | PASS |
 
 **周期数逐位相同** ⇒ 把可配置参数改成常量没有改变任何行为。
-LC50 生产几何的同一判据**另行运行**（结果见下文/`docs/03-status.md` 的进展记录）。
+
+**LC50 生产几何（`bash tools/run_sim.sh stage1_production_full`）也已通过**：
+
+```
+[PRODUCTION EQ] round=0 LC=50 P4=1680956 P16=322507 PASS
+[PRODUCTION EQ] round=1 LC=50 P4=1680956 P16=322507 PASS
+[PRODUCTION EQ] PASS 独立oracle、末组/807/补零/反向/并列零分/复位再任务
+```
+
+同一条判据（生产 P4 + 独立 oracle、score/pos/cw 三重逐位）在两档几何上都成立。
+**LC50 的周期比是 5.21×**（1,680,956 → 322,507），高于 LC6 的 2.70×——
+因为 P4 的周期数随 NUM_LC 扩张得更快（8.33 倍区域数下 P4 ×6.49、P16 ×3.36）。
+**两个倍数不是同一口径，不可混用。**
 
 ### 整机：与写死前逐项相同
 
