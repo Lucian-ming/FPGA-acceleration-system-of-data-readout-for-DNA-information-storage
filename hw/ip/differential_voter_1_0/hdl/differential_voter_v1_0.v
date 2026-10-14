@@ -246,7 +246,9 @@ module differential_voter_v1_0 #
         S_OUTPUT_WRITE    = 5'd13,
         S_WAIT_BRESP      = 5'd14,
         S_DONE            = 5'd15,
-        S_ERROR           = 5'd16;
+        S_ERROR           = 5'd16,
+        S_VOTE_PIPE       = 5'd18,
+        S_VOTE_DRAIN      = 5'd19;
 
     reg [4:0] state, next_state;
 
@@ -271,6 +273,12 @@ module differential_voter_v1_0 #
     reg  signed [9:0] bram_din;
     reg               bram_we;
 
+    // 投票读写地址分离；元数据与两级 BRAM 读延迟对齐。
+    reg [16:0] bram_wr_addr;
+    reg [16:0] vote_addr_stage0, vote_addr_stage1;
+    reg        vote_bit_stage0, vote_bit_stage1;
+    reg        vote_valid_stage0, vote_valid_stage1;
+
     // BRAM 实体 + 同步读寄存器
     // 【修订 B13】读通路只有两级：bram_addr →（打一拍）bram_raddr_q →
     // （同步读出）bram_dout。原先还有一级 bram_dout_r，使数据晚 3 拍才到，
@@ -282,8 +290,6 @@ module differential_voter_v1_0 #
 
     wire [9:0]  parse_score    = read_words[0][9:0];
     wire [15:0] parse_position = read_words[0][25:10];
-
-    reg [16:0] pre_calc_addr;
 
     reg [16:0] init_addr;          // 17位，足够覆盖 81000
     reg [31:0] read_count;
@@ -333,6 +339,13 @@ module differential_voter_v1_0 #
         end
     endfunction
 
+    wire [16:0] vote_issue_addr =
+        safe_address(calc_layer_position(bit_in_codeword, current_position));
+    wire [16:0] bram_read_addr =
+        (state == S_VOTE_PIPE) ? vote_issue_addr : bram_addr;
+    wire signed [9:0] vote_read_value =
+        (bram_we && (bram_wr_addr == vote_addr_stage1)) ? bram_din : bram_dout;
+
     function signed [9:0] safe_vote_value;
         input signed [9:0] vote;
         begin
@@ -359,7 +372,8 @@ module differential_voter_v1_0 #
     // 【D1/D2】比对分低于阈值的记录不参与投票（含上位机补零的尾批记录）。
     // parse_score 在 S_PARSE_READ 拍从 read_words[0] 组合读出，天然有效。
     wire score_below_min      = ({22'd0, parse_score} < score_min_cfg);
-    wire vote_update_complete = (bit_in_codeword >= CODEWORD_BITS - 1);
+    wire vote_issue_complete  = (bit_in_codeword >= CODEWORD_BITS - 1);
+    wire vote_drain_complete  = !vote_valid_stage0 && !vote_valid_stage1 && !bram_we;
 
     // A long task is valid as long as AXI or the internal pipeline is advancing.
     // The absolute counter catches runaway tasks; the no-progress counter catches
@@ -371,8 +385,8 @@ module differential_voter_v1_0 #
         (M00_AXI_WVALID  && M00_AXI_WREADY)  ||
         (M00_AXI_BVALID  && M00_AXI_BREADY)  ||
         (state == S_INIT_BRAM && init_addr <= (TOTAL_BITS - 1)) ||
-        (state == S_CALC_ADDR) ||
-        (state == S_VOTE_UPDATE) ||
+        (state == S_VOTE_PIPE) ||
+        (state == S_VOTE_DRAIN) ||
         (state == S_OUTPUT_PACK && output_bit_count < TOTAL_BITS);
 
     reg [31:0] global_timeout_counter;
@@ -381,8 +395,8 @@ module differential_voter_v1_0 #
     // ----------------- BRAM 同步读写（UG901 模板） -----------------
     always @(posedge M00_AXI_ACLK) begin
         if (bram_we)
-            bram[bram_addr] <= bram_din;     // 写
-        bram_raddr_q <= bram_addr;           // 读地址打一拍
+            bram[bram_wr_addr] <= bram_din;  // 独立写地址，允许读写同时前进
+        bram_raddr_q <= bram_read_addr;      // 读地址打一拍
         bram_dout    <= bram[bram_raddr_q];  // 同步读
     end
 
@@ -419,8 +433,15 @@ module differential_voter_v1_0 #
             bit_in_codeword     <= 9'd0;
 
             bram_addr           <= 17'd0;
+            bram_wr_addr        <= 17'd0;
             bram_din            <= 10'sd0;
             bram_we             <= 1'b0;
+            vote_addr_stage0    <= 17'd0;
+            vote_addr_stage1    <= 17'd0;
+            vote_bit_stage0     <= 1'b0;
+            vote_bit_stage1     <= 1'b0;
+            vote_valid_stage0   <= 1'b0;
+            vote_valid_stage1   <= 1'b0;
 
             output_bit_count    <= 17'd0;
             output_word         <= 64'd0;
@@ -437,8 +458,6 @@ module differential_voter_v1_0 #
 
             codeword_sr         <= {CODEWORD_BITS{1'b0}};
             current_position    <= 16'd0;
-
-            pre_calc_addr       <= 17'd0;
 
             debug_state_count   <= 32'd0;
             debug_pack_count    <= 32'd0;
@@ -458,6 +477,24 @@ module differential_voter_v1_0 #
         end else begin
             bram_we      <= 1'b0;
             pack_trigger <= 1'b0;
+
+            // 两级票元数据与 bram_dout 对齐；消费票通过单级待写结果旁路。
+            vote_valid_stage0 <= (state == S_VOTE_PIPE);
+            vote_valid_stage1 <= vote_valid_stage0;
+            vote_addr_stage1  <= vote_addr_stage0;
+            vote_bit_stage1   <= vote_bit_stage0;
+            if (state == S_VOTE_PIPE) begin
+                vote_addr_stage0 <= vote_issue_addr;
+                vote_bit_stage0  <= codeword_sr[0];
+            end
+            if (vote_valid_stage1) begin
+                if (vote_bit_stage1)
+                    bram_din <= safe_vote_value(vote_read_value + 10'sd1);
+                else
+                    bram_din <= safe_vote_value(vote_read_value - 10'sd1);
+                bram_wr_addr <= vote_addr_stage1;
+                bram_we      <= 1'b1;
+            end
 
             if (state == S_OUTPUT_PACK)  debug_pack_count  <= debug_pack_count + 1;
             if (state == S_OUTPUT_SETUP) debug_setup_count <= debug_setup_count + 1;
@@ -502,8 +539,9 @@ module differential_voter_v1_0 #
 
                 S_INIT_BRAM: begin
                     if ((FAST_INIT && init_addr <= 17'd63) || (!FAST_INIT && init_addr <= (TOTAL_BITS - 1))) begin
-                        bram_addr <= init_addr;
-                        bram_din  <= 10'sd0;
+                        bram_addr    <= init_addr;
+                        bram_wr_addr <= init_addr;
+                        bram_din     <= 10'sd0;
                         bram_we   <= 1'b1;
                         init_addr <= init_addr + 1;
                     end
@@ -544,48 +582,19 @@ module differential_voter_v1_0 #
 
                     bit_in_codeword <= 9'd0;
 
-                    pre_calc_addr     <= safe_address(calc_layer_position(9'd0, parse_position));
                     debug_state_count <= state;
                 end
 
-                S_CALC_ADDR: begin
-                    bram_addr <= pre_calc_addr;
-                    if (bit_in_codeword < CODEWORD_BITS - 1) begin
-                        pre_calc_addr     <= safe_address(calc_layer_position(bit_in_codeword + 1, current_position));
-                    end
-                    debug_state_count <= state;
-                end
-
-                S_VOTE_READ: begin
-                    // 【修订 B13】bram_addr 在上一拍（S_CALC_ADDR 末沿）才更新，
-                    // 两级读管线要再等一拍数据才对齐到 S_VOTE_UPDATE。
-                    debug_state_count <= state;
-                end
-
-                S_VOTE_WAIT: begin
-                    debug_state_count <= state;
-                end
-
-                S_VOTE_UPDATE: begin
-                    // 【修订 B13】改用 bram_dout（两级：bram_addr→bram_raddr_q→bram_dout），
-                    // 本拍恰好对齐本位的累加器；原先的 bram_dout_r 晚一拍，读到上一位。
-                    if (codeword_sr[0]) begin
-                        bram_din         <= safe_vote_value(bram_dout + 10'sd1);
-                    end else begin
-                        bram_din         <= safe_vote_value(bram_dout - 10'sd1);
-                    end
-                    bram_we <= 1'b1;
-
-                    if (bit_in_codeword < CODEWORD_BITS - 1)
-                        bit_in_codeword <= bit_in_codeword + 1;
-
-                    // 【S1】本拍消费了最低位，右移一位对准下一位。
-                    // S_VOTE_UPDATE 每条记录恰好进 CODEWORD_BITS 次
-                    // （vote_update_complete 之后转 S_NEXT_READ，见 next_state），
-                    // 所以最后一次多移的那一位不会被读到，且下一条记录的
-                    // S_PARSE_READ 会整体重载，因此不需要条件保护。
+                S_VOTE_PIPE: begin
+                    // 每拍发射一位；地址由当前索引计算，元数据随后与读数据对齐。
+                    bram_addr <= vote_issue_addr;
+                    if (!vote_issue_complete)
+                        bit_in_codeword <= bit_in_codeword + 1'b1;
                     codeword_sr <= {1'b0, codeword_sr[CODEWORD_BITS-1:1]};
+                    debug_state_count <= state;
+                end
 
+                S_VOTE_DRAIN: begin
                     debug_state_count <= state;
                 end
 
@@ -698,11 +707,11 @@ module differential_voter_v1_0 #
                 S_READ_DATA:       next_state = !rd_burst_complete ? S_READ_DATA
                                               : (read_data_complete ? S_PARSE_READ : S_READ_SETUP);
                 // 【D1/D2】低分记录直接跳到下一条，不进入投票循环
-                S_PARSE_READ:      next_state = score_below_min ? S_NEXT_READ : S_CALC_ADDR;
-                S_CALC_ADDR:       next_state = S_VOTE_READ;
-                S_VOTE_READ:       next_state = S_VOTE_WAIT;   // 【修订 B13】
-                S_VOTE_WAIT:       next_state = S_VOTE_UPDATE;
-                S_VOTE_UPDATE:     next_state = vote_update_complete ? S_NEXT_READ : S_CALC_ADDR;
+                S_PARSE_READ:      next_state = score_below_min ? S_NEXT_READ : S_VOTE_PIPE;
+                S_VOTE_PIPE:       next_state = vote_issue_complete
+                                              ? ((read_count >= total_reads - 1) ? S_VOTE_DRAIN : S_NEXT_READ)
+                                              : S_VOTE_PIPE;
+                S_VOTE_DRAIN:      next_state = vote_drain_complete ? S_NEXT_READ : S_VOTE_DRAIN;
                 S_NEXT_READ:       next_state = (read_count >= total_reads - 1) ? S_OUTPUT_PREFETCH : S_READ_SETUP;
                 S_OUTPUT_PREFETCH: next_state = S_OUTPUT_ADDR;
 
@@ -911,7 +920,7 @@ module differential_voter_v1_0 #
                         cycles_read <= cycles_read + 1'b1;
                 end
 
-                S_PARSE_READ, S_CALC_ADDR, S_VOTE_READ, S_VOTE_WAIT, S_VOTE_UPDATE, S_NEXT_READ: begin
+                S_PARSE_READ, S_VOTE_PIPE, S_VOTE_DRAIN, S_NEXT_READ: begin
                     if (!(&cycles_vote))
                         cycles_vote <= cycles_vote + 1'b1;
                 end
