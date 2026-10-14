@@ -205,6 +205,16 @@ for t in ('manifest.json','artifact_manifest.json'):
 print('manifest 已更新')
 PY
 
+if (( SYNC_SRC )); then
+  # 【2026-10-14 修】--sync-src 换掉了源码，但上面那步只把**参考包**的
+  # reports/source_manifest.json 原样复制了过来 ⇒ 清单描述的源码与包里真编的源码
+  # 对不上，而门禁只校验格式、查不出这种不一致。这里按当前工作树重新生成清单，
+  # 再让下面的重签把新哈希固化。生成器自带范围与合法性自检。
+  python3 "$REPO/tools/write_source_manifest.py" --package "$OUT_ABS" >/dev/null \
+    || { echo "source_manifest 重新生成失败" >&2; exit 1; }
+  echo "  source_manifest 已按当前工作树重建（--sync-src）"
+fi
+
 ( cd "$OUT_ABS" && find . -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort \
     | xargs -d '\n' sha256sum > SHA256SUMS )
 ( cd "$OUT_ABS" && sha256sum -c SHA256SUMS >/dev/null ) || { echo "SHA256SUMS 自检失败" >&2; exit 1; }
