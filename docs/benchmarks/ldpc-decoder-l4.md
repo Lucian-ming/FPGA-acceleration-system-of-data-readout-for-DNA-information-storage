@@ -2,7 +2,7 @@
 
 L4 的目标是「译码器 RTL 原型 + 对软件黄金验证」。结论：**功能对得上黄金，时序在 100 MHz 收敛。**
 
-- RTL：`hw/experimental/ldpc_decoder_p1.v`；testbench：`hw/experimental/tb_ldpc_decoder_p1.v`
+- RTL：`hw/ip/ldpc_decoder_1_0/hdl/ldpc_decoder_p1.v`；testbench：`hw/experimental/tb_ldpc_decoder_p1.v`
 - 架构：**p=1 边串行 flooding Min-Sum**（见[架构决定](../reference/ldpc-architecture-decision-2026-10-14.md)）
 - 器件 `xc7z020clg400-2`，时钟约束 100 MHz；流程 `docs/submission/skill/fpga-timing-probe/ooc_probe.tcl`（`SYNTH_IMPL=1`）
 - 留证：`logs/vivado/ldpc-dec{3,4,5}.stdout` 与 `logs/vivado/ldpc-decoder/synth_*`（`logs/` 忽略区）
