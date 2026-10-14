@@ -13,7 +13,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 WHICH="${1:-all}"
 case "$WHICH" in
-    all|packaging|hygiene|datapath|axi|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
+    all|packaging|hygiene|datapath|axi|ldpc_decoder|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
     *) echo "未知仿真项: $WHICH" >&2; exit 2 ;;
 esac
 [[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
@@ -90,6 +90,19 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "hygiene" ]; then
     fi
 fi
 D=hw/ip/desparsification_decoder_1_0/hdl
+LDPC=hw/ip/ldpc_decoder_1_0/hdl
+
+if [ "$WHICH" = "all" ] || [ "$WHICH" = "ldpc_decoder" ]; then
+    # 013 为 4 轮收敛样本；用仓库内黄金向量，并将 B_t ROM 指向打包 IP 的数据文件。
+    VVP_ARGS=(+TAG=013_se150_16384 +GOLD_DIR=tests/golden/ldpc)
+    run_case ldpc_decoder \
+        -g2012 \
+        '-DLDPC_BT_ROM_FILE="hw/ip/ldpc_decoder_1_0/data/bt_col_by_res.hex"' \
+        '-DLDPC_BT_OFF_FILE="hw/ip/ldpc_decoder_1_0/data/bt_res_off.hex"' \
+        "$LDPC/ldpc_decoder_p1.v" "$LDPC/ldpc_decoder_v1_0.v" \
+        hw/experimental/tb_ldpc_decoder_p1.v
+    VVP_ARGS=()
+fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "datapath" ]; then
     # Stage3 数据通路：81,000 bit 稀疏流 -> 64,800 bit 码字（含随机背压）

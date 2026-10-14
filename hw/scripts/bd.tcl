@@ -8,9 +8,11 @@
 #       IF: S00_AXI (AXI4-Lite), M00_AXI (AXI4 master)
 #   - xilinx.com:user:desparsification_decoder:1.0
 #       IF: S00_AXI (AXI4-Lite), M00_AXI (AXI4 master)
+#   - xilinx.com:user:ldpc_decoder:1.0
+#       IF: S00_AXI (AXI4-Lite), 64,800-bit LDPC decode control/data window
 # DMA: axi_dma_0 with Scatter-Gather (c_include_sg=1)
 # 拓扑：
-#   GP0 -> AXI-Lite IC -> {DMA S_AXI_LITE, DNA S_AXI_LITE_CTRL, Voter S00_AXI, Decoder S00_AXI}
+#   GP0 -> AXI-Lite IC -> {DMA S_AXI_LITE, DNA S_AXI_LITE_CTRL, Voter S00_AXI, Decoder S00_AXI, LDPC S00_AXI}
 #   {DMA M_AXI_MM2S, DMA M_AXI_S2MM, DMA M_AXI_SG, Voter M00_AXI, Decoder M00_AXI} -> HP IC -> PS HP0
 #   AXIS: DMA MM2S -> DNA S_AXIS_DATA; DNA M_AXIS_RESULT -> DMA S2MM
 # =========================================
@@ -61,12 +63,12 @@ connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ps_0/S_AXI_HP0_ACLK
 
 # AXI-Lite 互联 (GP0 -> 多从)
 set ic_lite [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect ic_lite]
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {4}] $ic_lite
-foreach pin {ACLK S00_ACLK M00_ACLK M01_ACLK M02_ACLK M03_ACLK} {
+set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {5}] $ic_lite
+foreach pin {ACLK S00_ACLK M00_ACLK M01_ACLK M02_ACLK M03_ACLK M04_ACLK} {
   connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ic_lite/$pin]
 }
 connect_bd_net [get_bd_pins rst_ps/interconnect_aresetn] [get_bd_pins ic_lite/ARESETN]
-foreach pin {S00_ARESETN M00_ARESETN M01_ARESETN M02_ARESETN M03_ARESETN} {
+foreach pin {S00_ARESETN M00_ARESETN M01_ARESETN M02_ARESETN M03_ARESETN M04_ARESETN} {
   connect_bd_net [get_bd_pins rst_ps/peripheral_aresetn] [get_bd_pins ic_lite/$pin]
 }
 connect_bd_intf_net [get_bd_intf_pins ps_0/M_AXI_GP0] [get_bd_intf_pins ic_lite/S00_AXI]
@@ -98,6 +100,12 @@ connect_bd_net [get_bd_pins rst_ps/peripheral_aresetn] [get_bd_pins axi_dma_0/ax
 set ip1 [create_bd_cell -type ip -vlnv xilinx.com:user:Dna_accelerator_core:1.0       Dna_accelerator_core_0]
 set ip2 [create_bd_cell -type ip -vlnv xilinx.com:user:differential_voter:1.0          differential_voter_0]
 set ip3 [create_bd_cell -type ip -vlnv xilinx.com:user:desparsification_decoder:1.0    desparsification_dec_0]
+set ip4 [create_bd_cell -type ip -vlnv xilinx.com:user:ldpc_decoder:1.0                ldpc_decoder_0]
+set _bd_root [file normalize [file join [file dirname [info script]] ../..]]
+set_property -dict [list \
+  CONFIG.BT_ROM_FILE [file normalize [file join $_bd_root hw/ip/ldpc_decoder_1_0/data/bt_col_by_res.hex]] \
+  CONFIG.BT_OFF_FILE [file normalize [file join $_bd_root hw/ip/ldpc_decoder_1_0/data/bt_res_off.hex]] \
+] $ip4
 
 # Stage1 可选生产参数：默认保留 ECO P4/组合树；P16 必须显式选择。
 set stage1_p_ways 4
@@ -143,12 +151,17 @@ foreach c {differential_voter_0 desparsification_dec_0} {
     }
   }
 }
+foreach pin {S00_AXI_ACLK} {
+  connect_bd_net [get_bd_pins clk_wiz_0/clk_out1] [get_bd_pins ldpc_decoder_0/$pin]
+}
+connect_bd_net [get_bd_pins rst_ps/peripheral_aresetn] [get_bd_pins ldpc_decoder_0/S00_AXI_ARESETN]
 
 # ===== AXI-Lite：GP0 -> ic_lite -> (DMA, DNA, Voter, Decoder) =====
 connect_bd_intf_net [get_bd_intf_pins ic_lite/M01_AXI] [get_bd_intf_pins axi_dma_0/S_AXI_LITE]
 connect_bd_intf_net [get_bd_intf_pins ic_lite/M00_AXI] [get_bd_intf_pins Dna_accelerator_core_0/S_AXI_LITE_CTRL]
 connect_bd_intf_net [get_bd_intf_pins ic_lite/M02_AXI] [get_bd_intf_pins differential_voter_0/S00_AXI]
 connect_bd_intf_net [get_bd_intf_pins ic_lite/M03_AXI] [get_bd_intf_pins desparsification_dec_0/S00_AXI]
+connect_bd_intf_net [get_bd_intf_pins ic_lite/M04_AXI] [get_bd_intf_pins ldpc_decoder_0/S00_AXI]
 
 # ===== 高带宽 AXI（Master 汇聚到 HP0）=====
 # DMA 三个 master 口：MM2S, S2MM, SG
@@ -177,6 +190,8 @@ assign_bd_address -offset 0x43C10000 -range 0x00010000 -target_address_space $ps
   [get_bd_addr_segs desparsification_dec_0/S00_AXI/S00_AXI_reg] -force
 assign_bd_address -offset 0x43C20000 -range 0x00010000 -target_address_space $ps_data \
   [get_bd_addr_segs differential_voter_0/S00_AXI/S00_AXI_reg] -force
+assign_bd_address -offset 0x43C30000 -range 0x00010000 -target_address_space $ps_data \
+  [get_bd_addr_segs ldpc_decoder_0/S00_AXI/S00_AXI_reg] -force
 
 # 校验/保存
 validate_bd_design

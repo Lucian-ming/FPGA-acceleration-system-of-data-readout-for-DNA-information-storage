@@ -1,5 +1,12 @@
 `timescale 1ns/1ps
 
+`ifndef LDPC_BT_ROM_FILE
+`define LDPC_BT_ROM_FILE "logs/ldpc/golden/bt_col_by_res.hex"
+`endif
+`ifndef LDPC_BT_OFF_FILE
+`define LDPC_BT_OFF_FILE "logs/ldpc/golden/bt_res_off.hex"
+`endif
+
 module tb_ldpc_decoder_p1;
     reg clk = 1'b0;
     reg rst = 1'b1;
@@ -19,6 +26,8 @@ module tb_ldpc_decoder_p1;
     reg [7:0] output_bytes [0:8099];
 
     string selected_tag;
+    string gold_dir;
+    string summary_path;
     string input_path;
     string output_path;
     string summary_tag;
@@ -187,7 +196,10 @@ module tb_ldpc_decoder_p1;
         end
     end
 
-    ldpc_decoder_p1 dut (
+    ldpc_decoder_p1 #(
+        .BT_ROM_FILE(`LDPC_BT_ROM_FILE),
+        .BT_OFF_FILE(`LDPC_BT_OFF_FILE)
+    ) dut (
         .clk(clk),
         .rst(rst),
         .load_we(load_we),
@@ -209,9 +221,12 @@ module tb_ldpc_decoder_p1;
             $fatal(1);
         end
 
-        summary_fd = $fopen("logs/ldpc/golden/summary.tsv", "r");
+        gold_dir = "logs/ldpc/golden";
+        scan_rc = $value$plusargs("GOLD_DIR=%s", gold_dir);
+        $sformat(summary_path, "%s/summary.tsv", gold_dir);
+        summary_fd = $fopen(summary_path, "r");
         if (summary_fd == 0) begin
-            $display("FAIL 无法打开 logs/ldpc/golden/summary.tsv");
+            $display("FAIL 无法打开 %s", summary_path);
             $fatal(1);
         end
         scan_rc = $fgets(summary_header, summary_fd);
@@ -238,10 +253,10 @@ module tb_ldpc_decoder_p1;
         if (codeword_input_mode) begin
             expected_converged = 1;
             expected_iters = 0;
-            $sformat(output_path, "logs/ldpc/golden/out_%s.hex", selected_tag);
+            $sformat(output_path, "%s/out_%s.hex", gold_dir, selected_tag);
             input_path = output_path;
         end else begin
-            $sformat(input_path, "logs/ldpc/golden/in_%s.hex", selected_tag);
+            $sformat(input_path, "%s/in_%s.hex", gold_dir, selected_tag);
         end
         hex_fd = $fopen(input_path, "r");
         if (hex_fd == 0) begin
@@ -260,7 +275,7 @@ module tb_ldpc_decoder_p1;
         $fclose(hex_fd);
         if (expected_converged) begin
             if (!codeword_input_mode)
-                $sformat(output_path, "logs/ldpc/golden/out_%s.hex", selected_tag);
+                $sformat(output_path, "%s/out_%s.hex", gold_dir, selected_tag);
             hex_fd = $fopen(output_path, "r");
             if (hex_fd == 0) begin
                 $display("FAIL 无法打开 %s", output_path);
