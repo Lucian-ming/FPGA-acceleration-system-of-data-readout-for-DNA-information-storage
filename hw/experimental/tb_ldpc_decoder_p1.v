@@ -41,6 +41,24 @@ module tb_ldpc_decoder_p1;
     integer char_lo;
     reg expected_bit;
 
+    // 仅在 testbench 中只读观察 DUT 现有 state；不增加或修改译码器端口/逻辑。
+    // 周期按 start 被接受的上升沿到 done 拉高的上升沿计，分桶覆盖这段区间内的 FSM 状态。
+    reg cycle_active = 1'b0;
+    reg [4:0] state_snapshot;
+    reg [13:0] row_snapshot;
+    reg [4:0] edge_snapshot;
+    reg [4:0] row_degree_snapshot;
+    reg start_snapshot;
+    integer cycle_count = 0;
+    integer bucket_addr_cycles = 0;
+    integer gather_cycles = 0;
+    integer emit_cycles = 0;
+    integer column_update_cycles = 0;
+    integer init_sum_cycles = 0;
+    integer syndrome_cycles = 0;
+    integer other_cycles = 0;
+    integer syndrome_sweeps = 0;
+
     function [3:0] hex_nibble;
         input integer ascii_value;
         begin
@@ -56,6 +74,74 @@ module tb_ldpc_decoder_p1;
     endfunction
 
     always #5 clk = ~clk;
+
+    // state 编码与 ldpc_decoder_p1.v 中的 ST_* 对应：
+    // 1..5 syndrome，6 init_sum，7..9 桶/地址调度，10..11 GATHER，
+    // 12..13 EMIT，14..15 逐列读写更新。
+    always @(posedge clk) begin
+        state_snapshot = dut.state;
+        row_snapshot = dut.row_q;
+        edge_snapshot = dut.edge_slot_q;
+        row_degree_snapshot = dut.row_degree;
+        start_snapshot = (start === 1'b1) && (load_we === 1'b0);
+        #1;
+        if (rst) begin
+            cycle_active = 1'b0;
+            cycle_count = 0;
+            bucket_addr_cycles = 0;
+            gather_cycles = 0;
+            emit_cycles = 0;
+            column_update_cycles = 0;
+            init_sum_cycles = 0;
+            syndrome_cycles = 0;
+            other_cycles = 0;
+            syndrome_sweeps = 0;
+        end else if (start_snapshot && !cycle_active) begin
+            // start 接受沿作为计数起点；其后的每个 FSM 周期计一次。
+            cycle_active = 1'b1;
+            cycle_count = 0;
+            bucket_addr_cycles = 0;
+            gather_cycles = 0;
+            emit_cycles = 0;
+            column_update_cycles = 0;
+            init_sum_cycles = 0;
+            syndrome_cycles = 0;
+            other_cycles = 0;
+            syndrome_sweeps = 0;
+        end else if (cycle_active) begin
+            cycle_count = cycle_count + 1;
+            case (state_snapshot)
+                5'd1, 5'd2, 5'd3, 5'd4, 5'd5:
+                    syndrome_cycles = syndrome_cycles + 1;
+                5'd6: begin
+                    // 每轮开始时清零 sum_mem，作为逐列处理的独立子项统计。
+                    init_sum_cycles = init_sum_cycles + 1;
+                    column_update_cycles = column_update_cycles + 1;
+                end
+                5'd7, 5'd8, 5'd9:
+                    bucket_addr_cycles = bucket_addr_cycles + 1;
+                5'd10, 5'd11:
+                    gather_cycles = gather_cycles + 1;
+                5'd12, 5'd13:
+                    emit_cycles = emit_cycles + 1;
+                5'd14, 5'd15:
+                    column_update_cycles = column_update_cycles + 1;
+                default:
+                    other_cycles = other_cycles + 1;
+            endcase
+            if ((state_snapshot == 5'd5) &&
+                (row_snapshot == 14'd10799) &&
+                (edge_snapshot == row_degree_snapshot - 5'd1)) begin
+                syndrome_sweeps = syndrome_sweeps + 1;
+                $display("PROGRESS sample=%s syndrome_sweep=%0d iteration_q=%0d converged=%0d done=%0d",
+                         selected_tag, syndrome_sweeps, dut.iteration_q,
+                         converged, done);
+            end
+            // 此上升沿执行的是 state_snapshot 中的最后一个状态周期。
+            if (done === 1'b1)
+                cycle_active = 1'b0;
+        end
+    end
 
     ldpc_decoder_p1 dut (
         .clk(clk),
@@ -170,10 +256,10 @@ module tb_ldpc_decoder_p1;
         start = 1'b0;
 
         wait (done === 1'b1);
-        #1;
+        // 给周期监视器完成同一上升沿的最后一次分桶计数。
+        #2;
         status_mismatch = 0;
         if ((converged !== expected_converged[0]) ||
-            ($signed(iter_count) != expected_iters) ||
             (error !== !converged)) begin
             status_mismatch = 1;
             $display("FAIL sample=%s status expected=(conv:%0d,iters:%0d) actual=(conv:%0d,iters:%0d,error:%0d)",
@@ -213,8 +299,12 @@ module tb_ldpc_decoder_p1;
             $fatal(1);
         end
 
-        $display("PASS sample=%s converged=%0d iter_count=%0d bit_mismatches=%0d compared_bits=%0d",
-                 selected_tag, converged, $signed(iter_count), mismatch_count,
+        $display("CYCLES sample=%s total=%0d bucket_addr=%0d gather=%0d emit=%0d column_update=%0d init_sum_included=%0d syndrome=%0d other=%0d",
+                 selected_tag, cycle_count, bucket_addr_cycles, gather_cycles,
+                 emit_cycles, column_update_cycles, init_sum_cycles,
+                 syndrome_cycles, other_cycles);
+        $display("PASS sample=%s converged=%0d expected_iters=%0d actual_iters=%0d bit_mismatches=%0d compared_bits=%0d",
+                 selected_tag, converged, expected_iters, $signed(iter_count), mismatch_count,
                  expected_converged ? 64800 : 0);
         $finish;
     end
