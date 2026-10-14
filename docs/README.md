@@ -29,7 +29,7 @@
 
 ## 本轮证据与历史
 
-- [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)、[同板P4/P16六档性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)（性能分正式口径）、[P16故障注入探针](benchmarks/bkb220-p16-fault-probes.md)（守卫/畸变包/中途断网 + 判据轮）、[P16长稳2小时](benchmarks/bkb220-p16-soak-2h.md)、[P16精细时间预算](benchmarks/bkb220-p16-time-budget.md)（speed 主线底稿）。
+- [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)、[同板P4/P16六档性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)（性能分正式口径）、[P16故障注入探针](benchmarks/bkb220-p16-fault-probes.md)（守卫/畸变包/中途断网 + 判据轮）、[P16长稳2小时](benchmarks/bkb220-p16-soak-2h.md)、[P16精细时间预算](benchmarks/bkb220-p16-time-budget.md)（speed 主线底稿）、[LDPC行引擎OOC探针](benchmarks/ldpc-row-engine-ooc-probe.md)。
 - docs/board：对应资料和板测小证据；docs/benchmarks：可复查的性能/功能摘要。
 - [本次合并归档索引](archive/history/2026/pre-bkb220-handoff-2026-10-10/README.md)：旧20份文档、原名→当前入口、快照校验清单。
 - docs/archive/history/2026其余历史与docs/reference保留来源/负结果；docs/submission是参赛提交资产，不自动成为本项目任务指令。
