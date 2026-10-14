@@ -270,7 +270,7 @@ assert "stage1_production_full" in runner and "tb_dna_stage1_p16_equivalence.v" 
 #   2) 行为判据 —— tb_dna_stage1_p16_equivalence.v 用「生产 P4 + 独立符号滑窗 oracle」
 #      对 P16 做 score/pos/cw **三重逐位**比对，LC6 与 LC50 两档都跑。
 #      与独立 oracle 的行为等价，强于与一个旧文件的字节等价。
-PRODUCTION_PWAY_SHA256 = "cefe308735eb1e51b579024c60a0c415ebeb93bd9441ecbc78d0af2934d46366"
+PRODUCTION_PWAY_SHA256 = "16ee2ce2503039db124f1d781a5f5288b54087529c3fe0bfe02eec813c960b67"
 _sha = hashlib.sha256((base / "hdl/srpe_batch_pway.v").read_bytes()).hexdigest()
 assert _sha == PRODUCTION_PWAY_SHA256, (
     "生产 P-way 源码 SHA 与冻结值不符：\n"

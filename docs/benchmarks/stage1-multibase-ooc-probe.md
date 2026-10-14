@@ -533,3 +533,25 @@ L7 板端判据 SHA 变化。
 L=4 余量更紧、地址转换更贵、且要一次做对更多东西；**L=2 的时延已与现有 C 实现持平**，
 用它先把"能跑通、能上板、判据不变"这条链走完，再决定是否加宽。
 **注意**：以上时延都是**外推**，不含 DMA 与端口冲突，不得当交付性能引用。
+
+---
+
+## 附：2026-10-14 的第二次源码变更 —— 预充填地址组数（压缩项 A）
+
+**本节是 `tools/check_ip_packaging.sh` 的 `PRODUCTION_PWAY_SHA256` 那次更新所要求的"改动理由"。**
+
+- **改了什么**：`srpe_batch_pway.v` 的 `S_PREFILL`，发出预充填地址的组数
+  由 `P_WAYS-1 = 15` 改为 `PREFILL_BODY = (WM_WINDOW_SIZE - K + K - 1)/K`（K=2 时 = 8）。
+  另把该 `localparam` 的**声明位置**放在 `WM_WINDOW_SIZE` 之后（它引用后者）。
+- **为什么**：窗口 17 深、每拍进 K=2 个，而 `S_LAUNCH` 已用 `pos_cnt` 那一个地址
+  覆盖了窗口前 K 项 ⇒ 只需 8 组。原写法的后 7 组返回的 tag 落在窗口外、被位置守卫丢弃。
+  实测：18 拍预充填里**只有 9.02 拍真正写窗口**。
+- **效果**：每块 **101 → 94 拍**；整机 **LUT −299**；板端全量档 **`[PIPE] total` 6,259 → 5,970 ms**。
+- **等价性判据（已过）**：
+  1. `tools/run_sim.sh stage1_pway` 2/2 PASS、`stage1_production` 功能用例 PASS；
+  2. **两档等价 TB 都跑过**：`tools/run_sim.sh stage1_production`（LC6）与
+     `stage1_production_full`（LC50），均 `[PRODUCTION EQ] PASS`；
+  3. **独立验收员**另做了差分仿真：3,264 块级样本 score/pos/cw **0/0/0 不符**，
+     并做**反证**（把组数改成 7 与 9 都必须变红，实测都红）；
+  4. **板端**：`run_g3.sh` 判据 SHA `fcd0cf90…b1f2c3` **逐位不变**。
+- **细节与边界**：见 [`stage1-block-overhead-plan.md`](stage1-block-overhead-plan.md)。

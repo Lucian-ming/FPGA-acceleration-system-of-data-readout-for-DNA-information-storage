@@ -66,15 +66,6 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     // 读段 150 个碱基被 K 整除（150/2=75），故 score_inc 的末组掩码路径在本配置下恒为真。
     localparam integer BASES_PER_CYCLE = 2;
 
-    // 【压缩项 A，2026-10-14】预充填只需发出「返回后会落进窗口」的那几组地址。
-    // 窗口 17 深、每拍进 K 个；S_LAUNCH 已用 pos_cnt 那一个地址覆盖了窗口的前 K 项，
-    // 故还差 ceil((WM_WINDOW_SIZE-K)/K) 组。原写法按 P_WAYS-1 = 15 组发，其中
-    // 7 组返回的 tag 落在窗口外、被位置守卫丢弃 —— 实测：18 拍预充填里只有
-    // 9.02 拍真正写窗口（docs/benchmarks/stage1-block-overhead-plan.md §2.1）。
-    // 本式在 K=2 下为 8，要求 WM_WINDOW_SIZE >= BASES_PER_CYCLE。
-    localparam integer PREFILL_BODY =
-        (WM_WINDOW_SIZE - BASES_PER_CYCLE + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
-
     // 区域索引与水印存储几何
     localparam integer REGION_W = 6;                     // 0~49
     localparam integer WM_DEPTH = NUM_LC * REF_LEN;      // 50*957 or 50*1055
@@ -83,6 +74,18 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     localparam integer WM_BANK_AW    = CLOG2(WM_BANK_DEPTH);
     localparam integer PLANE_BANK_DEPTH = (READ_BPS + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
     localparam integer WM_WINDOW_SIZE = P_WAYS + BASES_PER_CYCLE - 1;
+
+    // 【压缩项 A，2026-10-14】预充填只需发出「返回后会落进窗口」的那几组地址。
+    // 窗口 17 深、每拍进 K 个；S_LAUNCH 已用 pos_cnt 那一个地址覆盖了窗口的前 K 项，
+    // 故还差 ceil((WM_WINDOW_SIZE-K)/K) 组。原写法按 P_WAYS-1 = 15 组发，其中
+    // 7 组返回的 tag 落在窗口外、被位置守卫丢弃 —— 实测：18 拍预充填里只有
+    // 9.02 拍真正写窗口（docs/benchmarks/stage1-block-overhead-plan.md §2.1）。
+    // 本式在 K=2 下为 8，要求 WM_WINDOW_SIZE >= BASES_PER_CYCLE。
+    // ⚠️ 位置必须在 WM_WINDOW_SIZE **之后**——它引用了后者，写前面会被判"声明前引用"
+    // （Vivado 会出告警；虽然当前能两遍展开算对，但不能依赖这一点）。
+    localparam integer PREFILL_BODY =
+        (WM_WINDOW_SIZE - BASES_PER_CYCLE + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
+
     localparam integer RUN_GROUPS = (READ_BPS + BASES_PER_CYCLE - 1) / BASES_PER_CYCLE;
     localparam integer SCORE_INC_W = CLOG2(BASES_PER_CYCLE + 1);
 

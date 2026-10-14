@@ -139,8 +139,15 @@ while IFS= read -r hit; do
         (( ln > tot )) && STALE_REF+=$'\n'"      越界  $ref  实际 $tot 行  （出自 $src）"
     fi
 done < <(
+    # 豁免两类**历史记录**：本规则的用意是「现行文档别写行号，行号会静默过期」，
+    # 而这两类里的行号是**当时的人/模型真的这么写的**，改写等于伪造留证——
+    # 比行号过期严重得多。豁免的是"记录"，不是"结论"：结论仍写进 docs/ 并被本检查覆盖。
+    #   docs/archive/                      —— 已退休的项目材料
+    #   docs/submission/llm-collaboration/ —— 竞赛要求的 LLM 交互逐字记录（2026-10-14 建）
     grep -rn --include='*.md' -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' docs/ 2>/dev/null \
-        | grep -v '^docs/archive/' | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
+        | grep -v '^docs/archive/' \
+        | grep -v '^docs/submission/llm-collaboration/' \
+        | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
     grep -rn --include='*.c' --include='*.h' --include='*.v' --include='*.py' --include='*.sh' \
         -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' \
         sw/app/ hw/ip/ tools/ clients/python/ 2>/dev/null \
