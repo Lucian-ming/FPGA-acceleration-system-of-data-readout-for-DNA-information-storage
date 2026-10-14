@@ -319,6 +319,19 @@ banking 都未证；`column mod bank_count` 的实测统计是 4 bank 时每行�
 因为 P4 的周期数随 NUM_LC 扩张得更快（8.33 倍区域数下 P4 ×6.49、P16 ×3.36）。
 **两个倍数不是同一口径，不可混用。**
 
+同一入口的第二个用例 `dna_stage1_p16_interface`（AXI-Lite 控制 + S_AXIS 入口 +
+M_AXIS 背压）在 LC50 也通过：
+
+```
+[PRODUCTION AXIS] P16 round=0 LC=50 PASS records=64
+[PRODUCTION AXIS] P16 round=1 LC=50 PASS records=64
+[PRODUCTION AXIS] P4  round=0 LC=50 PASS records=64
+[PRODUCTION AXIS] P4  round=1 LC=50 PASS records=64
+[PRODUCTION AXIS] PASS LC=50 P4cycles=1674229 P16cycles=315778
+```
+
+**`stage1_production_full` 整轮 3 项通过 / 0 项失败。**
+
 ### 整机：与写死前逐项相同
 
 `hw/build/bkb220-p16-k2freeze-20261014T000848Z-board-migrate`（`stage1_p_ways=16 stage1_pipe_tree=1`）：

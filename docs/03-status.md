@@ -234,7 +234,9 @@ K 已由 `parameter` 改为 RTL 内 `localparam BASES_PER_CYCLE = 2`，全部构
   同样是「生产 P4 + 独立 oracle」score/pos/cw 三重逐位，两轮均 PASS；
   周期比 **5.21×**（1,680,956 → 322,507）。**该倍数与 LC6 的 2.70× 不是同一口径**，
   因为 P4 的周期随 NUM_LC 扩张更快。
-  （该入口的第二个用例 `dna_stage1_p16_interface` 在同一轮里接续运行。）
+  同一入口的第二个用例 `dna_stage1_p16_interface`（AXI-Lite + S_AXIS + M_AXIS 背压）
+  在 LC50 也通过（`P4cycles=1674229 / P16cycles=315778`）。
+  **`stage1_production_full` 整轮 3 项通过 / 0 项失败。**
 - 打包门禁已按约定**显式替换**（旧的 P14 字节等价 → 源码 SHA 冻结 + 行为判据）并 PASS。
 - **整机重建**：35,702 LUT / RAMB36 48 / DSP 5、WNS +0.313 / WHS +0.036、
   **0 失败端点（共 88,748）、DRC 0 Error**，与写死前逐项相同。
