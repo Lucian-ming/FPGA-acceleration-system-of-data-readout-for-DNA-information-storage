@@ -47,17 +47,31 @@ module tb_ldpc_decoder_p1;
     reg [4:0] state_snapshot;
     reg [13:0] row_snapshot;
     reg [4:0] edge_snapshot;
+    reg [4:0] emit_slot_snapshot;
     reg [4:0] row_degree_snapshot;
+    reg [4:0] gather_llr_slot_snapshot;
+    reg gather_llr_valid_snapshot;
+    reg gather_rom_valid_snapshot;
+    reg emit_write_valid_snapshot;
+    reg update_write_valid_snapshot;
+    reg update_scan_done_snapshot;
     reg start_snapshot;
     integer cycle_count = 0;
-    integer bucket_addr_cycles = 0;
-    integer gather_cycles = 0;
-    integer emit_cycles = 0;
-    integer column_update_cycles = 0;
+    integer row_setup_cycles = 0;
+    integer row_pipeline_cycles = 0;
+    integer emit_pipeline_cycles = 0;
+    integer update_pipeline_cycles = 0;
     integer init_sum_cycles = 0;
-    integer syndrome_cycles = 0;
     integer other_cycles = 0;
-    integer syndrome_sweeps = 0;
+    integer syndrome_passes = 0;
+    integer syndrome_edges = 0;
+    integer rom_read_ops = 0;
+    integer llr_read_ops = 0;
+    integer llr_capture_ops = 0;
+    integer emit_read_ops = 0;
+    integer emit_write_ops = 0;
+    integer update_read_ops = 0;
+    integer update_write_ops = 0;
 
     function [3:0] hex_nibble;
         input integer ascii_value;
@@ -76,67 +90,97 @@ module tb_ldpc_decoder_p1;
     always #5 clk = ~clk;
 
     // state 编码与 ldpc_decoder_p1.v 中的 ST_* 对应：
-    // 1..5 syndrome，6 init_sum，7..9 桶/地址调度，10..11 GATHER，
-    // 12..13 EMIT，14..15 逐列读写更新。
+    // 6 init_sum，7 行准备，8 ROM→LLR→捕获流水，9 EMIT 读写流水，10 逐列更新流水。
+    // syndrome 在状态 8 的 LLR 捕获时同步累计，不再占独立状态周期。
     always @(posedge clk) begin
         state_snapshot = dut.state;
         row_snapshot = dut.row_q;
         edge_snapshot = dut.edge_slot_q;
+        emit_slot_snapshot = dut.emit_slot_q;
         row_degree_snapshot = dut.row_degree;
+        gather_llr_slot_snapshot = dut.gather_llr_slot_q;
+        gather_llr_valid_snapshot = dut.gather_llr_valid_q;
+        gather_rom_valid_snapshot = dut.gather_rom_valid_q;
+        emit_write_valid_snapshot = dut.emit_write_valid_q;
+        update_write_valid_snapshot = dut.update_write_valid_q;
+        update_scan_done_snapshot = dut.update_scan_done_q;
         start_snapshot = (start === 1'b1) && (load_we === 1'b0);
         #1;
         if (rst) begin
             cycle_active = 1'b0;
             cycle_count = 0;
-            bucket_addr_cycles = 0;
-            gather_cycles = 0;
-            emit_cycles = 0;
-            column_update_cycles = 0;
+            row_setup_cycles = 0;
+            row_pipeline_cycles = 0;
+            emit_pipeline_cycles = 0;
+            update_pipeline_cycles = 0;
             init_sum_cycles = 0;
-            syndrome_cycles = 0;
             other_cycles = 0;
-            syndrome_sweeps = 0;
+            syndrome_passes = 0;
+            syndrome_edges = 0;
+            rom_read_ops = 0;
+            llr_read_ops = 0;
+            llr_capture_ops = 0;
+            emit_read_ops = 0;
+            emit_write_ops = 0;
+            update_read_ops = 0;
+            update_write_ops = 0;
         end else if (start_snapshot && !cycle_active) begin
             // start 接受沿作为计数起点；其后的每个 FSM 周期计一次。
             cycle_active = 1'b1;
             cycle_count = 0;
-            bucket_addr_cycles = 0;
-            gather_cycles = 0;
-            emit_cycles = 0;
-            column_update_cycles = 0;
+            row_setup_cycles = 0;
+            row_pipeline_cycles = 0;
+            emit_pipeline_cycles = 0;
+            update_pipeline_cycles = 0;
             init_sum_cycles = 0;
-            syndrome_cycles = 0;
             other_cycles = 0;
-            syndrome_sweeps = 0;
+            syndrome_passes = 0;
+            syndrome_edges = 0;
+            rom_read_ops = 0;
+            llr_read_ops = 0;
+            llr_capture_ops = 0;
+            emit_read_ops = 0;
+            emit_write_ops = 0;
+            update_read_ops = 0;
+            update_write_ops = 0;
         end else if (cycle_active) begin
             cycle_count = cycle_count + 1;
             case (state_snapshot)
-                5'd1, 5'd2, 5'd3, 5'd4, 5'd5:
-                    syndrome_cycles = syndrome_cycles + 1;
                 5'd6: begin
-                    // 每轮开始时清零 sum_mem，作为逐列处理的独立子项统计。
                     init_sum_cycles = init_sum_cycles + 1;
-                    column_update_cycles = column_update_cycles + 1;
                 end
-                5'd7, 5'd8, 5'd9:
-                    bucket_addr_cycles = bucket_addr_cycles + 1;
-                5'd10, 5'd11:
-                    gather_cycles = gather_cycles + 1;
-                5'd12, 5'd13:
-                    emit_cycles = emit_cycles + 1;
-                5'd14, 5'd15:
-                    column_update_cycles = column_update_cycles + 1;
+                5'd7: row_setup_cycles = row_setup_cycles + 1;
+                5'd8: row_pipeline_cycles = row_pipeline_cycles + 1;
+                5'd9: emit_pipeline_cycles = emit_pipeline_cycles + 1;
+                5'd10: update_pipeline_cycles = update_pipeline_cycles + 1;
                 default:
                     other_cycles = other_cycles + 1;
             endcase
-            if ((state_snapshot == 5'd5) &&
+            if ((state_snapshot == 5'd8) && (edge_snapshot < row_degree_snapshot) &&
+                dut.slot_is_info && dut.info_addr_valid)
+                rom_read_ops = rom_read_ops + 1;
+            if ((state_snapshot == 5'd8) && gather_rom_valid_snapshot)
+                llr_read_ops = llr_read_ops + 1;
+            if ((state_snapshot == 5'd8) && gather_llr_valid_snapshot) begin
+                llr_capture_ops = llr_capture_ops + 1;
+                syndrome_edges = syndrome_edges + 1;
+            end
+            if ((state_snapshot == 5'd8) && gather_llr_valid_snapshot &&
                 (row_snapshot == 14'd10799) &&
-                (edge_snapshot == row_degree_snapshot - 5'd1)) begin
-                syndrome_sweeps = syndrome_sweeps + 1;
-                $display("PROGRESS sample=%s syndrome_sweep=%0d iteration_q=%0d converged=%0d done=%0d",
-                         selected_tag, syndrome_sweeps, dut.iteration_q,
+                (gather_llr_slot_snapshot == row_degree_snapshot - 5'd1)) begin
+                syndrome_passes = syndrome_passes + 1;
+                $display("PROGRESS sample=%s syndrome_pass=%0d iteration_q=%0d converged=%0d done=%0d",
+                         selected_tag, syndrome_passes, dut.iteration_q,
                          converged, done);
             end
+            if ((state_snapshot == 5'd9) && (emit_slot_snapshot < row_degree_snapshot))
+                emit_read_ops = emit_read_ops + 1;
+            if ((state_snapshot == 5'd9) && emit_write_valid_snapshot)
+                emit_write_ops = emit_write_ops + 1;
+            if ((state_snapshot == 5'd10) && !update_scan_done_snapshot)
+                update_read_ops = update_read_ops + 1;
+            if ((state_snapshot == 5'd10) && update_write_valid_snapshot)
+                update_write_ops = update_write_ops + 1;
             // 此上升沿执行的是 state_snapshot 中的最后一个状态周期。
             if (done === 1'b1)
                 cycle_active = 1'b0;
@@ -299,10 +343,12 @@ module tb_ldpc_decoder_p1;
             $fatal(1);
         end
 
-        $display("CYCLES sample=%s total=%0d bucket_addr=%0d gather=%0d emit=%0d column_update=%0d init_sum_included=%0d syndrome=%0d other=%0d",
-                 selected_tag, cycle_count, bucket_addr_cycles, gather_cycles,
-                 emit_cycles, column_update_cycles, init_sum_cycles,
-                 syndrome_cycles, other_cycles);
+        $display("CYCLES sample=%s total=%0d row_setup=%0d row_pipeline=%0d emit_pipeline=%0d update_pipeline=%0d init_sum=%0d syndrome_state_cycles=0 other=%0d syndrome_passes=%0d syndrome_edges=%0d rom_reads=%0d llr_reads=%0d llr_captures=%0d emit_reads=%0d emit_writes=%0d update_reads=%0d update_writes=%0d",
+                 selected_tag, cycle_count, row_setup_cycles, row_pipeline_cycles,
+                 emit_pipeline_cycles, update_pipeline_cycles, init_sum_cycles,
+                 other_cycles, syndrome_passes, syndrome_edges, rom_read_ops,
+                 llr_read_ops, llr_capture_ops, emit_read_ops, emit_write_ops,
+                 update_read_ops, update_write_ops);
         $display("PASS sample=%s converged=%0d expected_iters=%0d actual_iters=%0d bit_mismatches=%0d compared_bits=%0d",
                  selected_tag, converged, expected_iters, $signed(iter_count), mismatch_count,
                  expected_converged ? 64800 : 0);
