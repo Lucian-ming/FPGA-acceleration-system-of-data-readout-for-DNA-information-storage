@@ -7,6 +7,7 @@ module Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL #(
     output wire [C_S_AXI_DATA_WIDTH-1:0] slv_reg1_out,
     output wire [C_S_AXI_DATA_WIDTH-1:0] slv_reg2_out,
     output wire [C_S_AXI_DATA_WIDTH-1:0] slv_reg3_out,
+    input  wire [C_S_AXI_DATA_WIDTH-1:0] stage1_cycle_data,
     input  wire                           S_AXI_ACLK,
     input  wire                           S_AXI_ARESETN,
     input  wire [C_S_AXI_ADDR_WIDTH-1:0]  S_AXI_AWADDR,
@@ -115,7 +116,7 @@ module Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL #(
             2'h0: reg_data_out = slv_reg0;
             2'h1: reg_data_out = slv_reg1;
             2'h2: reg_data_out = slv_reg2;
-            2'h3: reg_data_out = slv_reg3;
+            2'h3: reg_data_out = stage1_cycle_data;
             default: reg_data_out = 0;
         endcase
     end

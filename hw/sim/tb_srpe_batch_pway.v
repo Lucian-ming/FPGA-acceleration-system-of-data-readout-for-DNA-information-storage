@@ -66,6 +66,9 @@ module tb_srpe_batch_pway;
     wire [RESULT_W-1:0] res_din_4w;
     reg                 res_full_4w = 0;
     wire                busy_4w, done_4w;
+    wire [31:0]          pway_cycles_total, pway_cycles_prefill;
+    wire [31:0]          pway_cycles_run, pway_cycles_tree;
+    wire [31:0]          pway_blocks_done, pway_batches_done;
 
     // ----------------------------------------------------------
     // 实例化 4-Way(生产) 基线（来自 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_4way.v）
@@ -93,11 +96,18 @@ module tb_srpe_batch_pway;
         .SCORE_W(SCORE_W), .POS_W(POS_W)
     ) dut_4way (
         .clk(clk), .rst_n(rst_n), .start_batch(start_batch),
+        .clear_counters(1'b0),
         .cw_req(cw_req_4w), .cw_valid(cw_valid_4w), .cw_data(cw_data_4w),
         .bram_write_en(bram_write_en), .bram_sel(bram_sel),
         .bram_write_addr(bram_write_addr), .bram_write_data(bram_write_data),
         .res_wr(res_wr_4w), .res_din(res_din_4w), .res_full(res_full_4w),
-        .busy(busy_4w), .done(done_4w)
+        .busy(busy_4w), .done(done_4w),
+        .cycles_total(pway_cycles_total),
+        .cycles_prefill(pway_cycles_prefill),
+        .cycles_run(pway_cycles_run),
+        .cycles_tree(pway_cycles_tree),
+        .blocks_done(pway_blocks_done),
+        .batches_done(pway_batches_done)
     );
 
     // ----------------------------------------------------------

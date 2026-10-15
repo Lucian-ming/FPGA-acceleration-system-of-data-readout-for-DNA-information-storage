@@ -142,6 +142,8 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
     run_case srpe_batch_pway_p16 \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=16 -DCFG_PIPE_TREE=1 \
         "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
+    run_case stage1_cycle_counters \
+        "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_cycle_counters.v"
 fi
 
 # 真实生产P4/P16源集。stage1_production_full 显式启用LC50长测并建议

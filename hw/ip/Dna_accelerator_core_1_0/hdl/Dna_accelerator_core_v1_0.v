@@ -83,14 +83,32 @@ module Dna_accelerator_core_v1_0 #(
     // =================================================
     // AXI-Lite registers
     //  reg0[0]=start, reg0[1]=preload, reg0[2]=soft_reset
-    //  reg1[5:0]=wm_sel
+    //  reg1[5:0]=wm_sel, reg2[3:0]=Stage1 cycle-counter index, reg3=counter value (read)
     // =================================================
     wire [31:0] reg0, reg1, reg2, reg3;
+    wire [31:0] stage1_cycles_total, stage1_cycles_prefill;
+    wire [31:0] stage1_cycles_run, stage1_cycles_tree;
+    wire [31:0] stage1_blocks_done, stage1_batches_done;
+    reg  [31:0] stage1_cycle_read_data;
+
+    always @* begin
+        case (reg2[3:0])
+            4'd0: stage1_cycle_read_data = stage1_cycles_total;
+            4'd1: stage1_cycle_read_data = stage1_cycles_prefill;
+            4'd2: stage1_cycle_read_data = stage1_cycles_run;
+            4'd3: stage1_cycle_read_data = stage1_cycles_tree;
+            4'd4: stage1_cycle_read_data = stage1_blocks_done;
+            4'd5: stage1_cycle_read_data = stage1_batches_done;
+            default: stage1_cycle_read_data = 32'd0;
+        endcase
+    end
+
     Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL #(
         .C_S_AXI_DATA_WIDTH(C_S_AXI_LITE_CTRL_DATA_WIDTH),
         .C_S_AXI_ADDR_WIDTH(C_S_AXI_LITE_CTRL_ADDR_WIDTH)
     ) u_axil (
         .slv_reg0_out(reg0), .slv_reg1_out(reg1), .slv_reg2_out(reg2), .slv_reg3_out(reg3),
+        .stage1_cycle_data(stage1_cycle_read_data),
         .S_AXI_ACLK   (s_axi_lite_ctrl_aclk),
         .S_AXI_ARESETN(s_axi_lite_ctrl_aresetn),
         .S_AXI_AWADDR (s_axi_lite_ctrl_awaddr),
@@ -371,6 +389,12 @@ module Dna_accelerator_core_v1_0 #(
     // 静态选择生产变体。所有几何显式透传，实验250bp默认值不可进入生产。
     generate
         if (C_STAGE1_P_WAYS == 4 && C_STAGE1_PIPE_TREE == 0) begin: g_stage1_p4
+            assign stage1_cycles_total   = 32'd0;
+            assign stage1_cycles_prefill = 32'd0;
+            assign stage1_cycles_run     = 32'd0;
+            assign stage1_cycles_tree    = 32'd0;
+            assign stage1_blocks_done    = 32'd0;
+            assign stage1_batches_done   = 32'd0;
             srpe_batch #(
             .BATCH    (BATCH),
             .NUM_LC   (NUM_LC),
@@ -411,6 +435,7 @@ module Dna_accelerator_core_v1_0 #(
             .clk              (aclk),
             .rst_n            (aresetn & ~soft_reset_s),
             .start_batch      (arm_start),
+            .clear_counters   (start_rise),
             .cw_req           (eng_cw_req),
             .cw_valid         (eng_cw_vld),
             .cw_data          (cw_hold),
@@ -422,7 +447,13 @@ module Dna_accelerator_core_v1_0 #(
             .res_din          (eng_res_din),
             .res_full         (res_full),
             .busy             (eng_busy),
-            .done             (eng_done)
+            .done             (eng_done),
+            .cycles_total     (stage1_cycles_total),
+            .cycles_prefill   (stage1_cycles_prefill),
+            .cycles_run       (stage1_cycles_run),
+            .cycles_tree      (stage1_cycles_tree),
+            .blocks_done      (stage1_blocks_done),
+            .batches_done     (stage1_batches_done)
             );
         end else begin: g_stage1_invalid
             // 非法组合在仿真/综合展开时必须失败，不能静默回退到4路。

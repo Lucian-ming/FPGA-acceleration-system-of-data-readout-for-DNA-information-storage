@@ -23,7 +23,8 @@ module tb_dna_stage1_p16_equivalence;
     .bram_write_en(we),.bram_sel(sel),.bram_write_addr(addr),.bram_write_data(data),
     .res_wr(wr[0]),.res_din(result0),.res_full(full[0]),.busy(busy[0]),.done(done[0]));
   srpe_batch_pway #(.P_WAYS(16),.PIPE_TREE(1),.BATCH(64),.NUM_LC(LC),.STRIDE(807),.REF_LEN(957),.READ_BPS(150)) p16
-   (.clk(clk),.rst_n(rst),.start_batch(start),.cw_req(req[1]),.cw_valid(valid[1]),.cw_data(cw1),
+   (.clk(clk),.rst_n(rst),.start_batch(start),.clear_counters(start),
+    .cw_req(req[1]),.cw_valid(valid[1]),.cw_data(cw1),
     .bram_write_en(we),.bram_sel(sel),.bram_write_addr(addr),.bram_write_data(data),
     .res_wr(wr[1]),.res_din(result1),.res_full(full[1]),.busy(busy[1]),.done(done[1]));
   always @(posedge clk) begin

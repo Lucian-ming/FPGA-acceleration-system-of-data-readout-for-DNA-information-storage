@@ -127,7 +127,21 @@ AXI-Lite 控制口遵循 AW/W 独立握手：DNA、Voter、Desparsifier 三个�
 | 0x00 | [1] | `preload`（1=AXIS 数据写入水印 BRAM） |
 | 0x00 | [2] | `soft_reset` |
 | 0x04 | [5:0] | `wm_sel` —— 水印区域号 0..NUM_LC-1 |
-| 0x08 / 0x0C | — | 未使用 |
+| 0x08 | W | `reg2[3:0]`：Stage1 周期计数器索引；写入后用于选择 0x0C 的读值 |
+| 0x0C | R | 当前索引对应的 Stage1 周期计数器值；写入不改变可读计数值 |
+
+Stage1 计数器索引如下，计数在每个新任务的 `start` 上升沿清零，并在任务中的每个 64-read 引擎批次累加：
+
+| `reg2[3:0]` | 计数器 | 计数条件 |
+| ---: | --- | --- |
+| 0 | `cycles_total` | 每个引擎批次从 `start_batch` 被接受到 `S_DONE` 的周期总数之和；包含批次启动拍，不含批次间空闲间隔 |
+| 1 | `cycles_prefill` | `S_PREFILL` 驻留周期数之和 |
+| 2 | `cycles_run` | `S_RUN` 驻留周期数之和 |
+| 3 | `cycles_tree` | `S_UPD1` 与 `S_UPD2` 驻留周期数之和 |
+| 4 | `blocks_done` | 完成 `S_UPD2` 的位置块数；一个位置块是一个 64-read 引擎批次在一个 LC 上完成一个 P-Way 位置分段 |
+| 5 | `batches_done` | 进入 `S_DONE` 并完成的 64-read 引擎批次数 |
+
+除 `cycles_total` 在 `S_IDLE` 接受 `start_batch` 时计入启动拍外，其余递增均由 Stage1 引擎 `busy` 门控。在 `S_DONE` 完成最后一批后引擎回到 `S_IDLE`；TX/RX BD 全部完成后不会再有新批次，固件在 `PIPE_DONE_STAGE1` 读取，并再次读取 `cycles_total` 检查读期间稳定性。
 
 > `wm_sel` 是预载 50 个区域的唯一入口。B1 修复后的水印预载循环
 > （**2026-09-11 更正**：原写作 `echo.c:465-495`，该代码早已拆分到

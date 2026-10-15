@@ -560,3 +560,31 @@ L=4 余量更紧、地址转换更贵、且要一次做对更多东西；**L=2 �
      **且不含 Stage2 流水化** ⇒ **不能用它证明当前源码**。详见
      [`stage1-block-overhead-plan.md`](stage1-block-overhead-plan.md) 的 §6。
 - **细节与边界**：见 [`stage1-block-overhead-plan.md`](stage1-block-overhead-plan.md)。
+
+## 2026-10-15 Stage1 周期计数器仪表化
+
+本次 `srpe_batch_pway.v` 源码 SHA 更新是允许的有意变更：只新增六个观测计数器和任务开始清零输入，计数信号不进入比对、选优、结果打包或握手控制路径。`start_batch`、读段/水印访问、状态迁移与输出均保持原有逻辑。更新冻结 SHA 的依据是 `stage1_pway` 与 `stage1_production` 改前/改后逐位输出等价、外部周期完全一致，以及双批自证 TB 对累计条件的直接检查；本次不是算法或微架构替换。该说明供 `tools/check_ip_packaging.sh` 的生产源码 SHA 门禁审阅。
+
+**2026-10-15 OOC 复跑**（当前计数器 RTL，生产 P16 参数，100 MHz，`SYNTH_IMPL=1`）：
+
+| LUT | FF | RAMB36 | DSP | WNS | WHS | 路由失败网 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 28,633 | 26,703 | 12 | 5 | +0.343 ns | +0.084 ns | 0 |
+
+Vivado 2022.2 完成 OOC synth/place/route，setup 与 hold 均收敛。日志和报告保存在
+`logs/vivado/stage1-cycle-counter-20261015/`，RTL SHA 为
+`7a2bb07f9b722edc986e66a431ae7325ccca89ea99a4386f24fea290ea7674a4`。复跑命令：
+
+```bash
+SYNTH_PART=xc7z020clg400-2 SYNTH_IMPL=1 \
+SYNTH_GENERICS="P_WAYS=16 PIPE_TREE=1 BATCH=64 NUM_LC=50 STRIDE=807 REF_LEN=957 READ_BPS=150 SCORE_W=10 POS_W=16" \
+SYNTH_TAG=CYCLE_COUNTER \
+SYNTH_OUT_ROOT=logs/vivado/stage1-cycle-counter-20261015/reports/CYCLE_COUNTER \
+/tools/Xilinx/Vivado/2022.2/bin/vivado -mode batch \
+  -log logs/vivado/stage1-cycle-counter-20261015/CYCLE_COUNTER/vivado.log \
+  -journal logs/vivado/stage1-cycle-counter-20261015/CYCLE_COUNTER/vivado.jou \
+  -source docs/submission/skill/fpga-timing-probe/ooc_probe.tcl \
+  -tclargs srpe_batch_pway 100 hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_pway.v
+```
+
+这是模块级 OOC 数据，不包含整机接口约束、时钟树和系统布线，不能作为整机 signoff 或板端验收证据。Vivado 对 OOC 时钟源/端口部分布线给出警告；router 最终报告 0 条失败网且 WNS/WHS 为正。

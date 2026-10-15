@@ -35,6 +35,7 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     input  wire                   clk,
     input  wire                   rst_n,
     input  wire                   start_batch,
+    input  wire                   clear_counters, // 新任务开始脉冲；不改变引擎控制状态
 
     // 从上层依次读取 BATCH 条码字，每条宽 2*READ_BPS bit。
     output reg                    cw_req,     // 请求一条读段
@@ -53,7 +54,16 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     input  wire                   res_full,
 
     output reg                    busy,
-    output reg                    done
+    output reg                    done,
+
+    // Stage1 累计计数器：clear_counters 在每个任务的 start 上升沿清零，
+    // 后续各个 64-read 引擎批次累加，直到下一个任务开始。
+    output reg  [31:0]             cycles_total,
+    output reg  [31:0]             cycles_prefill,
+    output reg  [31:0]             cycles_run,
+    output reg  [31:0]             cycles_tree,
+    output reg  [31:0]             blocks_done,
+    output reg  [31:0]             batches_done
 );
 
     localparam integer CODEBITS = READ_BPS*2;
@@ -341,6 +351,43 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     // ----------------------------------------------------------
     // 主控制状态机
     // ----------------------------------------------------------
+    // 计数条件：
+    // - total 包含 start_batch 被 S_IDLE 接受的拍，以及 busy 期间直到 S_DONE 的拍；
+    // - prefill/run/tree 按对应状态驻留拍数计，tree = S_UPD1 + S_UPD2；
+    // - 每个 S_UPD2 完成一个「一个 64-read 批次 × 一个位置块」；
+    // - S_DONE 完成一个 64-read 批次。计数器在批次间空闲时保持，直到 clear_counters。
+    // 状态完成后 busy=0，状态回到 S_IDLE；因此 done 后不会有计数递增。
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cycles_total   <= 32'd0;
+            cycles_prefill <= 32'd0;
+            cycles_run     <= 32'd0;
+            cycles_tree    <= 32'd0;
+            blocks_done    <= 32'd0;
+            batches_done   <= 32'd0;
+        end else if (clear_counters) begin
+            cycles_total   <= 32'd0;
+            cycles_prefill <= 32'd0;
+            cycles_run     <= 32'd0;
+            cycles_tree    <= 32'd0;
+            blocks_done    <= 32'd0;
+            batches_done   <= 32'd0;
+        end else begin
+            if (busy || ((st == S_IDLE) && start_batch))
+                cycles_total <= cycles_total + 1'b1;
+            if (busy && st == S_PREFILL)
+                cycles_prefill <= cycles_prefill + 1'b1;
+            if (busy && st == S_RUN)
+                cycles_run <= cycles_run + 1'b1;
+            if (busy && ((st == S_UPD1) || (st == S_UPD2)))
+                cycles_tree <= cycles_tree + 1'b1;
+            if (busy && st == S_UPD2)
+                blocks_done <= blocks_done + 1'b1;
+            if (busy && st == S_DONE)
+                batches_done <= batches_done + 1'b1;
+        end
+    end
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             st              <= S_IDLE;

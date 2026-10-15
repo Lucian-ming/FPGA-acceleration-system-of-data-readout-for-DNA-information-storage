@@ -22,6 +22,8 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
   reg[3:0] awaddr=0;reg awvalid=0;wire awready;
   reg[31:0] wdata=0;reg[3:0] wstrb=15;reg wvalid=0;wire wready;
   wire[1:0] bresp;wire bvalid;reg bready=0;
+  reg[3:0] araddr=0;reg arvalid=0;wire arready;
+  wire[31:0] rdata;wire[1:0] rresp;wire rvalid;reg rready=0;
   reg[31:0] sdata=0;reg svalid=0,slast=0;wire sready;
   wire[63:0] mdata;wire[7:0] mstrb;wire mvalid,mlast;reg mready=0;
   reg[1:0] wm[0:LC*957-1];reg[299:0] reads[0:63];reg[325:0] expected[0:63];
@@ -29,6 +31,8 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
   reg stall_previous=0;reg[63:0] stall_data;reg stall_last;
   reg[31:0] prng=32'h0F12AB78;reg collect=0;
   integer word_n=0,record_n=0,lc,row,i,k,round,cycles=0,start_cycle,wait_n;
+  reg[31:0] hw_cycles_total,hw_cycles_prefill,hw_cycles_run,hw_cycles_tree;
+  reg[31:0] hw_blocks_done,hw_batches_done,hw_cycles_total_confirm;
   reg[8*1024-1:0] fixture_dir;
   Dna_accelerator_core_v1_0 #(.C_STAGE1_P_WAYS(WAYS),.C_STAGE1_PIPE_TREE(TREE),
     .READ_BPS(150),.NUM_LC(LC),.STRIDE(807),.REF_LEN(957),.BATCH(64)) dut
@@ -36,8 +40,8 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
     .s_axi_lite_ctrl_awaddr(awaddr),.s_axi_lite_ctrl_awprot(3'd0),.s_axi_lite_ctrl_awvalid(awvalid),.s_axi_lite_ctrl_awready(awready),
     .s_axi_lite_ctrl_wdata(wdata),.s_axi_lite_ctrl_wstrb(wstrb),.s_axi_lite_ctrl_wvalid(wvalid),.s_axi_lite_ctrl_wready(wready),
     .s_axi_lite_ctrl_bresp(bresp),.s_axi_lite_ctrl_bvalid(bvalid),.s_axi_lite_ctrl_bready(bready),
-    .s_axi_lite_ctrl_araddr(4'd0),.s_axi_lite_ctrl_arprot(3'd0),.s_axi_lite_ctrl_arvalid(1'b0),.s_axi_lite_ctrl_arready(),
-    .s_axi_lite_ctrl_rdata(),.s_axi_lite_ctrl_rresp(),.s_axi_lite_ctrl_rvalid(),.s_axi_lite_ctrl_rready(1'b1),
+    .s_axi_lite_ctrl_araddr(araddr),.s_axi_lite_ctrl_arprot(3'd0),.s_axi_lite_ctrl_arvalid(arvalid),.s_axi_lite_ctrl_arready(arready),
+    .s_axi_lite_ctrl_rdata(rdata),.s_axi_lite_ctrl_rresp(rresp),.s_axi_lite_ctrl_rvalid(rvalid),.s_axi_lite_ctrl_rready(rready),
     .S_AXIS_DATA_ACLK(clk),.S_AXIS_DATA_ARESETN(rst),.S_AXIS_DATA_TDATA(sdata),.S_AXIS_DATA_TSTRB(4'hF),
     .S_AXIS_DATA_TLAST(slast),.S_AXIS_DATA_TVALID(svalid),.S_AXIS_DATA_TREADY(sready),
     .M_AXIS_RESULT_ACLK(clk),.M_AXIS_RESULT_ARESETN(rst),.M_AXIS_RESULT_TDATA(mdata),.M_AXIS_RESULT_TSTRB(mstrb),
@@ -69,6 +73,28 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
       if(!bvalid||bresp!==0)$fatal(1,"AXIL响应错误");
       repeat(3)@(posedge clk);if(!bvalid)$fatal(1,"BVALID未在背压时保持");
       @(negedge clk);bready=1;@(negedge clk);bready=0;
+    end
+  endtask
+
+  task axi_read;
+    input[3:0] address;output[31:0] value;
+    begin
+      @(negedge clk);araddr=address;arvalid=1;rready=0;wait_n=0;
+      @(posedge clk);while(!arready && wait_n<20)begin wait_n=wait_n+1;@(posedge clk);end
+      if(!arready)$fatal(1,"AXIL AR等待超时");
+      @(negedge clk);arvalid=0;
+      wait_n=0;@(posedge clk);while(!rvalid && wait_n<20)begin wait_n=wait_n+1;@(posedge clk);end
+      if(!rvalid||rresp!==0)$fatal(1,"AXIL读响应错误");
+      value=rdata;
+      @(negedge clk);rready=1;@(negedge clk);rready=0;
+    end
+  endtask
+
+  task read_stage1_counter;
+    input[31:0] index;output[31:0] value;
+    begin
+      axi_write(4'h8,index,4'hf,index[0]);
+      axi_read(4'hc,value);
     end
   endtask
 
@@ -149,6 +175,32 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
       wait(record_n==64);repeat(8)@(negedge clk);
       if(round==0)compute_cycles=cycles-start_cycle;
       if(mvalid||dut.in_count!=0||!dut.in_empty)$fatal(1,"任务结束记录残留/多输出");
+      if(WAYS==16)begin
+        read_stage1_counter(0,hw_cycles_total);
+        read_stage1_counter(1,hw_cycles_prefill);
+        read_stage1_counter(2,hw_cycles_run);
+        read_stage1_counter(3,hw_cycles_tree);
+        read_stage1_counter(4,hw_blocks_done);
+        read_stage1_counter(5,hw_batches_done);
+        if(hw_blocks_done!==LC*((807+16)/16)||hw_batches_done!==1)
+          $fatal(1,"Stage1计数器块/批错误：blocks=%0d expect=%0d batches=%0d",
+                 hw_blocks_done,LC*((807+16)/16),hw_batches_done);
+        if(hw_cycles_total < hw_cycles_prefill+hw_cycles_run+hw_cycles_tree)
+          $fatal(1,"Stage1 total 小于三个阶段之和");
+        if(hw_cycles_prefill==0||hw_cycles_run==0||hw_cycles_tree==0)
+          $fatal(1,"Stage1阶段计数器未递增");
+        axi_write(4'hc,32'hdeadbeef,4'hf,1);
+        read_stage1_counter(0,hw_cycles_total_confirm);
+        if(hw_cycles_total_confirm!==hw_cycles_total)
+          $fatal(1,"写 0x0C 改变了只读计数值");
+        repeat(16)@(negedge clk);
+        read_stage1_counter(0,hw_cycles_total_confirm);
+        if(hw_cycles_total_confirm!==hw_cycles_total)
+          $fatal(1,"Stage1 done 后 cycles_total 仍在增长");
+        $display("[STAGE1 CYCLES] round=%0d total=%0d prefill=%0d run=%0d tree=%0d blocks=%0d batches=%0d PASS",
+                 round,hw_cycles_total,hw_cycles_prefill,hw_cycles_run,hw_cycles_tree,
+                 hw_blocks_done,hw_batches_done);
+      end
       $display("[PRODUCTION AXIS] P%0d round=%0d LC=%0d PASS records=%0d",WAYS,round,LC,record_n);
     end
     collect=0;finished=1;

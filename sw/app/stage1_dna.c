@@ -17,6 +17,12 @@
 #include "dna_time.h"
 #include "prof.h"
 
+static inline u32 dna_read_stage1_cycle(u32 index)
+{
+    write_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG2_CYCLE_INDEX, index);
+    return read_reg32(DNA_ACCELERATOR_BASEADDR, DNA_ACC_REG3_CYCLE_VALUE);
+}
+
 /* 第一级计数 */
 static int wm_tx_expected = 0;
 static int rx_expected    = 0;
@@ -391,6 +397,35 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         return PIPE_STEP_PROGRESS;
     }
     case PIPE_DONE_STAGE1: {
+        /* PIPE_DONE_STAGE1 只会在 TX 全部回收且 Stage1 输出 RX BD 全部完成后进入。
+         * 最后一批的 S_DONE 已先于最后一条结果排空，因此 P-Way busy 已清零，
+         * 也没有剩余输入可触发新批次；读寄存器期间计数器应保持不变。 */
+        const u32 hw_cycles_total =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_TOTAL);
+        const u32 hw_cycles_prefill =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_PREFILL);
+        const u32 hw_cycles_run =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_RUN);
+        const u32 hw_cycles_tree =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_TREE);
+        const u32 hw_blocks_done =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_BLOCKS);
+        const u32 hw_batches_done =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_BATCHES);
+        const u32 hw_cycles_total_confirm =
+            dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_TOTAL);
+        if (hw_cycles_total != hw_cycles_total_confirm) {
+            xil_printf("[HW-CYCLES] WARNING: Stage1 counter changed after completion (%u -> %u)\n\r",
+                       hw_cycles_total, hw_cycles_total_confirm);
+        }
+        xil_printf("[HW-CYCLES] Stage1: total %u cyc (%u.%03u ms), blocks %u, batches %u, prefill %u, run %u, tree %u\n\r",
+                   hw_cycles_total, hw_cycles_total / 100000U,
+                   (hw_cycles_total % 100000U) / 100U,
+                   hw_blocks_done, hw_batches_done, hw_cycles_prefill,
+                   hw_cycles_run, hw_cycles_tree);
+        xil_printf("[HW-CYCLES] Stage1: measured %u cyc/block\n\r",
+                   hw_blocks_done ? hw_cycles_total / hw_blocks_done : 0U);
+
         xil_printf("\n\r[STAGE1] ========================================\n\r");
         xil_printf("[STAGE1] ✓ DNA Accelerator stage COMPLETE\n\r");
         xil_printf("[STAGE1] ========================================\n\r");

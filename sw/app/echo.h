@@ -183,6 +183,14 @@
 /* 【修订 B1】预载的区域号寄存器。原实现从未写过它，
  * 结果 50 个区域里只有第 0 个被写入，其余 49 个恒为全 0。 */
 #define DNA_ACC_REG1_WMSEL          0x04U
+#define DNA_ACC_REG2_CYCLE_INDEX    0x08U
+#define DNA_ACC_REG3_CYCLE_VALUE    0x0CU
+#define DNA_ACC_CYCLE_IDX_TOTAL     0U
+#define DNA_ACC_CYCLE_IDX_PREFILL   1U
+#define DNA_ACC_CYCLE_IDX_RUN       2U
+#define DNA_ACC_CYCLE_IDX_TREE      3U
+#define DNA_ACC_CYCLE_IDX_BLOCKS    4U
+#define DNA_ACC_CYCLE_IDX_BATCHES   5U
 
 /* ========= 第二个IP核: Voter (差分投票) =========
  *
