@@ -11,6 +11,7 @@
 | --- | --- | --- |
 | `local_correlator.v` | 全库零引用。4-way 是扁平实现，不实例化任何子模块 | **保留**：不满足退休三条中任何一条（无实测证伪，亦无直接替代文件覆盖其微结构） |
 | `srpe_batch_pway.v` | 参数化 P 路 Stage1（由生产 4-way 机械推广），XC7Z020 迁移候选，**未打包** | **保留**：7020 摸底的被测对象；由 tools/run_sim.sh 的 stage1_pway 用例覆盖，结论见 docs/benchmarks/stage1-pway-7020-probe.md |
+| `srpe_batch_pway_dbuf_proto.v` | 双 bank 周期级原型：独立装载/扫描/发放 FSM，Port B 仲裁；**未打包** | **保留**：本轮验证跨批次 bank 生命周期、元数据顺序与 res_full 背压；配套 TB 在 hw/sim/ip_tb/tb_srpe_batch_pway_dbuf_proto.v，正式 LC50 测量与整机 route 待 main 完成 |
 | `vivado_quick_sim.tcl` | 2026-10-12 由 Dna_accelerator_core_1_0 的 hdl/ 目录移入。它是 Vivado batch **仿真脚本**，不是可综合 HDL；全库零活动调用点，也不在 component.xml 源集里 | **保留**：不满足退休三条中任何一条——未被实测证伪、无逐字节重复件、其功能（一键跑 quick sim）未被任何受回归覆盖的文件取代。移入依据是 AGENTS.md 代码卫生 §2「IP 打包目录只放会被综合的文件」 |
 | `ldpc_row_engine_probe.v` | p=1 LDPC 行引擎 OOC 探针，含 600×14 同步 ROM 地址候选转换、LLR/累加器 BRAM 与饱和消息写回；未打包 | **保留**：用于 XC7Z020 100 MHz 资源/时序摸底；ROM 内容是非真实 B_t 的仿射占位（仅为避免被综合折叠），整体不是完整译码器 |
 | `tb_ldpc_decoder_p1.v` | 通过 summary.tsv 选择黄金样本，加载输入字节并检查收敛状态、轮数和完整码字 | **保留**：Icarus 仿真 testbench，覆盖 packbits 大端位序、完整码字逐位比较和合法码字 0 轮返回 |
