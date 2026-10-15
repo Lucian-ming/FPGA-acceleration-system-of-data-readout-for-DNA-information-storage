@@ -68,6 +68,60 @@ def resolve_watermark(dataset_dir: Path) -> Path:
     return COMMON_DIR / "watermark.txt"
 
 
+def resolve_board_dump_path(
+    cfg: Dict[str, Any], dump_dir: Optional[Path] = None, rep: int = 0
+) -> Path:
+    """返回板测回传目标；指定 dump_dir 时始终写到独立输出目录。"""
+    if dump_dir is not None:
+        return Path(dump_dir) / f"{cfg.get('test_id', cfg['id'])}_rep{rep+1}.bin"
+    return Path(cfg.get("dump_path") or (DATASETS_DIR / cfg["id"] / "board_output.bin"))
+
+
+def _is_path_within(path: Path, root: Path) -> bool:
+    """同时检查词法路径和解析后的路径，避免通过 .. 或符号链接绕开留证保护。"""
+    candidates = [Path(os.path.abspath(path))]
+    roots = [Path(os.path.abspath(root))]
+    try:
+        candidates.append(path.resolve())
+        roots.append(root.resolve())
+    except (OSError, RuntimeError):
+        pass
+    for candidate in candidates:
+        for base in roots:
+            try:
+                candidate.relative_to(base)
+                return True
+            except ValueError:
+                continue
+    return False
+
+
+def board_dump_targets(
+    cfg: Dict[str, Any], dump_dir: Optional[Path] = None, rep: int = 0
+) -> List[Path]:
+    """列出板测函数可能写出的所有 dump，包括历史兼容副本。"""
+    targets = [resolve_board_dump_path(cfg, dump_dir=dump_dir, rep=rep)]
+    if dump_dir is None and cfg.get("test_id") == "D1_random_entropy_thr60":
+        targets.append(DATASETS_DIR / cfg["id"] / "board_output.bin")
+    return list(dict.fromkeys(targets))
+
+
+def refuse_existing_dataset_evidence(
+    targets: List[Path], *, allow_overwrite: bool = False
+) -> None:
+    """拒绝静默覆盖 tests/datasets 下已有的留证 dump。"""
+    if allow_overwrite:
+        return
+    dataset_root = DATASETS_DIR
+    for target in targets:
+        is_dataset_target = _is_path_within(target, dataset_root)
+        if is_dataset_target and (target.exists() or target.is_symlink()):
+            raise FileExistsError(
+                f"拒绝覆盖 tests/datasets 留证：{target} 已存在。"
+                "请使用 --out-dir 将新回传写入独立目录；确需更新留证时显式传 --overwrite-evidence。"
+            )
+
+
 def read_file_text(path: Path) -> str:
     return Path(path).read_text(encoding="utf-8").strip()
 
@@ -480,13 +534,12 @@ class MultiPayloadRegression:
 
     def run_board_test(self, cfg: Dict[str, Any],
                        dump_dir: Optional[Path] = None,
-                       rep: int = 0) -> PayloadTestResult:
+                       rep: int = 0,
+                       allow_evidence_overwrite: bool = False) -> PayloadTestResult:
         """执行物理板端交互读出。
 
-        dump_dir 非空时，本次回传写到该目录而**不覆盖** tests/datasets/ 下
-        已提交的留证 dump。重复实验必须走这条路径：那些 dump 是
-        docs/benchmarks/measured_board_multi_payload.md 引用的原始证据，
-        被覆盖就等于毁证（AGENTS.md「不得静默删除证据」）。
+        dump_dir 非空时，本次回传写到该目录。默认数据集路径仅允许首次取证
+        （目标尚不存在）写入；更新已有留证必须显式授权。
         """
         t0 = time.time()
         score_min = cfg.get("score_min", 67)
@@ -494,10 +547,11 @@ class MultiPayloadRegression:
         tag = f" 第{rep+1}次" if dump_dir is not None else ""
         print(f"\n--- [BOARD] 板级上板实测: {display_name}{tag} ({cfg['type']}) -> {self.ip}:{self.port} ---")
 
-        if dump_dir is not None:
-            out_dump = Path(dump_dir) / f"{cfg.get('test_id', cfg['id'])}_rep{rep+1}.bin"
-        else:
-            out_dump = Path(cfg.get("dump_path") or (DATASETS_DIR / cfg["id"] / "board_output.bin"))
+        targets = board_dump_targets(cfg, dump_dir=dump_dir, rep=rep)
+        refuse_existing_dataset_evidence(
+            targets, allow_overwrite=allow_evidence_overwrite
+        )
+        out_dump = targets[0]
         out_dump.parent.mkdir(parents=True, exist_ok=True)
 
         client_cfg = ClientConfig(
@@ -538,10 +592,12 @@ class MultiPayloadRegression:
         if dump_dir is None and cfg.get("test_id") == "D1_random_entropy_thr60":
             # 保持兼容，同步副本到历史 board_output.bin
             compat_dump = DATASETS_DIR / cfg["id"] / "board_output.bin"
-            try:
+            if compat_dump.resolve() != out_dump.resolve():
+                refuse_existing_dataset_evidence(
+                    [compat_dump], allow_overwrite=allow_evidence_overwrite
+                )
+                compat_dump.parent.mkdir(parents=True, exist_ok=True)
                 compat_dump.write_bytes(out_dump.read_bytes())
-            except Exception:
-                pass
 
         raw_bytes = out_dump.read_bytes()
         try:
@@ -720,14 +776,19 @@ def main():
     parser.add_argument(
         "--out-dir",
         default=None,
-        help="输出目录 (默认写入 logs/multi_payload/<run-id>/，严禁自动覆盖 docs/)",
+        help="报告输出目录 (默认 logs/multi_payload/<run-id>/)；显式指定时 board 回传写入其 dumps/ 子目录",
     )
     parser.add_argument("--report", default=None, help="自定义报告输出文件路径")
     parser.add_argument(
         "--repeat", type=int, default=1,
         help="每个数据集重复跑几次（仅 --mode board 有意义）。>1 时回传写入 "
-             "<out-dir>/dumps/ 而不覆盖 tests/datasets/ 下已提交的留证 dump，"
+             "<out-dir>/dumps/；单次 board 运行显式传 --out-dir 也写入该目录，"
              "并按数据集汇总通过率——单次结果不构成成功率（docs/06-verification-plan.md的统计与失败分类）。",
+    )
+    parser.add_argument(
+        "--overwrite-evidence",
+        action="store_true",
+        help="显式允许 board 模式覆盖 tests/datasets/ 下已存在的留证 dump；默认拒绝覆盖。",
     )
     parser.add_argument(
         "--extended",
@@ -784,11 +845,29 @@ def main():
     if reps > 1 and args.mode != "board":
         print(f"[WARN] --repeat 只对 --mode board 有意义，当前模式 {args.mode}，按 1 次处理")
         reps = 1
-    dump_dir = (out_dir / "dumps") if reps > 1 else None
+    # --out-dir 也控制单次 board 回传；未显式指定时，单次运行保留首次取证
+    # 写入数据集目录的能力，重复模式仍使用自动生成的 logs run 目录。
+    dump_dir = (
+        out_dir / "dumps"
+        if args.mode == "board" and (args.out_dir or reps > 1)
+        else None
+    )
     if dump_dir is not None:
         dump_dir.mkdir(parents=True, exist_ok=True)
-        print(f"  重复模式：每个数据集 {reps} 次，回传写入 {dump_dir}")
-        print("  （不覆盖 tests/datasets/ 下已提交的留证 dump）")
+        print(f"  板端回传输出目录：{dump_dir}")
+
+    if args.mode == "board":
+        try:
+            # 在发起任何板端任务前检查全部目标，避免已有留证让矩阵跑到一半才失败。
+            for cfg in configs:
+                for rep in range(reps):
+                    refuse_existing_dataset_evidence(
+                        board_dump_targets(cfg, dump_dir=dump_dir, rep=rep),
+                        allow_overwrite=args.overwrite_evidence,
+                    )
+        except FileExistsError as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 2
 
     for cfg in configs:
         for rep in range(reps):
@@ -797,7 +876,12 @@ def main():
             elif args.mode == "check-dumps":
                 res = reg.run_check_saved_dumps(cfg)
             elif args.mode == "board":
-                res = reg.run_board_test(cfg, dump_dir=dump_dir, rep=rep)
+                res = reg.run_board_test(
+                    cfg,
+                    dump_dir=dump_dir,
+                    rep=rep,
+                    allow_evidence_overwrite=args.overwrite_evidence,
+                )
             else:
                 continue
             if reps > 1:

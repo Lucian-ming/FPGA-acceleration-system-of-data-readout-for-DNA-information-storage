@@ -17,24 +17,31 @@
 ----
     # 先在 Windows 侧用 XSDB 只读导出（不要复位）：
     #   xsdb.bat D:\\dna_board_smoke\\dump_ddr.tcl
-    python3 tools/board_stage_check.py                       # 默认读 /mnt/d/dna_board_smoke
-    python3 tools/board_stage_check.py --dump-dir <目录>
-    python3 tools/board_stage_check.py --reads 4096          # 本次任务的记录条数
+    python3 tools/board_stage_check.py --dump-dir <G3留证目录>
+    python3 tools/board_stage_check.py --dump-dir <手工dump目录> \\
+        --payload-sha256 <期望载荷SHA256>
+    python3 tools/board_stage_check.py --dump-dir <目录> --golden-dir tests/golden
+        # 显式强制使用指定基准；没有匹配基准时必须保留 UNVERIFIED
 
 判据纪律
 --------
-任何一级不通过即以非零码退出。**四级全绿也不等于 G3 闭环**——
-最终判据永远是回传经 LDPC 译码后的图片 SHA-256，见 AGENTS.md「事实边界」。
+任何一级真不符以 1 退出；没有对应载荷的黄金向量以 3 退出并标为
+``UNVERIFIED``，不打印成 PASS 或硬件 FAIL。**四级全绿也不等于 G3 闭环**——
+最终判据仍由 ``run_g3.sh`` 的架构与系统判据共同决定。
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 GOLDEN = REPO / "tests" / "golden"
+BASELINE_MANIFEST = GOLDEN / "board_stage_baselines.json"
+DATASETS = REPO / "tests" / "datasets"
 DEFAULT_DUMP_DIR = Path("/mnt/d/dna_board_smoke")
 
 RECORD_BYTES = 48          # Stage1 每条记录 48 B = 6 拍 x 64 bit
@@ -56,6 +63,7 @@ class Result:
     def __init__(self, name: str) -> None:
         self.name = name
         self.ok = True
+        self.unverified = False
         self.lines: list[str] = []
 
     def note(self, msg: str) -> None:
@@ -63,13 +71,88 @@ class Result:
 
     def fail(self, msg: str) -> None:
         self.ok = False
+        self.unverified = False
+        self.lines.append(msg)
+
+    def mark_unverified(self, msg: str) -> None:
+        if self.ok:
+            self.unverified = True
         self.lines.append(msg)
 
     def render(self) -> None:
-        mark = "✅ PASS" if self.ok else "❌ FAIL"
+        if not self.ok:
+            mark = "❌ FAIL"
+        elif self.unverified:
+            mark = "⚠️ 未取证 / UNVERIFIED"
+        else:
+            mark = "✅ PASS"
         print(f"\n=== {self.name} — {mark} ===")
         for line in self.lines:
             print(f"  {line}")
+
+
+def find_payload_sha256(dump_dir: Path, explicit: str | None) -> str | None:
+    """在线阶段从已经生成的 G3 层报告取载荷身份；人工复算可显式传入。"""
+    if explicit:
+        value = explicit.lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError("--payload-sha256 必须是 64 位十六进制 SHA-256")
+        return value
+
+    reported: set[str] = set()
+    for path in dump_dir.glob("g3_layers_run*.json"):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        value = data.get("expect_sha256")
+        if value:
+            value = str(value).lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise ValueError(f"{path} 的 expect_sha256 不是有效 SHA-256")
+            reported.add(value)
+    if len(reported) > 1:
+        raise ValueError(f"G3 层报告中的期望载荷 SHA 不一致：{sorted(reported)}")
+    if reported:
+        return next(iter(reported))
+
+    summary = dump_dir / "summary.txt"
+    if summary.is_file():
+        match = re.search(r"^期望系统 SHA\s*:\s*([0-9a-fA-F]{64})", summary.read_text(
+            encoding="utf-8", errors="replace"), re.MULTILINE)
+        if match:
+            return match.group(1).lower()
+    return None
+
+
+def load_baseline_dir(payload_sha256: str, read_bps: int) -> Path | None:
+    """只按显式登记的载荷 SHA 和读长匹配，绝不默认套用 R0.83 基准。"""
+    manifest = json.loads(BASELINE_MANIFEST.read_text(encoding="utf-8"))
+    for entry in manifest.get("baselines", []):
+        if (entry.get("payload_sha256", "").lower() == payload_sha256
+                and int(entry.get("read_bps", -1)) == read_bps):
+            return (GOLDEN / entry["golden_dir"]).resolve()
+    return None
+
+
+def find_dataset_ids(payload_sha256: str) -> list[str]:
+    """从数据集自己的 manifest 识别载荷，不在 tests/datasets 下复制任何输入。"""
+    found: list[str] = []
+    for path in DATASETS.glob("*/manifest.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("payload", {}).get("sha256", "").lower() == payload_sha256:
+            found.append(str(data.get("dataset_id", path.parent.name)))
+
+    # D2_text_sub1pct 继承父数据集的载荷身份，只改变 FASTQ 读段。
+    for path in DATASETS.glob("*/mutation_manifest.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        parent = data.get("parent_manifest", {})
+        if parent.get("payload", {}).get("sha256", "").lower() == payload_sha256:
+            found.append(path.parent.name)
+    return sorted(set(found))
 
 
 def check_watermark(dump_dir: Path, golden_dir: Path, ref_len: int = 957) -> Result:
@@ -195,6 +278,28 @@ def check_stage3(dump_dir: Path, golden_dir: Path) -> Result:
     return r
 
 
+def unverified_checks(read_bps: int, payload_sha256: str | None,
+                      dataset_ids: list[str]) -> list[Result]:
+    if payload_sha256:
+        identity = f"payload SHA-256 {payload_sha256}"
+        if dataset_ids:
+            identity += f"（数据集：{', '.join(dataset_ids)}）"
+        else:
+            identity += "（仓库数据集 manifest 未识别）"
+    else:
+        identity = "未提供载荷 SHA-256，无法识别适用的黄金包"
+    reason = f"{identity}；tests/golden 未登记 read_bps={read_bps} 的四级基准，本级未取证"
+    checks = [
+        Result("展开水印 @0x10040000  vs  wm_regions.hex"),
+        Result("Stage1 输出 @0x10600000  vs  stage2_in.hex"),
+        Result("Stage2 输出 ⊕ 水印 @0x11000000  vs  sparse_expect.hex"),
+        Result("Stage3 输出 @0x11100000  vs  stage3_expect.hex"),
+    ]
+    for check in checks:
+        check.mark_unverified(reason)
+    return checks
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -204,19 +309,14 @@ def main() -> int:
     ap.add_argument("--read-bps", type=int, default=150, choices=[150, 250],
                     help="读段碱基数（150 或 250，默认 150）")
     ap.add_argument("--golden-dir", type=Path, default=None,
-                    help="黄金向量目录（默认按 read-bps 自动选 tests/golden 或 tests/golden/se250）")
+                    help="显式指定黄金目录；指定后按用户要求强制比较")
+    ap.add_argument("--payload-sha256", default=None,
+                    help="手工 dump 没有 G3 层报告时指定期望载荷 SHA-256")
     args = ap.parse_args()
 
     if not args.dump_dir.is_dir():
         print(f"FATAL: 找不到 dump 目录 {args.dump_dir}", file=sys.stderr)
         return 2
-
-    if args.golden_dir is not None:
-        golden_dir = args.golden_dir
-    elif args.read_bps == 250:
-        golden_dir = REPO / "tests" / "golden" / "se250"
-    else:
-        golden_dir = REPO / "tests" / "golden"
 
     if args.read_bps == 250:
         record_bytes = 72
@@ -236,8 +336,37 @@ def main() -> int:
             print(f"FATAL: 缺少 {args.dump_dir / need}，先在 Windows 侧跑 dump_ddr.tcl", file=sys.stderr)
             return 2
 
+    try:
+        payload_sha256 = find_payload_sha256(args.dump_dir, args.payload_sha256)
+        if args.golden_dir is not None:
+            golden_dir = args.golden_dir.resolve()
+            baseline_source = "--golden-dir 显式指定"
+        elif payload_sha256:
+            golden_dir = load_baseline_dir(payload_sha256, args.read_bps)
+            baseline_source = "BOARD_STAGE_BASELINES.json 按载荷 SHA 与读长匹配"
+        else:
+            golden_dir = None
+            baseline_source = "缺少载荷身份"
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        print(f"FATAL: 无法确定四级基准：{exc}", file=sys.stderr)
+        return 2
+
     print(f"dump 目录：{args.dump_dir}")
-    print(f"黄金向量：{golden_dir} (read_bps={args.read_bps}, {record_bytes}B/read)")
+    print(f"期望载荷 SHA256：{payload_sha256 or '未提供'}")
+    if golden_dir is None:
+        dataset_ids = find_dataset_ids(payload_sha256) if payload_sha256 else []
+        print(f"黄金向量：无可比基准（{baseline_source}；read_bps={args.read_bps}）")
+        checks = unverified_checks(args.read_bps, payload_sha256, dataset_ids)
+        for c in checks:
+            c.render()
+        print("\n" + "=" * 60)
+        print("逐级取证：UNVERIFIED — 该载荷没有四级黄金基准，未取证；不得据此判 PASS 或硬件 FAIL。")
+        return 3
+
+    if not golden_dir.is_dir():
+        print(f"FATAL: 黄金向量目录不存在：{golden_dir}", file=sys.stderr)
+        return 2
+    print(f"黄金向量：{golden_dir} ({baseline_source}; read_bps={args.read_bps}, {record_bytes}B/read)")
     checks.append(check_watermark(args.dump_dir, golden_dir, ref_len))
     checks.append(check_stage1(args.dump_dir, args.reads, golden_dir, record_bytes, beats_per_rec))
     checks.append(check_stage2(args.dump_dir, golden_dir))
@@ -247,15 +376,18 @@ def main() -> int:
         c.render()
 
     failed = [c.name for c in checks if not c.ok]
+    unverified = [c.name for c in checks if c.unverified and c.ok]
     print("\n" + "=" * 60)
     if failed:
         print(f"逐级取证：{len(checks) - len(failed)}/{len(checks)} 级通过，最先出错的一级是：")
         print(f"  → {failed[0]}")
         print("按 AGENTS.md 的纪律：第一处不一致就停下来定位到具体一级，不要跑完全程再回头猜。")
         return 1
+    if unverified:
+        print(f"逐级取证：UNVERIFIED — {len(unverified)}/{len(checks)} 级缺少可用基准，未取证。")
+        return 3
     print(f"逐级取证：{len(checks)}/{len(checks)} 级全部通过。")
-    print("但这**不等于 G3 闭环**——最终判据是回传经 tools/ldpc_decode.py 译码后的图片 SHA-256")
-    print("必须等于 fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3。")
+    print("四级取证只作为 G3 的中间层证据；整体裁决仍由 run_g3.sh 的架构与系统判据给出。")
     return 0
 
 

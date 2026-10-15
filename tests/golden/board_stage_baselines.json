@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "baselines": [
+    {
+      "payload_id": "R0.83",
+      "payload_sha256": "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3",
+      "read_bps": 150,
+      "golden_dir": "."
+    },
+    {
+      "payload_id": "R0.83",
+      "payload_sha256": "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3",
+      "read_bps": 250,
+      "golden_dir": "se250"
+    }
+  ]
+}
