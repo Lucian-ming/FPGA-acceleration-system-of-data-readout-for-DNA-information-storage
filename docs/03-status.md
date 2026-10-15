@@ -363,6 +363,37 @@ L4 的 8 收敛/6 不收敛分布在板上没复现。
 **不是 lwIP 空等**（打印标签是错的）；且方向早有反证——P3 三变体端到端只差 0.06%。
 详见 [09 台账](09-evidence-ledger.md) 末两行。
 
+### 2026-10-15 按阶段归因：**Stage1 占全量档 89.5%**
+
+纯固件仪表化包（bit 与上一份逐字节相同，只改 `sw/app/echo.c`）上板两轮，三层判据均 PASS。
+完整记录见 [`logs/board/stage-time-attribution-20261015.md`](../logs/board/stage-time-attribution-20261015.md)。
+
+| 阶段 | 默认档 | **全量档** | 占比 |
+| --- | ---: | ---: | ---: |
+| **Stage1** | 294.6 ms | **4,938.4 ms** | **89.5%** |
+| Stage2 | 194.1 ms | 363.4 ms | 6.6% |
+| Stage3 | 170.2 ms | 170.2 ms | 3.1% |
+| LDPC | 49.6 ms | 43.9 ms | 0.8% |
+| **合计** | **708.4**（=total 708） | **5,515.9**（=total 5,516） | 差 **0.000 ms** |
+
+- **`sum` 与 `total` 精确相等** ⇒ 这是**无残差**的归因，与此前那个把 87% 塞进
+  `[waiting]` 残差桶的口径是两回事。
+- **Stage1 的占比远高于此前"约 65%"的推导估计**（那个数不是实测）。
+- ⚠️ **这是墙钟不是硬件周期**：Stage1 **没有**硬件周期计数器（Stage2/Stage3 有，
+  核心 AXI-Lite 只有 4 个写向寄存器，且 `srpe_batch_pway.v` 的 SHA 是门禁冻结值），
+  所以"4,938 ms 里硬件占多少、PS 侧流式投递占多少"**目前答不了**。
+- ⚠️ **Stage3 的 170.2 ms 在两种规模下完全相同** ⇒ 与数据量无关的固定开销，
+  且其 `DECODER_PREP`(65) / `DONE_STAGE3`(73) 都是**单次命中**就要这么多。**下一个可疑项。**
+
+**同日发现的基础设施缺陷**：`tools/rebuild_software_package.py` 走
+XSCT `app create` **成功**时，app 用 **`-O0`** 编（XSCT 模板默认）；报
+`Socket create error` 走手写 fallback Makefile 时用 **`-O2`**。而这个 socket 错误**时有时无**。
+⇒ **出厂固件的优化级别由运气决定**，直接违背"可复现"的硬要求（性能又是评分项）。
+清点 6 份包只有 `stage2-prefill-sw` 那份是 `-O0`。**已实测该混淆影响很小**
+（`-O0` 5,522 vs `-O2` 5,516，差 0.13%；同级别的 `prefillopt`(`-O2`) 5,970 → 5,516
+= **−7.6%**，故 −7.5% 站得住）。修法建议见
+[`logs/dev/software-build-optimization-nondeterminism.md`](../logs/dev/software-build-optimization-nondeterminism.md)，**待定**。
+
 ⚠️ **仍未上板/未做**：冷启动（QSPI/SD）、8 h 长稳、功耗实测、v2 `score_min=67`、
 新载荷四级黄金向量。
 

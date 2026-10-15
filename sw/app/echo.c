@@ -101,6 +101,37 @@ static u32 pipe_poll_cbs = 0;
 static u64 pipe_state_cyc[PIPE_STATE_COUNT];
 static u32 pipe_state_hits[PIPE_STATE_COUNT];
 
+/* 阶段墙钟跨度：边界间经过的主循环节流时间也归入当前阶段。 */
+#define PIPE_STAGE_COUNT   4U
+#define PIPE_STAGE_NONE    0xFFFFFFFFU
+enum {
+    PIPE_STAGE_STAGE1 = 0,
+    PIPE_STAGE_STAGE2,
+    PIPE_STAGE_STAGE3,
+    PIPE_STAGE_LDPC
+};
+static u64 pipe_stage_cyc[PIPE_STAGE_COUNT];
+static u32 pipe_stage_hits[PIPE_STAGE_COUNT];
+static u32 pipe_stage_active = PIPE_STAGE_NONE;
+static XTime pipe_stage_t_start;
+
+static u32 pipe_cycles_to_ms_x1000(u64 cycles)
+{
+    return (u32)((cycles * 1000000ULL) / (u64)COUNTS_PER_SECOND);
+}
+
+static void pipe_stage_switch(u32 next, XTime at)
+{
+    if (pipe_stage_active < PIPE_STAGE_COUNT) {
+        pipe_stage_cyc[pipe_stage_active] += (u64)(at - pipe_stage_t_start);
+    }
+    pipe_stage_active = next;
+    if (next < PIPE_STAGE_COUNT) {
+        pipe_stage_t_start = at;
+        pipe_stage_hits[next]++;
+    }
+}
+
 static const char *pipe_state_name(int st)
 {
     switch (st) {
@@ -306,7 +337,13 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
         for (int _i = 0; _i < PIPE_STATE_COUNT; ++_i) {
             pipe_state_cyc[_i] = 0; pipe_state_hits[_i] = 0;
         }
+        for (u32 _i = 0; _i < PIPE_STAGE_COUNT; ++_i) {
+            pipe_stage_cyc[_i] = 0; pipe_stage_hits[_i] = 0;
+        }
+        pipe_stage_active = PIPE_STAGE_NONE;
         XTime_GetTime(&pipe_t_start);
+        /* WM_PREP 及其 WM_TX/RX_PREP/TX_PREFILL 前置从任务起点归入 Stage1。 */
+        pipe_stage_switch(PIPE_STAGE_STAGE1, pipe_t_start);
         g_proc_state = PROC_RUNNING; break;
     case PROC_RUNNING: {
         /* 【P0 固定开销】改之前：这里每次 poll 回调只推进**一个**流水线状态就 break，
@@ -349,21 +386,81 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
             pipe_poll_steps++;
             steps_this_cb++;
 
+            /* 只在状态机实际跨过阶段入口时打点；两个打点之间的 poll 节流
+             * 墙钟自然留在当前阶段跨度内。 */
+            if (st == XST_SUCCESS) {
+                if (pipe_stage_active == PIPE_STAGE_STAGE1 &&
+                    pipe_state == PIPE_VOTER_PREP) {
+                    pipe_stage_switch(PIPE_STAGE_STAGE2, t_b);
+                } else if (pipe_stage_active == PIPE_STAGE_STAGE2 &&
+                           pipe_state == PIPE_DECODER_PREP) {
+                    pipe_stage_switch(PIPE_STAGE_STAGE3, t_b);
+                } else if (pipe_stage_active == PIPE_STAGE_STAGE3 &&
+                           pipe_state == PIPE_LDPC_PREP) {
+                    pipe_stage_switch(PIPE_STAGE_LDPC, t_b);
+                }
+            }
+
             if (pipe_state == PIPE_FAIL) { g_proc_state = PROC_FAILED; break; }
 
             if (pipe_state == PIPE_SEND_RESULT && st == XST_SUCCESS) {
                 XTime t_end;
                 XTime_GetTime(&t_end);
+                /* SEND_RESULT 是终止标记，没有独立的状态执行区间；按实际到达
+                 * 路径结束当前阶段。当前 LDPC 路径因此把它作为 LDPC 的终点。 */
+                pipe_stage_switch(PIPE_STAGE_NONE, t_end);
                 xil_printf("[PIPE] total %u steps in %u callbacks, %u ms "
                            "(WM preload: %u steps)\n\r",
                            pipe_poll_steps, pipe_poll_cbs,
                            (u32)((t_end - pipe_t_start) /
                                  (XTime)(COUNTS_PER_SECOND / 1000U)),
                            wm_poll_steps);
+                {
+                    const u64 total_cyc = (u64)(t_end - pipe_t_start);
+                    const u64 stage_sum_cyc = pipe_stage_cyc[PIPE_STAGE_STAGE1] +
+                                              pipe_stage_cyc[PIPE_STAGE_STAGE2] +
+                                              pipe_stage_cyc[PIPE_STAGE_STAGE3] +
+                                              pipe_stage_cyc[PIPE_STAGE_LDPC];
+                    const u64 head_cyc = 0;
+                    const u64 tail_cyc = 0;
+                    const u64 accounted_cyc = head_cyc + stage_sum_cyc + tail_cyc;
+                    const char diff_sign = (accounted_cyc >= total_cyc) ? '+' : '-';
+                    const u64 diff_cyc = (accounted_cyc >= total_cyc)
+                                       ? accounted_cyc - total_cyc
+                                       : total_cyc - accounted_cyc;
+                    const u32 stage1_ms = pipe_cycles_to_ms_x1000(pipe_stage_cyc[PIPE_STAGE_STAGE1]);
+                    const u32 stage2_ms = pipe_cycles_to_ms_x1000(pipe_stage_cyc[PIPE_STAGE_STAGE2]);
+                    const u32 stage3_ms = pipe_cycles_to_ms_x1000(pipe_stage_cyc[PIPE_STAGE_STAGE3]);
+                    const u32 ldpc_ms = pipe_cycles_to_ms_x1000(pipe_stage_cyc[PIPE_STAGE_LDPC]);
+                    const u32 head_ms = pipe_cycles_to_ms_x1000(head_cyc);
+                    const u32 tail_ms = pipe_cycles_to_ms_x1000(tail_cyc);
+                    const u32 sum_ms = pipe_cycles_to_ms_x1000(accounted_cyc);
+                    const u32 total_ms = pipe_cycles_to_ms_x1000(total_cyc);
+                    const u32 diff_ms = pipe_cycles_to_ms_x1000(diff_cyc);
+                    xil_printf("[STAGE-TIME] stage1=%u.%03u ms (hits=%u) "
+                               "stage2=%u.%03u ms (hits=%u) "
+                               "stage3=%u.%03u ms (hits=%u) "
+                               "ldpc=%u.%03u ms (hits=%u) "
+                               "head=%u.%03u ms tail=%u.%03u ms "
+                               "sum=%u.%03u ms total=%u.%03u ms diff=%c%u.%03u ms\n\r",
+                               stage1_ms / 1000U, stage1_ms % 1000U,
+                               pipe_stage_hits[PIPE_STAGE_STAGE1],
+                               stage2_ms / 1000U, stage2_ms % 1000U,
+                               pipe_stage_hits[PIPE_STAGE_STAGE2],
+                               stage3_ms / 1000U, stage3_ms % 1000U,
+                               pipe_stage_hits[PIPE_STAGE_STAGE3],
+                               ldpc_ms / 1000U, ldpc_ms % 1000U,
+                               pipe_stage_hits[PIPE_STAGE_LDPC],
+                               head_ms / 1000U, head_ms % 1000U,
+                               tail_ms / 1000U, tail_ms % 1000U,
+                               sum_ms / 1000U, sum_ms % 1000U,
+                               total_ms / 1000U, total_ms % 1000U,
+                               diff_sign, diff_ms / 1000U, diff_ms % 1000U);
+                }
                 /* 【P0 分解】只打印有耗时的状态，按 ms 给出。
-                 * 注意这里统计的是**状态内部**的执行时间，不含「回到 lwIP 等下一次
-                 * poll」的空等——那部分等于 (总墙钟 - 各状态之和)，正是需要区分的两件事：
-                 * 状态自己慢，还是在等定时器。末行把这个差额直接算出来。 */
+                 * 注意这里统计的是**状态内部**的执行时间，不含主循环两次状态推进
+                 * 之间让出的 PIPE_RUN_SLEEP_US 节流时间；末行是由总墙钟减状态和得到的
+                 * 残差，并不单独表示 lwIP 空等。 */
                 {
                     u64 sum = 0; int _i;
                     const u32 per_ms = (u32)(COUNTS_PER_SECOND / 1000U);
@@ -377,7 +474,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
                     }
                     xil_printf("  %-14s %5s  %6u\n\r", "[in-state]", "-",
                                (u32)(sum / per_ms));
-                    xil_printf("  %-14s %5s  %6u  <- 回到 lwIP 等 poll 的空等\n\r",
+                    xil_printf("  %-14s %5s  %6u  <- 两次 poll 之间让出的时间（主循环 PIPE_RUN_SLEEP_US 节流，非 lwIP 空等）\n\r",
                                "[waiting]", "-",
                                (u32)(((t_end - pipe_t_start) - sum) / per_ms));
                 }
