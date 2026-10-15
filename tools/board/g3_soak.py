@@ -66,9 +66,17 @@ def parse_round(out_path: Path) -> dict:
     if m:
         verdict = m[-1]
     sha = ""
-    m = re.findall(r"唯一判据.*?([0-9a-f]{64})", text, re.S)
+    # 【2026-10-15 补】旧措辞「唯一判据 … SHA」是三层判据实施前的格式；改成三层后
+    # run_g3.sh 输出的是「系统判据 : PASS — SHA-256 <hex>；期望 <hex>」。
+    # 只留旧正则会让 judge_sha 恒空、match 恒 NO —— 一个不会响的检查。
+    # 先按新格式取"板端码字载荷"那一行，取不到再退回旧格式。
+    m = re.findall(r"系统判据\s*:\s*(?:PASS|FAIL)\s*—\s*SHA-256\s*([0-9a-f]{64})", text)
     if m:
         sha = m[-1]
+    else:
+        m = re.findall(r"唯一判据.*?([0-9a-f]{64})", text, re.S)
+        if m:
+            sha = m[-1]
     t = ""
     m = re.findall(r"Result: 8100 bytes, ([0-9.]+)s", text)
     if m:
