@@ -94,6 +94,12 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--xsdb", default=r"D:/xilinx/2026.1/Vitis/bin/xsdb.bat")
     ap.add_argument("--uart-port", default="COM10")
     ap.add_argument("--win-root", default=r"D:/bkb220_board_smoke")
+    # 【2026-10-15 补】WSL 侧走 Linux hw_server 时，run_g3.sh **强制要求**
+    # 显式传 `--hw-server TCP:127.0.0.1:3132`，不传直接 FATAL、每轮 rc=2。
+    # 旧默认是 Windows 路径的 xsdb（当时从 Windows 侧跑），所以这里以前不需要它；
+    # 一旦改用 WSL 的 `--xsdb /tools/.../xsdb`，长稳就会整轮整轮地空跑。
+    ap.add_argument("--hw-server", default="",
+                    help="WSL 侧必填，如 TCP:127.0.0.1:3132；Windows 侧留空")
     ap.add_argument("--hours", type=float, required=True, help="目标墙钟时长（小时）")
     ap.add_argument("--score-min", type=int, default=67)
     ap.add_argument("--expect-sha", default=EXPECT_SHA_DEFAULT)
@@ -129,6 +135,8 @@ def main(argv: list[str]) -> int:
                "--win-root", args.win_root,
                "--score-min", str(args.score_min), "--full", "--skip-dump", "--skip-boot",
                "--expect-sha", args.expect_sha]
+        if args.hw_server:
+            cmd += ["--hw-server", args.hw_server]
         with log.open("a") as fh:                 # 主日志只记一行索引，完整输出在 roundNNNN.out
             fh.write(f"\n[轮 {rnd}] $ {' '.join(cmd)}\n")
         rc = sh(cmd, rlog, timeout=args.round_timeout)
