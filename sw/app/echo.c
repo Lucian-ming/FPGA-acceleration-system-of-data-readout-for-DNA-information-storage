@@ -19,6 +19,7 @@
 #include "lwip/err.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "sleep.h"
 #include "xaxidma.h"
@@ -409,7 +410,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
                 /* SEND_RESULT 是终止标记，没有独立的状态执行区间；按实际到达
                  * 路径结束当前阶段。当前 LDPC 路径因此把它作为 LDPC 的终点。 */
                 pipe_stage_switch(PIPE_STAGE_NONE, t_end);
-                xil_printf("[PIPE] total %u steps in %u callbacks, %u ms "
+                FW_RESULT_PRINTF("[PIPE] total %u steps in %u callbacks, %u ms "
                            "(WM preload: %u steps)\n\r",
                            pipe_poll_steps, pipe_poll_cbs,
                            (u32)((t_end - pipe_t_start) /

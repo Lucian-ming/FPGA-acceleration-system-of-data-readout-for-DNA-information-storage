@@ -7,6 +7,7 @@
 
 #include "proto.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "sleep.h"
 #include <string.h>
 #include "netif/xadapter.h"

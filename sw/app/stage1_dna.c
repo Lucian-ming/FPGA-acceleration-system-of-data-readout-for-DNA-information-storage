@@ -12,6 +12,7 @@
 #include "fw_log.h"
 #include "ddr_layout.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "sleep.h"
 #include "dna_time.h"

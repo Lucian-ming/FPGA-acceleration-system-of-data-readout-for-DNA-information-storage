@@ -53,6 +53,7 @@
 #include "xscugic.h"
 #include "lwip/tcp.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "platform.h"
 #include "platform_config.h"
 #include "netif/xadapter.h"

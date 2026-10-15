@@ -9,6 +9,7 @@
 #include "xil_cache.h"
 #include "xil_io.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "dna_time.h"
 
 #ifndef XPAR_LDPC_DECODER_0_BASEADDR

@@ -3,6 +3,7 @@
 #ifdef PROF_ENABLE
 #include <string.h>
 #include "xil_printf.h"
+#include "fw_diag.h"
 
 prof_stats_t g_prof;
 

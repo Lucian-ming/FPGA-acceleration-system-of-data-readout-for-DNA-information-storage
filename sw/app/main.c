@@ -9,6 +9,7 @@
 #include "platform.h"
 #include "platform_config.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 
 /* lwIP */

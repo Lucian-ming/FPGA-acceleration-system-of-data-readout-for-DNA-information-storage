@@ -7,6 +7,7 @@
 #include "stage3_decoder.h"
 #include "reg_timing.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "sleep.h"
 #include "dna_time.h"

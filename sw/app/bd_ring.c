@@ -8,6 +8,7 @@
 #include "bd_ring.h"
 #include "fw_log.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "prof.h"
 

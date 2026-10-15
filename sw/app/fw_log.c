@@ -4,6 +4,7 @@
 #include "fw_log.h"
 #include "echo.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "prof.h"
 #include "xaxidma.h"

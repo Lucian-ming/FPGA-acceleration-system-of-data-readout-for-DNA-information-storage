@@ -8,6 +8,7 @@
 #include "dma_dna.h"
 #include "fw_log.h"
 #include "xil_printf.h"
+#include "fw_diag.h"
 #include "xil_cache.h"
 #include "prof.h"
 #include "bsp_compat.h"
