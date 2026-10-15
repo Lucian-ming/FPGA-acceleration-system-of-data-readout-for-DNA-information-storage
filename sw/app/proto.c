@@ -104,7 +104,7 @@ err_t send_framed_pkt(struct tcp_pcb *tpcb, u8 type,
         keep_tcp_alive();
         usleep(1000);
     }
-    xil_printf("[PKT] send_framed_pkt(%02X) giving up\n\r", type);
+    FW_ERR_PRINTF("[PKT] send_framed_pkt(%02X) giving up\n\r", type);
     return ERR_MEM;
 }
 
@@ -128,7 +128,7 @@ void process_caps(dna_connection_t *conn)
                caps.max_symbols, caps.max_reads, caps.features);
     if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CAPS_INFO,
                                       payload, sizeof payload) != ERR_OK)
-        xil_printf("[CAPS] ERROR: response enqueue failed\n\r");
+        FW_ERR_PRINTF("[CAPS] ERROR: response enqueue failed\n\r");
 }
 
 void process_config(dna_connection_t *conn, u8 *data, u32 len)
@@ -136,26 +136,26 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
     u8 ok[4];
 
     if (len != TASK_CONFIG_PAYLOAD_LEN) {
-        xil_printf("[CONFIG] ERROR: payload %u != %u\n\r",
+        FW_ERR_PRINTF("[CONFIG] ERROR: payload %u != %u\n\r",
                    len, (u32)TASK_CONFIG_PAYLOAD_LEN);
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
 
     if (conn->configured) {                    /* 拒绝码 8：重复配置 */
-        xil_printf("[CONFIG] rejected: already configured\n\r");
+        FW_ERR_PRINTF("[CONFIG] rejected: already configured\n\r");
         wr_u32_be(ok, 8u);
         if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
                                           ok, sizeof ok) != ERR_OK)
-            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
+            FW_ERR_PRINTF("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
     if (conn->watermark_size != 0u || conn->total_reads_received != 0u) {
         wr_u32_be(ok, 9u);                      /* 拒绝码 9：顺序非法 */
-        xil_printf("[CONFIG] rejected: data already received\n\r");
+        FW_ERR_PRINTF("[CONFIG] rejected: data already received\n\r");
         if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
                                           ok, sizeof ok) != ERR_OK)
-            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
+            FW_ERR_PRINTF("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
 
@@ -171,12 +171,12 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
             "", "version", "read_bps", "geometry", "symbols contract",
             "total_reads", "score_min", "CRC32"
         };
-        xil_printf("[CONFIG] rejected (%d): %s\n\r", rc,
+        FW_ERR_PRINTF("[CONFIG] rejected (%d): %s\n\r", rc,
                    (rc >= 1 && rc <= 7) ? why[rc] : "?");
         wr_u32_be(ok, (u32)rc);
         if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
                                           ok, sizeof ok) != ERR_OK)
-            xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
+            FW_ERR_PRINTF("[CONFIG] ERROR: response enqueue failed\n\r");
         return;
     }
 
@@ -188,5 +188,5 @@ void process_config(dna_connection_t *conn, u8 *data, u32 len)
     wr_u32_be(ok, 0u);
     if (conn->tpcb && send_framed_pkt(conn->tpcb, PKT_CONFIG_OK,
                                       ok, sizeof ok) != ERR_OK)
-        xil_printf("[CONFIG] ERROR: response enqueue failed\n\r");
+        FW_ERR_PRINTF("[CONFIG] ERROR: response enqueue failed\n\r");
 }

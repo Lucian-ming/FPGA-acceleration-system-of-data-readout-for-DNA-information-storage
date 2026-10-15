@@ -23,14 +23,14 @@ int setup_bd_ring(XAxiDma_BdRing *RingPtr, u32 base, int cnt, const char *name)
     XAxiDma_Bd BdTemplate;
     Status = XAxiDma_BdRingCreate(RingPtr, base, base, BD_ALIGNMENT, cnt);
     if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BdRingCreate failed\n\r");
+        FW_ERR_PRINTF("[ERROR] BdRingCreate failed\n\r");
         return XST_FAILURE;
     }
 
     XAxiDma_BdClear(&BdTemplate);
     Status = XAxiDma_BdRingClone(RingPtr, &BdTemplate);
     if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BdRingClone failed\n\r");
+        FW_ERR_PRINTF("[ERROR] BdRingClone failed\n\r");
         return XST_FAILURE;
     }
 
@@ -88,14 +88,14 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
 
     u32 free_bd = XAxiDma_BdRingGetFreeCnt(RingPtr);
     if (free_bd < bd_count) {
-        xil_printf("[ERROR] Not enough BDs (need %u, have %u)\n\r", bd_count, free_bd);
+        FW_ERR_PRINTF("[ERROR] Not enough BDs (need %u, have %u)\n\r", bd_count, free_bd);
         PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
 
     Status = XAxiDma_BdRingAlloc(RingPtr, bd_count, &BdPtr);
     if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] BD alloc failed\n\r");
+        FW_ERR_PRINTF("[ERROR] BD alloc failed\n\r");
         PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
@@ -138,7 +138,7 @@ int submit_bd_transfer(XAxiDma_BdRing *RingPtr,
 
     Status = XAxiDma_BdRingToHw(RingPtr, bd_count, BdPtr);
     if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] ToHw failed\n\r");
+        FW_ERR_PRINTF("[ERROR] ToHw failed\n\r");
         PROF_SUBMIT_END(submit, 0U);
         return -1;
     }
@@ -165,7 +165,7 @@ int reclaim_some_bd(XAxiDma_BdRing *RingPtr, int max_to_reclaim)
         for (int i = 0; i < n; i++) {
             u32 sts = XAxiDma_BdGetSts(CurPtr);
             if (sts & XAXIDMA_BD_STS_ALL_ERR_MASK) {
-                xil_printf("[ERROR] BD status error: 0x%08X (BD %d/%d)\n\r", sts, i, n);
+                FW_ERR_PRINTF("[ERROR] BD status error: 0x%08X (BD %d/%d)\n\r", sts, i, n);
                 PROF_RECLAIM_END(reclaim, 0U);
                 return -1;
             }

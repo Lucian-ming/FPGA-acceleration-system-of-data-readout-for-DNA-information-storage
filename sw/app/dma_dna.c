@@ -21,16 +21,16 @@ int dna_accelerator_init(void)
 {
     XAxiDma_Config *CfgPtr = XAxiDma_LookupConfig(DNA_DMA_CONFIG_KEY);
     if (!CfgPtr) {
-        xil_printf("[ERROR] DMA config lookup failed\n\r");
+        FW_ERR_PRINTF("[ERROR] DMA config lookup failed\n\r");
         return XST_FAILURE;
     }
     int Status = XAxiDma_CfgInitialize(&AxiDma, CfgPtr);
     if (Status != XST_SUCCESS) {
-        xil_printf("[ERROR] DMA CfgInitialize failed\n\r");
+        FW_ERR_PRINTF("[ERROR] DMA CfgInitialize failed\n\r");
         return XST_FAILURE;
     }
     if (!XAxiDma_HasSg(&AxiDma)) {
-        xil_printf("[ERROR] DMA not in SG mode\n\r");
+        FW_ERR_PRINTF("[ERROR] DMA not in SG mode\n\r");
         return XST_FAILURE;
     }
 
@@ -42,8 +42,14 @@ int dna_accelerator_init(void)
     if (setup_bd_ring(RxRingPtr, BD_SPACE_BASE_RX, MAX_BD_COUNT_RX, "RX") != XST_SUCCESS)
         return XST_FAILURE;
 
-    if (XAxiDma_BdRingStart(TxRingPtr) != XST_SUCCESS) return XST_FAILURE;
-    if (XAxiDma_BdRingStart(RxRingPtr) != XST_SUCCESS) return XST_FAILURE;
+    if (XAxiDma_BdRingStart(TxRingPtr) != XST_SUCCESS) {
+        FW_ERR_PRINTF("[ERROR] TX BD ring start failed\n\r");
+        return XST_FAILURE;
+    }
+    if (XAxiDma_BdRingStart(RxRingPtr) != XST_SUCCESS) {
+        FW_ERR_PRINTF("[ERROR] RX BD ring start failed\n\r");
+        return XST_FAILURE;
+    }
 
     dump_dma_regs("After init");
     xil_printf("[INIT] DNA Accelerator ready\n\r");
@@ -93,7 +99,7 @@ int dna_submit_reads_chunk(dna_tx_state_t *st)
 
     int reclaimed = reclaim_some_bd(TxRingPtr, 512);
     if (reclaimed < 0) {
-        xil_printf("[ERROR] TX BD reclaim failed before submit\n\r");
+        FW_ERR_PRINTF("[ERROR] TX BD reclaim failed before submit\n\r");
         return -1;
     }
     if (reclaimed > 0) {
@@ -139,14 +145,14 @@ int dna_wait_wm_region_bd(u32 region, int expected)
     while (got < expected) {
         int n = reclaim_some_bd(TxRingPtr, expected - got);
         if (n < 0) {
-            xil_printf("[ERROR] WM region %u: TX BD error\n\r", region);
+            FW_ERR_PRINTF("[ERROR] WM region %u: TX BD error\n\r", region);
             return -1;
         }
         got += n;
         if (got >= expected) break;
 
         if (waited_us >= WM_BD_WAIT_US) {
-            xil_printf("[ERROR] WM region %u: TX BD timeout (%d/%d after %u us)\n\r",
+            FW_ERR_PRINTF("[ERROR] WM region %u: TX BD timeout (%d/%d after %u us)\n\r",
                        region, got, expected, waited_us);
             dump_dma_regs("WM region BD timeout");
             return -1;

@@ -163,11 +163,11 @@ int force_decoder_to_idle(void) {
         }
     }
 
-    xil_printf("[RESET] ❌ All methods failed\n\r");
-    xil_printf("[RESET] Hardware requires:\n\r");
-    xil_printf("  1. Power cycle the board, OR\n\r");
-    xil_printf("  2. Reload bitstream, OR\n\r");
-    xil_printf("  3. Toggle ARESETN via GPIO (if available)\n\r");
+    FW_ERR_PRINTF("[RESET] ❌ All methods failed\n\r");
+    FW_ERR_PRINTF("[RESET] Hardware requires:\n\r");
+    FW_ERR_PRINTF("  1. Power cycle the board, OR\n\r");
+    FW_ERR_PRINTF("  2. Reload bitstream, OR\n\r");
+    FW_ERR_PRINTF("  3. Toggle ARESETN via GPIO (if available)\n\r");
     return -1;
 }
 void reset_all_ip_cores(void) {
@@ -191,9 +191,9 @@ void reset_all_ip_cores(void) {
     // Decoder (IP3) - 使用增强复位
     xil_printf("[INIT] Resetting Decoder (enhanced)...\n\r");
     if (force_decoder_to_idle() != 0) {
-        xil_printf("[INIT] ⚠️⚠️⚠️ DECODER RESET FAILED ⚠️⚠️⚠️\n\r");
-        xil_printf("[INIT] System may not function correctly!\n\r");
-        xil_printf("[INIT] Please power cycle the board.\n\r");
+        FW_ERR_PRINTF("[INIT] ⚠️⚠️⚠️ DECODER RESET FAILED ⚠️⚠️⚠️\n\r");
+        FW_ERR_PRINTF("[INIT] System may not function correctly!\n\r");
+        FW_ERR_PRINTF("[INIT] Please power cycle the board.\n\r");
         // 不要直接退出，让用户决定
     } else {
         xil_printf("[INIT] ✓ Decoder reset successful\n\r");
@@ -211,13 +211,13 @@ void reset_all_ip_cores(void) {
     if ((d_st & 0x01) == 0) {
         xil_printf("\n\r");
         xil_printf("========================================\n\r");
-        xil_printf("⚠️  WARNING: Decoder not in IDLE state  ⚠️\n\r");
+        FW_ERR_PRINTF("⚠️  WARNING: Decoder not in IDLE state  ⚠️\n\r");
         xil_printf("========================================\n\r");
-        xil_printf("Hardware reset is REQUIRED.\n\r");
-        xil_printf("Options:\n\r");
-        xil_printf("  1. Press board reset button\n\r");
-        xil_printf("  2. Power cycle the board\n\r");
-        xil_printf("  3. Reload bitstream in Vivado\n\r");
+        FW_ERR_PRINTF("Hardware reset is REQUIRED.\n\r");
+        FW_ERR_PRINTF("Options:\n\r");
+        FW_ERR_PRINTF("  1. Press board reset button\n\r");
+        FW_ERR_PRINTF("  2. Power cycle the board\n\r");
+        FW_ERR_PRINTF("  3. Reload bitstream in Vivado\n\r");
         xil_printf("========================================\n\r");
     } else {
         xil_printf("\n\r[INIT] ✓ All IP cores ready\n\r");
@@ -288,7 +288,7 @@ int main(void)
     /* 步骤 4: 添加 EmacPs 接口 */
     if (!xemac_add(echo_netif, &ipaddr, &netmask, &gw,
                    mac_ethernet_address, PLATFORM_EMAC_BASEADDR)) {
-        xil_printf("ERROR: Error adding N/W interface\n\r");
+        FW_ERR_PRINTF("ERROR: Error adding N/W interface\n\r");
         return -1;
     }
 
@@ -308,13 +308,13 @@ int main(void)
 
     xil_printf("[INIT] Initializing DNA Accelerator...\n\r");
     if (dna_accelerator_init() != 0) {
-        xil_printf("ERROR: DNA Accelerator initialization failed!\n\r");
+        FW_ERR_PRINTF("ERROR: DNA Accelerator initialization failed!\n\r");
         return -1;
     }
     xil_printf("[INIT] DNA Accelerator ready\n\r");
 
     if (start_application() != 0) {
-        xil_printf("ERROR: Failed to start application\n\r");
+        FW_ERR_PRINTF("ERROR: Failed to start application\n\r");
         return -1;
    }
 

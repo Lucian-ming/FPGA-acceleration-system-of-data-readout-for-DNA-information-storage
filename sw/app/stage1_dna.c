@@ -166,12 +166,12 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         {
             int stale = reclaim_some_bd(TxRingPtr, MAX_BD_COUNT);
             if (stale < 0) {
-                xil_printf("[WM] ERROR: TX ring 残留 BD 带错误状态\n\r");
+                FW_ERR_PRINTF("[WM] ERROR: TX ring 残留 BD 带错误状态\n\r");
                 pipeline_set_state(PIPE_FAIL);
                 return PIPE_STEP_FAIL;
             }
             if (stale > 0)
-                xil_printf("[WM] WARN: 排空了 %d 个残留 TX BD（上一次任务未收尾？）\n\r",
+                FW_ERR_PRINTF("[WM] WARN: 排空了 %d 个残留 TX BD（上一次任务未收尾？）\n\r",
                            stale);
         }
 
@@ -319,7 +319,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
                 usleep(50);
             }
             PROF_TIME_END(ts_lowwater, tstream_lowwater_ticks);
-            if (rx_stall_count > 5000) { xil_printf("[WARN] RX recovery timeout, forcing TX continue\n\r"); rx_stall_count = 0; }
+            if (rx_stall_count > 5000) { FW_ERR_PRINTF("[WARN] RX recovery timeout, forcing TX continue\n\r"); rx_stall_count = 0; }
             else return PIPE_STEP_PROGRESS;
         }
 
@@ -349,10 +349,10 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             XTime t_now;
             XTime_GetTime(&t_now);
             if ((t_now - s1_last_progress_time) > DNA_TIMEOUT_TICKS(30U)) {
-                xil_printf("\n\r[ERROR] STAGE1 停滞 30 s 无任何 BD 进展\n\r");
-                xil_printf("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
+                FW_ERR_PRINTF("\n\r[ERROR] STAGE1 停滞 30 s 无任何 BD 进展\n\r");
+                FW_ERR_PRINTF("  TX frames sent=%u/%u  TX BD done=%d/%d\n\r",
                            tx_frames_sent, tx_frames_total, tx_done, tx_expected);
-                xil_printf("  RX records done=%d/%d  submitted=%u  ring free=%d\n\r",
+                FW_ERR_PRINTF("  RX records done=%d/%d  submitted=%u  ring free=%d\n\r",
                            rx_done, rx_expected, rx_records_submitted,
                            (int)XAxiDma_BdRingGetFreeCnt(RxRingPtr));
                 dump_dma_regs("STAGE1 stall");
@@ -416,7 +416,7 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
         const u32 hw_cycles_total_confirm =
             dna_read_stage1_cycle(DNA_ACC_CYCLE_IDX_TOTAL);
         if (hw_cycles_total != hw_cycles_total_confirm) {
-            xil_printf("[HW-CYCLES] WARNING: Stage1 counter changed after completion (%u -> %u)\n\r",
+            FW_ERR_PRINTF("[HW-CYCLES] WARNING: Stage1 counter changed after completion (%u -> %u)\n\r",
                        hw_cycles_total, hw_cycles_total_confirm);
         }
         if (hw_cycles_total != 0U) {
@@ -464,11 +464,11 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
 
         /* 友好提示：若几乎全为 0，告警一次 */
         if (nonzero_bytes == 0) {
-            xil_printf("\n\r[WARNING] ⚠️  Stage1 output seems all zeros in first 10 reads!\n\r");
-            xil_printf("[WARNING] Possible causes:\n\r");
-            xil_printf("  1) DMA transfer incomplete\n\r");
-            xil_printf("  2) IP core computation error\n\r");
-            xil_printf("  3) Invalid input reads/watermark\n\r");
+            FW_ERR_PRINTF("\n\r[WARNING] ⚠️  Stage1 output seems all zeros in first 10 reads!\n\r");
+            FW_ERR_PRINTF("[WARNING] Possible causes:\n\r");
+            FW_ERR_PRINTF("  1) DMA transfer incomplete\n\r");
+            FW_ERR_PRINTF("  2) IP core computation error\n\r");
+            FW_ERR_PRINTF("  3) Invalid input reads/watermark\n\r");
         }
 
         /* 强制把数据刷新到 DDR（后续 Stage2 直接读取；[C1] 按实际条数） */

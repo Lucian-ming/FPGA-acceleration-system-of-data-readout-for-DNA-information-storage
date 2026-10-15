@@ -157,21 +157,21 @@ void platform_setup_timer(void)
 	DnaTimerReady = 0;
 	ConfigPtr = XScuTimer_LookupConfig(DNA_TIMER_CONFIG_KEY);
 	if (ConfigPtr == NULL) {
-		xil_printf("[ERROR] Scutimer config lookup failed\r\n");
+		FW_ERR_PRINTF("[ERROR] Scutimer config lookup failed\r\n");
 		return;
 	}
 	Status = XScuTimer_CfgInitialize(&TimerInstance, ConfigPtr,
 			ConfigPtr->BaseAddr);
 	if (Status != XST_SUCCESS) {
 
-		xil_printf("In %s: Scutimer Cfg initialization failed...\r\n",
+		FW_ERR_PRINTF("In %s: Scutimer Cfg initialization failed...\r\n",
 		__func__);
 		return;
 	}
 
 	Status = XScuTimer_SelfTest(&TimerInstance);
 	if (Status != XST_SUCCESS) {
-		xil_printf("In %s: Scutimer Self test failed...\r\n",
+		FW_ERR_PRINTF("In %s: Scutimer Self test failed...\r\n",
 		__func__);
 		return;
 
@@ -199,7 +199,7 @@ void platform_setup_interrupts(void)
         (void *)timer_callback, XPAR_XSCUTIMER_0_INTERRUPTS,
         XPAR_XSCUTIMER_0_INTERRUPT_PARENT, 0xA0U) != XST_SUCCESS) {
         DnaTimerReady = 0;
-        xil_printf("[ERROR] SDT timer interrupt initialization failed\r\n");
+        FW_ERR_PRINTF("[ERROR] SDT timer interrupt initialization failed\r\n");
         return;
     }
 #else

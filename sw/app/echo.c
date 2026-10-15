@@ -233,12 +233,12 @@ static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32
 {
     u16 magic; u8 pkt_type; u32 payload_len;
     if (parse_header(packet_data, &magic, &pkt_type, &payload_len) != 0) {
-        xil_printf("[PKT] Invalid header\n\r");
+        FW_ERR_PRINTF("[PKT] Invalid header\n\r");
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
     if (total_len != PROTOCOL_HDR_SIZE + payload_len) {
-        xil_printf("[PKT] Size mismatch\n\r");
+        FW_ERR_PRINTF("[PKT] Size mismatch\n\r");
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
@@ -262,7 +262,7 @@ static void process_complete_packet(dna_connection_t *conn, u8 *packet_data, u32
                           ? PKT_BATCH_OK : PKT_ERROR);
         break;
     case PKT_POST: process_post(conn); break;
-    default:       xil_printf("[PKT] Unknown type\n\r"); send_ack_byte(conn->tpcb, PKT_ERROR); break;
+    default:       FW_ERR_PRINTF("[PKT] Unknown type\n\r"); send_ack_byte(conn->tpcb, PKT_ERROR); break;
     }
 }
 
@@ -280,7 +280,7 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
 
     u16 received_len = p->tot_len;
     if (tcp_recv_offset + received_len > sizeof(tcp_recv_buffer)) {
-        xil_printf("[TCP] Buffer overflow; closing connection\n\r");
+        FW_ERR_PRINTF("[TCP] Buffer overflow; closing connection\n\r");
         return reject_and_close_connection(conn, tpcb, p);
     }
 
@@ -295,7 +295,7 @@ static err_t recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
             continue;
         }
         if (payload_len > sizeof(tcp_recv_buffer) - PROTOCOL_HDR_SIZE) {
-            xil_printf("[TCP] Declared payload %u exceeds receive capacity %u; "
+            FW_ERR_PRINTF("[TCP] Declared payload %u exceeds receive capacity %u; "
                        "closing connection\n\r",
                        payload_len,
                        (u32)(sizeof(tcp_recv_buffer) - PROTOCOL_HDR_SIZE));
@@ -505,7 +505,7 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
         prof_dump_once();
         break;
     case PROC_FAILED:
-        xil_printf("[POST] Pipeline failed\n\r");
+        FW_ERR_PRINTF("[POST] Pipeline failed\n\r");
         send_ack_byte(conn->tpcb, PKT_ERROR);
         g_proc_state = PROC_IDLE;
         prof_dump_once();
@@ -558,11 +558,11 @@ int start_application(void)
     xil_printf("\n\r[TCP] Starting server on port 7...\n\r");
 
     g_server_pcb = tcp_new();
-    if (!g_server_pcb) { xil_printf("[ERROR] tcp_new failed\n\r"); return -1; }
+    if (!g_server_pcb) { FW_ERR_PRINTF("[ERROR] tcp_new failed\n\r"); return -1; }
     err = tcp_bind(g_server_pcb, IP_ADDR_ANY, 7);
-    if (err != ERR_OK) { xil_printf("[ERROR] bind failed: %d\n\r", err); return -1; }
+    if (err != ERR_OK) { FW_ERR_PRINTF("[ERROR] bind failed: %d\n\r", err); return -1; }
     g_server_pcb = tcp_listen(g_server_pcb);
-    if (!g_server_pcb) { xil_printf("[ERROR] listen failed\n\r"); return -1; }
+    if (!g_server_pcb) { FW_ERR_PRINTF("[ERROR] listen failed\n\r"); return -1; }
     tcp_accept(g_server_pcb, accept_callback);
     xil_printf("[TCP] Server ready\n\r");
     return 0;
@@ -579,7 +579,7 @@ int process_watermark(dna_connection_t *conn, u8 *data, u32 len)
 {
     /* 【P3】强制 CONFIG：未配置直接拒绝 */
     if (!conn->configured) {
-        xil_printf("[WM] rejected: no PKT_CONFIG on this connection\n\r");
+        FW_ERR_PRINTF("[WM] rejected: no PKT_CONFIG on this connection\n\r");
         conn->watermark_size = 0;
         return -1;
     }
@@ -587,13 +587,13 @@ int process_watermark(dna_connection_t *conn, u8 *data, u32 len)
        MAX 当时还是 10120，比 81,000 bit 所需的 10,125 B 还小，
        尾部 40 bit 直接被丢掉，而上位机完全无从得知。 */
     if (len > MAX_WATERMARK_SIZE) {
-        xil_printf("[WM] ERROR: %u bytes exceeds MAX_WATERMARK_SIZE %u\n\r",
+        FW_ERR_PRINTF("[WM] ERROR: %u bytes exceeds MAX_WATERMARK_SIZE %u\n\r",
                    len, (u32)MAX_WATERMARK_SIZE);
         conn->watermark_size = 0;
         return -1;
     }
     if (len < WM_PACKED_BYTES) {
-        xil_printf("[WM] ERROR: %u bytes < required %u (%u bits)\n\r",
+        FW_ERR_PRINTF("[WM] ERROR: %u bytes < required %u (%u bits)\n\r",
                    len, (u32)WM_PACKED_BYTES, (u32)WM_TOTAL_BITS);
         conn->watermark_size = 0;
         return -1;
@@ -624,7 +624,7 @@ int expand_watermark_regions(dna_connection_t *conn)
     u32 lc, row, idx, sym;
 
     if (conn->watermark_size < WM_PACKED_BYTES) {
-        xil_printf("[WM] ERROR: watermark not loaded (%u bytes)\n\r",
+        FW_ERR_PRINTF("[WM] ERROR: watermark not loaded (%u bytes)\n\r",
                    conn->watermark_size);
         return -1;
     }
@@ -656,22 +656,22 @@ int process_batch(dna_connection_t *conn, u8 *data, u32 len)
 {
     /* 【P3】强制 CONFIG */
     if (!conn->configured) {
-        xil_printf("[BATCH] rejected: no PKT_CONFIG on this connection\n\r");
+        FW_ERR_PRINTF("[BATCH] rejected: no PKT_CONFIG on this connection\n\r");
         return -1;
     }
     if (len < 4u) {
-        xil_printf("[BATCH] invalid payload: %u bytes\n\r", len);
+        FW_ERR_PRINTF("[BATCH] invalid payload: %u bytes\n\r", len);
         return -1;
     }
     u32 num_reads = (data[0]<<24)|(data[1]<<16)|(data[2]<<8)|data[3];
     if (num_reads == 0u || num_reads > (len - 4u) / READ_SIZE_BYTES) {
-        xil_printf("[BATCH] invalid read count %u for payload %u\n\r",
+        FW_ERR_PRINTF("[BATCH] invalid read count %u for payload %u\n\r",
                    num_reads, len);
         return -1;
     }
     u32 data_size = num_reads * READ_SIZE_BYTES;
     if (len != 4u + data_size) {
-        xil_printf("[BATCH] size mismatch: payload=%u expected=%u\n\r",
+        FW_ERR_PRINTF("[BATCH] size mismatch: payload=%u expected=%u\n\r",
                    len, 4u + data_size);
         return -1;
     }
@@ -679,12 +679,12 @@ int process_batch(dna_connection_t *conn, u8 *data, u32 len)
     /* 【C3】容量防溢出：DDR 只预留了 TOTAL_READS 条的空间；
      * 【P3】也不得超过声明的本任务条数 */
     if (conn->total_reads_received + num_reads > TOTAL_READS) {
-        xil_printf("[BATCH] ✗ capacity exceeded: %u + %u > %u\n\r",
+        FW_ERR_PRINTF("[BATCH] ✗ capacity exceeded: %u + %u > %u\n\r",
                    conn->total_reads_received, num_reads, (u32)TOTAL_READS);
         return -1;
     }
     if (conn->total_reads_received + num_reads > conn->cfg.total_reads) {
-        xil_printf("[BATCH] ✗ exceeds declared total_reads: %u + %u > %u\n\r",
+        FW_ERR_PRINTF("[BATCH] ✗ exceeds declared total_reads: %u + %u > %u\n\r",
                    conn->total_reads_received, num_reads, conn->cfg.total_reads);
         return -1;
     }
@@ -702,18 +702,18 @@ void process_post(dna_connection_t *conn)
 {
     /* 【P3】强制 CONFIG */
     if (!conn->configured) {
-        xil_printf("[POST] rejected: no PKT_CONFIG on this connection\n\r");
+        FW_ERR_PRINTF("[POST] rejected: no PKT_CONFIG on this connection\n\r");
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
     if (conn->total_reads_received == 0 || conn->watermark_size == 0) {
-        xil_printf("[POST] No data\n\r");
+        FW_ERR_PRINTF("[POST] No data\n\r");
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
     }
     /* 【P3】声明条数与实际收到的必须一致 */
     if (conn->total_reads_received != conn->cfg.total_reads) {
-        xil_printf("[POST] ✗ count mismatch: declared %u, received %u\n\r",
+        FW_ERR_PRINTF("[POST] ✗ count mismatch: declared %u, received %u\n\r",
                    conn->cfg.total_reads, conn->total_reads_received);
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
@@ -730,9 +730,9 @@ void process_post(dna_connection_t *conn)
                                         READ_SIZE_BYTES,
                                         DNA_ACC_RESULT_PACKED_BYTES);
     if (layout_rc != 0) {
-        xil_printf("[POST] ✗ DDR layout validation failed (rc=%d, reads=%u)\n\r",
+        FW_ERR_PRINTF("[POST] ✗ DDR layout validation failed (rc=%d, reads=%u)\n\r",
                    layout_rc, conn->total_reads_received);
-        xil_printf("[POST]    -1=空任务 -2=非64整数倍(补零缺失) "
+        FW_ERR_PRINTF("[POST]    -1=空任务 -2=非64整数倍(补零缺失) "
                    "-3=超容量 -4/-5=区间越界\n\r");
         if (conn->tpcb) send_ack_byte(conn->tpcb, PKT_ERROR);
         return;
@@ -789,7 +789,7 @@ void send_result(dna_connection_t *conn)
             usleep(1000);
             continue;
         }
-        xil_printf("[ERROR] Header write failed: %d\n\r", e);
+        FW_ERR_PRINTF("[ERROR] Header write failed: %d\n\r", e);
         PROF_SEND_RESULT_END(sendres, 0U);
         return;
     }
@@ -830,7 +830,7 @@ void send_result(dna_connection_t *conn)
             keep_tcp_alive();
             usleep(1000);
         } else {
-            xil_printf("[ERROR] Data write failed: %d @%u\n\r", e, sent);
+            FW_ERR_PRINTF("[ERROR] Data write failed: %d @%u\n\r", e, sent);
             PROF_SEND_RESULT_END(sendres, sent);
             return;
         }
@@ -858,7 +858,7 @@ void send_result(dna_connection_t *conn)
                (conn->tpcb && conn->tpcb->unacked) ? 1 : 0);
 
     if (!delivery_settled) {
-        xil_printf("[ERROR] Result delivery timeout; refusing to report success\n\r");
+        FW_ERR_PRINTF("[ERROR] Result delivery timeout; refusing to report success\n\r");
         PROF_SEND_RESULT_END(sendres, sent);
         return;
     }

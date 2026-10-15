@@ -68,13 +68,13 @@ int voter_configure_and_verify(const dna_connection_t *conn)
     if (in_addr_rb != in_addr || in_beats_rb != in_beats ||
         out_addr_rb != out_addr || out_beats_rb != out_beats ||
         total_reads_rb != total_reads || score_min_rb != score_min) {
-        xil_printf("[ERROR] Voter configuration readback mismatch:\n\r");
-        xil_printf("  IN_ADDR     0x%08X != 0x%08X\n\r", in_addr_rb, in_addr);
-        xil_printf("  IN_BEATS    %u != %u\n\r", in_beats_rb, in_beats);
-        xil_printf("  OUT_ADDR    0x%08X != 0x%08X\n\r", out_addr_rb, out_addr);
-        xil_printf("  OUT_BEATS   %u != %u\n\r", out_beats_rb, out_beats);
-        xil_printf("  TOTAL_READS %u != %u\n\r", total_reads_rb, total_reads);
-        xil_printf("  SCORE_MIN   %u != %u\n\r", score_min_rb, score_min);
+        FW_ERR_PRINTF("[ERROR] Voter configuration readback mismatch:\n\r");
+        FW_ERR_PRINTF("  IN_ADDR     0x%08X != 0x%08X\n\r", in_addr_rb, in_addr);
+        FW_ERR_PRINTF("  IN_BEATS    %u != %u\n\r", in_beats_rb, in_beats);
+        FW_ERR_PRINTF("  OUT_ADDR    0x%08X != 0x%08X\n\r", out_addr_rb, out_addr);
+        FW_ERR_PRINTF("  OUT_BEATS   %u != %u\n\r", out_beats_rb, out_beats);
+        FW_ERR_PRINTF("  TOTAL_READS %u != %u\n\r", total_reads_rb, total_reads);
+        FW_ERR_PRINTF("  SCORE_MIN   %u != %u\n\r", score_min_rb, score_min);
         return XST_FAILURE;
     }
 
@@ -157,8 +157,8 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         xil_printf("  Parsed Position: %u\n\r", position);
 
         if (nz == 0) {
-            xil_printf("\n\r[ERROR] ❌ CRITICAL: Stage1→Stage2 input appears all-zero!\n\r");
-            xil_printf("[ERROR] Check DMA, IP configuration, or endian conversion.\n\r");
+            FW_ERR_PRINTF("\n\r[ERROR] ❌ CRITICAL: Stage1→Stage2 input appears all-zero!\n\r");
+            FW_ERR_PRINTF("[ERROR] Check DMA, IP configuration, or endian conversion.\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -186,7 +186,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
             xil_printf("[STAGE2] Status after clear: 0x%02X (IDLE=%d, DONE=%d)\n\r",
                        st, (st & VOTER_STATUS_IDLE) ? 1 : 0, (st & VOTER_STATUS_DONE) ? 1 : 0);
             if (st & VOTER_STATUS_DONE) {
-                xil_printf("[STAGE2] ❌ ERROR: Failed to clear DONE flag!\n\r");
+                FW_ERR_PRINTF("[STAGE2] ❌ ERROR: Failed to clear DONE flag!\n\r");
                 pipeline_set_state(PIPE_FAIL);
                 return PIPE_STEP_FAIL;
             }
@@ -195,12 +195,12 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
 
         /* -------------------- Step 3: 若非 IDLE，则做一次轻量复位 -------------------- */
         if (!(status_init & VOTER_STATUS_IDLE)) {
-            xil_printf("[STAGE2] WARNING: Voter not IDLE, resetting config...\n\r");
+            FW_ERR_PRINTF("[STAGE2] WARNING: Voter not IDLE, resetting config...\n\r");
             voter_reset_regs();
 
             u32 st = read_reg32(VOTER_BASEADDR, VOTER_REG_STATUS);
             if (!(st & VOTER_STATUS_IDLE)) {
-                xil_printf("[STAGE2] ❌ ERROR: Cannot reset Voter to IDLE!\n\r");
+                FW_ERR_PRINTF("[STAGE2] ❌ ERROR: Cannot reset Voter to IDLE!\n\r");
                 pipeline_set_state(PIPE_FAIL);
                 return PIPE_STEP_FAIL;
             }
@@ -223,7 +223,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
                    (status_before_start & VOTER_STATUS_DONE) ? 1 : 0);
 
         if (!(status_before_start & VOTER_STATUS_IDLE)) {
-            xil_printf("[START] ❌ ERROR: IP core not IDLE before START!\n\r");
+            FW_ERR_PRINTF("[START] ❌ ERROR: IP core not IDLE before START!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -272,7 +272,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         if ((status & VOTER_STATUS_ERROR) ||
             dbg_state == VOTER_DBG_ERROR_STATE ||
             (err_flags & VOTER_ERR_FLAGS_MASK) != 0u) {
-            xil_printf("\n\r[ERROR] Voter hardware failure: STATUS=0x%02X "
+            FW_ERR_PRINTF("\n\r[ERROR] Voter hardware failure: STATUS=0x%02X "
                        "DBG_STATE=%u ERR_FLAGS=0x%08X\n\r",
                        status, dbg_state, err_flags);
             voter_clear_start();
@@ -321,15 +321,15 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
         XTime t_now;
         XTime_GetTime(&t_now);
         if ((t_now - t_wait_start) > DNA_TIMEOUT_TICKS(VOTER_WAIT_TIMEOUT_S)) {
-            xil_printf("\n\r[ERROR] Voter timeout after %u s (%u polls)\n\r",
+            FW_ERR_PRINTF("\n\r[ERROR] Voter timeout after %u s (%u polls)\n\r",
                        VOTER_WAIT_TIMEOUT_S, poll_count);
-            xil_printf("[ERROR] Final status: 0x%02X\n\r", status);
+            FW_ERR_PRINTF("[ERROR] Final status: 0x%02X\n\r", status);
 
             /* ✓ 新增：输出详细诊断信息 */
-            xil_printf("[ERROR] Diagnostic information:\n\r");
-            xil_printf("  - Voter may be stuck in processing\n\r");
-            xil_printf("  - Check if START signal was captured\n\r");
-            xil_printf("  - Verify input data format\n\r");
+            FW_ERR_PRINTF("[ERROR] Diagnostic information:\n\r");
+            FW_ERR_PRINTF("  - Voter may be stuck in processing\n\r");
+            FW_ERR_PRINTF("  - Check if START signal was captured\n\r");
+            FW_ERR_PRINTF("  - Verify input data format\n\r");
 
             /* 清除START信号并失败 */
             voter_clear_start();
@@ -383,15 +383,15 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
                    nonzero_count, nonzero_pct10 / 10U, nonzero_pct10 % 10U);
         /* 警告：如果输出全为0 */
         if (nonzero_count == 0) {
-            xil_printf("\n\r[WARNING] Voter output is all zeros!\n\r");
-            xil_printf("[WARNING] This may indicate:\n\r");
-            xil_printf("  1. Input data format mismatch between Stage1 and Voter\n\r");
-            xil_printf("  2. Voter parsing logic error (codeword extraction)\n\r");
-            xil_printf("  3. Voting algorithm produced all-zero result\n\r");
-            xil_printf("  4. AXI write channel issue (writes not reaching DDR)\n\r");
-            xil_printf("  5. BRAM initialization problem\n\r");
-            xil_printf("[WARNING] Stage3 (Decoder) will likely fail or produce garbage.\n\r");
-            xil_printf("[WARNING] Proceeding anyway for debugging...\n\r");
+            FW_ERR_PRINTF("\n\r[WARNING] Voter output is all zeros!\n\r");
+            FW_ERR_PRINTF("[WARNING] This may indicate:\n\r");
+            FW_ERR_PRINTF("  1. Input data format mismatch between Stage1 and Voter\n\r");
+            FW_ERR_PRINTF("  2. Voter parsing logic error (codeword extraction)\n\r");
+            FW_ERR_PRINTF("  3. Voting algorithm produced all-zero result\n\r");
+            FW_ERR_PRINTF("  4. AXI write channel issue (writes not reaching DDR)\n\r");
+            FW_ERR_PRINTF("  5. BRAM initialization problem\n\r");
+            FW_ERR_PRINTF("[WARNING] Stage3 (Decoder) will likely fail or produce garbage.\n\r");
+            FW_ERR_PRINTF("[WARNING] Proceeding anyway for debugging...\n\r");
         } else {
             xil_printf("\n\r[STAGE2] ✓ Output contains valid data\n\r");
             xil_printf("[STAGE2] Non-zero ratio: %u.%u%%\n\r",
@@ -411,7 +411,7 @@ pipe_step_rc_e pipeline_step_stage2(dna_connection_t *conn)
     }
 
     default:
-        xil_printf("[ERROR] Unknown state in pipeline_step_stage2: %d\n\r",
+        FW_ERR_PRINTF("[ERROR] Unknown state in pipeline_step_stage2: %d\n\r",
                    pipe_state);
         return PIPE_STEP_FAIL;
     }

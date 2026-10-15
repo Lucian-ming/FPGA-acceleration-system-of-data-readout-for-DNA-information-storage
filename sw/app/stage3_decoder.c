@@ -84,7 +84,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                    status_before_config, (status_before_config & 0x01) ? 1 : 0);
 
         if (!(status_before_config & DECODER_STATUS_IDLE)) {
-            xil_printf("[STAGE3] ❌ ERROR: Not IDLE before config!\n\r");
+            FW_ERR_PRINTF("[STAGE3] ❌ ERROR: Not IDLE before config!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -110,7 +110,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         xil_printf("  Non-zero u64s: %u/%u\n\r", nonzero_count, DEC_IN_BEATS);
 
         if (nonzero_count == 0) {
-            xil_printf("[STAGE3] ❌ ERROR: Input is all zeros!\n\r");
+            FW_ERR_PRINTF("[STAGE3] ❌ ERROR: Input is all zeros!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -149,7 +149,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 
         if (in_addr_rb != DEC_IN_ADDR || in_beats_rb != DEC_IN_BEATS ||
             out_addr_rb != DEC_OUT_ADDR || out_beats_rb != DEC_OUT_BEATS) {
-            xil_printf("\n\r[ERROR] Configuration verification failed!\n\r");
+            FW_ERR_PRINTF("\n\r[ERROR] Configuration verification failed!\n\r");
             pipeline_set_state(PIPE_FAIL);
             return PIPE_STEP_FAIL;
         }
@@ -163,8 +163,8 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                    (status_after_config & 0x02) ? 1 : 0);
 
         if (!(status_after_config & DECODER_STATUS_IDLE)) {
-            xil_printf("[STAGE3] ❌ ERROR: IP started unexpectedly during config!\n\r");
-            xil_printf("[STAGE3] This indicates a hardware bug or signal glitch\n\r");
+            FW_ERR_PRINTF("[STAGE3] ❌ ERROR: IP started unexpectedly during config!\n\r");
+            FW_ERR_PRINTF("[STAGE3] This indicates a hardware bug or signal glitch\n\r");
 
             // 尝试紧急停止
             write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
@@ -178,7 +178,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                 // 重新开始PREP阶段
                 return PIPE_STEP_PROGRESS;
             } else {
-                xil_printf("[STAGE3] ❌ Cannot recover from unexpected start\n\r");
+                FW_ERR_PRINTF("[STAGE3] ❌ Cannot recover from unexpected start\n\r");
                 pipeline_set_state(PIPE_FAIL);
                 return PIPE_STEP_FAIL;
             }
@@ -277,7 +277,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                        written, (u32)DECODER_OUTPUT_BEATS);
 
             if (written >= DECODER_OUTPUT_BEATS) {
-                xil_printf("[STAGE3] ⚠️ 输出区 %u/%u 拍已全部写出，但 DONE=0；按完成收尾\n\r",
+                FW_ERR_PRINTF("[STAGE3] ⚠️ 输出区 %u/%u 拍已全部写出，但 DONE=0；按完成收尾\n\r",
                            written, (u32)DECODER_OUTPUT_BEATS);
                 decoder_clear_start();
                 poll_count = 0;
@@ -290,8 +290,8 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         XTime t_now;
         XTime_GetTime(&t_now);
         if ((t_now - t_wait_start) > DNA_TIMEOUT_TICKS(DECODER_WAIT_TIMEOUT_S)) {
-            xil_printf("\n\r[ERROR] STAGE3 等待超时仍未完成\n\r");
-            xil_printf("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
+            FW_ERR_PRINTF("\n\r[ERROR] STAGE3 等待超时仍未完成\n\r");
+            FW_ERR_PRINTF("  STATUS=0x%08X IN_ADDR=0x%08X IN_BEATS=%u OUT_ADDR=0x%08X OUT_BEATS=%u\n\r",
                        status,
                        read_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR),
                        read_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS),
@@ -326,8 +326,8 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                    written_pct10 / 10U, written_pct10 % 10U);
 
         if (final_written < DEC_OUT_BEATS / 2) {
-            xil_printf("[STAGE3] ⚠️  WARNING: Less than 50%% written\n\r");
-            xil_printf("[STAGE3] Results may be incomplete\n\r");
+            FW_ERR_PRINTF("[STAGE3] ⚠️  WARNING: Less than 50%% written\n\r");
+            FW_ERR_PRINTF("[STAGE3] Results may be incomplete\n\r");
         }
         xil_printf("[CLEANUP] Resetting Decoder for next run...\n\r");
         write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
@@ -340,7 +340,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
                    cleanup_status, (cleanup_status & 0x01) ? 1 : 0);
 
         if (!(cleanup_status & 0x01)) {
-            xil_printf("[CLEANUP] ⚠️ Not IDLE, forcing dummy run...\n\r");
+            FW_ERR_PRINTF("[CLEANUP] ⚠️ Not IDLE, forcing dummy run...\n\r");
             // 执行虚拟运行
             write_reg32(DECODER_BASEADDR, DECODER_REG_IN_ADDR,  DDR_VOTER_OUT_BASE);
             write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 1);
