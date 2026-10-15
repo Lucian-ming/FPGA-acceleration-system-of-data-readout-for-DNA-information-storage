@@ -497,6 +497,61 @@ LC50/单批 `total=297,901`、`blocks=2,550`、逐状态之和 297,901、**差�
 ⚠️ **仍需你留意的一条尾巴**：`run_g3.sh` 仍把检查器的「退出码 3 = 未取证」归为通用 FAIL——
 误报的**理由**对了，但**红还在**，需后续让运行器认这个码。
 
+---
+
+## 明日开工计划（2026-10-16，用户 2026-10-15 夜指定）
+
+**用户指定的顺序：两个可选性能项先做，8 h 长稳往后推。**
+
+### 第 1 项：双缓冲原型的 **LC50 正式测量**（离线仿真，不占板子）
+
+- 状态：原型与 TB 已入库（`hw/experimental/srpe_batch_pway_dbuf_proto.v` +
+  `hw/sim/ip_tb/tb_srpe_batch_pway_dbuf_proto.v`，LC6 冒烟已过：12 条 `cw/pos/score` 全等）。
+  昨夜按用户要求**中止了正在跑的 LC50 仿真**（那时已编译通过、刚开始跑）。
+- **一行重启**：
+  ```
+  mkdir -p logs/iverilog/dbuf-proto-lc50 && iverilog -g2005 -DCFG_NUM_LC=50 -DCFG_BATCH=64 \
+    -DCFG_BATCHES=3 -o logs/iverilog/dbuf-proto-lc50/tb_dbuf \
+    hw/experimental/srpe_batch_pway_dbuf_proto.v \
+    hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch_pway.v \
+    hw/sim/ip_tb/tb_srpe_batch_pway_dbuf_proto.v && \
+  vvp logs/iverilog/dbuf-proto-lc50/tb_dbuf | tee logs/iverilog/dbuf-proto-lc50/run.log
+  ```
+- **要看什么**：装载/发放**实际隐藏在 `S_RUN` 窗口内的周期数与占比**，对照理论上限 **932.5 ms**。
+  ⚠️ 预期有固定损失：首批装载与末批发放无法隐藏（各 28,800 拍 ≈ 0.288 ms，合计约 0.576 ms）。
+- ⚠️ **测出来之后也不要直接搬进生产件**：发布候选 **WHS 只有 +21 ps**，
+  必须先跑 100 MHz 整机 route 看 hold 与失败端点，再谈板测。
+
+### 第 2 项：Stage3 的固定 **50 ms 等待**（要板子）
+
+- 状态：昨夜派出的固件 agent 在探索阶段被**主动取消**，**未留任何改动**（工作树干净）。
+  需要重新派。
+- **改法方向**（只读调查给的，红线已明确）：把 `PIPE_DONE_STAGE3` 里的**无条件 `usleep(50ms)`**
+  改成**有界地轮询 `STATUS.IDLE`**；**不要**退回"按轮询次数超时"（`docs/03` P13 有教训），
+  且**必须保留安全下限**——IDLE 一直不置位时仍等满原时长并按原路径处理。
+- **三样不许动**：`START` 后的 100 µs 采样等待、`START 只写一次 1` 的 B27 时序、
+  主循环 `PIPE_RUN_SLEEP_US` 节流值。
+- 顺手：DONE_STAGE3 里那处**重复的输出缓存失效**（确认冗余后合成一次）。
+- **验收**：出包 → 上板 → **G3 三层判据仍须 PASS**、真实省下多少、连续任务下 Decoder 是否仍可靠。
+  单项收益约 **0.9%**，便宜但不白拿。
+
+### 第 3 项：**8 h 长稳跑满**
+
+- 昨夜跑过 **50 轮连续 PASS**（每轮 103,616 条、`result_s ≈ 5.05 s`、判据 SHA 每轮命中），
+  按电源计划中止 ⇒ **仍不算完成**。跑满才入账。
+- 命令模板见 `logs/soak/release-8h/`（注意 `--hw-server TCP:127.0.0.1:3132` 与
+  先确认板上就是本包再 `--skip-boot`）。
+
+### 再往后（板上验收欠账）
+
+QSPI/SD 冷启动（要用户切模式）→ v2 `score_min=67` → 新载荷板端四级取证 → 功耗（要仪器）。
+
+### 工具尾巴（**是验收口径决定，不要抢**）
+
+`run_g3.sh` 仍把四级检查器的「退出码 3 = 未取证」归为通用 FAIL——误报的**理由**修对了、
+**红还在**。改它等于改验收口径（四级取证"未取证"时 G3 总裁决该是什么），
+**必须连板测一起定**，不能顺手改。
+
 ⚠️ **仍未上板/未做**：冷启动（QSPI/SD）、8 h 长稳、功耗实测、v2 `score_min=67`、
 新载荷四级板端取证（D1/D2 暂无四级黄金向量；检查器对缺基准显示 `UNVERIFIED`）。
 
