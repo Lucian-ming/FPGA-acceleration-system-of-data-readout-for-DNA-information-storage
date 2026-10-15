@@ -5,6 +5,7 @@
 #   bash tools/run_sim.sh datapath     # 只跑某一项
 #   bash tools/run_sim.sh stage1_production       # 正式P4/P16，LC6快速回归
 #   SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full # LC50生产长测
+#   bash tools/run_sim.sh stage1_state_split      # LC50单批逐状态周期分解
 #   SIM_LOG_DIR=logs/iverilog/<run-id> 可指定证据目录；退出不删除日志/fixture。
 #
 # 依赖 Icarus Verilog（iverilog / vvp）。黄金向量由 tools/make_golden.py 生成。
@@ -13,7 +14,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 WHICH="${1:-all}"
 case "$WHICH" in
-    all|packaging|hygiene|datapath|axi|ldpc_decoder|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
+    all|packaging|hygiene|datapath|axi|ldpc_decoder|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|stage1_state_split|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
     *) echo "未知仿真项: $WHICH" >&2; exit 2 ;;
 esac
 [[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
@@ -59,7 +60,8 @@ run_case() {
     fi
 }
 
-if [[ "$WHICH" != packaging && "$WHICH" != hygiene && "$WHICH" != syntax ]] \
+if [[ "$WHICH" != packaging && "$WHICH" != hygiene && "$WHICH" != syntax \
+      && "$WHICH" != stage1_state_split ]] \
    && [ ! -f tests/golden/sparse_ideal.hex ]; then
     echo "缺少黄金向量，请先运行： python3 tools/make_golden.py"
     exit 1
@@ -70,7 +72,8 @@ fi
 # 放在最前面：这些问题会让综合工具「看到的设计」与你以为的不是同一个，
 # 后面所有仿真判据都建立在错误前提上。
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ] \
-   || [ "$WHICH" = "stage1_production" ] || [ "$WHICH" = "stage1_production_full" ]; then
+   || [ "$WHICH" = "stage1_production" ] || [ "$WHICH" = "stage1_production_full" ] \
+   || [ "$WHICH" = "stage1_state_split" ]; then
     if bash tools/check_ip_packaging.sh > "$BUILD/packaging.log" 2>&1; then
         cat "$BUILD/packaging.log"
         PASS=$((PASS+1))
@@ -144,6 +147,26 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
         "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
     run_case stage1_cycle_counters \
         "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_cycle_counters.v"
+fi
+
+if [ "$WHICH" = "stage1_state_split" ]; then
+    # LC50 单个 64-read 引擎批次正好完成 50*51=2,550 个位置块；
+    # TB 层次采样 srpe_batch_pway.st，测量状态占用而不改 RTL。
+    STATE_FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
+    mkdir -p "$STATE_FIXTURE_DIR"
+    if python3 tools/board/generate_stage1_fixture.py --num-lc 50 \
+        --out-dir "$STATE_FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
+        cat "$BUILD/fixture-generation.log"
+        sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
+        find "$STATE_FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
+        VVP_ARGS=("+fixture_dir=$STATE_FIXTURE_DIR")
+        run_case stage1_state_split -DCFG_NUM_LC=50 \
+            "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_state_split.v"
+        VVP_ARGS=()
+    else
+        cat "$BUILD/fixture-generation.log"
+        echo "  ✗ Stage1 状态分解 fixture 生成失败"; FAIL=$((FAIL+1))
+    fi
 fi
 
 # 真实生产P4/P16源集。stage1_production_full 显式启用LC50长测并建议
