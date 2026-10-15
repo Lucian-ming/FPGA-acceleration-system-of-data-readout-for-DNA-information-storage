@@ -4,6 +4,8 @@
 #   bash tools/run_sim.sh              # 跑全部
 #   bash tools/run_sim.sh datapath     # 只跑某一项
 #   bash tools/run_sim.sh stage1_production       # 正式P4/P16，LC6快速回归
+#   SIM_STAGE1_CYCLE_COUNTERS=1 bash tools/run_sim.sh stage1_production # 打开Stage1周期仪表
+#   SIM_STAGE1_CYCLE_COUNTERS=0 bash tools/run_sim.sh stage1_production # 默认关闭；0x0C应读0
 #   SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full # LC50生产长测
 #   bash tools/run_sim.sh stage1_state_split      # LC50单批逐状态周期分解
 #   SIM_LOG_DIR=logs/iverilog/<run-id> 可指定证据目录；退出不删除日志/fixture。
@@ -18,13 +20,23 @@ case "$WHICH" in
     *) echo "未知仿真项: $WHICH" >&2; exit 2 ;;
 esac
 [[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
+SIM_STAGE1_CYCLE_COUNTERS="${SIM_STAGE1_CYCLE_COUNTERS:-0}"
+if [[ "$SIM_STAGE1_CYCLE_COUNTERS" != 0 && "$SIM_STAGE1_CYCLE_COUNTERS" != 1 ]]; then
+    echo "SIM_STAGE1_CYCLE_COUNTERS 必须是 0 或 1" >&2
+    exit 2
+fi
+COUNTER_DEFINE=()
+if [[ "$SIM_STAGE1_CYCLE_COUNTERS" == 1 ]]; then
+    COUNTER_DEFINE=(-DSTAGE1_CYCLE_COUNTERS=1)
+fi
 VVP_ARGS=()
 # 每次运行保留编译、配置、源码hash和失败输出，不在退出时删除证据。
 BUILD="${SIM_LOG_DIR:-logs/iverilog/run_$(date +%Y%m%d_%H%M%S)_${BASHPID}_${WHICH}}"
 mkdir -p "$BUILD" || exit 1
 CASE_TIMEOUT="${SIM_CASE_TIMEOUT:-600}"
 echo "仿真入口: $WHICH；证据目录: $BUILD；每项超时: ${CASE_TIMEOUT}s"
-printf 'entry=%s\ntimeout_seconds=%s\n' "$WHICH" "$CASE_TIMEOUT" > "$BUILD/run-config.txt"
+printf 'entry=%s\ntimeout_seconds=%s\nstage1_cycle_counters=%s\n' \
+    "$WHICH" "$CASE_TIMEOUT" "$SIM_STAGE1_CYCLE_COUNTERS" > "$BUILD/run-config.txt"
 
 PASS=0
 FAIL=0
@@ -140,13 +152,19 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
     # P=4 须逐周期相同；P=16 + 选优树流水须逐位相同。NUM_LC=6 玩具配置，约 1 分钟。
     # 生产几何 NUM_LC=50 的结果见 docs/benchmarks/stage1-pway-7020-probe.md。
     run_case srpe_batch_pway_p4 \
+        "${COUNTER_DEFINE[@]}" \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=4 -DCFG_PIPE_TREE=0 \
         "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
     run_case srpe_batch_pway_p16 \
+        "${COUNTER_DEFINE[@]}" \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=16 -DCFG_PIPE_TREE=1 \
         "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
-    run_case stage1_cycle_counters \
-        "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_cycle_counters.v"
+    if [[ "$SIM_STAGE1_CYCLE_COUNTERS" == 1 ]]; then
+        run_case stage1_cycle_counters "${COUNTER_DEFINE[@]}" \
+            "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_cycle_counters.v"
+    else
+        echo "[STAGE1 COUNTERS] SKIP tb_stage1_cycle_counters.v requires SIM_STAGE1_CYCLE_COUNTERS=1; disabled 0x0C readback is checked by stage1_production."
+    fi
 fi
 
 if [ "$WHICH" = "stage1_state_split" ]; then
@@ -190,10 +208,10 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_production" ] \
         sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
         find "$FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
         VVP_ARGS=("+fixture_dir=$FIXTURE_DIR")
-        run_case dna_stage1_p16_equivalence -DCFG_NUM_LC="$PROD_LC" \
+        run_case dna_stage1_p16_equivalence "${COUNTER_DEFINE[@]}" -DCFG_NUM_LC="$PROD_LC" \
             "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
             "$IPTB/tb_dna_stage1_p16_equivalence.v"
-        run_case dna_stage1_p16_interface -DCFG_NUM_LC="$PROD_LC" \
+        run_case dna_stage1_p16_interface "${COUNTER_DEFINE[@]}" -DCFG_NUM_LC="$PROD_LC" \
             "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
             "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
             "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \

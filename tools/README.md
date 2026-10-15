@@ -105,7 +105,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；显式board/part_name/独立build与export目录，未验证BKB220配置拒绝构建 |
+| `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；显式board/part_name/独立build与export目录，未验证BKB220配置拒绝构建。`stage1_cycle_counters=0|1` 默认关闭Stage1硬件周期仪表；需测量时显式设为1 |
 | `build_sw_variant.sh` | **PS 编译宏 A/B 的完整变体包构建器**：复制一份已验收包 → 只在新包副本的 Makefile 里追加 `-D` 宏 → 重建应用 ELF → 重打 BOOT.bin → 写 manifest 派生字段 → 重签并自检 SHA256SUMS。**核验并拒绝**新包 bit 与参考包不同（本脚本不改硬件制品）。存在理由：`run_g3.sh` 禁止 `--elf` 指向包外文件，所以任何 PS 侧编译期改动的 A/B 都必须有自己的完整包。只证明新包自洽且与参考包同源，**不证明**它在板上通过 |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
 | `test_ldpc_perm.sh` | **PS 侧位级置换的主机单元测试**（不需要板子）。重新生成并校验 `sw/app/ldpc_perm_table.c` → 用 gcc 编 `sw/app/ldpc_perm.c` + 生成的表 → 与 `native_ldpc.deinterleave` 在**板端真实回传样本**与随机/全 0/全 1/交替模式上**逐位比对**，含往返还原。存在理由：板上缺解交织只表现为「核不收敛」，信号弱、定位慢；置换是纯数据变换，可以在主机上被穷尽核验。**只证明 C 实现 == Python 参考，不证明板上正确**（那要 G3 + 串口出现 `converged=1`） |

@@ -58,12 +58,13 @@ module `SRPE_BATCH_PWAY_MODNAME #(
 
     // Stage1 累计计数器：clear_counters 在每个任务的 start 上升沿清零，
     // 后续各个 64-read 引擎批次累加，直到下一个任务开始。
-    output reg  [31:0]             cycles_total,
-    output reg  [31:0]             cycles_prefill,
-    output reg  [31:0]             cycles_run,
-    output reg  [31:0]             cycles_tree,
-    output reg  [31:0]             blocks_done,
-    output reg  [31:0]             batches_done
+    // STAGE1_CYCLE_COUNTERS 默认未定义；仅仪表化构建显式定义它。
+    output wire [31:0]             cycles_total,
+    output wire [31:0]             cycles_prefill,
+    output wire [31:0]             cycles_run,
+    output wire [31:0]             cycles_tree,
+    output wire [31:0]             blocks_done,
+    output wire [31:0]             batches_done
 );
 
     localparam integer CODEBITS = READ_BPS*2;
@@ -357,36 +358,56 @@ module `SRPE_BATCH_PWAY_MODNAME #(
     // - 每个 S_UPD2 完成一个「一个 64-read 批次 × 一个位置块」；
     // - S_DONE 完成一个 64-read 批次。计数器在批次间空闲时保持，直到 clear_counters。
     // 状态完成后 busy=0，状态回到 S_IDLE；因此 done 后不会有计数递增。
+`ifdef STAGE1_CYCLE_COUNTERS
+    reg [31:0] cycles_total_r, cycles_prefill_r, cycles_run_r, cycles_tree_r;
+    reg [31:0] blocks_done_r, batches_done_r;
+    assign cycles_total   = cycles_total_r;
+    assign cycles_prefill = cycles_prefill_r;
+    assign cycles_run     = cycles_run_r;
+    assign cycles_tree    = cycles_tree_r;
+    assign blocks_done    = blocks_done_r;
+    assign batches_done   = batches_done_r;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            cycles_total   <= 32'd0;
-            cycles_prefill <= 32'd0;
-            cycles_run     <= 32'd0;
-            cycles_tree    <= 32'd0;
-            blocks_done    <= 32'd0;
-            batches_done   <= 32'd0;
+            cycles_total_r   <= 32'd0;
+            cycles_prefill_r <= 32'd0;
+            cycles_run_r     <= 32'd0;
+            cycles_tree_r    <= 32'd0;
+            blocks_done_r    <= 32'd0;
+            batches_done_r   <= 32'd0;
         end else if (clear_counters) begin
-            cycles_total   <= 32'd0;
-            cycles_prefill <= 32'd0;
-            cycles_run     <= 32'd0;
-            cycles_tree    <= 32'd0;
-            blocks_done    <= 32'd0;
-            batches_done   <= 32'd0;
+            cycles_total_r   <= 32'd0;
+            cycles_prefill_r <= 32'd0;
+            cycles_run_r     <= 32'd0;
+            cycles_tree_r    <= 32'd0;
+            blocks_done_r    <= 32'd0;
+            batches_done_r   <= 32'd0;
         end else begin
             if (busy || ((st == S_IDLE) && start_batch))
-                cycles_total <= cycles_total + 1'b1;
+                cycles_total_r <= cycles_total_r + 1'b1;
             if (busy && st == S_PREFILL)
-                cycles_prefill <= cycles_prefill + 1'b1;
+                cycles_prefill_r <= cycles_prefill_r + 1'b1;
             if (busy && st == S_RUN)
-                cycles_run <= cycles_run + 1'b1;
+                cycles_run_r <= cycles_run_r + 1'b1;
             if (busy && ((st == S_UPD1) || (st == S_UPD2)))
-                cycles_tree <= cycles_tree + 1'b1;
+                cycles_tree_r <= cycles_tree_r + 1'b1;
             if (busy && st == S_UPD2)
-                blocks_done <= blocks_done + 1'b1;
+                blocks_done_r <= blocks_done_r + 1'b1;
             if (busy && st == S_DONE)
-                batches_done <= batches_done + 1'b1;
+                batches_done_r <= batches_done_r + 1'b1;
         end
     end
+`else
+    // 关闭仪表时保留端口，但将 AXI-Lite 可见的六个值固定为 0；
+    // 计数寄存器、比较器和递增逻辑均不进入综合网表。
+    assign cycles_total   = 32'd0;
+    assign cycles_prefill = 32'd0;
+    assign cycles_run     = 32'd0;
+    assign cycles_tree    = 32'd0;
+    assign blocks_done    = 32'd0;
+    assign batches_done   = 32'd0;
+`endif
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin

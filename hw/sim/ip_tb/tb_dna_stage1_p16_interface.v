@@ -182,6 +182,7 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
         read_stage1_counter(3,hw_cycles_tree);
         read_stage1_counter(4,hw_blocks_done);
         read_stage1_counter(5,hw_batches_done);
+`ifdef STAGE1_CYCLE_COUNTERS
         if(hw_blocks_done!==LC*((807+16)/16)||hw_batches_done!==1)
           $fatal(1,"Stage1计数器块/批错误：blocks=%0d expect=%0d batches=%0d",
                  hw_blocks_done,LC*((807+16)/16),hw_batches_done);
@@ -200,6 +201,18 @@ module stage1_interface_driver #(parameter WAYS=16,TREE=1,LC=50)
         $display("[STAGE1 CYCLES] round=%0d total=%0d prefill=%0d run=%0d tree=%0d blocks=%0d batches=%0d PASS",
                  round,hw_cycles_total,hw_cycles_prefill,hw_cycles_run,hw_cycles_tree,
                  hw_blocks_done,hw_batches_done);
+`else
+        if(hw_cycles_total!==0 || hw_cycles_prefill!==0 || hw_cycles_run!==0 ||
+           hw_cycles_tree!==0 || hw_blocks_done!==0 || hw_batches_done!==0)
+          $fatal(1,"Stage1计数器关闭时 0x0C 应读0：total=%0d prefill=%0d run=%0d tree=%0d blocks=%0d batches=%0d",
+                 hw_cycles_total,hw_cycles_prefill,hw_cycles_run,hw_cycles_tree,
+                 hw_blocks_done,hw_batches_done);
+        axi_write(4'hc,32'hdeadbeef,4'hf,1);
+        read_stage1_counter(0,hw_cycles_total_confirm);
+        if(hw_cycles_total_confirm!==0)
+          $fatal(1,"写 0x0C 改变了关闭时恒零的读值");
+        $display("[STAGE1 CYCLES] counters disabled; indexes 0..5 and 0x0C readback stay 0 PASS");
+`endif
       end
       $display("[PRODUCTION AXIS] P%0d round=%0d LC=%0d PASS records=%0d",WAYS,round,LC,record_n);
     end

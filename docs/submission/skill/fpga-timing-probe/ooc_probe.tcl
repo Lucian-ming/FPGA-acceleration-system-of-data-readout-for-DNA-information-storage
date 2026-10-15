@@ -12,6 +12,7 @@
 # 可选环境变量：
 #   SYNTH_PART=xc7z020clg400-2      换目标器件（默认 BKB220 xc7z020clg400-2）
 #   SYNTH_GENERICS="WIDTH=16 ..."  顶层参数覆盖，逐个传给 synth_design -generic
+#   SYNTH_VERILOG_DEFINE="MACRO=1 ..."  编译期开关，逐个传给 synth_design -verilog_define
 #   SYNTH_TAG=z020_w16              报告目录后缀，避免多次摸底互相覆盖
 #   SYNTH_OUT_ROOT=logs/vivado/id/reports  报告根目录（默认 build/）
 #   SYNTH_IMPL=1                    再跑 OOC 布局布线，给出布线后 WNS（综合后 WNS 偏乐观：
@@ -27,6 +28,10 @@ if {[info exists ::env(SYNTH_PART)] && $::env(SYNTH_PART) ne ""} { set part_name
 set generics {}
 if {[info exists ::env(SYNTH_GENERICS)]} {
     foreach g $::env(SYNTH_GENERICS) { lappend generics -generic $g }
+}
+set verilog_defines {}
+if {[info exists ::env(SYNTH_VERILOG_DEFINE)] && $::env(SYNTH_VERILOG_DEFINE) ne ""} {
+    foreach d $::env(SYNTH_VERILOG_DEFINE) { lappend verilog_defines -verilog_define $d }
 }
 
 if {[llength $argv] < 3} {
@@ -44,7 +49,7 @@ set outdir [file join $outroot "synth_$top"]
 if {[info exists ::env(SYNTH_TAG)] && $::env(SYNTH_TAG) ne ""} { append outdir "_$::env(SYNTH_TAG)" }
 file mkdir $outdir
 
-puts "===> 综合 $top  器件 $part_name  时钟 ${clk_mhz}MHz (周期 ${period}ns)  参数 $generics"
+puts "===> 综合 $top  器件 $part_name  时钟 ${clk_mhz}MHz (周期 ${period}ns)  参数 $generics  defines $verilog_defines"
 
 create_project -in_memory -part $part_name
 foreach f $files {
@@ -56,7 +61,7 @@ set do_impl [expr {[info exists ::env(SYNTH_IMPL)] && $::env(SYNTH_IMPL) eq "1"}
 set failed 0
 set ooc {}
 if {$do_impl} { set ooc {-mode out_of_context} }
-synth_design -top $top -part $part_name -flatten_hierarchy rebuilt {*}$ooc {*}$generics
+synth_design -top $top -part $part_name -flatten_hierarchy rebuilt {*}$ooc {*}$generics {*}$verilog_defines
 
 # 综合后再约束：自动给所有时钟端口（clk / *ACLK）建时钟
 set clk_ports [get_ports -quiet -filter {DIRECTION == IN} *]

@@ -4,7 +4,8 @@
 set _here [file normalize [file dirname [info script]]]
 set repo_root [file normalize [file join $_here ../..]]
 set opts [dict create proj_name dna_accel board zynq_eco_7010 part_name {} clk_mhz 100 \
-  build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 jobs 8 dry_run 0]
+  build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 \
+  stage1_cycle_counters 0 jobs 8 dry_run 0]
 foreach arg $::argv {
   if {![regexp {^([a-z0-9_]+)=(.*)$} $arg -> key value] || ![dict exists $opts $key]} {
     error "未知构建参数 '$arg'；器件参数应为 part_name，不是 part"
@@ -13,10 +14,11 @@ foreach arg $::argv {
 }
 dict for {key value} $opts {set $key $value}
 if {![regexp {^[A-Za-z][A-Za-z0-9_]*$} $proj_name]} {error "非法 proj_name"}
-foreach key {stage1_p_ways stage1_pipe_tree jobs dry_run} {
+foreach key {stage1_p_ways stage1_pipe_tree stage1_cycle_counters jobs dry_run} {
   if {![string is integer -strict [set $key]]} {error "$key 必须为整数"}
 }
 if {$stage1_p_ways ni {4 16} || $stage1_pipe_tree ni {0 1}} {error "本轮只支持 stage1_p_ways=4|16、stage1_pipe_tree=0|1"}
+if {$stage1_cycle_counters ni {0 1}} {error "stage1_cycle_counters 必须为 0 或 1（默认 0）"}
 if {$stage1_p_ways == 16 && $stage1_pipe_tree != 1} {error "P16 必须启用流水选优树 stage1_pipe_tree=1"}
 if {$stage1_p_ways == 4 && $stage1_pipe_tree != 0} {error "P4 基线必须使用 stage1_pipe_tree=0"}
 if {$jobs < 1 || $jobs > 64 || $dry_run ni {0 1}} {error "jobs/dry_run 超出合法范围"}
@@ -58,6 +60,7 @@ set ip_repo [file join $repo_root hw ip]
 set ::dna_stage1_p_ways $stage1_p_ways
 set ::dna_stage1_pipe_tree $stage1_pipe_tree
 puts "===> board=$board part=$part_name clk=${clk_mhz}MHz Stage1=$stage1_p_ways/$stage1_pipe_tree"
+puts "===> Stage1 cycle counters=$stage1_cycle_counters (0=关闭/默认，1=定义 STAGE1_CYCLE_COUNTERS)"
 puts "===> root=$repo_root build_dir=$proj_wk export_dir=$export_dir report_dir=$report_dir"
 if {$dry_run} {puts "BUILD_CONFIG_PASS (仅配置检查，未构建)"; exit 0}
 if {![llength [info commands version]]} {error "真实构建必须在Vivado运行"}
@@ -77,6 +80,10 @@ proc require_run_success {run_name} {
 file mkdir $proj_wk
 create_project $proj_name $proj_wk -force
 set_property part $part_name [current_project]
+set stage1_cycle_define {}
+if {$stage1_cycle_counters} {set stage1_cycle_define {STAGE1_CYCLE_COUNTERS=1}}
+set_property verilog_define $stage1_cycle_define [get_filesets sources_1]
+puts "===> sources_1 Verilog defines: [get_property verilog_define [get_filesets sources_1]]"
 
 # 【A2】注册自研 IP 仓库（hw/ip 下三个 *_1_0 目录各含 component.xml）
 if {[file isdirectory $ip_repo]} {
@@ -169,6 +176,7 @@ set cfg [open [file join $export_dir hardware_build_config.txt] w]
 foreach pair [list [list board_id $board] [list part $part_name] [list tool_version [version -short]] \
   [list C_STAGE1_P_WAYS [dict get $::dna_stage1_actual C_STAGE1_P_WAYS]] \
   [list C_STAGE1_PIPE_TREE [dict get $::dna_stage1_actual C_STAGE1_PIPE_TREE]] \
+  [list STAGE1_CYCLE_COUNTERS $stage1_cycle_counters] \
   [list READ_BPS [dict get $::dna_stage1_actual READ_BPS]] [list NUM_LC [dict get $::dna_stage1_actual NUM_LC]] \
   [list STRIDE [dict get $::dna_stage1_actual STRIDE]] [list REF_LEN [dict get $::dna_stage1_actual REF_LEN]] \
   [list BATCH [dict get $::dna_stage1_actual BATCH]] \

@@ -418,13 +418,15 @@ pipe_step_rc_e pipeline_step_stage1(dna_connection_t *conn)
             xil_printf("[HW-CYCLES] WARNING: Stage1 counter changed after completion (%u -> %u)\n\r",
                        hw_cycles_total, hw_cycles_total_confirm);
         }
-        xil_printf("[HW-CYCLES] Stage1: total %u cyc (%u.%03u ms), blocks %u, batches %u, prefill %u, run %u, tree %u\n\r",
-                   hw_cycles_total, hw_cycles_total / 100000U,
-                   (hw_cycles_total % 100000U) / 100U,
-                   hw_blocks_done, hw_batches_done, hw_cycles_prefill,
-                   hw_cycles_run, hw_cycles_tree);
-        xil_printf("[HW-CYCLES] Stage1: measured %u cyc/block\n\r",
-                   hw_blocks_done ? hw_cycles_total / hw_blocks_done : 0U);
+        if (hw_cycles_total != 0U) {
+            xil_printf("[HW-CYCLES] Stage1: total %u cyc (%u.%03u ms), blocks %u, batches %u, prefill %u, run %u, tree %u\n\r",
+                       hw_cycles_total, hw_cycles_total / 100000U,
+                       (hw_cycles_total % 100000U) / 100U,
+                       hw_blocks_done, hw_batches_done, hw_cycles_prefill,
+                       hw_cycles_run, hw_cycles_tree);
+            xil_printf("[HW-CYCLES] Stage1: measured %u cyc/block\n\r",
+                       hw_blocks_done ? hw_cycles_total / hw_blocks_done : 0U);
+        }
 
         xil_printf("\n\r[STAGE1] ========================================\n\r");
         xil_printf("[STAGE1] ✓ DNA Accelerator stage COMPLETE\n\r");

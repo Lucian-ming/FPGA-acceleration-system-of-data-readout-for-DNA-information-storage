@@ -13,7 +13,9 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 用法：tools/run_vivado_build.sh [key=value ...]
 参数：board=zynq_eco_7010|bkb220 part_name=... proj_name=... clk_mhz=100
       build_dir=... export_dir=... report_dir=... jobs=8
-      stage1_p_ways=4|16 stage1_pipe_tree=0|1 dry_run=0|1
+      stage1_p_ways=4|16 stage1_pipe_tree=0|1
+      stage1_cycle_counters=0|1 (默认0关闭；1定义 STAGE1_CYCLE_COUNTERS，供Stage1计数测量)
+      dry_run=0|1
 新板资料未验证时必须失败；P4默认保持旧板；P16必须16/1并使用独立目录。
 当前开发主线：VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2。
 选择顺序：显式VIVADO > 显式VIVADO_ROOT > PATH；显式路径无效就失败。
