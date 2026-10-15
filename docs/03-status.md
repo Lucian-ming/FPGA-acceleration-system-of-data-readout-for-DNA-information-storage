@@ -69,7 +69,7 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 
 本轮是旧 ZYNQ ECO R6 / XC7Z010 到 BKB220 / XC7Z020 的 SE150、PL 100 MHz 迁移，Stage1 使用 16 滑窗位置并行。生产几何 150/50/807/957/64、64 记录/帧、线上协议和 8100 B 结果格式不变。BKB220 配置为 `ready=1`；P4/P16 完成整机 route 与 bit/XSA 构建，P4 G3 和 P16 多项板测已有记录。P16 六档矩阵、42 例 v2 数据集板测对照、故障探针和 2 h 长稳已完成。
 
-当前未完成项：v2 的 `score_min=67` 尚未板测；8 个 challenge 例仍以 LDPC 不收敛失败；新载荷四级逐级取证、8 h 长稳、QSPI/SD 冷启动、**UART 反向（✅ 2026-10-14 已实测通过，见 [UART 反向实测](benchmarks/bkb220-uart-reverse.md)）**、功耗及 F9 独立复核未完成。完整 P16 手工包已有 G3 PASS 记录；从硬件包到软件验收包的自动化入口现为 `tools/rebuild_software_package.py`，2026-10-14 用当天硬件包重建并通过 2965/2965 SHA 自检及 `--strict-artifacts --plan-only`。该次 plan-only 不是新包的板端 G3；复现步骤、XSCT socket 回退及字段/哈希对照见[制品复现说明](submission/reproduce-artifacts.md)与[任务报告](../logs/submission/vitis-chain.md)。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见下文和对应 benchmark。
+当前未完成项：v2 的 `score_min=67` 尚未板测；8 个 challenge 例仍以 LDPC 不收敛失败；新载荷四级板端取证、8 h 长稳、QSPI/SD 冷启动、**UART 反向（✅ 2026-10-14 已实测通过，见 [UART 反向实测](benchmarks/bkb220-uart-reverse.md)）**、功耗及 F9 独立复核未完成。四级工具现按 G3 期望载荷 SHA 选择基准；没有登记基准时明确输出 `UNVERIFIED`，不再拿 R0.83 向量裁决新载荷。当前四级基准仍只覆盖 R0.83 的 SE150/SE250，两种几何均不代表 D1/D2 已取证。完整 P16 手工包已有 G3 PASS 记录；从硬件包到软件验收包的自动化入口现为 `tools/rebuild_software_package.py`，2026-10-14 用当天硬件包重建并通过 2965/2965 SHA 自检及 `--strict-artifacts --plan-only`。该次 plan-only 不是新包的板端 G3；复现步骤、XSCT socket 回退及字段/哈希对照见[制品复现说明](submission/reproduce-artifacts.md)与[任务报告](../logs/submission/vitis-chain.md)。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见下文和对应 benchmark。
 
 工具链按用户指定分工：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 2026.1 只负责烧录、下载和调试。22 主线稳定并完成优化报告后，再做 Windows 2026.1 完整开发链独立复核，规则见 05/07。
 
@@ -105,7 +105,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 ~~2026-10-10/11设备核查快照没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4~~（2026-10-12 作废：已实测到 FT4232HL JTAG 与 COM9/10/11，见 §1a）。**仍然**待确认的是：厂商对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号（顶标/温度等级/PCB 修订），以及 ~~PS UART 的 MIO~~、~~ENET0 的 PHY/MDIO/RGMII/复位~~（均已由原理图 §10 关闭）、DDR 板级延迟与 DQS-to-CLK。~~`hw/boards/bkb220.tcl` 的 `ready=0` 不变~~（2026-10-12 已按用户授权置 1 并实板验证，见 §1c）。
 
-按05承接已完成阶段，不重开通过的门禁：`ready=1`、P4/P16 route 与构建、P4 G3、P16 全量/连续/恢复/故障探针、六档矩阵和 P4/P16 v2 42 例对照均有记录；2 h 长稳完成。当前剩余为 v2 `score_min=67` 板测、新载荷四级取证、8 h 长稳、QSPI/SD 冷启动、UART 反向、功耗和 F9。完整 P16 包已有 G3 PASS，但 Vitis 自动化生成仍需补步；Stage1 K2 后续工作仍在进行。功耗需仪器；SE250另profile；D0不默认分发。剩余门禁通过前不宣布迁移完成。
+按05承接已完成阶段，不重开通过的门禁：`ready=1`、P4/P16 route 与构建、P4 G3、P16 全量/连续/恢复/故障探针、六档矩阵和 P4/P16 v2 42 例对照均有记录；2 h 长稳完成。当前剩余为 v2 `score_min=67` 板测、新载荷四级板端取证、8 h 长稳、QSPI/SD 冷启动、UART 反向、功耗和 F9。四级检查器已能将无基准明确分成未取证，但 D1/D2 尚无四级向量和板端四级证据。完整 P16 包已有 G3 PASS，但 Vitis 自动化生成仍需补步；Stage1 K2 后续工作仍在进行。功耗需仪器；SE250另profile；D0不默认分发。剩余门禁通过前不宣布迁移完成。
 
 **工具链分工不变**：开发与构建全部在 WSL 2022.2，**Windows 2026.1 只负责烧录**；F9 用 26 做完整开发链的独立复核（22 主线稳定后）。见 §1b。
 
@@ -474,11 +474,11 @@ LC50/单批 `total=297,901`、`blocks=2,550`、逐状态之和 297,901、**差�
 这让此前跨包单次相减的比较（如 Stage2 的 −7.5%）可信度一并提高。
 
 ⚠️ **仍未上板/未做**：冷启动（QSPI/SD）、8 h 长稳、功耗实测、v2 `score_min=67`、
-新载荷四级黄金向量。
+新载荷四级板端取证（D1/D2 暂无四级黄金向量；检查器对缺基准显示 `UNVERIFIED`）。
 
 1. **B2**：P16 配置守卫 7/7、断连畸变恢复 30/30、中途断网 3/3 已通过；当时使用的 `sudo iptables` 只在 `finally` 清理，操作要求见对应探针记录。
 2. **C1 性能矩阵**：同板 P4/P16 六档（128/512/2048/8192/32768/full）各 ≥3 次已完成，正式结果见[性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)。
-3. **C2 泛化**：P4/P16 与软件验证器对 v2 42 例判定三方一致；challenge 仍有 8 例 LDPC 不收敛，v2 `score_min=67` 尚未板测，新载荷四级取证未完成。
+3. **C2 泛化**：P4/P16 与软件验证器对 v2 42 例判定三方一致；challenge 仍有 8 例 LDPC 不收敛，v2 `score_min=67` 尚未板测，新载荷四级板端取证未完成。四级工具已按目标载荷 SHA 选基准；D1/D2 没有四级黄金向量时会明确报告未取证。
 4. **D 长稳**：2 h 已完成，8 h 未做，按实际墙钟验收。
 5. **冻结 22 主线 → 全面优化（时间消耗+性能）→ 停止修改 → 写报告 → 最后才切 26 开发**
    （用户 2026-10-12 二度指示，**覆盖**此前「22 主线稳定后立即做 F9/26 复核」的顺序；详见 [05](05-implementation-plan.md) 的「后续总顺序」一节。要点：报告**不早于**优化完成，26 的开发与复核整体后移到优化与报告之后。）

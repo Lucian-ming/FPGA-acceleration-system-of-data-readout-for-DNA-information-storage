@@ -65,7 +65,7 @@
 | `generate_payload_dataset.py` | D1 多 payload 独立数据集生成 |
 | `mutate_reads.py` | D2 受控噪声 / D3 经验轮廓加噪 |
 | `extract_error_profile.py` | D3 真实测序经验误差轮廓提取 |
-| `run_multi_payload_regression.py` | 多 payload 泛化回归。`--repeat N` 做重复实验（写独立目录，**不覆盖已提交留证 dump**） |
+| `run_multi_payload_regression.py` | 多 payload 泛化回归。board 模式显式传 `--out-dir` 时，单次与重复回传都写入 `<out-dir>/dumps/`；未传时 `--repeat > 1` 使用自动生成的 logs run 目录，单次运行仅允许首次写入缺失的 `tests/datasets/` 基准，已有留证默认报错，确需更新时显式传 `--overwrite-evidence` |
 | `run_robustness_scan.py` | G5 抗噪边界扫描（错误率/覆盖度 → **恢复成功率**） |
 | `g5_false_accept.py` | G5「**误接受率**」的定义与测量：逐记录判定真/诱饵/错位，扫 `score_min` 出 FAR/FRR 曲线。**定义写在文件头，先读那里** |
 | `run_g5_matrix.sh` | 驱动上者跑 G5 受控误差矩阵（替换率 × 插删率 × 3 种子），产出 `summary.tsv` |
@@ -85,7 +85,7 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `vote_range.py` | 投票累加器运行中极值实测（回答是否会饱和溢出） |
-| `board_stage_check.py` | 四级 DDR 取证比对（由 `run_g3.sh` 调用） |
+| `board_stage_check.py` | 四级 DDR 取证：按 G3 期望载荷 SHA 和读长选择已登记基准；没有基准时逐级报告 `UNVERIFIED` 并以退出码 3 结束，不会把缺测报成 PASS 或硬件 FAIL；手工 dump 可传 `--payload-sha256`，`--golden-dir` 表示显式强制比较 |
 | `m2_chain.py` / `m3_mem.py` | M2/M3 仿真辅助 |
 
 ## 已退出现用区的历史工具

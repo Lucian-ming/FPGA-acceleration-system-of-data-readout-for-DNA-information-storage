@@ -231,6 +231,6 @@ Stage1 输出直接作为 Stage2 输入、Stage2 输出直接作为 Stage3 输�
    （含 `SCORE_MIN=67`）→ 回读校验 → start → 轮询 done
 6. `PIPE_DONE_STAGE2`：invalidate Voter 输出 → `apply_watermark_differential()` 对 10,125 B 做
    LSB-first 逐字节 XOR → flush 回 DDR；Stage2 输出已有黄金 RTL 判据背书
-   （`run_sim.sh stage2`）。BKB220 G3 与 P4/P16 全量板测已通过端到端判据；新载荷四级逐级取证仍未完成。
+   （`run_sim.sh stage2`）。BKB220 G3 与 P4/P16 全量板测已通过端到端判据；新载荷四级板端取证仍未完成。`board_stage_check.py` 按期望载荷 SHA 选已登记黄金向量，缺基准时报告 `UNVERIFIED`，不再以 R0.83 基准替新载荷裁决。
 7. `PIPE_DEC_*`：配置 Decoder → start → 轮询 done → 校验写入拍数
 8. `send_result()`：invalidate → 通过 TCP 发 8,100 B

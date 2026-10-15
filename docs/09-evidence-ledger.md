@@ -26,6 +26,8 @@
 | C2 | 四级中间结果逐字节吻合，不只是最终哈希对 | Stage1/Stage2⊕水印/Stage3 分别对黄金向量 | 同上，`board_stage_check.py` | 同上（脚本第 7/7 步） |
 | C3 | 4-Way 与 2-Way 在生产几何下与**独立黄金模型**逐条一致 | 分数严格相等 + 位置属同分并列最大集，64/64 | `logs/iverilog/run_20260909_005333_*` | 见 `docs/benchmarks/stage1_4way_ip_integration.md` §6.3 |
 
+**C2 的适用边界**：现有四级板端黄金包是 R0.83 的 SE150（`tests/golden/`）和 SE250（`tests/golden/se250/`）；`tests/golden/ldpc/` 是独立译码器向量，不是四级板端基准。`tools/board_stage_check.py` 按 G3 层报告中的期望载荷 SHA 与读长选择基准。未登记的 D1/D2 载荷会逐级标成 `UNVERIFIED` 并以退出码 3 结束，不能解读成硬件 FAIL 或 PASS。新载荷的四级板端证据仍须另行生成黄金包并上板取得。
+
 > **C3 的坑**：`tests/golden/stage1_fwd_expect.txt` 里的位置在同分并列时由 FFT
 > 浮点噪声决定（read 4 三个并列位置浮点值 `59.0 / 59.000000000000014 / 59.0`），
 > **不能按单值比相等**，否则会把正确的 RTL 判成失败。并列集由
