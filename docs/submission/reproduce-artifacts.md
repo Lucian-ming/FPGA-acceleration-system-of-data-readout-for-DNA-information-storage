@@ -44,14 +44,14 @@ tools/rebuild_software_package.py \
 
 入口会检查 XSA 内嵌 bit 与硬件包独立 bit 的 SHA、读取 XSA 的 PS7 初始化脚本，并在新 workspace 中调用 `sw/scripts/create_vitis.tcl`。Tcl 先运行第一次 `platform generate` 物化 BSP 头文件，再把 `lwipopts.h` 的 `TCP_WND` 设为 32768 并重新生成平台/BSP。入口读取新 BSP 的 `include/lwipopts.h` 和 lwIP 源模板，确认值确实为 32768；若头文件未生成或值不符则失败退出。
 
-XSCT 还会生成 standalone 平台、BSP 和 FSBL。若 XSCT 在 `app create` 阶段返回已知的 `Socket create error. Operation not permitted`，入口会在标准输出与 `logs/xsct-build.log` 中明示错误及回退，然后使用**同一个 Vitis 2022.2 安装树**的 ARM GCC 11.2.0 编译 `sw/app` 副本，并链接刚生成 BSP 的 `liblwip4.a` / `libxil.a`。源码副本逐字节核对；历史 `sw/app/xparameters.h` 不会复制进应用源码目录。其他 XSCT 错误不触发回退，会非零退出。
+XSCT 生成 standalone 平台、BSP 和 FSBL，并以 `build_app=0` 跳过 XSCT `app create/build`。随后入口始终使用**同一个 Vitis 2022.2 安装树**的 ARM GCC 11.2.0 与手写 Makefile 编译 `sw/app` 副本，并链接刚生成 BSP 的 `liblwip4.a` / `libxil.a`。应用优化级别固定为 `-O2`，完整 CFLAGS 同时写入 `reports/software_build_summary.md` 与 `manifest.json`。源码副本逐字节核对；历史 `sw/app/xparameters.h` 不会复制进应用源码目录。平台/BSP/FSBL 阶段的 XSCT 错误直接非零退出。
 
 入口随后生成 `export/dna_lwip_app.elf`、从同一硬件平台取 FSBL、运行 Bootgen 生成 `BOOT.bin`，再用 `bootgen -read BOOT.bin` 检查其中恰有 `fsbl.elf`、`top_bd_wrapper.bit`、`dna_lwip_app.elf` 三个 image。它生成 `manifest.json`、`artifact_manifest.json`、`reports/source_manifest.json` 和 `SHA256SUMS`，最后执行 SHA 自检及 G3 strict plan-only 门禁。
 
 逐项成功判据：
 
 1. BSP include 头存在，且 `TCP_WND=32768`；新 BSP 有非空 `libxil.a`、`liblwip4.a`，FSBL 非空。
-2. 如果触发 GCC 回退，应用构建日志含 `APP_BUILD_PASS`，且输出 ELF 非空。
+2. ARM GCC 应用构建日志含 `APP_BUILD_PASS`，`src/echo.c` 编译命令含固定 `-O2` 且不含 `-O0`，输出 ELF 非空；摘要与 manifest 都记录优化级别和 CFLAGS。
 3. `BOOT.bin` 非空，Bootgen readback exit 0 并报告 3 个上述 image。
 4. `manifest.json` 与 source/artifact manifest 都在 `SHA256SUMS` 中；`sha256sum -c SHA256SUMS` 每项均为 `OK`。
 5. `run_g3.sh --strict-artifacts --plan-only` 退出 0，并打印“只读制品/工具核验完成”。这只表示静态制品门禁接受，不表示上板通过。
@@ -85,7 +85,7 @@ XSDB、hw_server、串口和留证路径参数满足脚本的静态参数检查�
 - 新包 `board_id=bkb220`、`part=xc7z020clg400-2`，生产参数与手工包相同：READ_BPS=150、NUM_LC=50、STRIDE=807、REF_LEN=957、BATCH=64、P_WAYS=16、PIPE_TREE=1；Vivado/Vitis/XSCT/GCC/Bootgen 版本字段均匹配。
 - 新包 `top_bd_wrapper.bit` SHA-256 为 `8d17d17e54ee46d9e32b087fccfd5afef20a09539b38e4b5858f7d1873f38898`，与当天手工包完全一致；包内 XSA、`ps7_init.tcl` 和 `BOOT.bin` 也逐字节同 SHA。FSBL/ELF 全文件 SHA 因重新生成而不同；对两份 ELF 用 ARM GCC `objcopy` 比较 `.text`、`.data`、`.rodata`，应用和 FSBL 三个段均相同。新旧 LDPC base address 数值均为 `0x43C30000`，JSON 字符串仅十六进制字母大小写不同。
 - 实测 XSCT 选择 `lwip211_v1_8`。启动时提示 `lwip213` 不在 2022.2 repository，这是安装树差异；脚本按既有顺序回落并记录所选库，不把该提示当成构建成功判据。
-- 实测 `app create` 报 `Socket create error. Operation not permitted`，XSCT 返回 1；入口明确回落到同树 ARM GCC，最终 `APP_BUILD_PASS`、Bootgen readback、SHA 和 G3 plan-only 全通过。
+- 2026-10-14 历史包是在旧入口下实测 `app create` 报 `Socket create error. Operation not permitted` 后回落到同树 ARM GCC；确定性修复后的入口已跳过 XSCT app create/build，始终使用固定 `-O2` Makefile。修复实证见 [`build-determinism.md`](../../logs/dev/build-determinism.md)。
 - 受本次任务边界限制，未重新运行 Vivado 硬件构建，也未启动硬件服务、下载、烧录或运行真实板端 G3。重建包可被 `--strict-artifacts` 只读门禁接受；板端验收仍需按 `docs/07-board-build-and-acceptance.md` 单独执行。
 
 实际输出、哈希对照与门禁记录见 [`vitis-chain.md`](../../logs/submission/vitis-chain.md)。

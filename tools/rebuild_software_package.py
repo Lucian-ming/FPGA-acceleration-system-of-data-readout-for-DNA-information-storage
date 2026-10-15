@@ -26,7 +26,12 @@ OBJ_COPY = TOOLBIN / "arm-none-eabi-objcopy"
 APP_NAME = "dna_lwip_app"
 DOMAIN = "standalone_domain"
 CPU = "ps7_cortexa9_0"
-SOCKET_FAILURE = "Socket create error. Operation not permitted"
+APP_OPT_LEVEL = "-O2"
+APP_CFLAGS = (
+    "-mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard "
+    f"{APP_OPT_LEVEL} -g -Wall -Wextra -ffunction-sections -fdata-sections "
+    "-MMD -MP -I$(APP_SRC) -I$(BSP)/include"
+)
 
 sys.path.insert(0, str(REPO / "tools"))
 from board.g3_artifacts import inspect_xsa  # noqa: E402
@@ -161,7 +166,7 @@ OUT := $(CURDIR)/Debug
 BSP := $(CURDIR)/{platform_rel}
 CC := {GCC}
 CPU_FLAGS := -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard
-CFLAGS := $(CPU_FLAGS) -O2 -g -Wall -Wextra -ffunction-sections -fdata-sections -MMD -MP -I$(APP_SRC) -I$(BSP)/include
+CFLAGS := {APP_CFLAGS}
 LDFLAGS := $(CPU_FLAGS) -Wl,-build-id=none -Wl,--gc-sections -Wl,-Map,$(OUT)/{APP_NAME}.map -specs=$(ROOT)/sw/app/Xilinx.spec -T$(ROOT)/sw/linker/lscript.ld -L$(BSP)/lib
 SOURCES := $(wildcard $(APP_SRC)/*.c)
 OBJECTS := $(patsubst $(APP_SRC)/%.c,$(OUT)/%.o,$(SOURCES))
@@ -323,14 +328,13 @@ def main() -> int:
             str(XSCT), "-nodisp", str(REPO / "sw/scripts/create_vitis.tcl"),
             f"xsa={source_xsa}", f"ws={workspace}", f"plat={platform_name}",
             f"app={APP_NAME}", f"dom={DOMAIN}", "uart=ps7_uart_0",
-            "phy_link_speed=CONFIG_LINKSPEED_AUTODETECT",
+            "phy_link_speed=CONFIG_LINKSPEED_AUTODETECT", "build_app=0",
         ]
         xsct_log = logs / "xsct-build.log"
-        xsct_rc = run_logged("XSCT platform/BSP/FSBL/app", xsct_command, cwd=REPO, log_path=xsct_log)
-        xsct_text = xsct_log.read_text(encoding="utf-8", errors="replace")
-        fallback_used = SOCKET_FAILURE in xsct_text
-        if xsct_rc != 0 and not fallback_used:
-            raise BuildError(f"XSCT 失败且未命中已知 app create socket 错误（exit={xsct_rc}）；拒绝误回退")
+        xsct_rc = run_logged("XSCT platform/BSP/FSBL (app skipped)", xsct_command,
+                             cwd=REPO, log_path=xsct_log)
+        if xsct_rc != 0:
+            raise BuildError(f"XSCT 平台/BSP/FSBL 构建失败（exit={xsct_rc}）")
 
         platform_dir = workspace / platform_name
         bsp_root = platform_dir / CPU / DOMAIN / "bsp" / CPU
@@ -347,30 +351,32 @@ def main() -> int:
 
         app_dir = workspace / APP_NAME
         app_elf = app_dir / "Debug" / f"{APP_NAME}.elf"
-        method = "XSCT-managed app create/build"
         gcc_version_result = run_capture([str(GCC), "-dumpfullversion", "-dumpversion"])
         if gcc_version_result.returncode != 0:
             raise BuildError("ARM GCC 版本探针失败")
         gcc_version = gcc_version_result.stdout.strip().splitlines()[-1]
-        if fallback_used:
-            print(f"FALLBACK: XSCT app create 命中 `{SOCKET_FAILURE}`（XSCT exit={xsct_rc}）。", flush=True)
-            print(f"FALLBACK: 改用同一 Vitis 2022.2 安装树 ARM GCC {gcc_version}，直接编译并链接本次生成 BSP 的 liblwip4.a/libxil.a。", flush=True)
-            copied = copy_app_sources(app_dir, REPO)
-            print(f"FALLBACK: 从 sw/app 复制并逐字节核对 {copied} 个 .c/.h 文件；排除历史 xparameters.h。", flush=True)
-            write_fallback_makefile(app_dir, repo=REPO, platform_name=platform_name)
-            build_env = os.environ.copy()
-            build_env["PATH"] = str(TOOLBIN) + os.pathsep + build_env.get("PATH", "")
-            build_env["LWIP_LIBRARY"] = lwip_library
-            if run_logged("ARM GCC fallback app build", ["make", "-C", str(app_dir), "all"],
-                          cwd=REPO, log_path=logs / "app-build.log", env=build_env) != 0:
-                raise BuildError("ARM GCC fallback 编译/链接失败")
-            app_log = (logs / "app-build.log").read_text(encoding="utf-8", errors="replace")
-            if "APP_BUILD_PASS" not in app_log:
-                raise BuildError("ARM GCC 日志缺 APP_BUILD_PASS")
-            method = ("Vitis 2022.2 ARM GCC direct make against the newly generated XSA BSP; "
-                      f"XSCT app create failed with {SOCKET_FAILURE}")
-        elif xsct_rc == 0 and not app_elf.is_file():
-            raise BuildError("XSCT 返回成功，但没有生成应用 ELF")
+        print(f"APPLICATION: XSCT app create/build skipped; use Vitis 2022.2 ARM GCC {gcc_version} with the generated XSA BSP.", flush=True)
+        copied = copy_app_sources(app_dir, REPO)
+        print(f"APPLICATION: 从 sw/app 复制并逐字节核对 {copied} 个 .c/.h 文件；排除历史 xparameters.h。", flush=True)
+        write_fallback_makefile(app_dir, repo=REPO, platform_name=platform_name)
+        build_env = os.environ.copy()
+        build_env["PATH"] = str(TOOLBIN) + os.pathsep + build_env.get("PATH", "")
+        build_env["LWIP_LIBRARY"] = lwip_library
+        if run_logged("ARM GCC fixed -O2 app build", ["make", "-C", str(app_dir), "all"],
+                      cwd=REPO, log_path=logs / "app-build.log", env=build_env) != 0:
+            raise BuildError("ARM GCC 固定 -O2 应用编译/链接失败")
+        app_log = (logs / "app-build.log").read_text(encoding="utf-8", errors="replace")
+        if "APP_BUILD_PASS" not in app_log:
+            raise BuildError("ARM GCC 日志缺 APP_BUILD_PASS")
+        echo_compile_lines = [
+            line for line in app_log.splitlines()
+            if "-c " in line and "src/echo.c" in line and "Debug/echo.o" in line
+        ]
+        if len(echo_compile_lines) != 1:
+            raise BuildError(f"ARM GCC 日志中的 echo.c 编译命令不是恰好一条：{len(echo_compile_lines)}")
+        echo_compile_line = echo_compile_lines[0]
+        if APP_OPT_LEVEL not in echo_compile_line.split() or "-O0" in echo_compile_line.split():
+            raise BuildError(f"echo.c 编译命令没有唯一固定优化级别 {APP_OPT_LEVEL}：{echo_compile_line}")
         if not app_elf.is_file() or not app_elf.stat().st_size:
             raise BuildError(f"应用 ELF 缺失或为空：{app_elf}")
 
@@ -460,7 +466,9 @@ def main() -> int:
                 "lwip_upstream": lwip_upstream,
                 "tcp_wnd": 32768,
                 "phy_link_speed": "CONFIG_LINKSPEED_AUTODETECT",
-                "application_build_method": method,
+                "application_build_method": "Vitis 2022.2 ARM GCC direct make against the newly generated XSA BSP; XSCT app create/build skipped",
+                "application_optimization_level": APP_OPT_LEVEL,
+                "application_cflags": APP_CFLAGS,
                 "application_build_sentinel": "APP_BUILD_PASS",
                 "ldpc_base_macro": "XPAR_LDPC_DECODER_0_BASEADDR",
                 "ldpc_base_address": ldpc_match.group(1).lower(),
@@ -485,7 +493,9 @@ def main() -> int:
             f"- Geometry: `{json.dumps(params, sort_keys=True)}`.",
             f"- Toolchain: Vivado {xsa['tool_version']} source package; Vitis/XSCT {xsct_version}; ARM GCC {gcc_version}; Bootgen {bootgen_version}.",
             f"- BSP: `{lwip_library}`; materialized by the first `platform generate`, then verified `TCP_WND=32768` after the second generate.",
-            f"- Application: {method}.",
+            "- Application: XSCT app create/build skipped; the final app is always built with `write_fallback_makefile` against the newly generated XSA BSP.",
+            f"- Application optimization: `{APP_OPT_LEVEL}` (fixed for every package built by this entrypoint).",
+            f"- Application CFLAGS: `{APP_CFLAGS}`.",
             f"- FSBL source: `{fsbl_source.relative_to(workspace).as_posix()}`.",
             f"- LDPC base address from newly generated BSP: `{ldpc_match.group(1).lower()}`.",
             "- BOOT.bin readback requires three images: FSBL, bitstream, and application ELF.",
@@ -496,10 +506,9 @@ def main() -> int:
 
         commands = [
             f"XSCT version probe: {version_rc}",
-            f"XSCT create_vitis.tcl: {xsct_rc} (known app create socket failure; fallback={'used' if fallback_used else 'not used'})",
+            f"XSCT create_vitis.tcl platform/BSP/FSBL (app skipped): {xsct_rc}",
+            f"Vitis 2022.2 ARM GCC make ({APP_OPT_LEVEL}): 0 (APP_BUILD_PASS)",
         ]
-        if fallback_used:
-            commands.append("Vitis 2022.2 ARM GCC make: 0 (APP_BUILD_PASS)")
         commands.extend((f"Bootgen create: {bootgen_rc}", f"Bootgen readback: {readback_rc}"))
         (reports / "command-exit-codes.txt").write_text("\n".join(commands) + "\n", encoding="utf-8")
 

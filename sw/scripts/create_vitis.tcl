@@ -5,6 +5,7 @@
 # 此入口仅用于仍支持XSCT的旧版Vitis。2026.1 XSCT已disabled，使用create_vitis_modern.py。
 # 可选参数（-tclargs 覆盖）：
 #   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1 phy_link_speed=CONFIG_LINKSPEED_AUTODETECT
+#   build_app=0 仅生成平台/BSP/FSBL，由调用方使用固定构建器编译应用
 # phy_link_speed 可选：CONFIG_LINKSPEED_AUTODETECT / CONFIG_LINKSPEED1000 / CONFIG_LINKSPEED100 / CONFIG_LINKSPEED10
 # =========================================
 
@@ -12,6 +13,7 @@
 set plat "dna_platform"
 set dom  "standalone_domain"
 set app  "dna_lwip_app"
+set build_app 1
 set _here [file normalize [file dirname [info script]]]
 set _root [file normalize "$_here/../.."]
 set ws   "$_root/sw/workspace"
@@ -53,6 +55,7 @@ proc _arg {name default} {
 _arg plat $plat
 _arg dom  $dom
 _arg app  $app
+_arg build_app $build_app
 _arg ws   $ws
 _arg xsa  $xsa
 _arg ip   $ip
@@ -60,6 +63,7 @@ _arg mask $mask
 _arg gw   $gw
 _arg uart $uart
 _arg phy_link_speed $phy_link_speed
+if {$build_app ni {0 1}} {error "build_app必须为0或1"}
 if {$uart ni {ps7_uart_0 ps7_uart_1}} {error "uart必须为本板PS UART实例名"}
 if {$phy_link_speed ni {CONFIG_LINKSPEED_AUTODETECT CONFIG_LINKSPEED1000 CONFIG_LINKSPEED100 CONFIG_LINKSPEED10}} {
   error "phy_link_speed必须是CONFIG_LINKSPEED_AUTODETECT/1000/100/10之一"
@@ -197,6 +201,7 @@ if {$patched == 0} {
 platform generate
 
 # ---------- 应用 ----------
+if {$build_app} {
 # 若存在则复用，否则创建
 # 注意：workspace 里一个应用都没有时，`app list` 会**抛错**而不是返回空列表。
 set apps {}
@@ -251,6 +256,9 @@ if {[llength $elf_glob] > 0} {
   foreach e $elf_glob { puts "     $e" }
 } else {
   puts "NOTE: ELF not found yet; check build logs above."
+}
+} else {
+  puts "===> Skipping XSCT app create/build (build_app=0)."
 }
 
 puts "===> XSCT script finished."

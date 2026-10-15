@@ -385,14 +385,19 @@ L4 的 8 收敛/6 不收敛分布在板上没复现。
 - ⚠️ **Stage3 的 170.2 ms 在两种规模下完全相同** ⇒ 与数据量无关的固定开销，
   且其 `DECODER_PREP`(65) / `DONE_STAGE3`(73) 都是**单次命中**就要这么多。**下一个可疑项。**
 
-**同日发现的基础设施缺陷**：`tools/rebuild_software_package.py` 走
-XSCT `app create` **成功**时，app 用 **`-O0`** 编（XSCT 模板默认）；报
-`Socket create error` 走手写 fallback Makefile 时用 **`-O2`**。而这个 socket 错误**时有时无**。
-⇒ **出厂固件的优化级别由运气决定**，直接违背"可复现"的硬要求（性能又是评分项）。
-清点 6 份包只有 `stage2-prefill-sw` 那份是 `-O0`。**已实测该混淆影响很小**
-（`-O0` 5,522 vs `-O2` 5,516，差 0.13%；同级别的 `prefillopt`(`-O2`) 5,970 → 5,516
-= **−7.6%**，故 −7.5% 站得住）。修法建议见
-[`logs/dev/software-build-optimization-nondeterminism.md`](../logs/dev/software-build-optimization-nondeterminism.md)，**待定**。
+**同日发现并修复的软件构建确定性缺陷**：旧入口在 XSCT `app create` 成功时以模板默认
+`-O0` 编 app，遇到时有时无的 `Socket create error` 时则用手写 Makefile 的 `-O2`。
+现入口仍由 Vitis 2022.2 XSCT 生成平台/BSP/FSBL，但通过 `build_app=0` 跳过 XSCT app
+create/build；app 一律由 `write_fallback_makefile` 路径以固定 `-O2` 编译，并将优化级别和
+CFLAGS 写入 `reports/software_build_summary.md` 与 `manifest.json`。
+连续两次完整重建均通过，110 条源码清单逐项相同；`echo.c` 编译行除输出目录外逐字一致。
+新包 bit SHA-256 为 `14c43aaa93fab3a9d2e244045f3af2fb95f8cbb09c8b10889a8cb28c04a3383f`；
+`nm` 显示新包为 712 个 ELF 符号，与同源 `-O2` stagetime 包一致，而非旧 `-O0` 包的 883 个；
+两次 SHA 自检与 G3 strict plan-only 均通过。**没有触板**，不据此声称板端验收或性能变化。
+旧包测时中 `-O0` 5,522 ms vs `-O2` 5,516 ms，差 0.13%；同级别 `prefillopt` (`-O2`)
+5,970 → 5,516 = **−7.6%**，故 −7.5% 站得住。改动前分析见
+[`logs/dev/software-build-optimization-nondeterminism.md`](../logs/dev/software-build-optimization-nondeterminism.md)，
+实现与复建留证见 [`logs/dev/build-determinism.md`](../logs/dev/build-determinism.md)。
 
 ⚠️ **仍未上板/未做**：冷启动（QSPI/SD）、8 h 长稳、功耗实测、v2 `score_min=67`、
 新载荷四级黄金向量。
