@@ -11,11 +11,11 @@
 
 ## 1. 手册校验与阅读记录
 
-仓库资料：[BKB220 产品手册 v1.1](BKB220产品手册v1.1.pdf)、[资料索引](README.md)。复核命令在 `docs/board/bkb220/` 执行：
+仓库资料：[BKB220 产品手册 v1.1](bkb220-product-manual-v1.1.pdf)、[资料索引](README.md)。复核命令在 `docs/board/bkb220/` 执行：
 
 ```text
 $ sha256sum -c SHA256SUMS.txt
-BKB220产品手册v1.1.pdf: OK
+bkb220-product-manual-v1.1.pdf: OK
 exit_code=0
 ```
 
@@ -24,12 +24,12 @@ exit_code=0
 实际提取命令：
 
 ```text
-pdftotext -layout -f 1 -l 15 'docs/board/bkb220/BKB220产品手册v1.1.pdf' -   # exit 0
-pdftotext -layout -f 16 -l 30 'docs/board/bkb220/BKB220产品手册v1.1.pdf' - # exit 0
-pdfinfo 'docs/board/bkb220/BKB220产品手册v1.1.pdf'                           # exit 0，Pages: 30
-pdftoppm -f 5 -l 10 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
-pdftoppm -f 15 -l 17 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
-pdftoppm -f 27 -l 27 -r 110 -png 'docs/board/bkb220/BKB220产品手册v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+pdftotext -layout -f 1 -l 15 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf' -   # exit 0
+pdftotext -layout -f 16 -l 30 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf' - # exit 0
+pdfinfo 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf'                           # exit 0，Pages: 30
+pdftoppm -f 5 -l 10 -r 110 -png 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+pdftoppm -f 15 -l 17 -r 110 -png 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
+pdftoppm -f 27 -l 27 -r 110 -png 'docs/board/bkb220/bkb220-product-manual-v1.1.pdf' /tmp/board-migrate-bkb220 # exit 0
 ```
 
 ## 2. 板级来源表

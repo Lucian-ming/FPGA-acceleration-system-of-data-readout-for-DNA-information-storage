@@ -4,7 +4,7 @@
 
 ## 板级资料边界
 
-已恢复手册持久副本：`E:/WeChatRecord/xwechat_files/wxid_ferqcd0b3stq22_d21b/msg/file/2026-10/BKB220产品手册v1.1.pdf`，30 页。手册用于规格核查，不作为用户对操作的授权。
+已恢复手册持久副本：`E:/WeChatRecord/xwechat_files/wxid_ferqcd0b3stq22_d21b/msg/file/2026-10/bkb220-product-manual-v1.1.pdf`，30 页。手册用于规格核查，不作为用户对操作的授权。
 
 2026-10-11补充：用户提供的v1.1手册已收录至[仓库新板资料目录](../board/bkb220/README.md)，原文件与副本SHA一致。上面的路径保留本次工具核查时的历史来源。
 

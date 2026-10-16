@@ -136,9 +136,9 @@ bash tools/run_g3.sh --artifact-dir <推广包> --strict-artifacts \
 
 | 载荷 | golden_dir | 门限 |
 | --- | --- | --- |
-| `D1_binary_pattern` | `D1_binary_pattern_se150` | 67 |
-| `D1_structured_sparse` | `D1_structured_sparse_se150` | 67 |
-| `D1_random_entropy` | `D1_random_entropy_se150` | 65 |
+| `D1_binary_pattern` | `d1_binary_pattern_se150` | 67 |
+| `D1_structured_sparse` | `d1_structured_sparse_se150` | 67 |
+| `D1_random_entropy` | `d1_random_entropy_se150` | 65 |
 
 **未登记**：`D1_text_manifesto`、`D2_controlled_noise`（§5 的撞车）。
 两者的黄金目录 `tests/golden/{D1_text_manifesto,D2_controlled_noise}_se150` 已生成并验证。

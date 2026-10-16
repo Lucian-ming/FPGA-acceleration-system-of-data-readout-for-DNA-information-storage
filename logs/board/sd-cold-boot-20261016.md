@@ -43,7 +43,7 @@
 
 ## 3. 拨码
 
-手册（`BKB220产品手册v1.1.pdf`，第 3 章）的 BOOT_CFG 表：
+手册（`bkb220-product-manual-v1.1.pdf`，第 3 章）的 BOOT_CFG 表：
 
 | BOOT_CFG | 1 | 2 |
 | --- | --- | --- |

@@ -101,7 +101,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 ## 4. 未关闭的依赖与后续顺序
 
-2026-10-11资料更新：用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)已随仓库收录；原件与副本SHA-256一致，来源、校验命令见[资料索引](board/bkb220/README.md)。main和board-migrate先阅读并校验仓库内手册，使用手册页码注明规格来源，不再把产品手册列为缺项或依赖微信目录。
+2026-10-11资料更新：用户提供的[bkb220-product-manual-v1.1.pdf](board/bkb220/bkb220-product-manual-v1.1.pdf)已随仓库收录；原件与副本SHA-256一致，来源、校验命令见[资料索引](board/bkb220/README.md)。main和board-migrate先阅读并校验仓库内手册，使用手册页码注明规格来源，不再把产品手册列为缺项或依赖微信目录。
 
 ~~2026-10-10/11设备核查快照没有实际FTDI/JTAG/PS USB串口，只见蓝牙COM3/COM4~~（2026-10-12 作废：已实测到 FT4232HL JTAG 与 COM9/10/11，见 §1a）。**仍然**待确认的是：厂商对应 PCB 原理图、PS7 preset/board_files、原厂例程、实物完整料号（顶标/温度等级/PCB 修订），以及 ~~PS UART 的 MIO~~、~~ENET0 的 PHY/MDIO/RGMII/复位~~（均已由原理图 §10 关闭）、DDR 板级延迟与 DQS-to-CLK。~~`hw/boards/bkb220.tcl` 的 `ready=0` 不变~~（2026-10-12 已按用户授权置 1 并实板验证，见 §1c）。
 

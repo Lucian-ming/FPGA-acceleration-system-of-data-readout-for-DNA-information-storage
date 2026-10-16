@@ -38,7 +38,7 @@
 
 Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日志标记INTERRUPTED_DUPLICATE_AFTER_XSIM_PRODUCTION_PASS；不是Icarus接口PASS。旧BSP下13个C文件编译通过，但临时旧链接探针因Newlib/VFP ABI失败，不能称旧工具链完整重建。起点参赛agent_view.sh重复附件已改为引用tools唯一源码解决，旧失败日志及附件Git历史保留，未放宽门禁。
 
-2026-10-11已把用户提供的[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)收录至仓库，原件与副本SHA一致；[资料索引及校验](board/bkb220/README.md)是接管入口。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`，再核对对应PCB/实物及原厂配置；引用手册规格时注明页码。产品手册已具备，后续只按实际缺项补齐原理图/preset/例程，不重新制定计划。
+2026-10-11已把用户提供的[bkb220-product-manual-v1.1.pdf](board/bkb220/bkb220-product-manual-v1.1.pdf)收录至仓库，原件与副本SHA一致；[资料索引及校验](board/bkb220/README.md)是接管入口。main和board-migrate先完整阅读PDF，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`，再核对对应PCB/实物及原厂配置；引用手册规格时注明页码。产品手册已具备，后续只按实际缺项补齐原理图/preset/例程，不重新制定计划。
 
 ~~硬件核查快照（2026-10-10/11）：当时只读枚举只有蓝牙COM3/COM4，没有FTDI/JTAG~~（**2026-10-12 作废**：BKB220 已到货连接，JTAG 实测为 xc7z020，FT4232H 提供 JTAG + COM9/10/11；见 [03 §1a](03-status.md) 与 [07 §3a](07-board-build-and-acceptance.md)）。原理图已入库，PS UART 与 ENET0 PHY/复位均已确认；厂商 board_files/PS7 preset/例程、实物完整料号仍待确认。**工具链分工（用户 2026-10-12 明确）：开发全部在 WSL 用 Vivado/Vitis 2022.2；Windows 里的 2026.1 只负责烧录。** 22 主线是唯一发布线，26 不产出新板验收制品；`ready=1` 不代表所有迁移门禁完成。
 
@@ -261,7 +261,7 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 | **Vivado 2026.1 或 2025.2**（其他版本须说明并保证可复现） | 主线用 **2022.2** | 两条路：① P6 用 26 重建（用户已排到最后）；② 若 26 不成，**必须在报告里给出「版本说明 + 可复现保证」**。**这条是合规项，不能只写"未做"** |
 | 提交 **LLM 交互记录**（提示词/回答/自我纠错轨迹） | `docs/submission/ai-collaboration/` 已有提示词、回答和自我纠错记录 | 按提交材料复核覆盖范围与来源，不再列为未整理 |
 | `skill/README.md` 技能包 | **已有 8 个** | 已有新板/16 路相关内容；交付前核对入口说明与当前证据一致 |
-| 文件/目录名纯英文小写 | **提交面已下沉**（2026-10-13）：`docs/submission/**` 与 `docs/agent-prompts/**` 的 12 个文件全部改为小写（11 个 `readme.md` + 1 个 `audit.md`），全仓 0 断链、卫生门禁 PASS。**故意没动**的两类：① `docs/archive/**` 与旧制品——它们有**按路径记录的 SHA 清单**，重命名即破坏保护条款；② `AGENTS.md`/`CLAUDE.md`/`LICENSE`——前两个是 agent 工具的**约定文件名**，改名会让项目指令不再被加载，`LICENSE` 是 GitHub 识别惯例。用户提供的中文名原始资料（如 `docs/board/bkb220/BKB220产品手册v1.1.pdf`）保留原名 | 打包提交时按小写重排提交物；报告里说明保留原名的理由 |
+| 文件/目录名纯英文小写 | **提交面已下沉**（2026-10-13）：`docs/submission/**` 与 `docs/agent-prompts/**` 的 12 个文件全部改为小写（11 个 `readme.md` + 1 个 `audit.md`），全仓 0 断链、卫生门禁 PASS。**故意没动**的两类：① `docs/archive/**` 与旧制品——它们有**按路径记录的 SHA 清单**，重命名即破坏保护条款；② `AGENTS.md`/`CLAUDE.md`/`LICENSE`——前两个是 agent 工具的**约定文件名**，改名会让项目指令不再被加载，`LICENSE` 是 GitHub 识别惯例。用户提供的中文名原始资料（如 `docs/board/bkb220/bkb220-product-manual-v1.1.pdf`）保留原名 | 打包提交时按小写重排提交物；报告里说明保留原名的理由 |
 | 开源 + MIT/Apache | 根目录已有 MIT `LICENSE`，明确第三方素材适用范围 | GitHub public 状态仍按提交要求单独核对 |
 | 板上实测 | ✅ P4/P16 均有新板实测 | 保留 8 个 challenge 例失败、`score_min=67` 未板测及其他未完成边界 |
 | 决赛一页英文海报 | 未做 | P6 之后 |

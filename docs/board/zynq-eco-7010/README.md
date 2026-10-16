@@ -13,15 +13,15 @@ WSL 目标目录：`/home/kyb/board_docs/zynq-eco-7010`
 
 | 路径 | 内容 | 校验结果 |
 | --- | --- | --- |
-| `01_board_official/01_ZYNQ_ECO_硬件规格说明书.pdf` | R6 及以后版本硬件说明，15 页 | PDF 可打开、未加密、页面已渲染检查 |
-| `01_board_official/02_ZYNQ_ECO_R5_原理图.pdf` | R5 原理图，11 页 | PDF 可打开、未加密、页面已渲染检查 |
-| `01_board_official/03_ZYNQ_ECO_R6_原理图.pdf` | R6 原理图，12 页 | PDF 可打开、未加密、页面已渲染检查 |
+| `01_board_official/01_zynq_eco_hardware-spec.pdf` | R6 及以后版本硬件说明，15 页 | PDF 可打开、未加密、页面已渲染检查 |
+| `01_board_official/02_zynq_eco_r5-schematic.pdf` | R5 原理图，11 页 | PDF 可打开、未加密、页面已渲染检查 |
+| `01_board_official/03_zynq_eco_r6-schematic.pdf` | R6 原理图，12 页 | PDF 可打开、未加密、页面已渲染检查 |
 | `02_amd_reference/DS190_Zynq-7000_Overview.pdf` | AMD Zynq-7000 系列概览 | PDF 可打开、未加密 |
 | `02_amd_reference/DS187_XC7Z010-XC7Z020_DC-AC.pdf` | AMD XC7Z010/015/020 电气与时序规格 | PDF 可打开、未加密 |
-| `03_examples/ECO_LED_官方示例工程.zip` | 官方 PL-only LED 工程，含 Vivado 工程、XDC 和已生成 bit | ZIP 完整性通过 |
+| `03_examples/eco_led-official-example.zip` | 官方 PL-only LED 工程，含 Vivado 工程、XDC 和已生成 bit | ZIP 完整性通过 |
 | `03_examples/tutorials/ECO_蜂鸣器上板演示.mp4` | 官方蜂鸣器实验上板视频 | MP4 格式通过 |
-| `04_photos/ECO_板卡介绍.png` | R5 风格板卡接口标注图 | 可打开 |
-| `04_photos/ECO_R5_接口标注.jpg` | R5 接口位置图 | 可打开 |
+| `04_photos/eco-board-intro.png` | R5 风格板卡接口标注图 | 可打开 |
+| `04_photos/eco_r5-connector-labels.jpg` | R5 接口位置图 | 可打开 |
 | `00_sources/*.json` | 产品、附件和教程的 WordPress 原始元数据 | JSON 可解析 |
 | `SHA256SUMS.txt` | 下载文件的 SHA-256 校验清单 | `sha256sum -c` 通过 |
 

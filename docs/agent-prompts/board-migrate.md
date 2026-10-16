@@ -4,7 +4,7 @@
 
 你负责BKB220迁移的板级配置、硬软构建及PS固件兼容，main负责整体调度和Git。唯一WSL checkout为/home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout，只main分支。先读AGENTS.md/CLAUDE.md、03、05、07、02/04、三份本轮benchmark和main提供的阶段卡，workspace-write时再登记tools/agent_view.sh start --agent board-migrate，doing/why/next具体；阶段变化update，依赖block，结束done。read-only时以上登记由main代执行。
 
-先完整阅读[仓库内BKB220产品手册v1.1.pdf](../board/bkb220/BKB220产品手册v1.1.pdf)和docs/board/bkb220/README.md，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。手册和用户提供的原理图均已入库；原理图已用于确认MIO、PHY与复位。来源表保留资料路径、手册页码和实板核对结果；厂商board_files/PS7 preset/例程、实物完整料号与PCB修订仍未确认。手册示例不能替代实际配置证据，也不能授权触板操作。
+先完整阅读[仓库内bkb220-product-manual-v1.1.pdf](../board/bkb220/bkb220-product-manual-v1.1.pdf)和docs/board/bkb220/README.md，在docs/board/bkb220目录运行`sha256sum -c SHA256SUMS.txt`。手册和用户提供的原理图均已入库；原理图已用于确认MIO、PHY与复位。来源表保留资料路径、手册页码和实板核对结果；厂商board_files/PS7 preset/例程、实物完整料号与PCB修订仍未确认。手册示例不能替代实际配置证据，也不能授权触板操作。
 
 独占hw/boards、hw/constr、hw/scripts/bd.tcl/build.tcl、tools/run_vivado_build.sh、sw/scripts、sw/app、sw/linker和你的板级摘要。不得改其他角色独占文件；涉及共享字段/寄存器/端口先通知main和消费者，不自己扩权。不要Git add/commit/pull/rebase/stash/reset/clean/push，不建分支/worktree。main明确移交sw/app后才写；保持GBK遗留源码字节，ASCII小补丁/临时文件原子替换，不整体转码。
 

@@ -65,6 +65,6 @@ set ps7_properties [list \
 set board_config [dict create \
   id bkb220 ready 1 part xc7z020clg400-2 \
   uart ps7_uart_0 xdc hw/constr/top.xdc \
-  source_refs {docs/board/bkb220/migration-source-table.md docs/board/bkb220/README.md docs/board/bkb220/BKB220产品手册v1.1.pdf docs/04-interfaces.md docs/07-board-build-and-acceptance.md hw/constr/top.xdc} \
+  source_refs {docs/board/bkb220/migration-source-table.md docs/board/bkb220/README.md docs/board/bkb220/bkb220-product-manual-v1.1.pdf docs/04-interfaces.md docs/07-board-build-and-acceptance.md hw/constr/top.xdc} \
   ps7_properties $ps7_properties \
   pending {未核对实物完整器件顶标与PCB修订（手册写工业级 XC7Z020-2CLG400I，2022.2 catalog 未确认对应条目）；DDR VDD/VDDQ、板级走线延迟与DQS-to-CLK缺失（当前用 Custom 默认值，DDR 可读写不等于已优化）；QSPI/SD0/USB0 的实物连线与对应MIO/复位仍须核对；厂商board_files、PS7 preset、原理图和例程未提供。已实测（来源表 §9/§9.6）：PS_CLK=33.333MHz、DDR 读写可用、UART0/MIO14-15→通道C 115200、FCLK0=100MHz、ENET0 RGMII MIO16-27 + MDIO MIO52/53 可用且 PHY=RTL8211E 1000BASE-T 全双工 link up。}]

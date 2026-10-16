@@ -17,21 +17,21 @@
    "payload_id": "D1_binary_pattern",
    "payload_sha256": "034adb3c5096819e35dde255bcad95377f31f3fdcc7e27083ffe1ef0cdbe0525",
    "read_bps": 150,
-   "golden_dir": "D1_binary_pattern_se150",
+   "golden_dir": "d1_binary_pattern_se150",
    "score_min": 67
   },
   {
    "payload_id": "D1_structured_sparse",
    "payload_sha256": "831b499c0bf4dfd1ca70e89edd3412669ade6e213fe60b2f55d034c2b246486c",
    "read_bps": 150,
-   "golden_dir": "D1_structured_sparse_se150",
+   "golden_dir": "d1_structured_sparse_se150",
    "score_min": 67
   },
   {
    "payload_id": "D1_random_entropy",
    "payload_sha256": "d7cbdc06d173b6ec01b7fce8646249589e5f1611ca4fe0fedd25187af0cc7b5f",
    "read_bps": 150,
-   "golden_dir": "D1_random_entropy_se150",
+   "golden_dir": "d1_random_entropy_se150",
    "score_min": 65
   }
  ]

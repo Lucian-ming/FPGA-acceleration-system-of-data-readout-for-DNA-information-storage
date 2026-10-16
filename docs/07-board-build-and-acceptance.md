@@ -12,7 +12,7 @@
 | 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
 | 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H C 通道（Windows COM10 / WSL `/dev/ttyUSB2`）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |
 
-产品手册与用户提供的原理图已收录：[BKB220产品手册v1.1.pdf](board/bkb220/BKB220产品手册v1.1.pdf)、[原理图](board/bkb220/BK_B220_SchDoc.pdf)、[资料来源与SHA校验](board/bkb220/README.md)。原理图已用于核实 MIO、PHY 与复位配置；厂商 board_files/PS7 preset/例程及实物完整料号、PCB 修订仍未确认，手册示例不替代现场证据。
+产品手册与用户提供的原理图已收录：[bkb220-product-manual-v1.1.pdf](board/bkb220/bkb220-product-manual-v1.1.pdf)、[原理图](board/bkb220/BK_B220_SchDoc.pdf)、[资料来源与SHA校验](board/bkb220/README.md)。原理图已用于核实 MIO、PHY 与复位配置；厂商 board_files/PS7 preset/例程及实物完整料号、PCB 修订仍未确认，手册示例不替代现场证据。
 
 ## 2. 配置与构建门禁
 

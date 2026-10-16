@@ -15,10 +15,10 @@
   - R5：左侧有 USB HUB、4 个 USB Host 口，无 OLED。
   - R6：去掉 USB HUB，中间 Type-C 改为 Zynq USB2.0 Host/Device，新增 128×64 单色 OLED。
   - 两版核心器件、DDR 组织、以太网、UART、JTAG、LED 和主要 PL 引脚相同；
-    **USB 与 OLED 必须查 R6 原理图** `01_board_official/03_ZYNQ_ECO_R6_原理图.pdf`。
+    **USB 与 OLED 必须查 R6 原理图** `01_board_official/03_zynq_eco_r6-schematic.pdf`。
 
 核实方式（不是转述资料自带的 README）：官方 LED 示例工程
-`03_examples/ECO_LED_官方示例工程.zip` 的 part 为 `xc7z010clg400-1`，
+`03_examples/eco_led-official-example.zip` 的 part 为 `xc7z010clg400-1`，
 XDC 引脚 `T12/U12/V12/W13`、时钟 `K17`，与硬件规格说明书逐项一致。
 
 ---
@@ -174,7 +174,7 @@ CH340 通常是 `1A86:7523`）。
 
    ```bash
    # 资料包内已含官方工程，解压后取 impl_1/LED.bit
-   unzip -o "docs/board/zynq-eco-7010/03_examples/ECO_LED_官方示例工程.zip" -d /tmp/eco_led
+   unzip -o "docs/board/zynq-eco-7010/03_examples/eco_led-official-example.zip" -d /tmp/eco_led
    sha256sum /tmp/eco_led/ECO_LED/ECO_LED.runs/impl_1/LED.bit
    # 期望：98ae989ebe676aa633d4430440e8c49228128ce3e67f2aab1f127105aed31fe0
    ```
@@ -273,12 +273,12 @@ New-NetIPAddress -InterfaceAlias "以太网 2" -IPAddress 192.168.1.100 -PrefixL
 
 | 路径 | 内容 |
 | --- | --- |
-| `01_board_official/01_ZYNQ_ECO_硬件规格说明书.pdf` | R6 及以后版本硬件说明（15 页），**DDR 结论出处** |
-| `01_board_official/02_ZYNQ_ECO_R5_原理图.pdf` | R5 原理图（11 页），仅作对比 |
-| `01_board_official/03_ZYNQ_ECO_R6_原理图.pdf` | **R6 原理图（12 页），本板适用** |
+| `01_board_official/01_zynq_eco_hardware-spec.pdf` | R6 及以后版本硬件说明（15 页），**DDR 结论出处** |
+| `01_board_official/02_zynq_eco_r5-schematic.pdf` | R5 原理图（11 页），仅作对比 |
+| `01_board_official/03_zynq_eco_r6-schematic.pdf` | **R6 原理图（12 页），本板适用** |
 | `02_amd_reference/DS190_Zynq-7000_Overview.pdf` | AMD Zynq-7000 概览 |
 | `02_amd_reference/DS187_XC7Z010-XC7Z020_DC-AC.pdf` | AMD 电气与时序规格 |
-| `03_examples/ECO_LED_官方示例工程.zip` | 官方 PL-only LED 工程（含 XDC 与已生成 bit），冒烟测试用 |
+| `03_examples/eco_led-official-example.zip` | 官方 PL-only LED 工程（含 XDC 与已生成 bit），冒烟测试用 |
 | `04_photos/` | 板卡接口标注图 |
 | `00_sources/*.json` | 产品/附件/教程的原始站点元数据 |
 | `SHA256SUMS.txt` | 全部文件 SHA-256 |

@@ -23,7 +23,7 @@
 - 当前发布制品 SHA256SUMS 五项 OK，保留旧 export 和历史 XSA。
 - Windows Vivado 2026.1 在 `D:/xilinx/2026.1`，WSL Vivado 2022.2 在 `/tools/Xilinx/Vivado/2022.2`。Windows Vitis xsct/xsdb 入口存在，尚未完成实际软件构建验证；旧 G3 的2022.2 XSDB路径已不存在。
 - 最新 Windows 只读枚举没有FTDI/JTAG/USB串口，只有蓝牙COM3/COM4；没有板用物理以太网适配器，hw_server/xsdb/vivado均未运行。用户已被请求连接电源、USB调试口、网线并提供厂商资料路径。
-- 原微信临时PDF路径已失效，但已在 E:/WeChatRecord/xwechat_files/wxid_ferqcd0b3stq22_d21b/msg/file/2026-10/BKB220产品手册v1.1.pdf 找到完整持久副本并交板级Agent复核。手册仍不能替代原理图/preset；新板完整料号、PCB版本、PS时钟、DDR/preset、UART MIO、PHY等必须依据完整对应资料和实物确认。
+- 原微信临时PDF路径已失效，但已在 E:/WeChatRecord/xwechat_files/wxid_ferqcd0b3stq22_d21b/msg/file/2026-10/bkb220-product-manual-v1.1.pdf 找到完整持久副本并交板级Agent复核。手册仍不能替代原理图/preset；新板完整料号、PCB版本、PS时钟、DDR/preset、UART MIO、PHY等必须依据完整对应资料和实物确认。
 
 未得到可靠资料前，不猜 PS7 参数、不复位或下载到未知板。此依赖不阻塞通用构建入口、P16生产集成、测试和G3制品选择适配。
 
