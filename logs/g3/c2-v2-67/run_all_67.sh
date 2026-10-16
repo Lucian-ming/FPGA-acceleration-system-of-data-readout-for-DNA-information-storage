@@ -29,14 +29,87 @@ set -u
 cd /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 
 D="/mnt/e/桌面/dna-multimedia-simulation-v2-20261013"
-P="${ARTIFACT:-hw/build/bkb220-p16-k2-ldpc-release-stage3poll-20261016T000308Z-board-migrate}"
-OUT="${OUTDIR:-logs/g3/c2-v2-67}"
+P="${ARTIFACT:-}"
+OUT="${OUTDIR:-}"
 SCORE_MIN="${SCORE_MIN:-67}"
+ALLOW_OVERWRITE=0
+while (($#)); do
+  case "$1" in
+    --i-know-overwrite-existing) ALLOW_OVERWRITE=1; shift ;;
+    -h|--help)
+      cat <<'HELP'
+用法：ARTIFACT=<制品目录> OUTDIR=<全新输出目录> bash logs/g3/c2-v2-67/run_all_67.sh [--i-know-overwrite-existing]
+
+ARTIFACT 必须含 manifest.json，且 manifest 中 bit/elf 指向存在的文件。
+OUTDIR 必须显式设置；目录非空时拒绝运行，只有明确确认后才可加覆盖开关。
+HELP
+      exit 0
+      ;;
+    *) echo "FATAL: 未知参数 $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ -z "$P" ]]; then
+  echo "FATAL: 必须显式设置 ARTIFACT=<制品目录>；不再猜测默认制品包" >&2
+  exit 2
+fi
+if [[ ! -d "$P" || ! -f "$P/manifest.json" ]]; then
+  echo "FATAL: ARTIFACT 必须是含 manifest.json 的制品目录：$P" >&2
+  exit 2
+fi
+if [[ -z "$OUT" ]]; then
+  echo "FATAL: 必须显式设置 OUTDIR=<输出目录>；不再使用默认留证目录" >&2
+  exit 2
+fi
+if [[ -e "$OUT" && ! -d "$OUT" ]]; then
+  echo "FATAL: OUTDIR 已存在但不是目录：$OUT" >&2
+  exit 2
+fi
+if [[ -d "$OUT" ]] && find "$OUT" -mindepth 1 -print -quit | grep -q . && (( ! ALLOW_OVERWRITE )); then
+  echo "FATAL: OUTDIR 已存在且非空：$OUT；确认覆盖时显式传 --i-know-overwrite-existing" >&2
+  exit 2
+fi
+
+# 身份信息从 manifest 指定的实际 bit/elf 取值，避免用目录名猜测产物。
+IDENTITY=$(python3 - "$P" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+manifest = root / "manifest.json"
+data = json.loads(manifest.read_text(encoding="utf-8"))
+artifacts = data.get("artifacts", {})
+rows = [("manifest", manifest)]
+for key in ("bit", "elf"):
+    rel = artifacts.get(key)
+    if not isinstance(rel, str) or not rel:
+        raise SystemExit(f"manifest.json 缺少 artifacts.{key}")
+    path = (root / rel).resolve(strict=True)
+    try:
+        path.relative_to(root)
+    except ValueError:
+        raise SystemExit(f"artifacts.{key} 越出制品目录：{rel}")
+    if not path.is_file():
+        raise SystemExit(f"artifacts.{key} 不是文件：{rel}")
+    rows.append((key, path))
+for name, path in rows:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    print(f"{name}\t{path.relative_to(root)}\t{digest}")
+PY
+) || { echo "FATAL: 无法从制品包读取 manifest/bit/elf 身份" >&2; exit 2; }
+
 mkdir -p "$OUT"
 SUM="$OUT/SUMMARY.tsv"
-printf 'case\tasset\tclass\tkind\text\tinput_bytes\texpect_sha16\tverdict\tjudge_sha16\tmatch\tfailmode\tnote\n' > "$SUM"
+printf 'artifact\tpath\tsha256\n%s\n' "$IDENTITY" > "$OUT/artifact_identity.txt"
+printf 'case\tasset\tclass\tkind\text\tinput_bytes\texpect_sha16\tverdict\tjudge_sha16\tmatch\tfailmode\tnote\tprocess_rc\n' > "$SUM"
 
 BOOTED=0   # 0 = 板上还不是本包，第一例必须真烧录
+CASE_COUNT=0
+CASE_FAILURES=0
+RUN_FAILURES=0
+LAST_NOTE=""
 
 # 判据 SHA：先认新措辞（系统判据），再回退旧措辞（唯一判据）
 judge_sha() {   # $1 = run_g3.sh 的输出文件
@@ -48,7 +121,8 @@ judge_sha() {   # $1 = run_g3.sh 的输出文件
 
 run_one() {   # $1=case_id $2=asset $3=class $4=kind $5=ext $6=ib $7=sha $8=fq $9=wm ${10}=skipboot
   local case="$1" asset="$2" cls="$3" kind="$4" ext="$5" ib="$6" sha="$7" fq="$8" wm="$9" sb="${10}"
-  local tag="$OUT/${case}.out"
+  local suffix="${11:-}"
+  local tag="$OUT/${case}${suffix}.out"
   local EXTRA=()
   case "$ext" in jpg|jpeg) : ;; *) EXTRA=(--input-bytes "$ib") ;; esac
   local SBARG=()
@@ -62,6 +136,7 @@ run_one() {   # $1=case_id $2=asset $3=class $4=kind $5=ext $6=ib $7=sha $8=fq $
     --reads "$fq" --watermark "$wm" --expect-sha "$sha" \
     --score-min "$SCORE_MIN" --full --skip-dump "${SBARG[@]}" "${EXTRA[@]}" \
     > "$tag" 2>&1
+  local rc=$?
   local v j m note fm
   v=$(grep -aoE 'G3 (PASS|FAIL)' "$tag" | tail -1)
   j=$(judge_sha "$tag")
@@ -75,37 +150,104 @@ run_one() {   # $1=case_id $2=asset $3=class $4=kind $5=ext $6=ib $7=sha $8=fq $
   if grep -aqE '^\s*FAIL\s+烧录' "$tag" || grep -aqE '^\s*FAIL\s+板端应用层就绪' "$tag"; then
     note="BOOT_FAIL"     # 交给上层重烧一次
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$case" "$asset" "$cls" "$kind" "$ext" "$ib" "${sha:0:16}" "${v:-?}" "${j:0:16}" "$m" "$fm" "$note" >> "$SUM"
-  echo "  -> $case  $v  match=$m  failmode=$fm $note"
+  if (( rc == 0 )) && grep -aqE '^PASS[[:space:]]+烧录([[:space:]]|$)' "$tag"; then
+    BOOTED=1
+  fi
+  if (( rc != 0 )); then
+    note="${note:+$note,}RUN_G3_RC_$rc"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n' \
+    "$case" "$asset" "$cls" "${kind:-?}" "${ext:-?}" "${ib:-?}" "${sha:0:16}" "${v:-?}" "${j:0:16}" "$m" "${fm:-}" "${note:-}" "$rc" >> "$SUM"
+  LAST_NOTE="$note"
+  if (( rc != 0 )) || [[ "$v" != "G3 PASS" || "$m" != "YES" || "$fm" == "OTHER_SEE_LOG" || "${kind^^}" == "OTHER" || -n "$note" ]]; then
+    ((CASE_FAILURES += 1))
+    ((RUN_FAILURES += 1))
+  fi
+  echo "  -> $case  ${v:-?}  match=$m  failmode=$fm rc=$rc $note"
 }
 
-for ds in $(ls -d "$D"/datasets/*/ | sort); do
+record_missing() {   # $1=case $2=asset $3=class $4=kind $5=why
+  printf '%s\t%s\t%s\t%s\t?\t?\t?\tMISSING\t\tNO\tOTHER_SEE_LOG\t%s\tNA\n' \
+    "$1" "$2" "$3" "${4:-?}" "$5" >> "$SUM"
+  ((CASE_FAILURES += 1))
+  echo "  !! $1 缺失：$5"
+}
+
+if [[ ! -d "$D/datasets" ]]; then
+  echo "FATAL: 数据集目录不存在：$D/datasets" >&2
+  exit 2
+fi
+shopt -s nullglob
+DATASETS=("$D"/datasets/*/)
+if ((${#DATASETS[@]} == 0)); then
+  echo "FATAL: 数据集目录为空：$D/datasets" >&2
+  exit 2
+fi
+for ds in "${DATASETS[@]}"; do
   base=$(basename "$ds"); asset=${base#*_}
   enc="$D/encoded/$asset/block000"
   wm="$enc/watermark.txt"
-  read -r sha ib < <(python3 -I -c "import json;j=json.load(open('$enc/encoding.json'));print(j['input_sha256'], j['input_bytes'])")
-  ext=$(ls "$D/payloads" | grep -iE "^${asset}\." | head -1 | sed 's/.*\.//')
-  kind=$(python3 -I -c "
-import json
-for c in json.load(open('$D/suite_results.json')):
-    if c['asset']=='$asset': print(c['kind']); break")
+  meta=""
+  if [[ -f "$enc/encoding.json" ]]; then
+    meta=$(python3 -I - "$enc/encoding.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(data.get("input_sha256", ""), data.get("input_bytes", ""))
+PY
+) || meta=""
+  fi
+  read -r sha ib <<< "$meta"
+  ext=""
+  if [[ -d "$D/payloads" ]]; then
+    for payload in "$D"/payloads/*; do
+      [[ -f "$payload" ]] || continue
+      if [[ "$(basename "$payload")" =~ ^${asset}\. ]]; then
+        ext="${payload##*.}"
+        break
+      fi
+    done
+  fi
+  kind=""
+  if [[ -f "$D/suite_results.json" ]]; then
+    kind=$(python3 -I - "$D/suite_results.json" "$asset" <<'PY'
+import json, sys
+for case in json.load(open(sys.argv[1], encoding="utf-8")):
+    if case.get("asset") == sys.argv[2]:
+        print(case.get("kind", "")); break
+PY
+) || kind=""
+  fi
   for cls in baseline challenge; do
     fq="$ds/$cls/block000/se150.fastq"
-    [ -f "$fq" ] || { echo "SKIP $asset/$cls (无 se150.fastq)"; continue; }
     case_id="$asset-$cls"
+    ((CASE_COUNT += 1))
+    if [[ ! -f "$fq" ]]; then
+      record_missing "$case_id" "$asset" "$cls" "$kind" "无 se150.fastq"
+      continue
+    fi
+    if [[ -z "${sha:-}" || ! "${ib:-}" =~ ^[1-9][0-9]*$ || -z "$ext" || ! -f "$wm" || -z "$kind" ]]; then
+      record_missing "$case_id" "$asset" "$cls" "$kind" "encoding/payload/watermark/kind 元数据缺失"
+      continue
+    fi
     echo "===== $case_id ====="
     if [ "$BOOTED" = "0" ]; then
       run_one "$case_id" "$asset" "$cls" "$kind" "$ext" "$ib" "$sha" "$fq" "$wm" 0
-      BOOTED=1
     else
       run_one "$case_id" "$asset" "$cls" "$kind" "$ext" "$ib" "$sha" "$fq" "$wm" 1
-      if tail -1 "$SUM" | grep -q 'BOOT_FAIL'; then
-        echo "  !! 就绪失败，重烧重跑 $case_id"
-        sed -i '$ d' "$SUM"
-        run_one "$case_id" "$asset" "$cls" "$kind" "$ext" "$ib" "$sha" "$fq" "$wm" 0
+      if [[ "$LAST_NOTE" == *BOOT_FAIL* ]]; then
+        echo "  !! 就绪失败，保留首轮记录并重烧重跑 $case_id"
+        run_one "$case_id" "$asset" "$cls" "$kind" "$ext" "$ib" "$sha" "$fq" "$wm" 0 ".retry"
       fi
     fi
   done
 done
+if (( CASE_COUNT != 42 )); then
+  echo "FATAL: 预期 42 例，实际枚举到 $CASE_COUNT 例"
+  ((CASE_FAILURES += 1))
+fi
 echo "=== C2 V2 score_min=$SCORE_MIN FULL SWEEP DONE ==="
+if (( CASE_FAILURES != 0 || RUN_FAILURES != 0 || CASE_COUNT != 42 )); then
+  echo "AGGREGATE: FAIL cases=$CASE_COUNT case_failures=$CASE_FAILURES failed_runs=$RUN_FAILURES"
+  exit 1
+fi
+echo "AGGREGATE: PASS cases=$CASE_COUNT failures=0"

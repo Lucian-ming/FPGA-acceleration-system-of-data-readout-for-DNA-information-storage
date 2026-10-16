@@ -44,6 +44,8 @@ REPO = Path(__file__).resolve().parent.parent
 
 # 排除项：这些是构建产物或平台生成物，不是「源」
 EXCLUDE_NAMES = {"xparameters.h"}
+EXCLUDE_DIR_NAMES = {"__pycache__"}
+EXCLUDE_SUFFIXES = {".pyc", ".pyo"}
 
 
 def collect(repo: Path) -> list[str]:
@@ -51,8 +53,14 @@ def collect(repo: Path) -> list[str]:
     paths: set[str] = set()
 
     def add(p: Path) -> None:
-        if p.is_file() and p.name not in EXCLUDE_NAMES:
-            paths.add(p.relative_to(repo).as_posix())
+        if not p.is_file():
+            return
+        rel = p.relative_to(repo)
+        if (p.name in EXCLUDE_NAMES
+                or any(part in EXCLUDE_DIR_NAMES for part in rel.parts)
+                or p.suffix.lower() in EXCLUDE_SUFFIXES):
+            return
+        paths.add(rel.as_posix())
 
     for p in sorted((repo / "sw" / "app").glob("*.c")) + sorted((repo / "sw" / "app").glob("*.h")):
         add(p)

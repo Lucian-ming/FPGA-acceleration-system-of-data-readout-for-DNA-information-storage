@@ -115,15 +115,32 @@ def main(argv: list[str]) -> int:
                     help="每多少轮插一次畸变包恢复探针；0 = 不插")
     ap.add_argument("--round-timeout", type=float, default=900.0)
     ap.add_argument("--out-dir", required=True)
+    ap.add_argument("--i-know-overwrite-existing", action="store_true",
+                    help="明确允许复用非空输出目录；本轮会重置 TSV、主日志与恢复探针日志")
+    ap.add_argument("--stop-after-consecutive-failures", type=int, default=3,
+                    help="连续失败达到此轮数时提前停止（默认 3；单轮失败仍会继续）")
     ap.add_argument("--tag", required=True, help="本轮长稳的标识（含制品包 SHA/来源）")
     args = ap.parse_args(argv)
 
+    if Path(args.xsdb).is_absolute() and not args.hw_server.strip():
+        ap.error("WSL 侧绝对路径 --xsdb 必须同时传 --hw-server TCP:<主机>:<端口>")
+    if args.stop_after_consecutive_failures < 1:
+        ap.error("--stop-after-consecutive-failures 必须 >= 1")
+    if args.hours <= 0:
+        ap.error("--hours 必须大于 0")
+
     out = Path(args.out_dir)
+    if out.exists() and not out.is_dir():
+        ap.error(f"--out-dir 已存在但不是目录：{out}")
+    if out.is_dir() and any(out.iterdir()) and not args.i_know_overwrite_existing:
+        ap.error(f"--out-dir 已存在且非空：{out}；确认覆盖时传 --i-know-overwrite-existing")
     out.mkdir(parents=True, exist_ok=True)
     tsv = out / "soak.tsv"
     log = out / "soak.log"
-    if not tsv.exists():
-        tsv.write_text("round\twall_s\tverdict\trecords\tresult_s\tjudge_sha\tmatch\trun_dir\tnote\tprocess_rc\n")
+    # 通过非空目录检查后，启动新一轮数据；显式覆盖时也不能把旧 TSV 混入新结论。
+    tsv.write_text("round\twall_s\tverdict\trecords\tresult_s\tjudge_sha\tmatch\trun_dir\tnote\tprocess_rc\n")
+    log.write_text("")
+    (out / "recovery.jsonl").write_text("")
 
     t0 = time.time()
     deadline = t0 + args.hours * 3600.0
@@ -133,9 +150,12 @@ def main(argv: list[str]) -> int:
 
     rnd = 0
     recovery_probe_rcs: list[int] = []
+    consecutive_failures = 0
+    stop_reason = ""
     while time.time() < deadline:
         rnd += 1
         rlog = out / f"round{rnd:04d}.out"
+        rlog.write_text("")
         cmd = ["bash", "tools/run_g3.sh",
                "--artifact-dir", args.artifact_dir,
                "--xsdb", args.xsdb, "--device", args.device, "--strict-artifacts",
@@ -158,6 +178,15 @@ def main(argv: list[str]) -> int:
         print(f"[{time.time()-t0:7.0f}s] 轮 {rnd:4d}  {info['verdict']:4s}  "
               f"{info['records']:>7s} 条  {info['result_s']:>6s}s  match={match} rc={rc}")
 
+        if rc == 0 and info["verdict"] == "PASS" and match == "YES":
+            consecutive_failures = 0
+        else:
+            consecutive_failures += 1
+        if consecutive_failures >= args.stop_after_consecutive_failures:
+            stop_reason = f"stopped_early_after_{consecutive_failures}_consecutive_failures"
+            print(f"提前止损：连续 {consecutive_failures} 轮失败；已写入 summary，停止长稳循环")
+            break
+
         if args.recovery_every and rnd % args.recovery_every == 0:
             jl = out / "recovery.jsonl"
             prc = sh(["python3", "tools/board/g3_recovery_probe.py",
@@ -166,6 +195,13 @@ def main(argv: list[str]) -> int:
                       "--tag", f"{args.tag}-soak-r{rnd}"], log, timeout=600)
             recovery_probe_rcs.append(prc)
             print(f"          ↳ 畸变包探针 rc={prc}")
+            if prc != 0:
+                stop_reason = f"stopped_early_after_recovery_probe_failure_at_round_{rnd}"
+                print("提前止损：首次恢复探针失败；已写入 summary，停止长稳循环")
+                break
+
+    if not stop_reason:
+        stop_reason = "wall_clock_target_reached"
 
     # 收尾：必须同时有展示判据 PASS、期望 SHA 命中和 G3 子进程 rc=0。
     # 兼容旧 TSV 仅用于读取事实：旧表没有 process_rc 的轮次按“退出码未知”处理，
@@ -193,6 +229,7 @@ def main(argv: list[str]) -> int:
         return m.group(1) if m else ""
 
     wall = time.time() - t0
+    target_wall = args.hours * 3600.0
     round_statuses = []
     for row in rows:
         rc_value = process_rc(row)
@@ -212,11 +249,17 @@ def main(argv: list[str]) -> int:
     rounds_failed = sum(status == "fail" for status in round_statuses)
     rounds_unverified = sum(status == "unverified" for status in round_statuses)
     probe_failures = sum(rc != 0 for rc in recovery_probe_rcs)
-    enough_wall = wall >= args.hours * 3600 * 0.98
+    enough_wall = wall >= target_wall * 0.98
     verdict = "PASS" if (rows and len(ok) == len(rows) and not probe_failures and enough_wall) else "FAIL"
+    stopped_early = stop_reason.startswith("stopped_early_")
+    if stopped_early:
+        verdict = "FAIL"
     summary = {
         "tag": args.tag, "artifact_dir": args.artifact_dir, "ip": args.ip,
         "target_hours": args.hours, "wall_s": round(wall, 1),
+        "wall_target_delta_s": round(wall - target_wall, 1),
+        "wall_target_delta_hours": round((wall - target_wall) / 3600.0, 4),
+        "wall_time_minimum_s": round(target_wall * 0.98, 1),
         "rounds": len(rows), "rounds_pass_with_expected_sha": len(ok),
         "rounds_failed": rounds_failed, "rounds_unverified": rounds_unverified,
         "verdict": verdict,
@@ -225,13 +268,18 @@ def main(argv: list[str]) -> int:
         "recovery_probes_failed": probe_failures,
         "recovery_probe_rcs": recovery_probe_rcs,
         "wall_time_sufficient": enough_wall,
+        "consecutive_failure_limit": args.stop_after_consecutive_failures,
+        "stop_reason": stop_reason,
+        "stopped_early": stopped_early,
         "hardware_cycles": None, "power_w": None,
         "note": ("UNMEASURED: 无外部 UART 周期采集、无功率计；result_s 是客户端打印值，"
                  "不得反推周期或功耗"),
     }
     (out / "soak_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1))
-    print(f"\n墙钟 {wall/3600:.3f} h（目标 {args.hours} h），{len(rows)} 轮，"
+    print(f"\n实际墙钟 {wall/3600:.3f} h（目标 {args.hours} h，实际-目标 {wall-target_wall:+.1f}s；"
+          f"保留 98% 阈值 {target_wall*0.98:.1f}s），{len(rows)} 轮，"
           f"通过 {len(ok)} 轮，失败 {rounds_failed} 轮，未验证 {rounds_unverified} 轮")
+    print(f"停止原因：{stop_reason}")
     print(f"长稳结论：{verdict}  → {out/'soak_summary.json'}")
     return 0 if verdict == "PASS" else 1
 
