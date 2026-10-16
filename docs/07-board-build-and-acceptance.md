@@ -7,7 +7,7 @@
 | 项目 | 旧ZYNQ ECO R6 | BKB220 |
 |---|---|---|
 | 器件 | xc7z010clg400-1，实际已有板测 | 已按 `xc7z020clg400-2` 完成构建与板测；芯片顶标、工业级温度等级和 PCB 修订仍未逐项核实 |
-| PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在docs/board/zynq-eco-7010/ | 原理图已入库，PS7 配置经 Vivado 2022.2 校验，DDR 写读及实板运行已通过；DDR 板级延迟与 DQS-to-CLK 仍未单独表征 |
+| PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库） | 原理图已入库，PS7 配置经 Vivado 2022.2 校验，DDR 写读及实板运行已通过；DDR 板级延迟与 DQS-to-CLK 仍未单独表征 |
 | 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
 | 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
 | 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H C 通道（Windows COM10 / WSL `/dev/ttyUSB2`）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |

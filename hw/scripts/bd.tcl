@@ -30,7 +30,7 @@ set ps_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7 ps_0]
 apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config { make_external "FIXED_IO, DDR" } [get_bd_cells ps_0]
 
 # 板级参数来源（2026-08-29 修正）：
-#   - DDR3 以 **ZYNQ ECO（R6）实物** 为准，资料见 docs/board/zynq-eco-7010/。
+#   - DDR3 以 **ZYNQ ECO（R6）实物** 为准，资料见 （旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）。
 #     该板只有一颗 16 bit 的 MT41J256M16HA-125，硬件规格说明书明确写着
 #     「配置 DDR3 必须是 16 位，默认配置 32 位，如果不更改不能运行」。
 #     Vivado 预设中与之同组织、同速率的型号是 MT41J256M16 RE-125（仅 die revision 不同）。

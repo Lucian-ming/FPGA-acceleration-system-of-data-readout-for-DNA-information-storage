@@ -53,7 +53,7 @@ $ git ls-files | (含非 ASCII)   →  0 个
 - 仓库根**已有 MIT `LICENSE`**（子 Agent 核查确认），**本次未新建、未修改**。
 - ⚠️ **根目录 MIT 不自动覆盖的第三方或许可待核实素材**：
   - `clients/python/resources/` 下的 `R5_6_LDPC_hard_decoder.exe`、三个 MinGW 运行时 DLL、`dvb_s2_r5_6.pchk` 与 `permutation64800`；`libc_ldpc.so` 是仓库源码生成物，按项目 MIT 许可处理；
-  - `docs/board/bkb220/`、`docs/board/zynq-eco-7010/` 下的厂商手册、原理图、AMD/Xilinx PDF、示例压缩包及板卡媒体；
+  - `docs/board/bkb220/`、`（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）` 下的厂商手册、原理图、AMD/Xilinx PDF、示例压缩包及板卡媒体；
   - `data/`、`tests/datasets/`、`tests/golden/`、`docs/images/`、`archive/` 的原始或派生数据、图片与历史材料，以及 `hw/build/` 的导出制品和本地生成工作区。
 - **→ 逐项状态、许可依据与建议处置见 [第三方素材许可与再分发清单](third-party-notices.md)**；清单中“未能确定”的项目，在取得上游许可/授权或替换前，不应视为根目录 MIT 已覆盖。
 

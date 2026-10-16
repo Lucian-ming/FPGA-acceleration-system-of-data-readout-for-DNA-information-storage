@@ -153,22 +153,22 @@ docs/board/run-logs/run17-uart-ps-refactor-s6-2runs-2026-09-04.log	.log	板级�
 docs/board/run-logs/run18-uart-se150-s6-regression-2026-09-05.log	.log	板级资料与真板证据
 docs/board/run-logs/run5-uart-2026-08-30.log	.log	板级资料与真板证据
 docs/board/run-logs/run9-uart-full-dataset-2026-08-30.log	.log	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/media_led_2261.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/media_manual_9517.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/media_r5_9515.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/media_r6_8700.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/post_buzzer_432.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/00_sources/product_962.json	.json	板级资料与真板证据
-docs/board/zynq-eco-7010/01_board_official/01_zynq_eco_hardware-spec.pdf	.pdf	板级资料与真板证据
-docs/board/zynq-eco-7010/01_board_official/02_zynq_eco_r5-schematic.pdf	.pdf	板级资料与真板证据
-docs/board/zynq-eco-7010/01_board_official/03_zynq_eco_r6-schematic.pdf	.pdf	板级资料与真板证据
-docs/board/zynq-eco-7010/02_amd_reference/DS187_XC7Z010-XC7Z020_DC-AC.pdf	.pdf	板级资料与真板证据
-docs/board/zynq-eco-7010/02_amd_reference/DS190_Zynq-7000_Overview.pdf	.pdf	板级资料与真板证据
-docs/board/zynq-eco-7010/03_examples/eco_led-official-example.zip	.zip	板级资料与真板证据
-docs/board/zynq-eco-7010/04_photos/eco_r5-connector-labels.jpg	.jpg	板级资料与真板证据
-docs/board/zynq-eco-7010/04_photos/eco-board-intro.png	.png	板级资料与真板证据
-docs/board/zynq-eco-7010/README.md	.md	板级资料与真板证据
-docs/board/zynq-eco-7010/SHA256SUMS.txt	.txt	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/media_led_2261.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/media_manual_9517.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/media_r5_9515.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/media_r6_8700.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/post_buzzer_432.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）00_sources/product_962.json	.json	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）01_board_official/01_zynq_eco_hardware-spec.pdf	.pdf	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）01_board_official/02_zynq_eco_r5-schematic.pdf	.pdf	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）01_board_official/03_zynq_eco_r6-schematic.pdf	.pdf	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）02_amd_reference/DS187_XC7Z010-XC7Z020_DC-AC.pdf	.pdf	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）02_amd_reference/DS190_Zynq-7000_Overview.pdf	.pdf	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）03_examples/eco_led-official-example.zip	.zip	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）04_photos/eco_r5-connector-labels.jpg	.jpg	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）04_photos/eco-board-intro.png	.png	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）README.md	.md	板级资料与真板证据
+（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）SHA256SUMS.txt	.txt	板级资料与真板证据
 docs/images/images.jpg	.jpg	当前规范/状态/执行门禁
 docs/images/verification/failed_1060reads.jpg	.jpg	当前规范/状态/执行门禁
 docs/images/verification/failed_no_rc.jpg	.jpg	当前规范/状态/执行门禁
