@@ -11,7 +11,7 @@
 > 工作明细（每波每份报告）在 `logs/dev/swarm-findings/**` 与 `logs/dev/modifications/**`。
 > ⚠️ **`logs/*/` 被 `.gitignore` 忽略**——所以**判据与结论以本文为准**，日志只是过程留痕。
 
-## 1. 波次总览（共 **64** 个子 Agent）
+## 1. 波次总览（共 **77** 个子 Agent）
 
 | 波 | 数量 | 承载 | 干什么 |
 | --- | ---: | --- | --- |
@@ -39,7 +39,7 @@
 
 **无范围对手（`insp-global-adversary`）** 专门找 P0（放宽判据 / 伪造证据 / 越权）：
 未发现 P0 级越权；`data/`、`archive/`、两份 XSA、`docs/submission/llm-collaboration/**`、
-`hw/build/**/export/**`、`component.xml` 在本波中**均未被这 64 个 Agent 触碰**。
+`hw/build/**/export/**`、`component.xml` 在本波中**均未被这 77 个 Agent 触碰**。
 
 ### 2.2 一处**被检查员判错、由主会话推翻**的结论（必须记下）
 
