@@ -15,6 +15,8 @@
 
 /* 与 stage2_voter.c 的 VOTER_WAIT_TIMEOUT_S 同理：超时按墙钟计，不随轮询节拍漂移。 */
 #define DECODER_WAIT_TIMEOUT_S 30U
+#define DECODER_CLEANUP_IDLE_TIMEOUT_US 50000U
+#define DECODER_CLEANUP_IDLE_POLL_US 1000U
 
 int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_beats)
 {
@@ -313,9 +315,7 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         xil_printf("[STAGE3] ✓ Decoder Stage COMPLETE\n\r");
         xil_printf("[STAGE3] ========================================\n\r");
 
-        // 最终验证
-        PROF_CACHE_INVALIDATE(DEC_OUT_ADDR, DEC_OUT_BEATS * 8);
-
+        // 最终验证负责失效输出范围缓存；后续扫描直接读取 DDR 最新内容。
         u32 final_written = 0;
         validate_decoder_written_beats(DEC_OUT_ADDR, DEC_OUT_BEATS, &final_written);
 
@@ -333,9 +333,32 @@ pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
         write_reg32(DECODER_BASEADDR, DECODER_REG_START, 0x00);
         write_reg32(DECODER_BASEADDR, DECODER_REG_IN_BEATS, 0);
         write_reg32(DECODER_BASEADDR, DECODER_REG_OUT_BEATS, 0);
-        usleep(50000);  // 等待50ms让状态机稳定
+        /*
+         * STATUS.IDLE 是写引擎 busy 的跨时钟同步反相；RTL 只在最后一个
+         * AXI B 响应握手后清除 busy。DONE_STAGE3 已确认输出完成，因此 IDLE
+         * 可作为输出写事务排空的条件。若它一直不置位，仍等满原 50 ms 再走
+         * 下方原有 dummy-run 恢复路径；超时按墙钟计算，不依赖轮询次数。
+         */
+        XTime cleanup_wait_start, cleanup_wait_now;
+        const XTime cleanup_wait_limit_ticks =
+            ((XTime)COUNTS_PER_SECOND * DECODER_CLEANUP_IDLE_TIMEOUT_US) / 1000000U;
+        u32 cleanup_status;
+        XTime_GetTime(&cleanup_wait_start);
+        for (;;) {
+            cleanup_status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
+            if (cleanup_status & DECODER_STATUS_IDLE) {
+                break;
+            }
 
-        u32 cleanup_status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
+            XTime_GetTime(&cleanup_wait_now);
+            if ((cleanup_wait_now - cleanup_wait_start) >= cleanup_wait_limit_ticks) {
+                /* 截止点再采样一次，保持原固定等待后的状态判定语义。 */
+                cleanup_status = read_reg32(DECODER_BASEADDR, DECODER_REG_STATUS);
+                break;
+            }
+            usleep(DECODER_CLEANUP_IDLE_POLL_US);
+        }
+
         xil_printf("[CLEANUP] Decoder STATUS: 0x%02X (IDLE=%d)\n\r",
                    cleanup_status, (cleanup_status & 0x01) ? 1 : 0);
 
