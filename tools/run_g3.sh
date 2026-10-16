@@ -39,7 +39,8 @@
 #   tools/run_g3.sh --artifact-dir <export>            # 复现 G3 闭环那组参数（2048 条源读段）
 #   tools/run_g3.sh --artifact-dir <export> --limit 4096 # 分档测量：源读段数翻倍
 #   tools/run_g3.sh --artifact-dir <export> --limit 2048 --skip-boot # 板子已在跑，只重跑任务
-#   tools/run_g3.sh --artifact-dir <export> --xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132 --device xc7z020 --uart-port /dev/ttyUSB2 --win-root /tmp/bkb220-g3
+#   tools/run_g3.sh --artifact-dir <export> --xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132 --device xc7z020 --uart-port /dev/ttyUSBn --win-root /tmp/bkb220-g3
+#     # WSL 示例占位：先按 bInterfaceNumber=02 找到通道 C 的实际 /dev/ttyUSBn；编号会随枚举漂移。
 #   tools/run_g3.sh --artifact-dir <export> --win-root D:/dna_board_smoke
 #   tools/run_g3.sh --artifact-dir <export> --bit <path> # 仅允许所选包内同一bit，禁止独立覆盖
 #   tools/run_g3.sh --artifact-dir <export> --elf <path> # 仅允许选中包内同一ELF
@@ -718,7 +719,7 @@ if (( PLAN_ONLY )); then
     if [[ -n "$UART_PORT" ]]; then
         info "串口选择      : $UART_PORT"
     elif [[ "$XSDB_MODE" == "wsl" ]]; then
-        info "串口选择      : 运行时必须显式传 --uart-port。BKB220 2026-10-12 实测：PS UART=UART0/MIO14-15 → FT4232H 通道 C = /dev/ttyUSB2（见 docs/board/bkb220/migration-source-table.md §9）"
+        info "串口选择      : 运行时必须显式传 --uart-port。BKB220 PS UART=UART0/MIO14-15 → FT4232H 通道 C（bInterfaceNumber=02）；/dev/ttyUSBn 名称随枚举漂移，按 cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber 查找（见 docs/07 §3a）"
     else
         info "串口选择      : Windows 运行时按唯一 USB 串口选择；多口必须显式 --uart-port"
     fi
@@ -850,7 +851,7 @@ say "3/7 串口实录"
 if (( DO_UART )); then
     if [[ "$XSDB_MODE" == "wsl" ]]; then
         if [[ -z "$UART_PORT" || "$UART_PORT" != /dev/ttyUSB[0-9]* ]]; then
-            uart_unavailable "WSL 串口必须显式指定为 /dev/ttyUSBn；BKB220 实测 PS UART 在通道 C = /dev/ttyUSB2（2026-10-12，见来源表 §9）"
+            uart_unavailable "WSL 串口必须显式指定为 /dev/ttyUSBn；BKB220 PS UART 是 FT4232H 通道 C（bInterfaceNumber=02），设备名随枚举漂移，请按 cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber 查找（2026-10-16，见 docs/07 §3a）"
             DO_UART=0
         elif [[ ! -e "$UART_PORT" ]]; then
             uart_unavailable "串口设备不存在：$UART_PORT"

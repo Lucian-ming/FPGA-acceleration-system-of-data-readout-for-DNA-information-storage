@@ -10,7 +10,7 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 |---|---|
 | 器件 **xc7z020**，IDCODE `0x23727093` | JTAG 链 `Xilinx HW-Z1-ZCU104 FT4232H 15051A` → `arm_dap (4ba00477)` → `xc7z020`；手册 p.5-6 写 XC7Z020-2CLG400I |
 | 板载 **FT4232HL** 桥，无需外置下载器 | 手册 p.7；三串口 + JTAG 与手册 p.16「一路 PL、一路 PS 加 JTAG」相符 |
-| 串口：通道 A=JTAG，B/C/D=三串口 | Windows 为 COM9/10/11；直通 WSL 后 `/dev/ttyUSB0`=JTAG、`1/2/3`=串口。已确认 PS UART 为 UART0/MIO14-15，FT4232H C 通道（COM10 / `/dev/ttyUSB2`） |
+| 串口：通道 A=JTAG，B/C/D=三串口 | Windows 为 COM9/10/11；WSL `/dev/ttyUSBn` 编号随 USB 重枚举漂移。已确认 PS UART 为 UART0/MIO14-15、FT4232H C 通道 / interface 02（Windows COM10；曾枚举为 `/dev/ttyUSB2`，按 `bInterfaceNumber=02` 判定，见下表） |
 | 网口：ASIX USB 千兆网卡在 Windows 侧 `192.168.1.100/24`，链路 1Gbps | 已确认网线是**板子直连该 ASIX 网卡**。2026-10-12 经 JTAG 用 MDIO 实测：PHY = **Realtek RTL8211E**（OUI 0x001CC9），自协商完成、**1000BASE-T 全双工 link up**，与 1Gbps 互相印证。板端仍尚未发过 TCP 包（ReceivedBytes=0，属正常：还没跑固件） |
 | `BOOT_MODE` 0xF800025C = `0` | **JTAG 启动模式**；`DDR_PLL_CTRL=0x3F`（DDR PLL 掉电）、`FPGA0_CLK_CTRL` bit0=0、`GEM0_NETWORK_CONTROL=0`、`UART0/1_CTRL=0x128` → PS 是干净的 JTAG 待机态，只有 BootROM 在跑 |
 | **PS_CLK = 33.333 MHz** | 由 `IO_PLL_CTRL` FBDIV=26 推出 IO PLL=433.33 MHz，且 BootROM 能正常执行。属推导+寄存器证据，非厂商书面确认 |
@@ -36,14 +36,14 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 
 **串口与 JTAG 的通道映射（2026-10-12 实测 + 原理图双重确认）**
 
-| FT4232H 通道 | 功能 | 序列号 | Windows | WSL |
+| FT4232H 通道 | 功能 | 序列号 | Windows | WSL（按接口号判定） |
 |---|---|---|---|---|
-| A | JTAG | 15051A | （XSDB 直接用） | `/dev/ttyUSB0` |
-| B | 未使用/备用 | 15051B | COM9 | `/dev/ttyUSB1` |
-| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **`/dev/ttyUSB2`** |
-| D | PL UART | 15051D | COM11 | `/dev/ttyUSB3` |
+| A | JTAG | 15051A | （XSDB 直接用） | interface 00；JTAG 常被 usbfs/hw_server 持有，不一定注册为 tty |
+| B | 未使用/备用 | 15051B | COM9 | interface 01；对应 `/dev/ttyUSBn` 随枚举变化 |
+| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **interface 02；对应 `/dev/ttyUSBn` 随枚举变化** |
+| D | PL UART | 15051D | COM11 | interface 03；对应 `/dev/ttyUSBn` 随枚举变化 |
 
-> 按序列号认通道比按 COM 号稳（重枚举后 COM 号可能变）。**不要用蓝牙 COM3/COM4 兜底。**
+> WSL 下 `/dev/ttyUSBn` 是枚举名，不是通道标识。用 `cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber` 查看接口号，输出 `02` 才是 PS UART 的 FT4232H 通道 C。2026-10-16 实测重上电前 PS UART 曾为 `/dev/ttyUSB2`，重枚举后为 `/dev/ttyUSB3`；这些是当次设备名快照。**不要用蓝牙 COM3/COM4 兜底。**
 
 **触板操作要点**
 
@@ -116,7 +116,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 | F0 接管与现场核对 | **完成**：仓库绑定 PASS（main/origin 0/0，HEAD `22a0874`）、工具链与真实设备枚举、`agent_view` 以 main 登记、按现成 05 计划接管 |
 | F1 已有成果确认 | 子 Agent 只读复核完成：P4/P16 正式源集与 `PACKAGED_VARIANTS.txt` 条目集合一致、无未覆盖文件、`check_ip_packaging.sh` 与 `check_repo_hygiene.sh` main 复跑均 **exit 0 PASS**（子 Agent 报的 packaging FAIL 是只读沙箱无法建临时输入所致，非真实缺陷）。P16 整机 LUT 先验约 33.9k（64%），仅 OOC 外推 |
 | **F2 新板配置** | **基本完成**：来源表与候选 PS7 profile 已产出并经 Vivado 2022.2 逐属性验证（[来源表](board/bkb220/migration-source-table.md) §8、`hw/boards/bkb220.tcl`，`ready=0`）。**实测已定**：PS_CLK=33.333 MHz、DDR=533.33 MHz(DDR3-1066)、FCLK0=100 MHz、PS UART=UART0/MIO14-15→FT4232H 通道 C。`MT41K256M16TW-107` 被 PS7 catalog 拒绝，改用自定义 DDR 参数 |
-| **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环被 `/dev/ttyUSB2` 以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
+| **F3 最小启动** | **全部通过**：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 **0 不符**；UART0 经 JTAG 回环当时被 `/dev/ttyUSB2`（FT4232H interface 02；设备名随枚举漂移）以正确 ASCII 收到；**ENET0 经 MDIO 实测 PHY=RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4）。详见 §1c |
 | **F4/F5 构建与整机时序** | **通过**：P4(4/0) 与 P16(16/1) 均在 `xc7z020clg400-2` 完成完整 route + bitstream + XSA，**WNS +0.680/+0.617、WHS +0.036/+0.017、失败端点 0、DRC 0 errors、`clk_fpga_0`=100.000MHz**。P16 资源 33,987 LUT(63.89%)，与先验 33.9k/64% 吻合。详见 [benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md) |
 | **F4 整机 G3** | **通过（7/7 全绿）**（[来源表 §13](board/bkb220/migration-source-table.md)）：补回 profile 缺失的 ENET0 MIO 配置并重建后，CAPS 握手、4096 板端记录、**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、串口实录 7781 字符。通道为 Windows 2026.1 烧录 22 制品 + COM10，符合 §1b 分工 |
 | F6～F8 | 未开始：全量≥3 次、连续/脏干净、断连恢复、性能矩阵、泛化/长稳；`REQP-1839/1840` 异步复位 BRAM 警告待 RTL 复核。**板上是 P4，P16 尚未上板** |
@@ -142,7 +142,7 @@ Icarus重复LC50接口长测在XSim正式接口通过后主动停止，不称Ica
 
 **板子状态：已断电（用户 23:30 市电切断，板子靠该 USB 供电，FT4232H 已从系统消失）。**
 清查方式（**别被幽灵条目骗**）：`Get-PnpDevice -PresentOnly` 匹配 `VID_0403` 应为空、`usbipd list` 的 **Connected 段**无 `0403:6011`。那些 `Status: Unknown` 的 `FTDIBUS\VID_0403+PID_6011+15051B/C/D` 是**记忆条目**，不是在线设备。
-**明天开工第一步：重新接上板子 USB，按 [07 §3a](07-board-build-and-acceptance.md) 确认通道**（`usbipd` 归属 → `hw_server` → **COM10** / `ttyUSB2`）。
+**明天开工第一步：重新接上板子 USB，按 [07 §3a](07-board-build-and-acceptance.md) 确认通道**（`usbipd` 归属 → `hw_server` → Windows **COM10** / WSL 按 `bInterfaceNumber=02` 查到的 `/dev/ttyUSBn`；名称随枚举漂移）。
 
 **今晚新增（全部已提交推送，`main...origin/main` = 0/0，工作树干净）**：
 
@@ -740,7 +740,7 @@ LUT as Logic 需 **62,588** / Slice LUTs 需 **63,352**，可用 53,200（发布
    （用户 2026-10-12 二度指示，**覆盖**此前「22 主线稳定后立即做 F9/26 复核」的顺序；详见 [05](05-implementation-plan.md) 的「后续总顺序」一节。要点：报告**不早于**优化完成，26 的开发与复核整体后移到优化与报告之后。）
 6. **交付收尾**：冻结 writer、按路径提交推送、同步 03/05/07/09 与提示词及 Windows 镜像、各 agent 看板 `done`。
 
-**断电前现场**：板卡已断电（用户 23:30 断电），FT4232H 归属会随机器重启变化 —— **恢复时按 `docs/07` §3a 重新确认通道**（`usbipd` 归属、`hw_server`、COM10/`ttyUSB2`）。所有制品与留证都在磁盘上（`hw/build/bkb220-*`、`D:\bkb220_board_smoke\g3_runs\*`），`logs/` 已被 .gitignore 覆盖但文件保留。
+**断电前现场**：板卡已断电（用户 23:30 断电），FT4232H 归属会随机器重启变化 —— **恢复时按 `docs/07` §3a 重新确认通道**（`usbipd` 归属、`hw_server`、Windows COM10；WSL 按 interface 02 查找设备，`/dev/ttyUSB2` 仅为断电前的一次枚举名）。所有制品与留证都在磁盘上（`hw/build/bkb220-*`、`D:\bkb220_board_smoke\g3_runs\*`），`logs/` 已被 .gitignore 覆盖但文件保留。
 
 ## 1c. 2026-10-12 F3 实板结果摘要
 

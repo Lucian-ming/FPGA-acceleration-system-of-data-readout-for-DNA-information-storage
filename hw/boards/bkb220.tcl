@@ -9,7 +9,8 @@
 # 【已实测证实，见 docs/board/bkb220/migration-source-table.md §9】
 #   * ps7_init/ps7_post_config RC=0；JTAG 单目标 xc7z020
 #   * DDR 在 0x10000000 起 1024 字写读 0/1024 不符（DDR 可用）
-#   * PS UART = UART0/MIO14-15 → FT4232H 通道 C（/dev/ttyUSB2），115200 8N1，
+#   * PS UART = UART0/MIO14-15 → FT4232H 通道 C（bInterfaceNumber=02），115200 8N1；
+#     WSL `/dev/ttyUSBn` 名称随 USB 重枚举漂移，按 sysfs interface number 定位，
 #     经 JTAG 直写 TX FIFO 后被正确 ASCII 接收
 #   * PS_CLK=33.333MHz、DDR PLL=533.33MHz(DDR3-1066)、FCLK0=100MHz（PLL 寄存器回读）
 #

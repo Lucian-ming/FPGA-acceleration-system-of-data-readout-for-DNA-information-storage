@@ -11,10 +11,11 @@
 #
 # 本脚本只做 F3，不做 G3：
 #   1) 前置：WSL 里恰好一个 FT4232H、hw_server 在 127.0.0.1:3132、唯一 APU 目标
-#   2) 在 ttyUSB1/2/3 上被动抓串口（DTR/RTS 不拉，避免给未上电的 PS 注入电流）
+#   2) 按 bInterfaceNumber 枚举 FT4232H interface 01/02/03 并被动抓串口；
+#      /dev/ttyUSBn 的编号会随 USB 重枚举漂移（DTR/RTS 不拉）
 #   3) xsdb：选 APU -> rst -system -> source <ps7_init.tcl> -> ps7_init -> ps7_post_config
 #   4) 读回关键寄存器作为 DDR/UART/时钟的可留证判据
-#   5) 报告哪个 ttyUSB 收到字节（用于确定 PS UART 落在哪个 FTDI 通道）
+#   5) 报告哪个 interface 收到字节；PS UART 的权威归属是 FT4232H interface 02
 #
 # 判据边界（别把它读成超过它证明的东西）
 # ------------------------------------
@@ -48,7 +49,9 @@ PS7_INIT=""
 RUN_DIR=""
 SERIAL_SECONDS=15
 DDR_WINDOW=""
-SERIAL_PORTS="/dev/ttyUSB1 /dev/ttyUSB2 /dev/ttyUSB3"
+SERIAL_PORTS=""
+SERIAL_PORTS_OVERRIDE=0
+SERIAL_PORT_DISCOVERY=""
 
 usage() { sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; }
 
@@ -58,11 +61,48 @@ while [[ $# -gt 0 ]]; do
         --run-dir)       RUN_DIR="$2"; shift 2 ;;
         --serial-seconds) SERIAL_SECONDS="$2"; shift 2 ;;
         --ddr-window)    DDR_WINDOW="$2"; shift 2 ;;
-        --ports)         SERIAL_PORTS="$2"; shift 2 ;;
+        --ports)         SERIAL_PORTS="$2"; SERIAL_PORTS_OVERRIDE=1; shift 2 ;;
         -h|--help)       usage ;;
         *) printf '未知参数：%s\n' "$1" >&2; exit 2 ;;
     esac
 done
+
+# ttyUSB 编号不是 FT4232H 通道号。默认依据 sysfs interface number 选择
+# B/C/D（01/02/03）；若 sysfs 映射不完整，则回退扫描全部 ttyUSB 节点，避免漏口。
+if (( ! SERIAL_PORTS_OVERRIDE )); then
+    serial_devices=""
+    serial_candidates=""
+    serial_device_count=0
+    serial_candidate_count=0
+    serial_lookup_incomplete=0
+    for p in /dev/ttyUSB*; do
+        [[ -e "$p" ]] || continue
+        serial_devices+="${serial_devices:+ }$p"
+        serial_device_count=$((serial_device_count + 1))
+        name=${p##*/}
+        interface_file="/sys/class/tty/$name/device/../bInterfaceNumber"
+        if [[ ! -r "$interface_file" ]]; then
+            serial_lookup_incomplete=1
+            continue
+        fi
+        interface_number=$(<"$interface_file")
+        case "$interface_number" in
+            01|02|03)
+                serial_candidates+="${serial_candidates:+ }$p"
+                serial_candidate_count=$((serial_candidate_count + 1))
+                ;;
+        esac
+    done
+    if (( serial_lookup_incomplete )) || { (( serial_device_count > 0 )) && (( serial_candidate_count == 0 )); }; then
+        SERIAL_PORTS="$serial_devices"
+        SERIAL_PORT_DISCOVERY="全部 /dev/ttyUSB*（interface 映射不可用，回退扫描）"
+    else
+        SERIAL_PORTS="$serial_candidates"
+        SERIAL_PORT_DISCOVERY="按 bInterfaceNumber 01/02/03 枚举"
+    fi
+else
+    SERIAL_PORT_DISCOVERY="使用 --ports 显式指定"
+fi
 
 [[ -n "$PS7_INIT" ]] || { echo "--ps7-init 必填" >&2; exit 2; }
 [[ -n "$RUN_DIR"  ]] || { echo "--run-dir 必填（必须是不存在的全新目录）" >&2; exit 2; }
@@ -93,6 +133,8 @@ note "=== BKB220 F3 最小启动 ==="
 note "run_dir   : $RUN_DIR"
 note "ps7_init  : $PS7_INIT  (sha256 $(sha256sum "$PS7_INIT" | cut -d' ' -f1))"
 note "xsdb      : $XSDB"
+note "串口节点  : ${SERIAL_PORTS:-（未发现）}（$SERIAL_PORT_DISCOVERY）"
+note "PS UART   : FT4232H channel C / bInterfaceNumber=02；按 cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber 判定，ttyUSBn 名称会漂"
 
 # --- 1) 前置：唯一 FT4232H ---------------------------------------------------
 note
@@ -137,10 +179,16 @@ capture_pids=()
 for p in $SERIAL_PORTS; do
     [[ -e "$p" ]] || { note "  (跳过不存在的 $p)"; continue; }
     name=$(basename "$p")
-    if stty -F "$p" 115200 cs8 -cstopb -parenb -crtscts -ixon -ixoff raw -echo 2>"$RUN_DIR/serial-$name.stty.err"; then
-        note "  $p 已配置 115200 8N1 raw"
+    interface_file="/sys/class/tty/$name/device/../bInterfaceNumber"
+    if [[ -r "$interface_file" ]]; then
+        interface_number=$(<"$interface_file")
     else
-        note "  $p stty 配置失败（见 serial-$name.stty.err），仍尝试读取"
+        interface_number="unknown"
+    fi
+    if stty -F "$p" 115200 cs8 -cstopb -parenb -crtscts -ixon -ixoff raw -echo 2>"$RUN_DIR/serial-$name.stty.err"; then
+        note "  $p（bInterfaceNumber=$interface_number）已配置 115200 8N1 raw"
+    else
+        note "  $p（bInterfaceNumber=$interface_number）stty 配置失败（见 serial-$name.stty.err），仍尝试读取"
     fi
     ( timeout "$SERIAL_SECONDS" cat "$p" >"$RUN_DIR/serial-$name.bin" 2>"$RUN_DIR/serial-$name.err" ) &
     capture_pids+=($!)
@@ -237,7 +285,13 @@ for p in $SERIAL_PORTS; do
     bin="$RUN_DIR/serial-$name.bin"
     [[ -e "$bin" ]] || continue
     n=$(stat -c%s "$bin")
-    note "  $p : $n bytes"
+    interface_file="/sys/class/tty/$name/device/../bInterfaceNumber"
+    if [[ -r "$interface_file" ]]; then
+        interface_number=$(<"$interface_file")
+    else
+        interface_number="unknown"
+    fi
+    note "  $p（bInterfaceNumber=$interface_number）: $n bytes"
     if [[ "$n" -gt 0 ]]; then
         note "    --- 前 200 字节 ---"
         head -c 200 "$bin" | tr -d '\000' | sed 's/^/    /'

@@ -55,7 +55,7 @@ def capture(device: Path, log_path: Path, seconds: float, stop_file: Path) -> in
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", type=Path, required=True,
-                        help="WSL 串口设备，例如 /dev/ttyUSB2")
+                        help="WSL 串口设备；PS UART 按 bInterfaceNumber=02 定位，/dev/ttyUSBn 名称随枚举漂移")
     parser.add_argument("--log", type=Path, required=True)
     parser.add_argument("--seconds", type=float, required=True)
     parser.add_argument("--stop-file", type=Path, required=True)

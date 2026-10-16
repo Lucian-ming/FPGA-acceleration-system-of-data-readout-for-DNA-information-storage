@@ -105,7 +105,7 @@ bit `2ec76c7d…`、ELF `1ed635b8…`、XSA `8fb75a31…`；源码 `517f1dc`）�
 - 🔴 **`g3_soak.py` 的 `--hw-server` 默认空**；而走 WSL 侧 XSDB 时 `run_g3.sh` **强制要求它**，
   不传就 `FATAL`、**每轮 rc=2**。脚本自己的注释就写着"长稳会整轮整轮地空跑"。
   ⇒ **上板命令必须显式传** `--xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132
-  --uart-port /dev/ttyUSB2 --win-root <WSL 可写目录>`（脚本三个默认值全是 **Windows 侧**的）。
+  --uart-port <按 bInterfaceNumber=02 查到的 /dev/ttyUSBn> --win-root <WSL 可写目录>`（脚本三个默认值全是 **Windows 侧**的）。`/dev/ttyUSBn` 名称随 USB 枚举漂移；上板前用 `cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber` 找到值为 `02` 的通道 C，并将当次实际路径显式传入。
   **已在修成失败关闭**（WSL xsdb + 空 hw-server ⇒ 启动即报错）。
 - **遇到确定失败不停**：循环到墙钟期限。配置错/连不上/注入未执行都会**白耗满 8 小时**。
   **已在修**（连续 N 轮失败即止损，并如实标注"提前停止"，不伪装跑满）。

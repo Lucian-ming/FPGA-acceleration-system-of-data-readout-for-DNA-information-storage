@@ -245,7 +245,8 @@ def run_g3_gate(package: Path) -> int:
         "--xsdb", str(VITIS_ROOT / "bin/xsdb"),
         "--hw-server", "TCP:127.0.0.1:3132",
         "--win-root", "/tmp/vitis-chain-plan-only",
-        "--uart-port", "/dev/ttyUSB2",
+        # --plan-only 不打开串口；设备名会随 USB 重枚举变化，真实 G3 运行时
+        # 必须按 bInterfaceNumber=02 找到 FT4232H 通道 C 后显式传 --uart-port。
         "--plan-only",
     ]
     with tempfile.NamedTemporaryFile(prefix="vitis-chain-g3-plan-", suffix=".log",

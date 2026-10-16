@@ -12,7 +12,7 @@
 | PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库） | 原理图已入库，PS7 配置经 Vivado 2022.2 校验，DDR 写读及实板运行已通过；DDR 板级延迟与 DQS-to-CLK 仍未单独表征 |
 | 时钟/UART/GEM/PHY/MIO/XDC | 已退役；旧 profile 与板卡资料于 2026-10-16 移出当前构建树，不作为构建目标 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
 | 制品/正确性 | 历史旧包五项 SHA 摘要仍可查，原包已移出当前仓库；SE150 真板闭环属于历史证据 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
-| 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H C 通道（Windows COM10 / WSL `/dev/ttyUSB2`）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |
+| 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H 通道 C / interface 02（Windows COM10；当次 WSL 枚举为 `/dev/ttyUSB2`，设备名会漂移，按 interface 02 判定）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |
 
 产品手册与用户提供的原理图已收录：[bkb220-product-manual-v1.1.pdf](board/bkb220/bkb220-product-manual-v1.1.pdf)、[原理图](board/bkb220/BK_B220_SchDoc.pdf)、[资料来源与SHA校验](board/bkb220/README.md)。原理图已用于核实 MIO、PHY 与复位配置；厂商 board_files/PS7 preset/例程及实物完整料号、PCB 修订仍未确认，手册示例不替代现场证据。
 
@@ -62,14 +62,14 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 
 **通道映射（2026-10-12 实测 + 原理图双重确认）**
 
-| FT4232H 通道 | 功能 | 序列号 | Windows | WSL |
+| FT4232H 通道 | 功能 | 序列号 | Windows | WSL（按接口号判定） |
 |---|---|---|---|---|
-| A | JTAG | 15051A | XSDB 直接使用 | `/dev/ttyUSB0` |
-| B | 未使用/备用 | 15051B | COM9 | `/dev/ttyUSB1` |
-| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **`/dev/ttyUSB2`** |
-| D | PL UART | 15051D | COM11 | `/dev/ttyUSB3` |
+| A | JTAG | 15051A | XSDB 直接使用 | interface 00；JTAG 常被 usbfs/hw_server 持有，不一定注册为 tty |
+| B | 未使用/备用 | 15051B | COM9 | interface 01；对应 `/dev/ttyUSBn` 随枚举变化 |
+| **C** | **PS UART（UART0 / MIO14-15）** | **15051C** | **COM10** | **interface 02；对应 `/dev/ttyUSBn` 随枚举变化** |
+| D | PL UART | 15051D | COM11 | interface 03；对应 `/dev/ttyUSBn` 随枚举变化 |
 
-> 按序列号认通道比按 COM 号稳（重枚举后 COM 号可能变）。**不用蓝牙 COM3/COM4 兜底。**
+> WSL 下 `/dev/ttyUSBn` 是枚举名，不是通道标识。用 `cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber` 查看接口号，输出 `02` 才是 PS UART 的 FT4232H 通道 C。2026-10-16 实测重上电前 PS UART 曾为 `/dev/ttyUSB2`，重枚举后为 `/dev/ttyUSB3`；这些是当次设备名快照。按序列号认通道比按 COM 号稳。**不用蓝牙 COM3/COM4 兜底。**
 
 **触板操作要点**
 
@@ -93,7 +93,7 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | **BKB220 F4 整机 G3** | **P4 PASS（7/7）**（[来源表 §13](board/bkb220/migration-source-table.md)）：同源包真实下载并端到端跑通，**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、CAPS READY。后续 P16 smoke、全量三轮、连续/状态复位、故障探针及 v2 数据集对照已完成；正式 P16 上传配置包 G3 PASS，见相应 benchmark。 |
 | **BKB220 P4/P16 整机 100MHz 构建** | **PASS**（[benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md)）：均为 `Physopt postRoute`，P4 WNS+0.680/WHS+0.036、P16 WNS+0.617/WHS+0.017，**失败端点均 0**，DRC 各 **0 errors**，`clk_fpga_0`=100.000 MHz，XSA 内 `PART=xc7z020clg400-2`；P16 33,987 LUT（63.89%）。P4/P16 已有对应板测。 |
 | **BKB220 PS7 catalog 验证** | 29 属性经 Vivado 2022.2 逐条检查（[来源表 §8](board/bkb220/migration-source-table.md)）。`MT41K256M16TW-107` **被 catalog 拒绝**，改用 `Custom` + 自定义容量/时序；`xc7z020clg400-2` 在库中，但手册的工业级条目未确认 |
-| **BKB220 F3 实板最小启动** | **通过**（[来源表 §9](board/bkb220/migration-source-table.md)）：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 0 不符；PS UART = UART0/MIO14-15 → FT4232H 通道 C（`/dev/ttyUSB2`）115200 8N1 明文正确；PS_CLK 33.333 MHz、DDR 533.33 MHz、FCLK0 100 MHz；**ENET0 MDIO 通、PHY = RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4） |
+| **BKB220 F3 实板最小启动** | **通过**（[来源表 §9](board/bkb220/migration-source-table.md)）：`ps7_init`/`ps7_post_config` RC=0；DDR 0x10000000 起 1024 字写读 0 不符；PS UART = UART0/MIO14-15 → FT4232H 通道 C / interface 02（当次被枚举为 `/dev/ttyUSB2`，名称会漂移）115200 8N1 明文正确；PS_CLK 33.333 MHz、DDR 533.33 MHz、FCLK0 100 MHz；**ENET0 MDIO 通、PHY = RTL8211E、1000BASE-T 全双工 link up**。尚缺 CAPS（需固件，属 F4） |
 
 计划与索引曾先推送c4d7ad4；后续用户已明确授权代码和完整整理交付。原三子Agent额度中断后 main 接管。上述构建、板测结果不代表所有剩余迁移门禁均已关闭。
 

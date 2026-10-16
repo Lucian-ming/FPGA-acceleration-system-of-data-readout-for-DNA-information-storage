@@ -10,7 +10,7 @@
 
 目标SE150、100MHz、64记录/帧、几何150/50/807/957/64；P4=4/0、P16=16/1。BKB220 profile 当前为 `ready=1`，P4/P16 route 与板测已有记录；该配置状态不等于迁移终态全部完成。旧7010 profile保留已知PS7配置；未知的实物完整料号、PCB修订与DDR板级延迟不能从手册示例猜。不要修改data/archive/旧export或覆盖已有run目录。
 
-已有配置与连接证据：PS_CLK/DDR配置、UART0/MIO14-15→COM10/`ttyUSB2`、ENET0/PHY/MDIO/reset 已核实，JTAG 与网口链路已测；勿沿用 2026-10-10/11 的蓝牙 COM3/COM4 快照。剩余需如实记录厂商配置资料、实物完整料号/PCB修订及DDR板级时序缺口；不得据此将已完成的route或板测重新列为未做。
+已有配置与连接证据：PS_CLK/DDR配置、UART0/MIO14-15→FT4232H 通道 C / interface 02（Windows COM10；WSL `/dev/ttyUSBn` 名称随枚举漂移，按 `cat /sys/class/tty/ttyUSB<n>/device/../bInterfaceNumber` 查找）、ENET0/PHY/MDIO/reset 已核实，JTAG 与网口链路已测；勿沿用 2026-10-10/11 的蓝牙 COM3/COM4 快照。剩余需如实记录厂商配置资料、实物完整料号/PCB修订及DDR板级时序缺口；不得据此将已完成的route或板测重新列为未做。
 
 `ready=1` profile、P4/P16 100 MHz route、P4 G3 与 P16 完整包已有通过记录；当前若接手该提示词，应从 main 明确分配的剩余构建自动化或资料核验开始，不重跑已通过板测。新载荷四级取证、v2 `score_min=67`、8 h 长稳、冷启动、UART反向、功耗和 F9 仍未完成。大型Vivado/XSim、hw_server/JTAG/UART/download/reset/halt/DDR dump须main分配资源，不擅自触板。
 
