@@ -38,6 +38,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,13 +48,16 @@ from typing import Callable, Optional
 import numpy as np
 from native_ldpc import (
     K_INFO,
+    MAX_PAYLOAD_BYTES,
     N_BITS,
     PARITY_COLS,
+    bits_to_bytes,
     bits_to_payload_bytes,
     deinterleave,
     load_pchk,
     load_permutation,
     read_bit_text,
+    infer_payload,
     validate_input_bytes,
 )
 
@@ -134,11 +139,13 @@ def verify_board_result(
     output_dir: Path,
     input_bytes: Optional[int] = None,
     log: Optional[Callable[[str], None]] = None,
+    expect_sha: Optional[str] = None,
 ) -> BoardVerifyResult:
     """校验板端回传的码字并提取载荷。
 
     :param result_bits_path: 板端回传解包后的 64,800 个 0/1 位（即 dec_input.txt）
-    :param input_bytes: 载荷字节数。给了按此截断；不给按 JPEG EOI 截断（沿用 R0.83 判据）。
+    :param input_bytes: 载荷字节数。给了按此截断；不给用 infer_payload 推断。
+    :param expect_sha: 可选的期望载荷 SHA-256；未知长度时用于精确仲裁长度。
     :raises BoardCodeRejected: syndrome 非零 —— 板端没纠对，本用例失败。
     """
     emit = log or (lambda _msg: None)
@@ -172,8 +179,81 @@ def verify_board_result(
     decoded_bits_path = output_dir / DECODED_BITS_NAME
     decoded_bits_path.write_text("".join("01"[int(b)] for b in info), encoding="utf-8")
 
-    payload = bits_to_payload_bytes(info, input_bytes)
-    payload_path = output_dir / PAYLOAD_NAME
+    if input_bytes is not None:
+        # 显式长度路径保持原有逐位打包、截断和文件命名语义。
+        payload = bits_to_payload_bytes(info, input_bytes)
+        payload_suffix = ".bin"
+    else:
+        guess = infer_payload(info)
+        emit(
+            "[载荷推断] "
+            f"method={guess.method} length_certain={guess.length_certain} "
+            f"media_type={guess.media_type} extension={guess.extension!r} "
+            f"bytes={len(guess.data)}"
+        )
+        if not guess.length_certain:
+            emit(
+                "[载荷推断] 告警：长度并非确定值；当前长度只是推断结果，"
+                "必须由期望 SHA-256 仲裁才能确认。"
+            )
+        if len(guess.data) > MAX_PAYLOAD_BYTES:
+            raise ValueError(
+                f"infer_payload 返回长度超出 1..{MAX_PAYLOAD_BYTES}：{len(guess.data)}"
+            )
+
+        expected = None
+        if expect_sha is not None:
+            expected = expect_sha.lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", expected):
+                raise ValueError("expect_sha 必须是 64 位十六进制 SHA-256")
+
+        guess_sha = hashlib.sha256(guess.data).hexdigest()
+        if expected is not None and guess_sha == expected:
+            payload = guess.data
+            validate_input_bytes(len(payload), int(info.size))
+            emit(
+                f"[载荷长度仲裁] 推断长度 {len(payload)} B 的 SHA-256 精确命中：{guess_sha}"
+            )
+        elif expected is None:
+            payload = guess.data
+            validate_input_bytes(len(payload), int(info.size))
+            emit(
+                "[载荷长度仲裁] 未提供期望 SHA-256；保留 infer_payload 结果，"
+                "长度未获 SHA 确认。"
+            )
+        else:
+            emit(
+                "[载荷长度仲裁] 推断长度 SHA 未命中；遍历 1.."
+                f"{MAX_PAYLOAD_BYTES} B 寻找精确 SHA-256。"
+            )
+            all_payload_bytes = bits_to_bytes(info, MAX_PAYLOAD_BYTES)
+            matched_length = None
+            for candidate_length in range(1, MAX_PAYLOAD_BYTES + 1):
+                candidate = all_payload_bytes[:candidate_length]
+                if hashlib.sha256(candidate).hexdigest() == expected:
+                    matched_length = candidate_length
+                    payload = candidate
+                    break
+            if matched_length is None:
+                raise ValueError(
+                    "载荷长度未验证：infer_payload 候选和 1.."
+                    f"{MAX_PAYLOAD_BYTES} B 全部未命中期望 SHA-256 {expected}；"
+                    "不回退到 JPEG 截断或整段载荷。"
+                )
+            emit(
+                f"[载荷长度仲裁] SHA-256 精确命中长度 {matched_length} B：{expected}"
+            )
+
+        extension = guess.extension
+        if extension and not extension.startswith("."):
+            extension = "." + extension
+        payload_suffix = extension
+
+    payload_path = (
+        output_dir / PAYLOAD_NAME
+        if input_bytes is not None
+        else output_dir / f"decoded_payload{payload_suffix}"
+    )
     payload_path.write_bytes(payload)
     emit(f"[板端校验] 已保存信息位 {decoded_bits_path}（{K_INFO} bit）")
     emit(f"[板端校验] 已保存载荷 {payload_path}（{len(payload)} 字节）")

@@ -747,7 +747,18 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--input-bytes",
         type=int,
         default=None,
-        help="载荷字节数（1..6750）；省略时沿用 JPEG EOI 截断",
+        help="载荷字节数（1..6750）；省略时用 infer_payload 推断",
+    )
+    parser.add_argument(
+        "--expect-sha",
+        default=None,
+        help="载荷期望 SHA-256；省略 input-bytes 时用于精确仲裁载荷长度",
+    )
+    parser.add_argument(
+        "--resolved-input-bytes-out",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args(argv)
 
@@ -800,6 +811,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             Path(config.out).resolve().parent,
             input_bytes=args.input_bytes,
             log=lambda message: print(message),
+            expect_sha=args.expect_sha,
         )
     except BoardCodeRejected as exc:
         print(
@@ -807,6 +819,12 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
             file=sys.stderr,
         )
         raise SystemExit(1) from exc
+
+    if args.resolved_input_bytes_out is not None:
+        args.resolved_input_bytes_out.parent.mkdir(parents=True, exist_ok=True)
+        args.resolved_input_bytes_out.write_text(
+            f"{verified.payload_bytes}\n", encoding="ascii"
+        )
 
     print(
         f"✓ 板端已纠对（{verified.total_rows} 条校验行全零）；PC 端未做译码。"

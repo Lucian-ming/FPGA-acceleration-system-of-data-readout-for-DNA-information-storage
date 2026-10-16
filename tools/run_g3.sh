@@ -203,6 +203,58 @@ done
 if [[ -n "$OFFLINE_RECHECK_DIR" ]]; then
     RECHECK_ARGS=(--offline-recheck "$OFFLINE_RECHECK_DIR" --expect-sha "$EXPECT_SHA")
     [[ -n "$INPUT_BYTES" ]] && RECHECK_ARGS+=(--input-bytes "$INPUT_BYTES")
+    if [[ -z "$INPUT_BYTES" ]]; then
+        if RECHECK_LENGTH_LOG="$(python3 - "$OFFLINE_RECHECK_DIR" "$EXPECT_SHA" 2>&1 <<'PYRECHECK'
+from pathlib import Path
+import sys
+import tempfile
+
+repo = Path.cwd()
+sys.path.insert(0, str(repo / "clients" / "python"))
+from ldpc_pipeline import BoardCodeRejected, verify_board_result
+
+run_dir = Path(sys.argv[1])
+bits_path = next(
+    (run_dir / name for name in ("dec_input_run1.txt", "dec_input.txt")
+     if (run_dir / name).is_file()),
+    None,
+)
+if bits_path is None:
+    raise FileNotFoundError(f"{run_dir} 内没有 dec_input_run1.txt 或 dec_input.txt")
+try:
+    with tempfile.TemporaryDirectory(prefix="g3-offline-length-") as temporary:
+        result = verify_board_result(
+            bits_path,
+            Path(temporary),
+            expect_sha=sys.argv[2],
+            log=lambda message: print(message),
+        )
+except BoardCodeRejected as error:
+    print(f"BOARD_CODE_REJECTED={error}", file=sys.stderr)
+    raise SystemExit(3)
+print(f"RESOLVED_INPUT_BYTES={result.payload_bytes}")
+PYRECHECK
+        )"; then
+            RECHECK_INPUT_BYTES="$(printf '%s\n' "$RECHECK_LENGTH_LOG" | sed -nE 's/^RESOLVED_INPUT_BYTES=([1-9][0-9]*)$/\1/p' | tail -1)"
+            if [[ ! "$RECHECK_INPUT_BYTES" =~ ^[1-9][0-9]*$ ]] ||
+               (( ${#RECHECK_INPUT_BYTES} > 4 )) || (( RECHECK_INPUT_BYTES > 6750 )); then
+                printf '离线载荷长度仲裁失败：没有得到 1..6750 范围内的 SHA 确认长度。\n' >&2
+                printf '%s\n' "$RECHECK_LENGTH_LOG" >&2
+                exit 1
+            fi
+            RECHECK_ARGS+=(--input-bytes "$RECHECK_INPUT_BYTES")
+        elif [[ "$RECHECK_LENGTH_LOG" == *"载荷长度未验证"* ]]; then
+            printf '离线载荷长度仲裁失败：infer_payload 候选及 1..6750 B 均未命中期望 SHA-256。\n' >&2
+            printf '%s\n' "$RECHECK_LENGTH_LOG" >&2
+            exit 1
+        elif [[ "$RECHECK_LENGTH_LOG" == *"BOARD_CODE_REJECTED="* ]]; then
+            # syndrome 非零时没有可仲裁的板端载荷；g3_judge 仍负责记录架构 FAIL。
+            printf '离线板端 syndrome 非零；跳过长度仲裁并交由 g3_judge 记录架构失败。\n' >&2
+        else
+            printf '离线载荷长度仲裁执行失败：\n%s\n' "$RECHECK_LENGTH_LOG" >&2
+            exit 2
+        fi
+    fi
     exec python3 tools/board/g3_judge.py "${RECHECK_ARGS[@]}"
 fi
 # ---------------------------------------------------------------------------
@@ -367,7 +419,7 @@ for (( r = 1; r <= RUNS; r++ )); do
     info "  第 $r 轮 : 源读段 $(printf '%8s' "${RUN_SR[r-1]}") 条 → $(printf '%7s' "${RUN_REC[r-1]}") 条记录，score_min=${RUN_SM[r-1]}，超时 ${RUN_TO[r-1]}s$tag"
 done
 info "判据 score_min : $SCORE_MIN（只有这个阈值的轮次作为判据轮）"
-info "载荷输出模式 : $( [[ -n "$INPUT_BYTES" ]] && echo "原始字节截断（$INPUT_BYTES B）" || echo 'JPEG EOI 截断' )"
+info "载荷输出模式 : $( [[ -n "$INPUT_BYTES" ]] && echo "原始字节截断（$INPUT_BYTES B）" || echo 'infer_payload 推断长度并以期望 SHA-256 仲裁' )"
 info "系统 SHA  : $EXPECT_SHA（架构判据与系统判据都须过才是 G3 通过）"
 info "留证目录  : $RUN_DIR"
 info "XSDB 模式 : $XSDB_MODE${HW_SERVER_URL:+，hw_server=$HW_SERVER_URL}"
@@ -708,11 +760,9 @@ if (( ! FAILED )); then
 say "6/7 下发任务并记录三层判据（共 $RUNS 轮）"
 for (( r = 1; r <= RUNS; r++ )); do
     BITS_OUT="$RUN_DIR/dec_input_run$r.txt"
-    if [[ -n "$INPUT_BYTES" ]]; then
-        PAYLOAD_OUT="$RUN_DIR/decoded_run$r.payload"
-    else
-        PAYLOAD_OUT="$RUN_DIR/decoded_run$r.jpg"
-    fi
+    PAYLOAD_OUT="$RUN_DIR/decoded_run$r.payload"
+    RESOLVED_INPUT_BYTES_OUT="$RUN_DIR/resolved_input_bytes_run$r.txt"
+    RUN_INPUT_BYTES="$INPUT_BYTES"
     CLI_LOG="$RUN_DIR/first_run$r.log"
 
     RUN_SCORE_MIN="${RUN_SM[r-1]}"
@@ -732,6 +782,12 @@ for (( r = 1; r <= RUNS; r++ )); do
                 --read-bps "$READ_BPS")
     [[ -n "$RUN_THIS_LIMIT" ]] && FIRST_ARGS+=(--limit "$RUN_THIS_LIMIT")
     FIRST_ARGS+=(--score-min "$RUN_SCORE_MIN")
+    if [[ -n "$INPUT_BYTES" ]]; then
+        FIRST_ARGS+=(--input-bytes "$INPUT_BYTES")
+    else
+        FIRST_ARGS+=(--expect-sha "$EXPECT_SHA"
+                     --resolved-input-bytes-out "$RESOLVED_INPUT_BYTES_OUT")
+    fi
 
     T0=$SECONDS
     if python3 clients/python/first.py "${FIRST_ARGS[@]}" > "$CLI_LOG" 2>&1; then
@@ -744,6 +800,26 @@ for (( r = 1; r <= RUNS; r++ )); do
     RESULT_LINE="$(grep -E '^\s+Result:' "$CLI_LOG" | tail -1)"
     if (( FIRST_RC == 0 )); then
         step_ok "第 $r 轮 first.py 原始回传" "${RUN_REC[r-1]} 条记录 / score_min=$RUN_SCORE_MIN / ${T_RUN}s；$RESULT_LINE"
+        if [[ -z "$INPUT_BYTES" ]]; then
+            if [[ ! -s "$RESOLVED_INPUT_BYTES_OUT" ]]; then
+                step_bad "第 $r 轮载荷长度仲裁" \
+                    "first.py 成功但未写入 SHA 确认长度；载荷未验证，停止本轮判据"
+                break
+            fi
+            RUN_INPUT_BYTES="$(<"$RESOLVED_INPUT_BYTES_OUT")"
+            if [[ ! "$RUN_INPUT_BYTES" =~ ^[1-9][0-9]*$ ]] ||
+               (( ${#RUN_INPUT_BYTES} > 4 )) || (( RUN_INPUT_BYTES > 6750 )); then
+                step_bad "第 $r 轮载荷长度仲裁" \
+                    "first.py 写出的长度不在 1..6750：${RUN_INPUT_BYTES:-空}；停止本轮判据"
+                break
+            fi
+            info "载荷长度由期望 SHA-256 精确确认：${RUN_INPUT_BYTES} B"
+        fi
+    elif grep -q '载荷长度未验证' "$CLI_LOG"; then
+        step_bad "第 $r 轮载荷长度仲裁" \
+            "infer_payload 候选及 1..6750 B 均未命中期望 SHA-256；载荷未验证，停止本轮判据"
+        tail -20 "$CLI_LOG"
+        break
     elif [[ -s "$BITS_OUT" ]] && grep -Eq '板端未纠对|校验行非零' "$CLI_LOG"; then
         # first.py 在保存原始码字后会因 BoardCodeRejected 退出 1。
         # 这是架构判据失败，不是传输失败；仍跑主机诊断以保留旧口径可比性。
@@ -763,7 +839,7 @@ for (( r = 1; r <= RUNS; r++ )); do
                 --host-bits-out "$RUN_DIR/decoded_bits_run$r.txt"
                 --host-payload-out "$PAYLOAD_OUT"
                 --host-log-out "$RUN_DIR/ldpc_run$r.log")
-    [[ -n "$INPUT_BYTES" ]] && JUDGE_ARGS+=(--input-bytes "$INPUT_BYTES")
+    [[ -n "$RUN_INPUT_BYTES" ]] && JUDGE_ARGS+=(--input-bytes "$RUN_INPUT_BYTES")
     if python3 tools/board/g3_judge.py "${JUDGE_ARGS[@]}" > "$LAYER_REPORT" 2>"$RUN_DIR/g3_judge_run$r.err"; then
         JUDGE_RC=0
     else
@@ -941,7 +1017,7 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "命令        : tools/run_g3.sh $INVOCATION"
     echo "任务次数    : $RUNS（同一次上电内连续下发，中间不复位、不重烧）"
     echo "判据阈值    : score_min=$SCORE_MIN（该阈值标识常规判据轮；每轮架构 syndrome 均判定）"
-    echo "载荷字节数  : ${INPUT_BYTES:-JPEG EOI 截断}"
+    echo "载荷字节数  : ${RUN_INPUT_BYTES:-SHA 仲裁未获得长度}"
     echo "orient      : $ORIENT（both = 每条读段发正/反两条记录），记录数按 64 对齐"
     echo
     printf '%-4s %-10s %-9s %-9s %-7s %-8s %s\n' \

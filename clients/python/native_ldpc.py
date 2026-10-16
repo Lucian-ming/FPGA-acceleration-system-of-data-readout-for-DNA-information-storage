@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +14,15 @@ N_BITS = 64_800
 K_INFO = 54_000
 PARITY_COLS = 10_800
 MAX_PAYLOAD_BYTES = K_INFO // 8
+
+
+@dataclass(frozen=True)
+class PayloadGuess:
+    data: bytes
+    media_type: str
+    extension: str
+    length_certain: bool
+    method: str
 
 
 def load_pchk(path: Path):
@@ -153,6 +163,93 @@ def bits_to_jpeg_bytes(bits: np.ndarray) -> bytes:
 def bits_to_payload_bytes(bits: np.ndarray, input_bytes: int | None = None) -> bytes:
     """写任意载荷；未给长度时沿用原 JPEG EOI 截断，给长度时按字节截断。"""
     return bits_to_jpeg_bytes(bits) if input_bytes is None else bits_to_bytes(bits, input_bytes)
+
+
+def infer_payload(bits: np.ndarray) -> PayloadGuess:
+    """根据信息位中的魔数推断载荷格式，并在可确定时截到真实结尾。"""
+    if bits.size < K_INFO:
+        raise ValueError(f"信息位至少需要 {K_INFO} bit，实得 {bits.size}")
+    data = bits_to_bytes(bits, MAX_PAYLOAD_BYTES)
+
+    def uncertain(media_type: str, extension: str, method: str) -> PayloadGuess:
+        return PayloadGuess(
+            data=data.rstrip(b"\0"),
+            media_type=media_type,
+            extension=extension,
+            length_certain=False,
+            method=method,
+        )
+
+    # JPEG 的 EOI 标记通常也可能出现在压缩流中，按既有约定取最后一个。
+    if data.startswith(b"\xff\xd8\xff"):
+        end = data.rfind(b"\xff\xd9")
+        if end >= 0:
+            return PayloadGuess(data[:end + 2], "image/jpeg", ".jpg", True, "JPEG EOI (FFD9)")
+        return uncertain("image/jpeg", ".jpg", "JPEG 未找到 EOI；去尾零（不确定）")
+
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        marker = data.rfind(b"IEND")
+        while marker >= 0:
+            end = marker + 8  # IEND 四字节类型码及其四字节 CRC。
+            if end <= len(data):
+                return PayloadGuess(data[:end], "image/png", ".png", True, "PNG IEND")
+            marker = data.rfind(b"IEND", 0, marker)
+        return uncertain("image/png", ".png", "PNG 未找到完整 IEND；去尾零（不确定）")
+
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        end = data.rfind(b"\x3b")
+        if end >= 0:
+            return PayloadGuess(data[:end + 1], "image/gif", ".gif", True, "GIF Trailer (3B)")
+        return uncertain("image/gif", ".gif", "GIF 未找到 Trailer；去尾零（不确定）")
+
+    if data.startswith(b"BM"):
+        if len(data) >= 6:
+            end = int.from_bytes(data[2:6], "little")
+            if 14 <= end <= len(data):
+                return PayloadGuess(data[:end], "image/bmp", ".bmp", True, "BMP 文件长度字段")
+        return uncertain("image/bmp", ".bmp", "BMP 长度字段无效；去尾零（不确定）")
+
+    if data.startswith(b"RIFF") and len(data) >= 12 and data[8:12] in (b"WAVE", b"AVI "):
+        end = int.from_bytes(data[4:8], "little") + 8
+        if 12 <= end <= len(data):
+            if data[8:12] == b"WAVE":
+                return PayloadGuess(data[:end], "audio/wav", ".wav", True, "RIFF WAVE 长度字段")
+            return PayloadGuess(data[:end], "video/x-msvideo", ".avi", True, "RIFF AVI 长度字段")
+        media_type, extension = (
+            ("audio/wav", ".wav") if data[8:12] == b"WAVE" else ("video/x-msvideo", ".avi")
+        )
+        return uncertain(media_type, extension, "RIFF 长度字段无效；去尾零（不确定）")
+
+    if data.startswith(b"%PDF"):
+        end = data.rfind(b"%%EOF")
+        if end >= 0:
+            return PayloadGuess(data[:end + 5], "application/pdf", ".pdf", True, "PDF %%EOF")
+        return uncertain("application/pdf", ".pdf", "PDF 未找到 %%EOF；去尾零（不确定）")
+
+    if data.startswith(b"PK\x03\x04"):
+        marker = data.rfind(b"PK\x05\x06")
+        if marker >= 0 and marker + 22 <= len(data):
+            end = marker + 22 + int.from_bytes(data[marker + 20:marker + 22], "little")
+            if end <= len(data):
+                return PayloadGuess(data[:end], "application/zip", ".zip", True, "ZIP EOCD (PK0506)")
+        return uncertain("application/zip", ".zip", "ZIP 未找到完整 EOCD；去尾零（不确定）")
+
+    # NUL 之后按补零处理；严格 UTF-8 解码失败就保守归为二进制。
+    nul = data.find(b"\0")
+    text_prefix = data if nul < 0 else data[:nul]
+    if text_prefix:
+        try:
+            text_prefix.decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+        else:
+            return uncertain(
+                "text/plain; charset=utf-8",
+                ".txt",
+                "UTF-8 文本去尾零（不确定）",
+            )
+
+    return uncertain("application/octet-stream", ".bin", "去尾零（不确定）")
 
 
 def read_bit_text(path: Path, expected_bits: int = N_BITS) -> str:

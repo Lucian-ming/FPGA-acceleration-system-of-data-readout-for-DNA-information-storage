@@ -35,7 +35,9 @@ import threading
 import time
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
+
+import numpy as np
 
 # 确保脚本所在目录位于模块搜索路径首位，方便引用同级模块
 CLIENTS_PY_DIR = Path(__file__).resolve().parent
@@ -69,7 +71,7 @@ from first import (
     run_client,
 )
 from ldpc_pipeline import BoardCodeRejected, BoardVerifyResult, verify_board_result
-from native_ldpc import MAX_PAYLOAD_BYTES
+from native_ldpc import MAX_PAYLOAD_BYTES, PayloadGuess, infer_payload
 from task_protocol import SUPPORTED_READ_BASES, default_score_min
 
 from ui_theme import (
@@ -202,6 +204,7 @@ class DNAAcceleratorApp(tk.Tk):
         self.reads_var = tk.StringVar(value=str(self._defaults.reads))
         self.output_var = tk.StringVar(value=str(self._defaults.out))
         self.input_bytes_var = tk.StringVar(value="")
+        self.dev_mode_var = tk.BooleanVar(value=False)
 
         # 几何与参数
         self.geom_mode_var = tk.StringVar(value="auto")
@@ -468,13 +471,24 @@ class DNAAcceleratorApp(tk.Tk):
         card = RoundedCard(parent, title="自适应流水线参数", radius=10, title_font=self.fonts.card_header)
         card.pack(fill="x", pady=(0, 6))
 
+        dev_mode_bar = ttk.Frame(card.inner)
+        dev_mode_bar.pack(fill="x", pady=(0, 4))
+        ttk.Checkbutton(
+            dev_mode_bar,
+            text="开发模式",
+            variable=self.dev_mode_var,
+            command=self._on_toggle_dev_mode,
+        ).pack(side="left")
+
         g = ttk.Frame(card.inner)
+        self._params_grid = g
         g.pack(fill="x")
         g.columnconfigure(1, weight=1)
         g.columnconfigure(3, weight=1)
 
         # 几何模式与读长
-        ttk.Label(g, text="几何规格:").grid(row=0, column=0, sticky="w", pady=4)
+        geom_label = ttk.Label(g, text="几何规格:")
+        geom_label.grid(row=0, column=0, sticky="w", pady=4)
         geom_cb = ttk.Combobox(
             g,
             textvariable=self.geom_mode_var,
@@ -486,7 +500,8 @@ class DNAAcceleratorApp(tk.Tk):
         geom_cb.bind("<<ComboboxSelected>>", self._on_geom_changed)
 
         # 匹配阈值
-        ttk.Label(g, text="分数阈值:").grid(row=0, column=2, sticky="w", pady=4)
+        score_label = ttk.Label(g, text="分数阈值:")
+        score_label.grid(row=0, column=2, sticky="w", pady=4)
         sbox = ttk.Frame(g)
         sbox.grid(row=0, column=3, sticky="w", padx=4, pady=4)
         ttk.Entry(sbox, textvariable=self.score_min_var, width=8).pack(side="left")
@@ -505,7 +520,8 @@ class DNAAcceleratorApp(tk.Tk):
         ).pack(side="left", padx=2)
 
         # 测序方向与批大小
-        ttk.Label(g, text="测序方向:").grid(row=1, column=0, sticky="w", pady=4)
+        orient_label = ttk.Label(g, text="测序方向:")
+        orient_label.grid(row=1, column=0, sticky="w", pady=4)
         orient_cb = ttk.Combobox(
             g,
             textvariable=self.orient_var,
@@ -516,8 +532,10 @@ class DNAAcceleratorApp(tk.Tk):
         orient_cb.grid(row=1, column=1, sticky="w", padx=(4, 8), pady=4)
         orient_cb.bind("<<ComboboxSelected>>", lambda e: self._refresh_estimate())
 
-        ttk.Label(g, text="传输批大小:").grid(row=1, column=2, sticky="w", pady=4)
-        ttk.Entry(g, textvariable=self.batch_var, width=8).grid(row=1, column=3, sticky="w", padx=4, pady=4)
+        batch_label = ttk.Label(g, text="传输批大小:")
+        batch_label.grid(row=1, column=2, sticky="w", pady=4)
+        batch_entry = ttk.Entry(g, textvariable=self.batch_var, width=8)
+        batch_entry.grid(row=1, column=3, sticky="w", padx=4, pady=4)
 
         # 发送条数与全量选择
         ttk.Label(g, text="发送条数:").grid(row=2, column=0, sticky="w", pady=4)
@@ -543,23 +561,53 @@ class DNAAcceleratorApp(tk.Tk):
         )
         self.full_cb.pack(side="left", padx=(6, 0))
 
-        ttk.Label(g, text="载荷字节数:").grid(row=3, column=0, sticky="w", pady=4)
-        ttk.Entry(g, textvariable=self.input_bytes_var, width=10).grid(
+        input_bytes_label = ttk.Label(g, text="载荷字节数:")
+        input_bytes_label.grid(row=3, column=0, sticky="w", pady=4)
+        input_bytes_entry = ttk.Entry(g, textvariable=self.input_bytes_var, width=10)
+        input_bytes_entry.grid(
             row=3, column=1, sticky="w", padx=(4, 8), pady=4
         )
-        ttk.Label(
+        input_bytes_hint = ttk.Label(
             g,
-            text=f"留空按 JPEG EOI 截断（1..{MAX_PAYLOAD_BYTES}）",
+            text=(
+                "留空=客户端自动识别格式与长度（不确定时会提示）；"
+                f"填了按该字节数截取（1..{MAX_PAYLOAD_BYTES}）"
+            ),
             style="Muted.TLabel",
-        ).grid(row=3, column=2, columnspan=2, sticky="w", padx=4, pady=4)
+        )
+        input_bytes_hint.grid(row=3, column=2, columnspan=2, sticky="w", padx=4, pady=4)
+
+        self._dev_mode_grid_widgets = [
+            geom_label,
+            geom_cb,
+            score_label,
+            sbox,
+            orient_label,
+            orient_cb,
+            batch_label,
+            batch_entry,
+            input_bytes_label,
+            input_bytes_entry,
+            input_bytes_hint,
+        ]
 
         # 复选框选项
         chk_box = ttk.Frame(card.inner)
         chk_box.pack(fill="x", pady=(6, 0))
-        ttk.Checkbutton(chk_box, text="跳过水印预载 (仅调试)", variable=self.skip_wm_var).pack(side="left", padx=(0, 14))
-        ttk.Checkbutton(chk_box, text="发送 POST 触发硬件流水线", variable=self.post_var).pack(side="left")
+        self.skip_wm_check = ttk.Checkbutton(
+            chk_box,
+            text="跳过水印预载 (仅调试)",
+            variable=self.skip_wm_var,
+        )
+        self.post_check = ttk.Checkbutton(
+            chk_box,
+            text="发送 POST 触发硬件流水线",
+            variable=self.post_var,
+        )
+        self.post_check.pack(side="left")
 
         preset_bar = ttk.Frame(card.inner)
+        self.preset_bar = preset_bar
         preset_bar.pack(fill="x", pady=(8, 0))
         RoundedButton(
             preset_bar,
@@ -587,6 +635,12 @@ class DNAAcceleratorApp(tk.Tk):
             height=28,
             font=self.fonts.body,
         ).pack(side="left", padx=6)
+
+        self._dev_mode_pack_widgets = [
+            (self.skip_wm_check, {"side": "left", "padx": (0, 14)}),
+            (self.preset_bar, {"fill": "x", "pady": (8, 0)}),
+        ]
+        self._on_toggle_dev_mode()
 
     def _build_action_card(self, parent: ttk.Frame) -> None:
         card = ttk.Frame(parent, style="Window.TFrame", padding=(2, 6))
@@ -892,6 +946,7 @@ class DNAAcceleratorApp(tk.Tk):
                 "batch": self.batch_var.get(),
                 "send_count": self.send_count_var.get(),
                 "full_scale": self.full_scale_var.get(),
+                "dev_mode": self.dev_mode_var.get(),
                 "input_bytes": self.input_bytes_var.get(),
                 "skip_watermark": self.skip_wm_var.get(),
                 "post": self.post_var.get(),
@@ -945,6 +1000,7 @@ class DNAAcceleratorApp(tk.Tk):
             batch = read_integer("batch")
             send_count = read_integer("send_count")
             full_scale = values["full_scale"]
+            dev_mode = values.get("dev_mode", False)
             input_bytes_raw = values.get("input_bytes", "")
             if input_bytes_raw is None:
                 input_bytes_raw = ""
@@ -977,8 +1033,8 @@ class DNAAcceleratorApp(tk.Tk):
                 or not 1 <= int(input_bytes) <= MAX_PAYLOAD_BYTES
             ):
                 raise ValueError(f"input_bytes 必须为空或在 1..{MAX_PAYLOAD_BYTES}")
-            if not all(isinstance(flag, bool) for flag in (full_scale, skip_watermark, post)):
-                raise ValueError("full_scale、skip_watermark 和 post 必须是布尔值")
+            if not all(isinstance(flag, bool) for flag in (full_scale, dev_mode, skip_watermark, post)):
+                raise ValueError("full_scale、dev_mode、skip_watermark 和 post 必须是布尔值")
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             messagebox.showerror("加载失败", f"参数预设无效或无法读取:\n{exc}")
             return
@@ -991,9 +1047,11 @@ class DNAAcceleratorApp(tk.Tk):
         self.batch_var.set(str(batch))
         self.send_count_var.set(send_count)
         self.full_scale_var.set(full_scale)
+        self.dev_mode_var.set(dev_mode)
         self.input_bytes_var.set(input_bytes)
         self.skip_wm_var.set(skip_watermark)
         self.post_var.set(post)
+        self._on_toggle_dev_mode()
         self.send_spin.configure(state="disabled" if full_scale else "normal")
         self._refresh_estimate()
         self._append_log(f"[INFO] 参数预设已加载: {path}")
@@ -1061,8 +1119,9 @@ class DNAAcceleratorApp(tk.Tk):
             self.send_spin.configure(state="normal")
         self._refresh_estimate()
 
-    def _resolve_read_bps(self) -> int:
-        mode = self.geom_mode_var.get()
+    def _resolve_read_bps(self, mode: Optional[str] = None) -> int:
+        if mode is None:
+            mode = self.geom_mode_var.get()
         if "150" in mode:
             return 150
         if "250" in mode:
@@ -1071,10 +1130,78 @@ class DNAAcceleratorApp(tk.Tk):
             return self._read_info.detected_read_bps
         return 150
 
+    def _effective_config_values(self) -> Tuple[str, int, int, str, int, bool, Optional[int]]:
+        """集中解析开发/普通模式实际传给任务的参数。"""
+        dev_mode = self.dev_mode_var.get()
+        geom_mode = self.geom_mode_var.get() if dev_mode else "auto"
+        read_bps = self._resolve_read_bps(geom_mode)
+
+        if dev_mode:
+            try:
+                batch = int(self.batch_var.get())
+                if batch <= 0:
+                    raise ValueError
+            except ValueError:
+                raise ValueError("批大小必须是正整数。")
+
+            input_bytes_raw = self.input_bytes_var.get().strip()
+            if not input_bytes_raw:
+                input_bytes: Optional[int] = None
+            elif not input_bytes_raw.isdigit() or not 1 <= int(input_bytes_raw) <= MAX_PAYLOAD_BYTES:
+                raise ValueError(
+                    f"载荷字节数必须留空，或输入 1..{MAX_PAYLOAD_BYTES} 的整数。"
+                )
+            else:
+                input_bytes = int(input_bytes_raw)
+
+            score_min_raw = self.score_min_var.get().strip()
+            score_min = (
+                int(score_min_raw)
+                if score_min_raw.isdigit()
+                else default_score_min(read_bps)
+            )
+            orient = "both" if "both" in self.orient_var.get() else "forward"
+            batch_value = batch
+            skip_wm = self.skip_wm_var.get()
+        else:
+            score_min = default_score_min(read_bps)
+            orient = "both"
+            batch_value = self._defaults.batch
+            skip_wm = False
+            input_bytes = None
+
+        return geom_mode, read_bps, score_min, orient, batch_value, skip_wm, input_bytes
+
+    def _on_toggle_dev_mode(self) -> None:
+        """显示或隐藏高级参数，并按当前模式收紧参数网格。"""
+        skip_wm_widget, skip_wm_pack_options = self._dev_mode_pack_widgets[0]
+        _, preset_pack_options = self._dev_mode_pack_widgets[1]
+
+        if self.dev_mode_var.get():
+            for widget in self._dev_mode_grid_widgets:
+                widget.grid()
+            self._params_grid.columnconfigure(1, weight=1)
+            self._params_grid.columnconfigure(3, weight=1)
+
+            # 重排复选框，使开发选项位于常用的 POST 选项之前。
+            self.post_check.pack_forget()
+            skip_wm_widget.pack(**skip_wm_pack_options)
+            self.post_check.pack(side="left")
+            self.preset_bar.pack(**preset_pack_options)
+        else:
+            for widget in self._dev_mode_grid_widgets:
+                widget.grid_remove()
+            self._params_grid.columnconfigure(1, weight=0)
+            self._params_grid.columnconfigure(3, weight=0)
+            skip_wm_widget.pack_forget()
+            self.preset_bar.pack_forget()
+
+        self._refresh_estimate()
+
     def _refresh_estimate(self) -> None:
         try:
             count = int(self.send_count_var.get())
-            orient = "both" if "both" in self.orient_var.get() else "forward"
+            orient = self._effective_config_values()[3]
             sec = estimate_processing_time(count, orient=orient)
             self.est_time_var.set(f"~{sec:.1f} 秒（两点实测粗估）")
         except Exception:
@@ -1141,14 +1268,6 @@ class DNAAcceleratorApp(tk.Tk):
             return
 
         try:
-            batch = int(self.batch_var.get())
-            if batch <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showerror("参数错误", "批大小必须是正整数。")
-            return
-
-        try:
             send_count = int(self.send_count_var.get())
             if send_count <= 0:
                 raise ValueError
@@ -1156,40 +1275,32 @@ class DNAAcceleratorApp(tk.Tk):
             messagebox.showerror("参数错误", "发送条数必须是正整数。")
             return
 
-        input_bytes_raw = self.input_bytes_var.get().strip()
-        input_bytes: Optional[int]
-        if not input_bytes_raw:
-            input_bytes = None
-        elif not input_bytes_raw.isdigit() or not 1 <= int(input_bytes_raw) <= MAX_PAYLOAD_BYTES:
-            messagebox.showerror(
-                "参数错误",
-                f"载荷字节数必须留空，或输入 1..{MAX_PAYLOAD_BYTES} 的整数。",
-            )
-            return
-        else:
-            input_bytes = int(input_bytes_raw)
-
         watermark_path = Path(self.watermark_var.get()).expanduser()
         reads_path = Path(self.reads_var.get()).expanduser()
         output_path = Path(self.output_var.get()).expanduser()
 
-        if not self.skip_wm_var.get() and not watermark_path.is_file():
-            messagebox.showerror("文件错误", "水印文件不存在。")
-            return
         if not reads_path.is_file():
             messagebox.showerror("文件错误", "FASTQ 文件不存在。")
             return
-
-        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if not self._read_info or self._read_info.path != reads_path:
             if not self._detect_reads(reads_path):
                 return
 
-        read_bps = self._resolve_read_bps()
-        score_min_raw = self.score_min_var.get().strip()
-        score_min = int(score_min_raw) if score_min_raw.isdigit() else default_score_min(read_bps)
-        orient = "both" if "both" in self.orient_var.get() else "forward"
+        try:
+            _, read_bps, score_min, orient, batch, skip_wm, input_bytes = (
+                self._effective_config_values()
+            )
+        except ValueError as exc:
+            messagebox.showerror("参数错误", str(exc))
+            return
+
+        if not skip_wm and not watermark_path.is_file():
+            messagebox.showerror("文件错误", "水印文件不存在。")
+            return
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         effective_source_reads = min(send_count, self._read_info.total_reads)
         self._expected_hw_seconds = estimate_processing_time(
             effective_source_reads,
@@ -1205,7 +1316,7 @@ class DNAAcceleratorApp(tk.Tk):
             batch=batch,
             total=self._read_info.total_reads,
             send_limit=send_count,
-            skip_wm=self.skip_wm_var.get(),
+            skip_wm=skip_wm,
             post=self.post_var.get(),
             format=self._read_info.format,
             orient=orient,
@@ -1247,6 +1358,12 @@ class DNAAcceleratorApp(tk.Tk):
         def log_fn(message: str) -> None:
             self._log_queue.put(message)
 
+        def verify_log_fn(message: str) -> None:
+            # verify_board_result 先写中间 .bin；最终路径和长度由本方法确定后再记录。
+            if message.startswith("[板端校验] 已保存载荷 "):
+                return
+            log_fn(message)
+
         callbacks = ProgressCallbacks(
             update_status=lambda msg: self.after(0, self._update_status, msg),
             update_upload=lambda sent, total: self.after(0, self._update_upload_progress, sent, total),
@@ -1268,11 +1385,13 @@ class DNAAcceleratorApp(tk.Tk):
             self.after(0, self._update_status, "正在校验板端回传码字与载荷...")
             verify_started = time.perf_counter()
             try:
+                # 留空时先完整读取信息位，交给 infer_payload 决定边界；显式长度仍按原值截取。
+                verify_input_bytes = MAX_PAYLOAD_BYTES if input_bytes is None else input_bytes
                 result = verify_board_result(
                     Path(config.out),
                     Path(config.out).resolve().parent,
-                    input_bytes=input_bytes,
-                    log=log_fn,
+                    input_bytes=verify_input_bytes,
+                    log=verify_log_fn,
                 )
             except BoardCodeRejected as exc:
                 elapsed_ms = (time.perf_counter() - verify_started) * 1000
@@ -1281,9 +1400,69 @@ class DNAAcceleratorApp(tk.Tk):
                 self.after(0, self._on_run_complete, False, "BoardCodeRejected")
                 return
 
+            decoded_bits = result.decoded_bits_path.read_text(encoding="ascii")
+            info_bits = np.frombuffer(decoded_bits.encode("ascii"), dtype=np.uint8) - ord("0")
+            inferred = infer_payload(info_bits)
+            if input_bytes is None:
+                payload_guess = inferred
+                payload = inferred.data
+            else:
+                # 仅借助魔数建议后缀；明确长度对应的载荷字节保持原样。
+                payload = result.payload_path.read_bytes()
+                media_type = inferred.media_type
+                extension = inferred.extension
+                if media_type == "application/octet-stream":
+                    media_type = detect_payload_media_type(payload)
+                    extension = {
+                        "image/jpeg": ".jpg",
+                        "image/png": ".png",
+                        "image/gif": ".gif",
+                        "image/bmp": ".bmp",
+                        "image/tiff": ".tiff",
+                        "audio/wav": ".wav",
+                        "audio/mpeg": ".mp3",
+                        "audio/ogg": ".ogg",
+                        "audio/flac": ".flac",
+                        "video/mp4": ".mp4",
+                        "video/avi": ".avi",
+                        "video/webm-or-matroska": ".mkv",
+                        "text": ".txt",
+                        "binary": ".bin",
+                    }.get(media_type, ".bin")
+                payload_guess = PayloadGuess(
+                    data=payload,
+                    media_type=media_type,
+                    extension=extension,
+                    length_certain=True,
+                    method=f"用户显式指定 {input_bytes} 字节；格式按魔数识别",
+                )
+
+            if (
+                not payload_guess.extension.startswith(".")
+                or Path(payload_guess.extension).name != payload_guess.extension
+            ):
+                raise ValueError(f"载荷推断返回了无效扩展名: {payload_guess.extension!r}")
+            payload_path = result.payload_path.with_name(
+                f"decoded_payload{payload_guess.extension}"
+            )
+            payload_path.write_bytes(payload)
+            if payload_path != result.payload_path:
+                result.payload_path.unlink(missing_ok=True)
+            result.payload_path = payload_path
+            result.payload_bytes = len(payload)
+
+            certainty = "确定" if payload_guess.length_certain else "不确定"
+            log_fn(
+                f"[PAYLOAD] 识别格式：{payload_guess.media_type}；建议扩展名：{payload_guess.extension}；"
+                f"长度是否确定：{certainty}；判定依据：{payload_guess.method}"
+            )
+            if not payload_guess.length_certain:
+                log_fn("[WARN] 载荷长度靠去尾零推测，可能不准。")
+            log_fn(f"[板端校验] 已保存载荷 {result.payload_path}（{result.payload_bytes} 字节）")
+
             elapsed_ms = (time.perf_counter() - verify_started) * 1000
             self.after(0, lambda: self.metric_verify_var.set(f"{elapsed_ms:.1f} ms"))
-            self.after(0, self._handle_board_verify_result, result)
+            self.after(0, self._handle_board_verify_result, result, payload_guess)
             self.after(0, self._on_run_complete, True, None)
         except OperationCancelled:
             log_fn("[INFO] 任务已被用户取消")
@@ -1493,7 +1672,11 @@ class DNAAcceleratorApp(tk.Tk):
             failed=True,
         )
 
-    def _handle_board_verify_result(self, result: BoardVerifyResult) -> None:
+    def _handle_board_verify_result(
+        self,
+        result: BoardVerifyResult,
+        payload_guess: Optional[PayloadGuess] = None,
+    ) -> None:
         self._last_verify_result = result
         payload = result.payload_path.read_bytes()
         sha256 = hashlib.sha256(payload).hexdigest()
@@ -1503,10 +1686,24 @@ class DNAAcceleratorApp(tk.Tk):
         )
         self.payload_hash_var.set(status_txt)
         self.hash_label.configure(fg=COLOR_SUCCESS_TEXT if is_golden else COLOR_PRIMARY)
-        media_type = detect_payload_media_type(payload)
+        media_type = (
+            payload_guess.media_type if payload_guess else detect_payload_media_type(payload)
+        )
         self._append_log(f"[VERIFY] 载荷 SHA-256: {sha256}；类型: {media_type}")
         if is_golden:
             self._append_log("[GOLDEN] 载荷与 R0.83 黄金基线逐字节吻合。")
+
+        payload_details = ""
+        if payload_guess is not None:
+            certainty = "确定" if payload_guess.length_certain else "不确定"
+            payload_details = (
+                f"\n识别格式：{payload_guess.media_type}"
+                f"\n建议扩展名：{payload_guess.extension}"
+                f"\n长度是否确定：{certainty}"
+                f"\n判定依据：{payload_guess.method}"
+            )
+            if not payload_guess.length_certain:
+                payload_details += "\n载荷长度靠去尾零推测，可能不准。"
 
         media_labels = {
             "audio/mpeg": "音频 MP3",
@@ -1515,9 +1712,14 @@ class DNAAcceleratorApp(tk.Tk):
             "audio/flac": "音频 FLAC",
             "video/mp4": "视频 MP4",
             "video/avi": "视频 AVI",
+            "video/x-msvideo": "视频 AVI",
             "video/webm-or-matroska": "视频 WebM/Matroska",
             "text": "文本",
+            "text/plain; charset=utf-8": "文本（UTF-8）",
+            "application/pdf": "PDF",
+            "application/zip": "ZIP",
             "binary": "二进制",
+            "application/octet-stream": "二进制",
         }
         if media_type.startswith("image/"):
             if Image is not None and ImageTk is not None:
@@ -1531,20 +1733,52 @@ class DNAAcceleratorApp(tk.Tk):
                             Image.Resampling.LANCZOS,
                         )
                     self._preview_photo = ImageTk.PhotoImage(thumbnail)
-                    self.preview_label.configure(image=self._preview_photo, text="")
+                    self.preview_label.configure(
+                        image=self._preview_photo,
+                        text=(
+                            f"已保存到 {result.payload_path}，{result.payload_bytes} 字节"
+                            f"{payload_details}"
+                        ),
+                        compound="top",
+                    )
                 except Exception:
-                    self._show_saved_payload(result, "二进制（无法预览）")
+                    self._show_saved_payload(
+                        result, "二进制（无法预览）", payload_guess
+                    )
             else:
-                self._show_saved_payload(result, "图片（PIL 不可用，按文件打开）")
+                self._show_saved_payload(
+                    result, "图片（PIL 不可用，按文件打开）", payload_guess
+                )
         else:
-            self._show_saved_payload(result, media_labels.get(media_type, "二进制"))
+            self._show_saved_payload(
+                result, media_labels.get(media_type, "二进制"), payload_guess
+            )
         self.open_payload_button.configure(state="normal")
 
-    def _show_saved_payload(self, result: BoardVerifyResult, media_label: str) -> None:
+    def _show_saved_payload(
+        self,
+        result: BoardVerifyResult,
+        media_label: str,
+        payload_guess: Optional[PayloadGuess] = None,
+    ) -> None:
         self._preview_photo = None
+        details = ""
+        if payload_guess is not None:
+            certainty = "确定" if payload_guess.length_certain else "不确定"
+            details = (
+                f"\n识别格式：{payload_guess.media_type}"
+                f"\n建议扩展名：{payload_guess.extension}"
+                f"\n长度是否确定：{certainty}"
+                f"\n判定依据：{payload_guess.method}"
+            )
+            if not payload_guess.length_certain:
+                details += "\n载荷长度靠去尾零推测，可能不准。"
         self.preview_label.configure(
             image="",
-            text=f"已保存到 {result.payload_path}，{result.payload_bytes} 字节\n载荷类型：{media_label}",
+            text=(
+                f"已保存到 {result.payload_path}，{result.payload_bytes} 字节\n"
+                f"载荷类型：{media_label}{details}"
+            ),
         )
 
     def _open_output_dir(self) -> None:
