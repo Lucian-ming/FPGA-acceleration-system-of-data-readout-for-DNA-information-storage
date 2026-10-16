@@ -17,6 +17,7 @@
 #include "xaxidma.h"
 #include "lwip/tcp.h"
 #include "netif/xadapter.h"
+#include "ldpc_onchip.h"
 
 /* 基地址来自仓库里那份**真实的** sw/app/xparameters.h（壳层只补了 _ps.h）。 */
 #include "xparameters.h"
@@ -35,6 +36,18 @@
 #define VOT_OUT_BEATS  1266u
 #define DEC_OUT_BEATS  1013u
 #define DEC_SENTINEL   0x0A55AA55AA55AA55ULL
+
+/* 主机模型不模拟片上 LDPC 核：保留 Stage3 输出，按未收敛回退路径
+ * 将流水线推进到 echo.c 消费的终止状态。返回码遵循 pipe_step_rc_e，
+ * 让 run_processing_pipeline() 将其作为一次成功的状态推进处理。 */
+pipe_step_rc_e pipeline_step_ldpc(void)
+{
+    if (pipe_state < PIPE_LDPC_PREP || pipe_state > PIPE_LDPC_READBACK)
+        return PIPE_STEP_FAIL;
+
+    pipeline_set_state(PIPE_SEND_RESULT);
+    return PIPE_STEP_PROGRESS;
+}
 
 host_hw_cfg_t host_hw_cfg = {
     .result_fifo_depth = 16u,

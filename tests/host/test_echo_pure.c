@@ -14,7 +14,7 @@
  *   G. expand_watermark_regions  黄金向量：50×957 个符号逐个相同
  *   H. apply_watermark_differential  共识 ⊕ 水印，含「只动前 10,125 B」
  *   I. validate_decoder_written_beats  哨兵计数
- *   J. run_processing_pipeline 的状态分派：**PIPE_SEND_RESULT 落在所有区间之外**
+ *   J. run_processing_pipeline 的状态分派：**PIPE_SEND_RESULT 是可到达终态，但不作为下一次直接分派入口**
  *
  * 用法：  test_echo_pure <tests/golden 目录>
  ******************************************************************************/
@@ -361,7 +361,7 @@ static void t_sentinel(void)
 static void t_dispatch(void)
 {
     dna_connection_t conn;
-    section("J. run_processing_pipeline 的状态分派（区间判断）");
+    section("J. run_processing_pipeline 的状态分派（终态会到达，但不作为下一次直接分派入口）");
 
     memset(&conn, 0, sizeof conn);
     conn.tpcb = host_tcp_client();
@@ -370,15 +370,12 @@ static void t_dispatch(void)
        PIPE_SEND_RESULT < PIPE_DECODER_PREP,
        "枚举顺序：PIPE_SEND_RESULT 夹在 DONE_STAGE2 与 DECODER_PREP 之间");
 
-    /* 三个区间是 [IDLE,DONE_STAGE1] / [VOTER_PREP,DONE_STAGE2] /
-     * [DECODER_PREP,DONE_STAGE3]，PIPE_SEND_RESULT 一个都不落在里面 →
-     * 一旦真的走到这个状态，run_processing_pipeline 直接判 FAIL。
-     * 当前固件靠「DECODER_WAIT 里 DONE 置位就把 g_proc_state 推成 PROC_DONE」
-     * 绕开了它，所以这条路径在板上从没被走到过。拆分时若改动
-     * poll_callback 与 DONE_STAGE3 的先后，就会掉进来。 */
+    /* PIPE_SEND_RESULT 会由 LDPC 阶段设置，并在当前 poll_callback() 中消费；
+     * 它不作为下一轮 run_processing_pipeline() 的直接分派入口。
+     * 直接给该状态分派仍须失败并置 PIPE_FAIL。 */
     pipe_state = PIPE_SEND_RESULT;
     ok(run_processing_pipeline(&conn) == XST_FAILURE,
-       "pipe_state=PIPE_SEND_RESULT → 落在所有区间之外，直接 XST_FAILURE");
+       "pipe_state=PIPE_SEND_RESULT → 直接分派返回 XST_FAILURE");
     ok(pipe_state == PIPE_FAIL, "并把状态推成 PIPE_FAIL");
 
     pipe_state = PIPE_FAIL;

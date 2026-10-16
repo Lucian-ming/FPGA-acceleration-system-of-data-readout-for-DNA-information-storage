@@ -182,10 +182,14 @@ int main(int argc, char **argv)
        "全程没有因结果 FIFO 满而停摆（B21 的锁死机理）");
     ok(host_dec_start_pulses() == 1,
        "Decoder 只被启动 **1** 次");
-    ok(host_dec_start_writes() == 4,
-       "但固件对 DECODER_REG_START 一共写了 4 次（PREP 两次 0、START 一次 1、"
-       "WAIT 里 DONE 后一次 0）：**正确性靠 RTL 只认 wdata[0]=1 且忙时不接受**。"
-       "拆分时这 4 次写的次数与顺序都不许动 —— 这就是 B27");
+    ok(host_dec_start_writes() == 5,
+       "但固件对 DECODER_REG_START 一共写了 5 次（PREP 两次 0、START 一次 1、"
+       "WAIT 里 DONE 后一次 0、Stage3 收尾 decoder_reset_regs() 与 "
+       "decoder_confirm_idle_zero() 各一次 0）：**正确性靠 RTL 只认 wdata[0]=1 "
+       "且忙时不接受**。拆分时这 5 次写的**次数与顺序**都不许动 —— 这就是 B27。"
+       "⚠️ 2026-10-16：原为 4 次，收尾清理（decoder_reset_regs / "
+       "decoder_confirm_idle_zero）加入后为 5 次；写序的**逐行**约束由本文件末尾的"
+       "行为轨迹判据承担（它把全部寄存器写的顺序钉死），此处只作计数快检");
     check_result_frame();
 
     if (record) {
