@@ -20,7 +20,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_g3.sh` | **板级验收唯一入口**。必须显式传入 `--artifact-dir`，完整制品包须有 manifest；无清单包直接拒绝。烧录 → 下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
+| `run_g3.sh` | **板级验收唯一入口**。必须显式传入 `--artifact-dir`，完整制品包须有 manifest；无清单包直接拒绝。显式 `--hw-server TCP:<主机>:<端口>` 后，正常流程在烧录后、判据前核对板上 `fw_build_id`，`--skip-boot` 时在判据准备前核对；缺失、全零、读失败或不匹配都会失败关闭。随后下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
 | `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际执行数不少于 28；跳过项不计入下限，全跳过会失败 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
@@ -41,6 +41,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
+| `tools/board/read_fw_build_id.tcl` | 从显式指定的 ELF 用 `arm-none-eabi-nm` 解析 `fw_build_id` 地址，经显式 `--hw-server TCP:<主机>:<端口>` 连接板卡后逐字节读到 NUL；只接受 16 个小写十六进制字符，读回值由 `run_g3.sh` 与所选包 `manifest.json` 比对 |
 | `g3_artifacts.py` | 强制 manifest 的完整制品目录、SHA、XSA内bit/器件/生产几何核验；无旧包回退；只读预检，不将哈希自洽当作源码因果证明 |
 | `g3_judge.py` | G3 三层判据：复用客户端 syndrome 校验，保留 `ldpc_decode.py` 旧口径诊断；`run_g3.sh --offline-recheck <run-dir>` 可只读复算历史留证，不接触硬件 |
 | `g3_uart_cap.ps1` / `g3_uart_cap.py` | Windows COM 与 WSL `/dev/ttyUSBn` 串口采集器；端口必须显式传入，记录接收量，禁止默认 COM6 |
@@ -49,7 +50,7 @@
 | `create_stage1_xsim_input.py` | 为**Windows 2026.1 正式 Stage1 XSim** 制作**带 SHA 的只读构建输入**：先 `generate_stage1_fixture.py --num-lc 50` 生成 oracle，再把生产 RTL/TB/fixture 复制成一份带 14 文件 SHA 清单的输入目录，供 `run_stage1_xsim.ps1` 消费。存在理由：正式仿真的输入必须是**不可变、可核验**的，不能就地拿工作树跑 |
 | `g3_performance_matrix.py` | 同板P4/P16多规模≥3次性能矩阵；明确t_result/上传/LDPC/整轮边界，未采集硬件周期时null |
 | `g3_upload_sweep.sh` | **读段上传段的多档 × 多次扫描**（`--no-post`，**只测上传、不触发流水线、不判正确性**）：4 档规模各 3 次，出耗时与吞吐。用来区分上传段是被「轮询周期/接收窗口」还是「停等」限速。**不烧录**——A/B 时换包由调用者负责。见 [上传段 benchmark](../docs/benchmarks/bkb220-p16-speed-a-upload.md) |
-| `g3_soak.py` | **新板长稳（2h/8h）编排**：按**实际墙钟**循环跑 `run_g3.sh` 完整判据轮（全量输入、`--skip-boot`、唯一判据 SHA），逐轮写 TSV，每 N 轮插一次畸变包恢复探针。**不烧录**——调用方须先真烧录本包并把包 SHA 记进 `--tag`；`hardware_cycles`/`power_w` 恒 null，板端耗时是客户端打印值，不得反推。墙钟达标≠全部轮次通过：有失败轮仍继续跑（观察能否恢复），但最终 verdict 会红 |
+| `g3_soak.py` | **新板长稳（2h/8h）编排**：按**实际墙钟**循环跑 `run_g3.sh` 完整判据轮（全量输入、`--skip-boot`、唯一判据 SHA）；启动时先核对板上 `fw_build_id`，成功读回留证复用于各轮，避免重复连接 XSDB。逐轮写 TSV，每 N 轮插一次畸变包恢复探针。**不烧录**——调用方须先真烧录本包并把包 SHA 记进 `--tag`；`hardware_cycles`/`power_w` 恒 null，板端耗时是客户端打印值，不得反推。墙钟达标≠全部轮次通过：有失败轮仍继续跑（观察能否恢复），但最终 verdict 会红 |
 | `g3_caps.py` / `g3_wait_ready.py` | 完整核对 CAPS 的 SE150 几何；探针要求显式 `--ip`。CAPS 不含 P_WAYS/PIPE_TREE，因此无法区分 P4/P16 |
 | `g3_overhead_sweep.py` | 固定开销尺寸扫描与模型拟合。**必须 `post=True`**，`--no-post` 是「不发 POST 触发」，板子根本不算 |
 | `g3_recovery_probe.py` / `g3_netfault_probe.py` | 畸变包 / 断网注入恢复探针 |

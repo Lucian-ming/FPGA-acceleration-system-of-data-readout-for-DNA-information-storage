@@ -21,8 +21,8 @@
 
 ## 边界（读结论前必须看）
 
-- **它不烧录**：`--skip-boot`。调用方必须先用本包跑过一轮真烧录并在 `--tag` 里
-  记录制品包 SHA；否则「板上是哪份固件」无从证明。
+- **它不烧录**：`--skip-boot`。启动时先用 XSDB 将板上 `fw_build_id` 与所选包
+  `manifest.json` 核对一次；成功读回留证会传给各轮 G3，避免每轮重复连接 JTAG。
 - **不采集硬件周期与功耗**：TSV 里 `hardware_cycles`/`power_w` 恒为 `null`。
   板端结果耗时是**客户端打印值**，不是硬件计数器，**不得反推周期或功耗**。
 - **墙钟达标 ≠ 全部轮次通过**：`--hours` 只保证跑够时长；只要有一轮 FAIL，
@@ -102,12 +102,10 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--xsdb", default=r"D:/xilinx/2026.1/Vitis/bin/xsdb.bat")
     ap.add_argument("--uart-port", default="COM10")
     ap.add_argument("--win-root", default=r"D:/bkb220_board_smoke")
-    # 【2026-10-15 补】WSL 侧走 Linux hw_server 时，run_g3.sh **强制要求**
-    # 显式传 `--hw-server TCP:127.0.0.1:3132`，不传直接 FATAL、每轮 rc=2。
-    # 旧默认是 Windows 路径的 xsdb（当时从 Windows 侧跑），所以这里以前不需要它；
-    # 一旦改用 WSL 的 `--xsdb /tools/.../xsdb`，长稳就会整轮整轮地空跑。
     ap.add_argument("--hw-server", default="",
-                    help="WSL 侧必填，如 TCP:127.0.0.1:3132；Windows 侧留空")
+                    help="必填，如 TCP:127.0.0.1:3132；固件身份核对必须显式指定")
+    ap.add_argument("--fw-id-nm", default="",
+                    help="可选：覆盖 arm-none-eabi-nm 路径；仅在默认工具路径不适用时使用")
     ap.add_argument("--hours", type=float, required=True, help="目标墙钟时长（小时）")
     ap.add_argument("--score-min", type=int, default=67)
     ap.add_argument("--expect-sha", default=EXPECT_SHA_DEFAULT)
@@ -116,14 +114,14 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--round-timeout", type=float, default=900.0)
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--i-know-overwrite-existing", action="store_true",
-                    help="明确允许复用非空输出目录；本轮会重置 TSV、主日志与恢复探针日志")
+                    help="明确允许复用非空输出目录；本轮会重置 TSV、日志、身份读回与恢复探针留证")
     ap.add_argument("--stop-after-consecutive-failures", type=int, default=3,
                     help="连续失败达到此轮数时提前停止（默认 3；单轮失败仍会继续）")
     ap.add_argument("--tag", required=True, help="本轮长稳的标识（含制品包 SHA/来源）")
     args = ap.parse_args(argv)
 
-    if Path(args.xsdb).is_absolute() and not args.hw_server.strip():
-        ap.error("WSL 侧绝对路径 --xsdb 必须同时传 --hw-server TCP:<主机>:<端口>")
+    if not args.hw_server.strip():
+        ap.error("必须显式传 --hw-server TCP:<主机>:<端口>；固件身份核对不使用隐式 server")
     if args.stop_after_consecutive_failures < 1:
         ap.error("--stop-after-consecutive-failures 必须 >= 1")
     if args.hours <= 0:
@@ -141,6 +139,68 @@ def main(argv: list[str]) -> int:
     tsv.write_text("round\twall_s\tverdict\trecords\tresult_s\tjudge_sha\tmatch\trun_dir\tnote\tprocess_rc\n")
     log.write_text("")
     (out / "recovery.jsonl").write_text("")
+
+    identity_log = out / "fw_build_id_startup.out"
+    identity_evidence = out.resolve() / "fw_build_id_startup.json"
+    identity_log.write_text("")
+    identity_evidence.write_text("")
+    identity_cmd = ["bash", "tools/run_g3.sh",
+                    "--artifact-dir", args.artifact_dir,
+                    "--xsdb", args.xsdb, "--device", args.device, "--strict-artifacts",
+                    "--ip", args.ip, "--port", str(args.port), "--win-root", args.win_root,
+                    "--hw-server", args.hw_server, "--skip-boot", "--fw-id-only",
+                    "--fw-id-evidence-out", str(identity_evidence)]
+    if args.fw_id_nm:
+        identity_cmd += ["--fw-id-nm", args.fw_id_nm]
+    with log.open("a") as fh:
+        fh.write("\n[启动固件身份核对] $ " + " ".join(identity_cmd) + "\n")
+    identity_rc = sh(identity_cmd, identity_log, timeout=min(args.round_timeout, 180.0))
+    identity_doc = None
+    if identity_evidence.is_file():
+        try:
+            identity_doc = json.loads(identity_evidence.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            identity_doc = None
+    identity_ok = (
+        identity_rc == 0 and isinstance(identity_doc, dict) and
+        identity_doc.get("verdict") == "PASS" and
+        identity_doc.get("check_source") == "live_readback" and
+        isinstance(identity_doc.get("expected_fw_build_id"), str) and
+        re.fullmatch(r"[0-9a-f]{16}", identity_doc["expected_fw_build_id"]) and
+        identity_doc.get("expected_fw_build_id") == identity_doc.get("actual_fw_build_id") and
+        identity_doc.get("expected_fw_build_id") != "0000000000000000" and
+        identity_doc.get("actual_fw_build_id") != "0000000000000000"
+    )
+    if not identity_ok:
+        with log.open("a") as fh:
+            fh.write(f"\n[启动固件身份核对] FAIL rc={identity_rc}; 详见 {identity_log}\n")
+        summary = {
+            "tag": args.tag, "artifact_dir": args.artifact_dir, "ip": args.ip,
+            "target_hours": args.hours, "wall_s": 0.0,
+            "rounds": 0, "rounds_pass_with_expected_sha": 0,
+            "rounds_failed": 0, "rounds_unverified": 0,
+            "verdict": "FAIL", "stop_reason": "fw_build_id_startup_check_failed",
+            "fw_build_id_check": {
+                "verdict": "FAIL", "exit_code": identity_rc,
+                "expected_fw_build_id": (identity_doc or {}).get("expected_fw_build_id", "<unknown>"),
+                "actual_fw_build_id": (identity_doc or {}).get("actual_fw_build_id", "<unknown>"),
+                "reason": (identity_doc or {}).get("reason", "startup readback failed"),
+                "evidence": str(identity_evidence), "log": str(identity_log),
+            },
+            "hardware_cycles": None, "power_w": None,
+            "note": "启动身份核对未通过；没有开始长稳循环。",
+        }
+        (out / "soak_summary.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"启动失败：板上运行的固件与所选包不符，未启动长稳；见 {identity_log}")
+        return 1
+
+    expected_fw_id = identity_doc["expected_fw_build_id"]
+    actual_fw_id = identity_doc["actual_fw_build_id"]
+    with log.open("a") as fh:
+        fh.write(f"[启动固件身份核对] PASS expected={expected_fw_id} actual={actual_fw_id} "
+                 f"checked_utc={identity_doc.get('checked_utc', '')}\n")
+    print(f"板上固件身份核对通过：期望={expected_fw_id}；实读={actual_fw_id}")
 
     t0 = time.time()
     deadline = t0 + args.hours * 3600.0
@@ -162,9 +222,11 @@ def main(argv: list[str]) -> int:
                "--uart-port", args.uart_port, "--ip", args.ip, "--port", str(args.port),
                "--win-root", args.win_root,
                "--score-min", str(args.score_min), "--full", "--skip-dump", "--skip-boot",
-               "--expect-sha", args.expect_sha]
-        if args.hw_server:
-            cmd += ["--hw-server", args.hw_server]
+               "--expect-sha", args.expect_sha,
+               "--hw-server", args.hw_server,
+               "--fw-id-evidence", str(identity_evidence)]
+        if args.fw_id_nm:
+            cmd += ["--fw-id-nm", args.fw_id_nm]
         with log.open("a") as fh:                 # 主日志只记一行索引，完整输出在 roundNNNN.out
             fh.write(f"\n[轮 {rnd}] $ {' '.join(cmd)}\n")
         rc = sh(cmd, rlog, timeout=args.round_timeout)
@@ -256,6 +318,12 @@ def main(argv: list[str]) -> int:
         verdict = "FAIL"
     summary = {
         "tag": args.tag, "artifact_dir": args.artifact_dir, "ip": args.ip,
+        "fw_build_id_check": {
+            "verdict": "PASS", "expected_fw_build_id": expected_fw_id,
+            "actual_fw_build_id": actual_fw_id,
+            "checked_utc": identity_doc.get("checked_utc"),
+            "evidence": str(identity_evidence),
+        },
         "target_hours": args.hours, "wall_s": round(wall, 1),
         "wall_target_delta_s": round(wall - target_wall, 1),
         "wall_target_delta_hours": round((wall - target_wall) / 3600.0, 4),

@@ -11,6 +11,7 @@
 #include "platform_config.h"
 #include "xil_printf.h"
 #include "fw_diag.h"
+#include "fw_build_id.h"
 #include "xil_cache.h"
 
 /* lwIP */
@@ -243,6 +244,7 @@ static void print_app_header(void)
     xil_printf("====================================\n\r");
     xil_printf("DNA Accelerator Complete Pipeline\n\r");
     xil_printf("====================================\n\r");
+    FW_RESULT_PRINTF("[FW] build=%s\r\n", fw_build_id);
 
 }
 

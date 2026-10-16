@@ -156,9 +156,28 @@ def copy_app_sources(app_dir: Path, repo: Path) -> int:
     return copied
 
 
-def write_fallback_makefile(app_dir: Path, *, repo: Path, platform_name: str) -> None:
+def compute_fw_build_id(app_src_dir: Path) -> str:
+    """按相对路径排序，对已暂存的应用 .c/.h 路径与内容做 SHA-256 摘要。"""
+    sources = sorted(
+        (path for path in app_src_dir.rglob("*")
+         if path.is_file() and path.suffix in {".c", ".h"}),
+        key=lambda path: path.relative_to(app_src_dir).as_posix(),
+    )
+    if not sources:
+        raise BuildError(f"应用源码目录没有可用于构建身份的 .c/.h 文件：{app_src_dir}")
+    digest = hashlib.sha256()
+    for path in sources:
+        digest.update(path.relative_to(app_src_dir).as_posix().encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:16]
+
+
+def write_fallback_makefile(app_dir: Path, *, repo: Path, platform_name: str,
+                            fw_build_id: str) -> None:
     if " " in str(repo) or " " in str(app_dir):
         raise BuildError("当前直接 GCC Makefile 不支持含空格的仓库/输出路径")
+    if not re.fullmatch(r"[0-9a-f]{16}", fw_build_id):
+        raise BuildError(f"固件构建 ID 必须为 16 位小写十六进制：{fw_build_id!r}")
     platform_rel = f"../{platform_name}/{CPU}/{DOMAIN}/bsp/{CPU}"
     makefile = f"""ROOT := {repo}
 APP_SRC := $(CURDIR)/src
@@ -166,7 +185,7 @@ OUT := $(CURDIR)/Debug
 BSP := $(CURDIR)/{platform_rel}
 CC := {GCC}
 CPU_FLAGS := -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard
-CFLAGS := {APP_CFLAGS}
+CFLAGS := {APP_CFLAGS} -DFW_BUILD_ID=\\\"{fw_build_id}\\\"
 LDFLAGS := $(CPU_FLAGS) -Wl,-build-id=none -Wl,--gc-sections -Wl,-Map,$(OUT)/{APP_NAME}.map -specs=$(ROOT)/sw/app/Xilinx.spec -T$(ROOT)/sw/linker/lscript.ld -L$(BSP)/lib
 SOURCES := $(wildcard $(APP_SRC)/*.c)
 OBJECTS := $(patsubst $(APP_SRC)/%.c,$(OUT)/%.o,$(SOURCES))
@@ -358,7 +377,13 @@ def main() -> int:
         print(f"APPLICATION: XSCT app create/build skipped; use Vitis 2022.2 ARM GCC {gcc_version} with the generated XSA BSP.", flush=True)
         copied = copy_app_sources(app_dir, REPO)
         print(f"APPLICATION: 从 sw/app 复制并逐字节核对 {copied} 个 .c/.h 文件；排除历史 xparameters.h。", flush=True)
-        write_fallback_makefile(app_dir, repo=REPO, platform_name=platform_name)
+        fw_build_id = compute_fw_build_id(app_dir / "src")
+        app_cflags = f'{APP_CFLAGS} -DFW_BUILD_ID=\\"{fw_build_id}\\"'
+        print(f"APPLICATION: fw_build_id={fw_build_id}（按暂存 .c/.h 路径与内容计算）。", flush=True)
+        write_fallback_makefile(
+            app_dir, repo=REPO, platform_name=platform_name,
+            fw_build_id=fw_build_id,
+        )
         build_env = os.environ.copy()
         build_env["PATH"] = str(TOOLBIN) + os.pathsep + build_env.get("PATH", "")
         build_env["LWIP_LIBRARY"] = lwip_library
@@ -439,6 +464,7 @@ def main() -> int:
             "schema_version": 1,
             "package_name": out_package.name,
             "created_utc": now,
+            "fw_build_id": fw_build_id,
             "board_id": config["board_id"],
             "part": xsa["part"],
             "parameters": params,
@@ -468,7 +494,7 @@ def main() -> int:
                 "phy_link_speed": "CONFIG_LINKSPEED_AUTODETECT",
                 "application_build_method": "Vitis 2022.2 ARM GCC direct make against the newly generated XSA BSP; XSCT app create/build skipped",
                 "application_optimization_level": APP_OPT_LEVEL,
-                "application_cflags": APP_CFLAGS,
+                "application_cflags": app_cflags,
                 "application_build_sentinel": "APP_BUILD_PASS",
                 "ldpc_base_macro": "XPAR_LDPC_DECODER_0_BASEADDR",
                 "ldpc_base_address": ldpc_match.group(1).lower(),
@@ -495,7 +521,8 @@ def main() -> int:
             f"- BSP: `{lwip_library}`; materialized by the first `platform generate`, then verified `TCP_WND=32768` after the second generate.",
             "- Application: XSCT app create/build skipped; the final app is always built with `write_fallback_makefile` against the newly generated XSA BSP.",
             f"- Application optimization: `{APP_OPT_LEVEL}` (fixed for every package built by this entrypoint).",
-            f"- Application CFLAGS: `{APP_CFLAGS}`.",
+            f"- Application CFLAGS: `{app_cflags}`.",
+            f"- Firmware build ID: `{fw_build_id}` (first 16 lowercase hex characters of SHA-256 over sorted staged `.c`/`.h` relative paths and contents).",
             f"- FSBL source: `{fsbl_source.relative_to(workspace).as_posix()}`.",
             f"- LDPC base address from newly generated BSP: `{ldpc_match.group(1).lower()}`.",
             "- BOOT.bin readback requires three images: FSBL, bitstream, and application ELF.",

@@ -77,6 +77,13 @@ ARTIFACT_DIR=""
 ARTIFACT_EXPLICIT=0
 STRICT_ARTIFACTS=0
 ALLOW_UART_SKIP=0
+FW_ID_ONLY=0
+FW_ID_EVIDENCE_IN=""
+FW_ID_EVIDENCE_OUT=""
+FW_ID_EXPECTED=""
+FW_ID_ACTUAL="<not-read>"
+FW_ID_VERDICT="FAIL"
+FW_ID_REASON=""
 
 # ---------------------------------------------------------------------------
 # 默认值：G3 闭环那一组参数。改默认值等于改判据口径，改之前先读 docs/07-board-build-and-acceptance.md和docs/04-interfaces.md。
@@ -133,6 +140,7 @@ XSDB_VALUE="${G3_XSDB:-D:/dev_tools/Vivado_Lab/2022.2/bin/xsdb.bat}"
 HW_SERVER_URL="${G3_HW_SERVER_URL:-}"
 JTAG_DEVICE="${G3_DEVICE:-}"
 XSDB_MODE="windows"
+FW_ID_NM_VALUE="${G3_FW_BUILD_ID_NM:-}"
 
 # 使用同一转换函数，支持 Windows 盘符、反斜杠和 /mnt/<盘符>/，拒绝相对/UNC猜测。
 path_pair() {
@@ -159,6 +167,10 @@ while [[ $# -gt 0 ]]; do
         --strict-artifacts) STRICT_ARTIFACTS=1; shift ;;
         --xsdb)             XSDB_VALUE="$2"; shift 2 ;;
         --hw-server)        HW_SERVER_URL="$2"; shift 2 ;;
+        --fw-id-nm)         FW_ID_NM_VALUE="$2"; shift 2 ;;
+        --fw-id-only)       FW_ID_ONLY=1; DO_BOOT=0; shift ;;
+        --fw-id-evidence)   FW_ID_EVIDENCE_IN="$2"; shift 2 ;;
+        --fw-id-evidence-out) FW_ID_EVIDENCE_OUT="$2"; shift 2 ;;
         --device)           JTAG_DEVICE="$2"; shift 2 ;;
         --win-root)         WIN_ROOT_VALUE="$2"; WIN_ROOT_EXPLICIT=1; shift 2 ;;
         --limit)            LIMIT="$2"; shift 2 ;;
@@ -197,6 +209,19 @@ while [[ $# -gt 0 ]]; do
         *) echo "未知参数：$1" >&2; usage 2 ;;
     esac
 done
+
+if (( FW_ID_ONLY )) && [[ -n "$FW_ID_EVIDENCE_IN" ]]; then
+    printf '%s\n' "FATAL: --fw-id-only 直接读取板端，不接受 --fw-id-evidence" >&2; exit 2
+fi
+if [[ -n "$FW_ID_EVIDENCE_IN" ]] && (( DO_BOOT )); then
+    printf '%s\n' "FATAL: --fw-id-evidence 只允许与 --skip-boot 一起使用" >&2; exit 2
+fi
+if [[ -n "$FW_ID_EVIDENCE_OUT" ]] && (( ! FW_ID_ONLY )); then
+    printf '%s\n' "FATAL: --fw-id-evidence-out 只允许与 --fw-id-only 一起使用" >&2; exit 2
+fi
+if (( FW_ID_ONLY )) && [[ -n "$OFFLINE_RECHECK_DIR" ]]; then
+    printf '%s\n' "FATAL: --fw-id-only 与 --offline-recheck 不能同时使用" >&2; exit 2
+fi
 
 # 离线复算入口必须在任何路径转换、工具/串口检查和 run 目录创建之前分流。
 # g3_judge.py 的中间产物只落在临时目录；历史留证目录保持只读。
@@ -282,6 +307,194 @@ info() { printf '    %s\n' "$*"; }
 die()  { printf '\n\033[31mFATAL: %s\033[0m\n' "$*" >&2; exit 2; }
 warn() { printf '\033[33m    %s\033[0m\n' "$*" >&2; }
 
+persist_fw_build_id_evidence() {
+    local source="$1" evidence_path="$RUN_DIR/fw_build_id_check.json"
+    python3 - "$evidence_path" "$FW_ID_EXPECTED" "$FW_ID_ACTUAL" "$FW_ID_VERDICT" \
+        "$FW_ID_REASON" "$FW_ID_MANIFEST_SHA" "$source" "$ARTIFACT_DIR" \
+        "$FW_ID_ORIGINAL_CHECKED_UTC" <<'PYFWID'
+from datetime import datetime, timezone
+import json
+import sys
+from pathlib import Path
+
+path, expected, actual, verdict, reason, manifest_sha, source, artifact_dir, original_checked = sys.argv[1:]
+doc = {
+    "verdict": verdict,
+    "expected_fw_build_id": expected,
+    "actual_fw_build_id": actual,
+    "manifest_sha256": manifest_sha,
+    "check_source": source,
+    "checked_utc": original_checked or datetime.now(timezone.utc).isoformat(),
+    "artifact_dir": artifact_dir,
+    "reason": reason,
+}
+Path(path).write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PYFWID
+    if [[ -n "$FW_ID_EVIDENCE_OUT" ]]; then
+        mkdir -p "$(dirname "$FW_ID_EVIDENCE_OUT")" || return 1
+        cp -f "$evidence_path" "$FW_ID_EVIDENCE_OUT" || return 1
+    fi
+}
+
+run_fw_build_id_reader() {
+    local elf_for_xsdb nm_for_xsdb reader_for_xsdb wrapper="$RUN_DIR/fw_build_id_run.tcl"
+    : > "$RUN_DIR/fw_build_id_readback.out"
+    cp tools/board/read_fw_build_id.tcl "$RUN_DIR/read_fw_build_id.tcl" \
+        2>> "$RUN_DIR/fw_build_id_readback.out" || return 1
+    cp tools/board/g3_xsdb.ps1 "$RUN_DIR/g3_xsdb_fw_id.ps1" \
+        2>> "$RUN_DIR/fw_build_id_readback.out" || return 1
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        elf_for_xsdb="$RUN_DIR/dna_lwip_app.elf"
+        nm_for_xsdb="$FW_ID_NM_VALUE"
+        reader_for_xsdb="$RUN_DIR/read_fw_build_id.tcl"
+    else
+        elf_for_xsdb="$RUN_DIR_WIN/dna_lwip_app.elf"
+        nm_for_xsdb="$FW_ID_NM_WIN"
+        reader_for_xsdb="$RUN_DIR_WIN/read_fw_build_id.tcl"
+    fi
+    python3 - "$wrapper" "$reader_for_xsdb" "$elf_for_xsdb" "$HW_SERVER_URL" "$nm_for_xsdb" \
+        > "$RUN_DIR/fw_build_id_readback.out" 2>&1 <<'PYTCL'
+import sys
+from pathlib import Path
+
+out, reader, elf, server, nm = sys.argv[1:]
+def word(value: str) -> str:
+    if any(char in value for char in "{}\r\n"):
+        raise SystemExit(f"Tcl 参数含不支持的花括号或换行: {value}")
+    return "{" + value + "}"
+
+Path(out).write_text(
+    "set argv [list --elf " + word(elf) + " --hw-server " + word(server) +
+    " --nm " + word(nm) + "]\nsource " + word(reader) + "\n",
+    encoding="utf-8",
+)
+PYTCL
+    if [[ $? -ne 0 ]]; then return 1; fi
+
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        "$XSDB_UNIX" "$wrapper" > "$RUN_DIR/fw_build_id_readback.out" 2>&1
+    else
+        powershell.exe -NoProfile -ExecutionPolicy Bypass \
+            -File "$RUN_DIR_WIN/g3_xsdb_fw_id.ps1" -XsdbPath "$XSDB_BAT" \
+            -TclPath "$RUN_DIR_WIN/fw_build_id_run.tcl" < /dev/null \
+            > "$RUN_DIR/fw_build_id_readback.out" 2>&1
+    fi
+}
+
+verify_fw_build_id() {
+    local source="live_readback" reason="" actual_line="" read_rc=0 evidence_output=""
+    FW_ID_EXPECTED="$(python3 - "$ARTIFACT_DIR/manifest.json" <<'PYMANIFEST'
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+if "fw_build_id" not in manifest:
+    print("<missing>")
+    raise SystemExit(0)
+value = manifest["fw_build_id"]
+if not isinstance(value, str):
+    print("<invalid-type>")
+elif isinstance(value, str):
+    print(value)
+PYMANIFEST
+    )" || FW_ID_EXPECTED="<manifest-unreadable>"
+    if [[ -f "$ARTIFACT_DIR/manifest.json" ]]; then
+        FW_ID_MANIFEST_SHA="$(sha256sum "$ARTIFACT_DIR/manifest.json" | awk '{print $1}')"
+    else
+        FW_ID_MANIFEST_SHA=""
+    fi
+    FW_ID_ACTUAL="<not-read>"
+    FW_ID_VERDICT="FAIL"
+    FW_ID_REASON=""
+    FW_ID_ORIGINAL_CHECKED_UTC=""
+
+    if [[ "$FW_ID_EXPECTED" == "<missing>" ]]; then
+        reason="所选包 manifest.json 没有 fw_build_id；该包无构建 ID、无法核对"
+    elif [[ "$FW_ID_EXPECTED" == "<manifest-unreadable>" || "$FW_ID_EXPECTED" == "<invalid-type>" ]]; then
+        reason="所选包 manifest.json 的 fw_build_id 字段无法读取"
+    elif [[ ! "$FW_ID_EXPECTED" =~ ^[0-9a-f]{16}$ ]]; then
+        reason="所选包 fw_build_id 必须恰好是 16 个小写十六进制字符"
+    elif [[ "$FW_ID_EXPECTED" == "0000000000000000" ]]; then
+        reason="所选包 fw_build_id 为全零，属于未打标构建，验收端拒绝"
+    elif [[ -n "$FW_ID_EVIDENCE_IN" ]]; then
+        source="cached_startup_readback"
+        if evidence_output="$(python3 - "$FW_ID_EVIDENCE_IN" "$FW_ID_EXPECTED" "$FW_ID_MANIFEST_SHA" 2>&1 <<'PYEVIDENCE'
+import json
+import re
+import sys
+from pathlib import Path
+
+path, expected, manifest_sha = sys.argv[1:]
+try:
+    doc = json.loads(Path(path).read_text(encoding="utf-8"))
+except Exception as error:
+    raise SystemExit(f"身份读回留证不可读: {error}")
+actual = doc.get("actual_fw_build_id")
+if doc.get("verdict") != "PASS" or doc.get("check_source") != "live_readback":
+    raise SystemExit("身份读回留证不是成功的直接板端读回")
+if doc.get("expected_fw_build_id") != expected or actual != expected:
+    raise SystemExit("身份读回留证中的期望值/实读值与当前制品包不一致")
+if not isinstance(actual, str) or not re.fullmatch(r"[0-9a-f]{16}", actual) or actual == "0000000000000000":
+    raise SystemExit("身份读回留证中的实读值格式无效或为全零")
+if doc.get("manifest_sha256") != manifest_sha:
+    raise SystemExit("身份读回留证对应的 manifest SHA-256 与当前包不一致")
+checked = doc.get("checked_utc")
+if not isinstance(checked, str) or not checked:
+    raise SystemExit("身份读回留证缺少 checked_utc")
+print(actual + "\t" + checked)
+PYEVIDENCE
+        )"; then
+            IFS=$'\t' read -r FW_ID_ACTUAL FW_ID_ORIGINAL_CHECKED_UTC <<< "$evidence_output"
+            FW_ID_VERDICT="PASS"
+        else
+            reason="长稳启动身份读回留证校验失败：$evidence_output"
+        fi
+    elif [[ -z "$HW_SERVER_URL" ]]; then
+        reason="必须显式传入 --hw-server TCP:<主机>:<端口> 才能读取板端身份"
+    elif [[ "$XSDB_MODE" == "wsl" && ! -x "$FW_ID_NM_VALUE" ]]; then
+        reason="arm-none-eabi-nm 不存在或不可执行：$FW_ID_NM_VALUE"
+    elif [[ "$XSDB_MODE" != "wsl" && ! -f "$FW_ID_NM_UNIX" ]]; then
+        reason="Windows XSDB 使用的 arm-none-eabi-nm 不存在：$FW_ID_NM_VALUE"
+    elif [[ ! -f "$RUN_DIR/dna_lwip_app.elf" ]]; then
+        reason="所选包 staging 后缺少 dna_lwip_app.elf"
+    else
+        if run_fw_build_id_reader; then
+            actual_line="$(tr -d '\r' < "$RUN_DIR/fw_build_id_readback.out" | sed -nE 's/^FW_BUILD_ID[[:space:]]+([^[:space:]]+)$/\1/p' | tail -1)"
+            if [[ "$actual_line" =~ ^[0-9a-f]{16}$ ]]; then
+                FW_ID_ACTUAL="$actual_line"
+                if [[ "$FW_ID_ACTUAL" == "$FW_ID_EXPECTED" && "$FW_ID_ACTUAL" != "0000000000000000" ]]; then
+                    FW_ID_VERDICT="PASS"
+                else
+                    reason="板端实读值与所选包期望值不相等"
+                fi
+            else
+                FW_ID_ACTUAL="<unreadable>"
+                reason="XSDB 未返回格式有效的 FW_BUILD_ID；详见 fw_build_id_readback.out"
+            fi
+        else
+            read_rc=$?
+            FW_ID_ACTUAL="<unreadable>"
+            reason="XSDB 固件身份读取失败（退出码 $read_rc）；详见 fw_build_id_readback.out"
+        fi
+    fi
+
+    if ! persist_fw_build_id_evidence "$source"; then
+        reason="${reason:+$reason；}身份核对留证写入失败"
+        FW_ID_REASON="$reason"
+        FW_ID_VERDICT="FAIL"
+        persist_fw_build_id_evidence "$source" || warn "无法写入 fw_build_id_check.json 留证"
+    fi
+    if [[ "$FW_ID_VERDICT" == "PASS" ]]; then
+        step_ok "板上固件构建身份核对（fw_build_id）" "期望=$FW_ID_EXPECTED；实读=$FW_ID_ACTUAL"
+    else
+        FW_ID_REASON="$reason"
+        step_bad "板上固件构建身份核对（fw_build_id）" \
+            "板上运行的固件与所选包不符：期望=$FW_ID_EXPECTED；实读=$FW_ID_ACTUAL；原因=$reason"
+    fi
+    info "固件身份核对：期望=$FW_ID_EXPECTED；实读=$FW_ID_ACTUAL；结果=$FW_ID_VERDICT"
+}
+
 # ---------------------------------------------------------------------------
 # 0. 参数推导
 # ---------------------------------------------------------------------------
@@ -315,6 +528,23 @@ else
     XSDB_BAT="$(printf '%s\n' "$PAIR" | head -1)"
     XSDB_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
 fi
+if [[ -z "$FW_ID_NM_VALUE" ]]; then
+    if [[ "$XSDB_MODE" == "wsl" ]]; then
+        FW_ID_NM_VALUE="/tools/Xilinx/Vitis/2022.2/gnu/aarch32/lin/gcc-arm-none-eabi/bin/arm-none-eabi-nm"
+    elif [[ "$XSDB_BAT" == */Vitis/bin/xsdb.bat ]]; then
+        FW_ID_NM_VALUE="${XSDB_BAT%/bin/xsdb.bat}/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-nm.exe"
+    else
+        FW_ID_NM_VALUE="D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-nm.exe"
+    fi
+fi
+if [[ "$XSDB_MODE" == "wsl" ]]; then
+    FW_ID_NM_UNIX="$FW_ID_NM_VALUE"
+    FW_ID_NM_WIN="$FW_ID_NM_VALUE"
+else
+    PAIR="$(path_pair "$FW_ID_NM_VALUE")" || die "--fw-id-nm 路径转换失败"
+    FW_ID_NM_WIN="$(printf '%s\n' "$PAIR" | head -1)"
+    FW_ID_NM_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
+fi
 if (( ! ARTIFACT_EXPLICIT )) || [[ -z "$ARTIFACT_DIR" ]]; then
     die "必须显式传 --artifact-dir 指定完整制品包；当前不接受缺少 manifest 的旧包回退"
 fi
@@ -326,7 +556,9 @@ if [[ -n "$HW_SERVER_URL" ]]; then
     CONNECT_CMD="connect -url {$HW_SERVER_URL}"
 else
     CONNECT_CMD="connect"
+    (( PLAN_ONLY )) || die "固件身份核对必须显式传 --hw-server TCP:<主机>:<端口>"
 fi
+(( ! FW_ID_ONLY || ! PLAN_ONLY )) || die "--fw-id-only 不能与 --plan-only 一起使用"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 RUN_NAME="$STAMP${TAG:+-$TAG}"
 RUN_DIR="$WIN_ROOT_UNIX/g3_runs/$RUN_NAME"
@@ -520,6 +752,27 @@ python3 tools/board/g3_artifacts.py "${ARTIFACT_ARGS[@]}" --stage "$RUN_DIR" \
 step_ok "完整制品包一致性（所选SHA/XSA内bit/part/参数）" "$ARTIFACT_DIR"
 info "bit / elf / ps7_init 均来自所选同一XSA制品包；摘要见 artifact_selection.json"
 
+# --skip-boot 时板子运行的是上一轮留下的镜像，先在任何判据前直接读回身份。
+if (( ! DO_BOOT )); then
+    verify_fw_build_id
+    if (( FW_ID_ONLY )); then
+        printf 'FW_BUILD_ID_CHECK verdict=%s expected=%s actual=%s evidence=%s\n' \
+            "$FW_ID_VERDICT" "$FW_ID_EXPECTED" "$FW_ID_ACTUAL" "$RUN_DIR/fw_build_id_check.json"
+        if [[ "$FW_ID_VERDICT" == "PASS" ]]; then
+            printf '\n######## G3 FW_BUILD_ID_ONLY PASS ########\n'
+            exit 0
+        fi
+        printf '\n######## G3 FW_BUILD_ID_ONLY FAIL ########\n'
+        exit 1
+    fi
+    if [[ "$FW_ID_VERDICT" != "PASS" ]]; then
+        printf 'FAIL step_bad: 板上运行的固件与所选包不符；期望=%s；实读=%s；详见 %s\n' \
+            "$FW_ID_EXPECTED" "$FW_ID_ACTUAL" "$RUN_DIR/fw_build_id_check.json"
+        printf '\n######## G3 FAIL ########\n'
+        exit 1
+    fi
+fi
+
 # ---------------------------------------------------------------------------
 # 2. 渲染板级脚本
 # ---------------------------------------------------------------------------
@@ -695,6 +948,16 @@ if (( DO_BOOT )); then
     fi
 else
     step_skip "烧录" "--skip-boot"
+fi
+if (( DO_BOOT )); then
+    verify_fw_build_id
+    if [[ "$FW_ID_VERDICT" != "PASS" ]]; then
+        stop_uart
+        printf 'FAIL step_bad: 板上运行的固件与所选包不符；期望=%s；实读=%s；详见 %s\n' \
+            "$FW_ID_EXPECTED" "$FW_ID_ACTUAL" "$RUN_DIR/fw_build_id_check.json"
+        printf '\n######## G3 FAIL ########\n'
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -1045,6 +1308,7 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "串口接收量  : $(tr -d '\r' < "$RUN_DIR/uart_cap.out" 2>/dev/null | sed -nE 's/^CAPTURE_DONE (bytes|chars)=([0-9]+)$/\2/p' | tail -1)"
     echo "串口        : ${UART_PORT:-未抓取}"
     echo "制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）"
+    echo "固件身份    : 期望=$FW_ID_EXPECTED；实读=$FW_ID_ACTUAL；结果=$FW_ID_VERDICT；留证=fw_build_id_check.json"
     echo "期望系统 SHA: $EXPECT_SHA（系统判据；架构判据与它都须过才是 G3 通过）"
     echo
     echo "三层判据（架构与系统都须过；主机译码仅作诊断，不参与裁决）"
