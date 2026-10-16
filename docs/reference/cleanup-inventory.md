@@ -1,4 +1,4 @@
-# 项目清理瘦身清单（2026-10-16）
+# 项目清理瘦身清单与执行记录（2026-10-16）
 
 用户要求「给项目清理瘦身、减少历史包袱」——换了板子之后旧板信息与演示视频不该留在项目里，
 过时的脚本工具该清就清。
@@ -44,7 +44,7 @@
 | 1 | `hw/build/*/build/` | 18 个 | **4.98 G** | Vivado 工程目录；`hw/scripts/build.tcl` + `tools/run_vivado_build.sh` 从源码重建 | **无**（已 grep：`run_g3.sh`、`tools/board/*.py`、回归工具只读 `export/`） |
 | 2 | `hw/build/*/workspace/*_platform/` | 30 个 | **~1.43 G** | Vitis platform/BSP，由 XSA 重建 | 无 |
 | 3 | `logs/iverilog/*/` 下的仿真器可执行文件 | **83 个** | **432 M** | `iverilog` 编译产物 | 无（留证是 `.log`/`.txt`/`.hex`，另计约 12 M） |
-| 4 | `docs/board/zynq-eco-7010/03_examples/tutorials/ECO_蜂鸣器上板演示.mp4` | 1 | **12.0 M** | 厂商教程视频 | 无（**你点名的那个演示视频**；本来就没被 git 跟踪） |
+| 4 | `（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）03_examples/tutorials/ECO_蜂鸣器上板演示.mp4` | 1 | **12.0 M** | 厂商教程视频 | 无（**你点名的那个演示视频**；本来就没被 git 跟踪） |
 | 5 | `tools/attic/__pycache__/` | — | 40 K | Python 缓存 | 无 |
 
 **小计 ≈ 6.85 GB。** 工作区从 **9.0 G → 约 2.1 G**。
@@ -70,7 +70,7 @@ XSim 那条路有 `tools/prune_xsim.sh`（保留最近 N 轮、日志自动归�
 
 | 事项 | 为什么 |
 | --- | --- |
-| 删 `docs/board/zynq-eco-7010/`（旧板资料 20 MB） | 被 **17 个文件**引用，其中 `hw/boards/zynq_eco_7010.tcl`、`hw/scripts/bd.tcl`、`tools/board/g3_artifacts.py` 是**工具与板级 profile**，不是文档。删它要同步改 17 处，改错会直接影响 `run_g3.sh` 能否运行。**20 MB 换这个风险不值得。** 而且 `migration-source-table.md` 的价值正是"记录从哪块板迁过来的"——把旧板资料删干净会让那张表失去可核对的对象 |
+| 删 `（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）`（旧板资料 20 MB） | 被 **17 个文件**引用，其中 `hw/boards/zynq_eco_7010.tcl`、`hw/scripts/bd.tcl`、`tools/board/g3_artifacts.py` 是**工具与板级 profile**，不是文档。删它要同步改 17 处，改错会直接影响 `run_g3.sh` 能否运行。**20 MB 换这个风险不值得。** 而且 `migration-source-table.md` 的价值正是"记录从哪块板迁过来的"——把旧板资料删干净会让那张表失去可核对的对象 |
 | 删 `archive/`（228 MB） | 明文只读保护（见 §1） |
 | 删 `hw/experimental/` | 门禁依赖，且里面的文件都在用 |
 | 删 `docs/archive/` | 被 58 处引用 |
@@ -98,3 +98,64 @@ XSim 那条路有 `tools/prune_xsim.sh`（保留最近 N 轮、日志自动归�
 - 「可重建」是**依据"脚本与输入数据在库"判断的，没有实际跑一遍重建验证**；
 - 没有评估 `logs/` 下其它子目录（`g5_matrix` 27 M、`d3_profile` 18 M、`vivado` 25 M 等）——
   它们都不是本次的体量大头。
+
+
+---
+
+# 执行记录（2026-10-16，用户批准后执行）
+
+用户指示：「可清理的删掉；历史的发布制品也可以删掉；现在作为 1.0 正式版本发布；
+旧版资料也能删；iverilog 做成工具或只保留 xsim」。
+
+## 先备份（可逆性来自这里，不是来自"我小心"）
+
+备份根：`D:\bkb220_cleanup_backup_20261016T104516Z\`（**655 MB**）
+
+| 子目录 | 内容 | 校验 |
+| --- | --- | --- |
+| `artifacts/` | **45 个历史包的 `export/`**（408 MB） | **296 个文件逐字节一致** |
+| `board-docs/` | 旧板资料（20 MB，17 个文件） | README 逐字节一致 |
+| `archive/` | 2025 年那份提交（228 MB，19 个文件） | 文件数一致 |
+
+**只备份不可重建的东西**——可重建的 `build/`、`*_platform/`、仿真器二进制不占备份空间。
+
+## 已执行
+
+| 动作 | 结果 |
+| --- | --- |
+| 删 `hw/build/*/build/` + `workspace/*_platform/` + `logs/iverilog` 编译产物 + 演示视频 + `attic/__pycache__` | 释放 **6.80 GB**（8.71 G → 1.92 G） |
+| 删 70 个历史制品包 + 可重建的 `dna_accel.{runs,gen,cache}` | `hw/build` 1.2 G → 421 M |
+| `prune_xsim.sh --keep 3` | 311 M 未变（已在保留上限内） |
+| 删旧板资料目录 `docs/board/zynq-eco-7010/` | 16 个跟踪文件、20 MB；**10 处活引用已同步修正** |
+| 补 `.gitignore` 规则 `hw/build/bkb220-v*-*/` | v1.0 包此前未被忽略，会误提交 68 MB |
+| 新建 v1.0 定版包并板端验证 | 见 [release-v1.0.md](release-v1.0.md) |
+| 新建 `tools/prune_iverilog.sh` 并登记 | 门禁要求 `tools/*.sh` 必须登记，已补 |
+
+**最终：工作区 8.71 G → 1.3 G。**
+
+## ⚠️ 执行中弄坏又修好的一件事（必须记下来）
+
+删 `workspace/*_platform/` 时**我误判了它的作用**：以为它只是"可由 XSA 重建的 BSP"，
+**但它被制品的 `SHA256SUMS` 引用（2956 条 `workspace/` 条目）**，而 `g3_artifacts.py`
+会逐条校验 ⇒ **29 个软件包当场全部过不了 `--strict-artifacts`**。
+
+> **教训：说"可重建"之前，必须查它有没有被完整性清单/门禁引用。**
+> 我当时的判据是"没有工具读 `build/`"——那只查了 `/build/`，**没查 `/workspace/`**。
+
+**处置**：由于用户本就要删历史制品、只留一个，**改为重建唯一要留的那个**——
+正是 v1.0 定版包（完整、自洽：`sha256sum -c` 2977 条全 OK、`g3_artifacts --strict-artifacts` PASS）。
+坏掉的 29 个历史包随之删除，问题自然消解。
+**v1.0 的 `workspace/` 完整保留**，不受影响。
+
+## 明确**没有**做的事
+
+- **`data/` 未动**——它是仍在用的构建输入（D0 的水印就来自 `data/R0.83_data/`），
+  虽然旧板已换掉，但这份数据与新板无关、且仍被引用；
+- **`archive/` 未删**（228 MB）——已备份，等用户明确；它受 `AGENTS.md` 与 `README.md` 只读保护，
+  且 P9 报告记着"按用户指令与红线要求不删也不自行移动"；
+- **旧板 profile 与构建系统分支未动**——`hw/boards/zynq_eco_7010.tcl`、`hw/scripts/build.tcl`
+  里的 `zynq_eco_7010` 分支**是构建系统的 legacy 默认路径**（`board zynq_eco_7010` 是默认值、
+  `if {$board ne "zynq_eco_7010"}` 是分支条件）。删它是**重写构建逻辑**，不是清理。
+  已用 `dry_run` 验证两块板的配置检查都仍 `BUILD_CONFIG_PASS`；
+- **`docs/archive/history/**` 里指向旧板资料的引用未改**——那是历史快照，当时的路径就是那样；
+- **`docs/submission/llm-collaboration/**` 一律未动**——逐字证据。
