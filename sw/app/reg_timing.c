@@ -126,8 +126,8 @@ void decoder_configure(u32 in_addr, u32 out_addr, u32 out_beats, u32 in_beats)
 
 static const u32 DEC_IN_ADDR  = DDR_VOTER_OUT_BASE;
 static const u32 DEC_OUT_ADDR = DDR_DECODER_OUT_BASE;
-static const u32 DEC_IN_BEATS = 1266;
-static const u32 DEC_OUT_BEATS = 1013;
+static const u32 DEC_IN_BEATS = DECODER_INPUT_BEATS;
+static const u32 DEC_OUT_BEATS = DECODER_OUTPUT_BEATS;
 
 void decoder_configure_default(void)
 {

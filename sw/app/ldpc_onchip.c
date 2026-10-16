@@ -99,6 +99,7 @@ static void ldpc_keep_original_and_finish(u32 status, u32 timed_out)
     ldpc_iterations = ldpc_status_iterations(status);
     FW_ERR_PRINTF("[LDPC] converged=%u iterations=%d error=%u timeout=%u; 保留 Stage3 原码字\n\r",
                converged, ldpc_iterations, error, timed_out);
+    /* 终态由 echo.c 的 poll_callback() 消费，再由 PROC_DONE 分支发送结果。 */
     pipeline_set_state(PIPE_SEND_RESULT);
 }
 
@@ -223,6 +224,7 @@ pipe_step_rc_e pipeline_step_ldpc(void)
             xil_printf("[LDPC] converged=1 iterations=%d; wrote back %u words; "
                        "reinterleaved in %u ms\n\r",
                        ldpc_iterations, (u32)LDPC_CODEWORD_WORDS, perm_ms);
+            /* 终态由 echo.c 的 poll_callback() 消费，再由 PROC_DONE 分支发送结果。 */
             pipeline_set_state(PIPE_SEND_RESULT);
         }
         return PIPE_STEP_PROGRESS;

@@ -623,20 +623,6 @@
           </spirit:parameter>
         </spirit:parameters>
       </spirit:view>
-      <spirit:view>
-        <spirit:name>bd_tcl</spirit:name>
-        <spirit:displayName>Block Diagram</spirit:displayName>
-        <spirit:envIdentifier>:vivado.xilinx.com:block.diagram</spirit:envIdentifier>
-        <spirit:fileSetRef>
-          <spirit:localName>bd_tcl_view_fileset</spirit:localName>
-        </spirit:fileSetRef>
-        <spirit:parameters>
-          <spirit:parameter>
-            <spirit:name>viewChecksum</spirit:name>
-            <spirit:value>16328387</spirit:value>
-          </spirit:parameter>
-        </spirit:parameters>
-      </spirit:view>
     </spirit:views>
     <spirit:ports>
       <spirit:port>
@@ -1536,13 +1522,6 @@
         <spirit:fileType>tclSource</spirit:fileType>
         <spirit:userFileType>CHECKSUM_edfe889a</spirit:userFileType>
         <spirit:userFileType>XGUI_VERSION_2</spirit:userFileType>
-      </spirit:file>
-    </spirit:fileSet>
-    <spirit:fileSet>
-      <spirit:name>bd_tcl_view_fileset</spirit:name>
-      <spirit:file>
-        <spirit:name>bd/bd.tcl</spirit:name>
-        <spirit:fileType>tclSource</spirit:fileType>
       </spirit:file>
     </spirit:fileSet>
   </spirit:fileSets>

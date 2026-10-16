@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include "xparameters.h"
+#include "app_net_config.h"
 #include "netif/xadapter.h"
 #include "platform.h"
 #include "platform_config.h"
@@ -14,6 +15,7 @@
 
 /* lwIP */
 #include "lwip/init.h"
+#include "lwip/ip_addr.h"
 #include "lwip/tcp.h"
 #include "lwip/dhcp.h"
 #include "lwip/timeouts.h"
@@ -26,6 +28,16 @@
 #include "sleep.h"
 #include "dna_time.h"
 #include "prof.h"
+
+#ifndef APP_IP_ADDR
+#error "app_net_config.h must define APP_IP_ADDR"
+#endif
+#ifndef APP_IP_MASK
+#error "app_net_config.h must define APP_IP_MASK"
+#endif
+#ifndef APP_GW_ADDR
+#error "app_net_config.h must define APP_GW_ADDR"
+#endif
 
 /* 流水线运行期主循环每圈的休眠（us），0 = 不休眠。可用 -DPIPE_RUN_SLEEP_US=N 覆盖做对照实验。 */
 #ifndef PIPE_RUN_SLEEP_US
@@ -272,10 +284,13 @@ int main(void)
     init_platform();
 
 
-    /* 静态 IP 配置(按需修改) */
-    IP4_ADDR(&ipaddr,  192, 168, 1, 10);
-    IP4_ADDR(&netmask, 255, 255, 255, 0);
-    IP4_ADDR(&gw,      192, 168, 1, 1);
+    /* 静态 IPv4 配置由构建入口导入的 app_net_config.h 提供。 */
+    if (!ipaddr_aton(APP_IP_ADDR, &ipaddr) ||
+        !ipaddr_aton(APP_IP_MASK, &netmask) ||
+        !ipaddr_aton(APP_GW_ADDR, &gw)) {
+        xil_printf("[ERROR] Invalid IPv4 settings in app_net_config.h\r\n");
+        return -1;
+    }
 
     print_app_header();
 

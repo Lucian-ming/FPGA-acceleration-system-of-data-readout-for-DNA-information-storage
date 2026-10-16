@@ -1,5 +1,6 @@
+// 历史配方，当前无消费者；软件打包入口见 tools/rebuild_software_package.py 与 sw/scripts/create_vitis_modern.py，二者在 export/ 下生成 boot.bif。
 // ZYNQ ECO(R6) 启动镜像：16 bit DDR + B20/B23/B24/B25 + B26/B27 修复后
-// 生成：bootgen -image sw/boot/dna_board_b27.bif -arch zynq -o hw/build/export/BOOT.bin -w on
+// 当前启动镜像由上述软件入口生成并交给 Bootgen；本文件仅保留作历史记录。
 the_ROM_image:
 {
   [bootloader] hw/build/export/fsbl.elf

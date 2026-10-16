@@ -8,87 +8,27 @@
    sw/workspace/dna_lwip_app_b27/src/ 同名文件的一致性，不同则直接判定 FAIL。
 ================================================================================
 
-lwIP Echo Server
-----------------
+DNA 数据读出应用（当前实现）
+----------------------------
 
-The lwIP Echo server application starts an echo server at port 7. Any data sent to
-this port is simply echoed back.
+本程序运行在 Zynq PS 上，通过 lwIP 接收自定义任务协议数据并推进 DNA 读出流水线。
+它不是原样回送输入字节的 Echo Server；请使用仓库内实现该协议的客户端，不要用
+telnet 作为协议客户端。包格式与任务配置约定见 docs/04-interfaces.md。
 
-By default, the program assigns the following settings to the board:
-IP Address: 192.168.1.10
-Netmask   : 255.255.255.0
-Gateway   : 192.168.1.1
-MAC address:  00:0a:35:00:01:02
-These settings can be changed in the file main.c.
+当前 main.c 使用以下静态网络配置：
+IPv4 地址 : 192.168.1.10
+子网掩码  : 255.255.255.0
+默认网关  : 192.168.1.1
+MAC 地址  : 00:0a:35:00:01:02
 
-The main echo server logic is present in the file echo.c.
+应用在 TCP 端口 7 上监听任务连接。连接建立后，固件按自定义任务协议接收能力查询、
+任务配置和任务数据；收到有效 POST 请求后运行加速流水线，并在同一 TCP 连接回传结果。
+这与 Xilinx Echo 示例中“输入什么就原样回送什么”的行为不同。
 
-platform.c implements certain processor and platform dependent functions.
-The file platform_config.h is generated based on the hardware design. It makes two
-assumptions: The timer has its interrupt line connected to the interrupt controller,
-and all the ethernet peripherals (xps_ethernetlite or xps_ll_temac) accessible from 
-the processor can be used with lwIP.
+启动过程由 main.c 驱动：初始化平台与 lwIP、复位 PL 加速核、注册 EmacPs 网络接口、
+初始化 DNA Accelerator，然后启动 TCP 服务。主循环持续处理以太网输入、lwIP 定时器
+和事件驱动流水线。
 
-Running the Echo Server example
--------------------------------
-
-To connect and test the echo server, download and run the program on the board, 
-and then issue the following command from your host machine:
-
-$ telnet 192.168.1.10 7
-Trying 192.168.1.10...
-Connected to 192.168.1.10.
-Escape character is '^]'.
-hello world
-hello world
-all messages will be echo'ed back
-all messages will be echo'ed back
-^]
-telnet> quit
-Connection closed. 
-$
-
-
-lwIPv6 Echo Server
-----------------
-
-The lwIPv6 Echo server application starts an echo server at port 7. Any data sent to
-this port is simply echoed back.
-
-By default, the program assigns the following settings to the board:
-IPv6 address: FE80:0:0:0:20A:35FF:FE00:102
-MAC address:  00:0a:35:00:01:02
-These settings can be changed in the file main.c.
-
-The main echo server logic is present in the file echo.c.
-
-platform.c implements certain processor and platform dependent functions.
-The file platform_config.h is generated based on the hardware design. It makes two
-assumptions: The timer has its interrupt line connected to the interrupt controller,
-and all the ethernet peripherals (xps_ethernetlite or xps_ll_temac) accessible from
-the processor can be used with lwIP.
-
-Running the Echo Server example
--------------------------------
-
-To connect and test the echo server, download and run the program on the board,
-and then issue the following command from your host machine:
-
-$ telnet -6 FE80:0:0:0:20A:35FF:FE00:102%eth1 7
-Trying fe80::20a:35ff:fe00:102%eth1...
-Connected to FE80:0:0:0:20A:35FF:FE00:102%eth1.
-Escape character is '^]'.
-hello world
-hello world
-all messages will be echo'ed back
-all messages will be echo'ed back
-^]
-telnet> quit
-Connection closed.
-$
-    
-References
-----------
-
-More details regarding the echo server can be obtained from Xilinx XAPP 1026:
-http://www.xilinx.com/support/documentation/application_notes/xapp1026.pdf
+若需修改当前 IPv4 配置，请检查 sw/app/app_net_config.h 中的 APP_IP_* 配置；main.c
+通过 ipaddr_aton 解析这些地址。端口与协议处理分别由应用网络入口和协议层实现，接口契约
+见 docs/04-interfaces.md。

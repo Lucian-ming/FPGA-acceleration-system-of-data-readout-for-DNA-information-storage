@@ -1,5 +1,5 @@
 // =============================================================
-// File: srpe_batch_2way.v
+// File: srpe_batch.v
 // Desc : 64-read batch engine using bit-plane BRAM & 2-Way Multi-Position Sliding Window
 //        - 保持位平面 BRAM 与码字装载/结果输出逻辑 100% 兼容不变
 //        - 引入 2 拍水印滑窗移位寄存器与 2 组独立累加器

@@ -48,8 +48,10 @@ int parse_header(u8 *buf, u16 *magic, u8 *pkt_type, u32 *payload_len)
 {
     *magic = (buf[0] << 8) | buf[1];
     *pkt_type = buf[2];
-    *payload_len = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
+    *payload_len = ((u32)buf[4] << 24) | ((u32)buf[5] << 16) |
+                   ((u32)buf[6] << 8) | (u32)buf[7];
     if (*magic != PROTOCOL_MAGIC) return -1;
+    if (buf[3] != 0u) return -1;
     return 0;
 }
 

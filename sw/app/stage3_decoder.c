@@ -44,30 +44,18 @@ int validate_decoder_written_beats(u32 out_addr, u32 total_beats, u32 *written_b
 
 /*============================================================================
  * 第三阶段(最终修复版本)
- * 核心规模统一：
- *   - 输入：81000 bit → 输入拍数 1266(最后一拍仅 40bit)
- *   - 输出：64800 字节 → 8100 拍(8B/拍)
+ * 几何定义统一取自 echo.h：
+ *   - 输入拍数 = ceil(DECODER_INPUT_BITS / 64 bit/拍)，末拍有效位数为
+ *     DECODER_INPUT_BITS 对 64 取余。
+ *   - 输出字节数 = ceil(DECODER_OUTPUT_BITS / 8 bit/字节)。
+ *   - 输出拍数 = ceil(DECODER_OUTPUT_BYTES / 8 字节/拍)。
  *============================================================================*/
-#ifdef DECODER_INPUT_BEATS
-#undef DECODER_INPUT_BEATS
-#endif
-#ifdef DECODER_OUTPUT_BEATS
-#undef DECODER_OUTPUT_BEATS
-#endif
-#ifdef DECODER_OUTPUT_BYTES
-#undef DECODER_OUTPUT_BYTES
-#endif
-#define DEC_IN_BITS              (81000u)
-#define DECODER_INPUT_BEATS      ((DEC_IN_BITS + 63u)/64u)  /* =1266 */  /* =1266 */
-#define DECODER_OUTPUT_BYTES     (8100u)
-#define DECODER_OUTPUT_BEATS     ((DECODER_OUTPUT_BYTES + 7u)/8u)  /* =1013 */  /* =8100 */
-
 pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
 {
     const u32 DEC_IN_ADDR  = DDR_VOTER_OUT_BASE;
     const u32 DEC_OUT_ADDR = DDR_DECODER_OUT_BASE;
-    const u32 DEC_IN_BEATS = 1266;   // 81000位 / 64
-    const u32 DEC_OUT_BEATS = 1013;  // 8100字节 / 8
+    const u32 DEC_IN_BEATS = DECODER_INPUT_BEATS;
+    const u32 DEC_OUT_BEATS = DECODER_OUTPUT_BEATS;
 
     switch (pipe_state) {
 

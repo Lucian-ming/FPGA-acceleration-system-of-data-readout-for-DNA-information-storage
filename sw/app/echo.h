@@ -113,14 +113,12 @@
 /* Stage1: DNA Accelerator */
 #define DDR_DNA_ACC_OUT_BASE    0x10600000U    /* Stage1输出: 129600*48B = 6220800B */
 #define DNA_ACC_RESULT_PACKED_BYTES  48U
-#define DNA_ACC_OUTPUT_SIZE_BYTES    (TOTAL_READS * DNA_ACC_RESULT_PACKED_BYTES)
 
 /* Stage2: Voter (直接使用Stage1输出，无需中间缓冲区) */
 #define DDR_VOTER_IN_BASE       DDR_DNA_ACC_OUT_BASE  /* ✅ 直接使用Stage1输出 */
 #define DDR_VOTER_OUT_BASE      0x11000000U    /* Stage2输出: 1266×8B = 10.128KB */
 
 /* Stage3: Decoder */
-#define DDR_DECODER_IN_BASE     DDR_VOTER_OUT_BASE    /* 使用Stage2输出 */
 #define DDR_DECODER_OUT_BASE    0x11100000U    /* Stage3输出: 1013×8B = 8.1KB */
 
 /* DMA BD描述符空间 */
@@ -151,24 +149,20 @@
  *   - 81000 bits = 1266个u64 (每个u64包含64位投票数据)
  *============================================================================*/
 #define VOTER_INPUT_BYTES_PER_READ   48U
-#define VOTER_INPUT_TOTAL_BYTES      (TOTAL_READS * VOTER_INPUT_BYTES_PER_READ)
-#define VOTER_INPUT_BEATS            TOTAL_READS  /* ✅ 硬件自动处理6个u64/read */
 
 #define VOTER_OUTPUT_BITS       81000U
-#define VOTER_OUTPUT_BYTES      10125U
-#define VOTER_OUTPUT_BEATS      1266U   /* (81000+63)/64 = 1266拍 */
+#define VOTER_OUTPUT_BYTES      ((VOTER_OUTPUT_BITS + 7U) / 8U)
+#define VOTER_OUTPUT_BEATS      ((VOTER_OUTPUT_BITS + 63U) / 64U)
 
 /*=============================================================================
  * Stage3 输入/输出格式
  *============================================================================*/
-#define DECODER_INPUT_BITS      81000U
-#define DECODER_INPUT_BYTES     10125U
-#define DECODER_INPUT_BEATS     1266U
+/* Stage3 输入与 Voter 输出相同，直接复用其几何定义。 */
+#define DECODER_INPUT_BITS      VOTER_OUTPUT_BITS
+#define DECODER_INPUT_BEATS     VOTER_OUTPUT_BEATS
 #define DECODER_OUTPUT_BITS     64800U
-#define DECODER_OUTPUT_BYTES    8100U
-#define DECODER_OUTPUT_BEATS    1013U
-
-#define RESULT_SIZE_BYTES       DECODER_OUTPUT_BYTES
+#define DECODER_OUTPUT_BYTES    ((DECODER_OUTPUT_BITS + 7U) / 8U)
+#define DECODER_OUTPUT_BEATS    ((DECODER_OUTPUT_BYTES + 7U) / 8U)
 
 /*=============================================================================
  * IP核基地址与寄存器映射
@@ -221,12 +215,6 @@
 #define VOTER_REG_CYCLES_READ       0x48U  /* DDR 读周期数 */
 #define VOTER_REG_CYCLES_VOTE       0x4CU  /* 投票流水线周期数 */
 #define VOTER_REG_CYCLES_WRITE      0x50U  /* DDR 写回周期数 */
-
-/* 【P3】推荐阈值默认值（客户端参考）：固件不再固定使用，而是经 PKT_CONFIG
- * 的 score_min 字段运行时下发。67 = int(0.45 × READ_BPS)，与 tests/golden 的
- * stage2_expect.hex（make_golden.py --min-score 0.45）严格一致；噪声底 59~62，
- * 分离带内 67/68 均可，但判据向量按 67 生成。 */
-#define VOTER_SCORE_MIN             112U
 
 /* 为保持代码兼容性，保留旧名称别名 */
 #define VOTER_REG_START             VOTER_REG_CTRL_STATUS

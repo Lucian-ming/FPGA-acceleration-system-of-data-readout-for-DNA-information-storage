@@ -19,7 +19,7 @@
 // 读、写是两个**完全独立**的状态机，只通过数据通路的 valid/ready 耦合，
 // 因此不存在互锁；每段突发一旦发出 AW/AR 就一定走完，不中途放弃。
 //
-// 判据：hw/ip/desparsification_decoder_1_0/hdl/tb_desparsifier.v
+// 判据：hw/sim/ip_tb/tb_desparsifier.v
 //       （bash tools/run_sim.sh）
 // ================================================================
 `timescale 1 ns / 1 ps

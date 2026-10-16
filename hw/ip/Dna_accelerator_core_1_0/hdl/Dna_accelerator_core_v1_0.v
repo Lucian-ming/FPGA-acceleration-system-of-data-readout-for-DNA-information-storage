@@ -278,9 +278,11 @@ module Dna_accelerator_core_v1_0 #(
     end
 
     // =================================================
-    // Batch processing engine handshake:
-    //  - Sync FIFO read delay is 1 cycle => cw_valid = in_rd (previous cycle read, current cycle data valid)
-    //  - Each cw_req only triggers one in_rd
+    // 批处理引擎握手：
+    //  - FIFO 自身两级同步读：先 raddr_q <= rptr，再 dout <= mem[raddr_q]。
+    //  - 本级 in_rd 经 in_rd_d1、in_rd_d2 延迟两级；eng_cw_vld 再寄存 in_rd_d2 一拍，
+    //    u_srpe.cw_valid 接 eng_cw_vld，所以 cw_valid 比 in_rd_d2 晚一拍。
+    //  - 以上从 in_rd 的 FIFO 读使能计时；eng_cw_req 到 in_rd 的等待不在此计数内。
     // =================================================
     wire eng_cw_req;
     reg  eng_cw_vld;
@@ -300,10 +302,11 @@ module Dna_accelerator_core_v1_0 #(
             // Default pull low
             in_rd      <= 1'b0;
             // [B26] 原来是 eng_cw_vld <= in_rd，注释还写着「FIFO 读延迟 1 拍」。
-            // 但 fifo_sync_sdpram_b64 是两级同步读（raddr_q <= rptr; dout <= mem[raddr_q]），
-            // pop 之后 dout 要 3 拍才稳定，早采样会把上一条记录当成本条，
-            // 板上表现为结果整体错位一条读段（读段 0 的结果丢失、末尾多一条）。
-            // 改为延到 in_rd_d2 才置 valid，并用 cw_hold 锁存住那一拍的数据。
+            // FIFO 先采样 rptr 到 raddr_q，再采样 mem[raddr_q] 到 dout，属两级同步读。
+            // 从 FIFO 接受 pop 的上升沿起，再过两个上升沿，dout 才切到更新后的 rptr 项；
+            // 若把接受沿计入，则是第 3 个采样沿；该计数只描述 FIFO 输出切换。
+            // core 用 in_rd_d1/in_rd_d2 延迟 in_rd，cw_hold 锁存数据，eng_cw_vld 再寄存一拍。
+            // 旧时序在板上表现为结果整体错位一条读段（读段 0 的结果丢失、末尾多一条）。
             in_rd_d1   <= in_rd;
             in_rd_d2   <= in_rd_d1;
             if (in_rd_d2)

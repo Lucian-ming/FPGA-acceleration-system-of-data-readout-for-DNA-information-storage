@@ -1,5 +1,5 @@
 // ================================================================
-// File   : differential_voter_v1_0_fixed_final.v
+// File   : differential_voter_v1_0.v
 // Desc   : Voter(第二个IP核) -- BRAM推断 + DONE语义修正 + ARADDR时序稳固 + 末拍WSTRB硬件推导
 //
 // Key Fixes:

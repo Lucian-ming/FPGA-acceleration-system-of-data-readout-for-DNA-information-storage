@@ -14,7 +14,7 @@
 // 运行（一批 64 条约需 6.2 M 周期，Icarus 上约 1~3 分钟）：
 //   iverilog -g2005 -o /tmp/tb_srpe \
 //       hw/ip/Dna_accelerator_core_1_0/hdl/srpe_batch.v \
-//       hw/ip/Dna_accelerator_core_1_0/hdl/tb_srpe_batch.v
+//       hw/sim/ip_tb/tb_srpe_batch.v
 //   vvp /tmp/tb_srpe
 // =============================================================
 `timescale 1ns/1ps

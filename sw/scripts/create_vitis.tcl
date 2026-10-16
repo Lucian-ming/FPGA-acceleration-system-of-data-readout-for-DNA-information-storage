@@ -4,7 +4,7 @@
 #   xsct sw/scripts/create_vitis.tcl
 # 此入口仅用于仍支持XSCT的旧版Vitis。2026.1 XSCT已disabled，使用create_vitis_modern.py。
 # 可选参数（-tclargs 覆盖）：
-#   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1 phy_link_speed=CONFIG_LINKSPEED_AUTODETECT
+#   -tclargs xsa=/abs/path/to/xxx.xsa ws=/abs/path/to/workspace app=my_app plat=my_platform dom=my_domain ip=192.168.1.10 mask=255.255.255.0 gw=192.168.1.1 phy_link_speed=CONFIG_LINKSPEED_AUTODETECT uart=ps7_uart_0
 #   build_app=0 仅生成平台/BSP/FSBL，由调用方使用固定构建器编译应用
 # phy_link_speed 可选：CONFIG_LINKSPEED_AUTODETECT / CONFIG_LINKSPEED1000 / CONFIG_LINKSPEED100 / CONFIG_LINKSPEED10
 # =========================================
@@ -35,7 +35,7 @@ set xsa  ""
 set ip   "192.168.1.10"
 set mask "255.255.255.0"
 set gw   "192.168.1.1"
-set uart "ps7_uart_1"
+set uart ""
 set phy_link_speed "CONFIG_LINKSPEED_AUTODETECT"
 
 # ---------- 解析 -tclargs ----------
@@ -136,7 +136,7 @@ if {$lwip_lib eq ""} {
   bsp config phy_link_speed $phy_link_speed
 }
 
-# 默认保留旧板UART1；新板须按对应XSA显式选择uart。
+# UART须按板卡profile显式指定；stdin/stdout共用该PS UART。
 bsp config stdin $uart
 bsp config stdout $uart
 
@@ -233,7 +233,7 @@ if {[file exists $linker_ld]} {
   puts "WARN: Linker script not found: $linker_ld"
 }
 
-# 可选：为应用注入网络参数的头文件（若你的代码读取这些宏）
+# 为应用生成必需的网络参数头文件；main.c 显式包含并校验这些宏。
 set cfg_h "$ws/$app/src/app_net_config.h"
 set fh [open $cfg_h w]
 puts $fh "#pragma once"

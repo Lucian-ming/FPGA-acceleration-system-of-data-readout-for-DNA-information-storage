@@ -617,7 +617,7 @@ module tb_m3_bd3b_dma;
             if (errors != 0) return;
 
             step(50);
-            // echo.c PIPE_WM_WAIT：每个区域传完都退出预载模式
+            // echo.c PIPE_WM_TX：每个区域传完都退出预载模式
             axi_write32(ADDR_DNA + DNA_REG0, 32'h0);
             step(20);
 

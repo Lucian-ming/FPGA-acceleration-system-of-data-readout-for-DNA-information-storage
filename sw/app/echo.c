@@ -32,9 +32,6 @@
 #define BIT_GET(val, bit)    (((val) >> (bit)) & 1ULL)
 
 /* 轮询与日志相关 */
-#define VOTER_EXPECTED_TIME_MS  500
-#define VOTER_TIMEOUT_POLLS     5000000
-#define VOTER_REPORT_INTERVAL   10000
 /* ===== Fallback: Voter 调试寄存器偏移（如果 echo.h 未定义时启用） ===== */
 #ifndef VOTER_REG_DBG_STATE
 #define VOTER_REG_DBG_STATE     0x18u
@@ -184,16 +181,43 @@ int run_processing_pipeline(dna_connection_t *conn)
 {
     pipe_step_rc_e rc;
 
-    if (pipe_state >= PIPE_IDLE && pipe_state <= PIPE_DONE_STAGE1) {
+    switch (pipe_state) {
+    case PIPE_IDLE:
+    case PIPE_WM_PREP:
+    case PIPE_WM_TX:
+    case PIPE_RX_PREP:
+    case PIPE_TX_PREFILL:
+    case PIPE_START_IP:
+    case PIPE_TX_STREAM:
+    case PIPE_PROGRESS:
+    case PIPE_DONE_STAGE1:
         rc = pipeline_step_stage1(conn);
-    } else if (pipe_state >= PIPE_VOTER_PREP && pipe_state <= PIPE_DONE_STAGE2) {
+        break;
+
+    case PIPE_VOTER_PREP:
+    case PIPE_VOTER_START:
+    case PIPE_VOTER_WAIT:
+    case PIPE_DONE_STAGE2:
         rc = pipeline_step_stage2(conn);
-    } else if (pipe_state >= PIPE_DECODER_PREP && pipe_state <= PIPE_DONE_STAGE3) {
+        break;
+
+    case PIPE_DECODER_PREP:
+    case PIPE_DECODER_START:
+    case PIPE_DECODER_WAIT:
+    case PIPE_DONE_STAGE3:
         rc = pipeline_step_stage3(conn);
-    } else if (pipe_state >= PIPE_LDPC_PREP && pipe_state <= PIPE_LDPC_READBACK) {
+        break;
+
+    case PIPE_LDPC_PREP:
+    case PIPE_LDPC_RUN:
+    case PIPE_LDPC_READBACK:
         rc = pipeline_step_ldpc();
-    } else {
+        break;
+
+    case PIPE_SEND_RESULT:
+    default:
         rc = PIPE_STEP_FAIL;
+        break;
     }
 
     if (rc == PIPE_STEP_FAIL) { pipe_state = PIPE_FAIL; return XST_FAILURE; }
@@ -407,8 +431,8 @@ static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
             if (pipe_state == PIPE_SEND_RESULT && st == XST_SUCCESS) {
                 XTime t_end;
                 XTime_GetTime(&t_end);
-                /* SEND_RESULT 是终止标记，没有独立的状态执行区间；按实际到达
-                 * 路径结束当前阶段。当前 LDPC 路径因此把它作为 LDPC 的终点。 */
+                /* PIPE_SEND_RESULT 由 poll_callback() 在阶段推进后消费并结束任务；
+                 * 它不是可直接分派给 pipeline_step_*() 的状态，直接分派仍须失败。 */
                 pipe_stage_switch(PIPE_STAGE_NONE, t_end);
                 FW_RESULT_PRINTF("[PIPE] total %u steps in %u callbacks, %u ms "
                            "(WM preload: %u steps)\n\r",
@@ -748,12 +772,12 @@ void process_post(dna_connection_t *conn)
 }
 
 /*============================================================================
- * 结果发送(严格发送 64800 字节)
+ * 结果发送(严格发送 8100 字节)
  *============================================================================*/
 void send_result(dna_connection_t *conn)
 {
     PROF_TIME_BEGIN(sendres);
-    u32 result_size = DECODER_OUTPUT_BYTES; /* 64800 (或 SE150 的 8100) */
+    u32 result_size = DECODER_OUTPUT_BYTES; /* 字节数由 echo.h 的数据几何定义。 */
     xil_printf("\n\r[RESULT] Sending %u bytes (initial sndbuf=%u)\n\r",
                result_size, tcp_sndbuf(conn->tpcb));
 

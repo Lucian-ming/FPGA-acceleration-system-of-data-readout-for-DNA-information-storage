@@ -1,6 +1,6 @@
 # ========================================================
 # Vivado Quick Simulation Script for DNA Accelerator
-# Usage: vivado -mode batch -source vivado_quick_sim.tcl
+# Usage: vivado -mode batch -source hw/experimental/vivado_quick_sim.tcl ?-tclargs part_name=<device>?
 # Or in Vivado GUI: Tools -> Run Tcl Script
 # ========================================================
 
@@ -10,7 +10,23 @@ puts "========================================"
 
 # Project settings
 set project_name "dna_sim"
-set part_name "xc7z010clg400-1"  ;# 修订 A9：实际器件是 xc7z010
+set _script_dir [file normalize [file dirname [info script]]]
+set repo_root [file normalize [file join $_script_dir ../..]]
+source [file join $repo_root hw boards load_board.tcl]
+set board_config [dna_load_board $repo_root bkb220]
+set part_name [dict get $board_config part]
+if {[info exists argv]} {
+    if {[llength $argv] > 1} {
+        error "用法：-tclargs part_name=<器件>"
+    }
+    if {[llength $argv] == 1} {
+        set arg [lindex $argv 0]
+        if {![regexp {^part_name=(.+)$} $arg -> explicit_part]} {
+            error "未知参数 '$arg'；支持 part_name=<器件>"
+        }
+        set part_name $explicit_part
+    }
+}
 set sim_time "100us"
 
 # Create project directory

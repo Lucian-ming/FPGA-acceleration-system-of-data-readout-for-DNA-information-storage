@@ -12,7 +12,7 @@
 // 运行：
 //   iverilog -g2005 -o /tmp/tb_desp \
 //       hw/ip/desparsification_decoder_1_0/hdl/desparsification_decoder_v1_0.v \
-//       hw/ip/desparsification_decoder_1_0/hdl/tb_desparsifier.v
+//       hw/sim/ip_tb/tb_desparsifier.v
 //   vvp /tmp/tb_desp
 // =============================================================
 `timescale 1ns/1ps

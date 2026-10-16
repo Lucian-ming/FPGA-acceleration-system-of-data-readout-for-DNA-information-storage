@@ -2,7 +2,7 @@
 # m3_bd_sim.tcl —— M3：实际 Block Design 集成仿真的工程生成器
 #
 #   vivado -mode batch -source hw/scripts/m3_bd_sim.tcl -tclargs \
-#       outdir=<绝对路径> [part=xc7z010clg400-1] [clk_mhz=100] \
+#       outdir=<绝对路径> [board=bkb220] [part_name=<器件覆盖>] [clk_mhz=100] \
 #       [tb_top=<顶层>] [tb_srcs=<以逗号分隔的 TB 源文件>] [stage=bd1|sim] \
 #       [sim_time=<如 2ms>] [bd_script_sel=prod|sim_mem]
 #
@@ -14,7 +14,8 @@
 # =========================================
 
 set outdir   ""
-set part_name "xc7z010clg400-1"
+set board "bkb220"
+set part_name ""
 set clk_mhz   100
 set tb_top    ""
 set tb_srcs   ""
@@ -34,6 +35,7 @@ proc _arg {k def} {
   }
 }
 _arg outdir   $outdir
+_arg board $board
 _arg part_name $part_name
 _arg clk_mhz  $clk_mhz
 _arg tb_top   $tb_top
@@ -46,6 +48,9 @@ if {$outdir eq ""} { puts "FATAL: outdir= is required"; exit 1 }
 
 set _here     [file normalize [file dirname [info script]]]
 set repo_root [file normalize "$_here/../.."]
+source [file join $repo_root hw boards load_board.tcl]
+set ::dna_board_config [dna_load_board $repo_root $board]
+if {$part_name eq ""} { set part_name [dict get $::dna_board_config part] }
 if {$bd_script_sel eq "sim_mem"} {
   set bd_script [file join $repo_root hw/scripts/bd_sim_mem.tcl]
 } else {
