@@ -27,8 +27,10 @@ import argparse
 import ctypes
 import datetime
 import json
+import math
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -372,6 +374,11 @@ def prepare_dataset(reads_path: Path, n_reads: int, rb: int) -> Tuple[np.ndarray
     if not reads_path.exists():
         raise FileNotFoundError(f"Reads file not found: {reads_path}")
     reads = [s.upper() for s in g.iter_fastq(reads_path, n_reads)]
+    if len(reads) != n_reads:
+        raise ValueError(f"FASTQ 记录不足：要求 {n_reads} 条，实际读取 {len(reads)} 条 ({reads_path})")
+    invalid = [i for i, read in enumerate(reads) if len(read) != rb]
+    if invalid:
+        raise ValueError(f"FASTQ 读长与 {rb} bp 模式不符，首个错误记录索引 {invalid[0]} ({reads_path})")
     R = np.array([[g.BASE2VAL.get(c, 0) for c in s] for s in reads], dtype=np.uint8)
     return ref, R
 
@@ -405,32 +412,34 @@ def parse_board_log(log_path: Path) -> Optional[Dict[str, Any]]:
             elf = line_str.split(":", 1)[1].strip()
         if "判据哈希" in line_str and ":" in line_str and not criterion_hash:
             criterion_hash = line_str.split(":", 1)[1].strip()
-        # 解析如: PASS 第 2 轮 first.py — 4096 条记录 / score_min=67 / 9s； Result: 8100 bytes, 8.60s
-        if "Result:" in line_str and "bytes" in line_str and "s," in line_str:
-            try:
-                part = line_str.split("Result:")[1]
-                s_part = [p for p in part.split(",") if "s" in p and "Mbps" not in p]
-                if s_part:
-                    val_str = s_part[0].replace("s", "").strip()
-                    elapsed_s = float(val_str)
-            except Exception:
-                pass
-        if "条记录" in line_str and "判据" in line_str:
-            for token in line_str.split():
-                if "条记录" in token:
-                    try:
-                        records = int(token.replace("条记录", "").replace("—", "").strip())
-                        source_reads = records // 2
-                    except Exception:
-                        pass
+        # Result 行含有 "bytes"，不能通过找任意字母 s 来猜耗时字段。
+        result_match = re.search(
+            r"Result:\s*[0-9,]+\s+bytes,\s*([0-9]+(?:\.[0-9]+)?)s(?=,|\s|$)",
+            line_str,
+        )
+        if result_match:
+            elapsed_s = float(result_match.group(1))
+
+        # orientation=both 的板测记录数必须是源读段数的两倍；接受数字与“条记录”间的空格。
+        records_match = re.search(r"([0-9][0-9,]*)\s*条记录", line_str)
+        if records_match:
+            parsed_records = int(records_match.group(1).replace(",", ""))
+            records = parsed_records
+            source_reads = parsed_records // 2 if parsed_records % 2 == 0 else None
 
     if not run_id:
         run_id = log_path.stem
-    if not source_reads:
-        source_reads = 2048
-        records = 4096
-    if elapsed_s is None:
-        elapsed_s = 8.60  # 标准判据轮中位数
+    # 缺失或无效的测量字段不能用“典型值”补齐后冒充历史实测。
+    if (
+        source_reads is None
+        or records is None
+        or elapsed_s is None
+        or source_reads <= 0
+        or records <= 0
+        or elapsed_s <= 0
+        or not math.isfinite(elapsed_s)
+    ):
+        return None
 
     throughput_source = source_reads / elapsed_s if elapsed_s > 0 else 0.0
     throughput_records = records / elapsed_s if elapsed_s > 0 else 0.0
@@ -540,14 +549,10 @@ def run_benchmark_suite(
     if modes is None:
         modes = ["SE150", "SE250"]
 
-    if not run_id:
-        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_id = f"bench_{timestamp_str}"
-
-    output_dir = outdir or (LOGS_BASE_DIR / run_id)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    host_info = get_host_info()
+    if reads <= 0 or probe <= 0 or repeats <= 0:
+        raise ValueError("reads、probe、repeats 都必须是正整数")
+    if not threads or any(thread <= 0 for thread in threads):
+        raise ValueError("threads 必须包含至少一个正整数")
 
     test_configs = {
         "SE150": (150, DATA_DIR / "Sequencing data" / "DNA-40.5Kb-MC-SE150.fastq"),
@@ -557,15 +562,28 @@ def run_benchmark_suite(
         for k, v in fastq_overrides.items():
             if k in test_configs:
                 test_configs[k] = (test_configs[k][0], v)
+    unknown_modes = [mode for mode in modes if mode not in test_configs]
+    if unknown_modes:
+        raise ValueError(f"未知 mode: {', '.join(unknown_modes)}；支持 SE150、SE250")
+
+    if not run_id:
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_id = f"bench_{timestamp_str}"
+
+    output_dir = outdir or (LOGS_BASE_DIR / run_id)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    host_info = get_host_info()
 
     all_results: List[Dict[str, Any]] = []
+    errors: List[str] = []
 
     for mode_name in modes:
-        if mode_name not in test_configs:
-            continue
         rb, fastq_path = test_configs[mode_name]
         if not fastq_path.exists():
-            print(f"[WARN] 数据集文件未找到: {fastq_path}，跳过 {mode_name}")
+            message = f"数据集文件未找到: {fastq_path}，无法测量 {mode_name}"
+            errors.append(message)
+            print(f"[FAIL] {message}")
             continue
 
         print(f"\n>>> 正在加载数据集 {mode_name} (读长: {rb} bp, 源读段数: {reads} 条) ...")
@@ -678,8 +696,11 @@ def run_benchmark_suite(
                     r["speedup_vs_c1"] = "N/A (跨分型不比)"
 
     # 构造最终结构化 JSON
+    status = "PASS" if all_results and not errors else "FAIL"
     output_json = {
         "contract_version": CONTRACT_VERSION,
+        "status": status,
+        "errors": errors,
         "run_id": run_id,
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "host_info": host_info,
@@ -706,6 +727,10 @@ def run_benchmark_suite(
     # 生成人类可读 Markdown 摘要
     md_lines = [
         f"# CPU vs FPGA 公平基准与计时契约评测报告 ({run_id})",
+        "",
+        f"- **运行状态**: **{status}**",
+        *([f"- **失败原因**: {message}" for message in errors] if errors else []),
+        *(["- **失败原因**: 没有生成任何测量结果。"] if not all_results and not errors else []),
         "",
         "> 依据 `docs/08-performance-and-strategy.md的公平基线` 规范生成。严格杜绝稻草人对比与虚假加速比。",
         "",
@@ -763,8 +788,9 @@ def run_benchmark_suite(
     summary_md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
 
     print("\n" + "\n".join(md_lines))
-    print(f"\n[PASS] 结构化评测结果已保存至: {json_path}")
-    print(f"[PASS] 摘要报告已保存至: {summary_md_path}")
+    marker = "PASS" if status == "PASS" else "FAIL"
+    print(f"\n[{marker}] 结构化评测结果已保存至: {json_path}")
+    print(f"[{marker}] 摘要报告已保存至: {summary_md_path}")
 
     return output_json
 
@@ -788,18 +814,22 @@ def main():
     board_log = Path(args.board_log) if args.board_log else None
     outdir = Path(args.outdir) if args.outdir else None
 
-    run_benchmark_suite(
-        reads=args.reads,
-        probe=args.probe,
-        threads=args.threads,
-        modes=args.modes,
-        board_log_path=board_log,
-        include_estimates=args.include_estimates,
-        run_id=args.run_id,
-        outdir=outdir,
-        repeats=args.repeats,
-    )
+    try:
+        result = run_benchmark_suite(
+            reads=args.reads,
+            probe=args.probe,
+            threads=args.threads,
+            modes=args.modes,
+            board_log_path=board_log,
+            include_estimates=args.include_estimates,
+            run_id=args.run_id,
+            outdir=outdir,
+            repeats=args.repeats,
+        )
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        parser.error(str(exc))
+    return 0 if result["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

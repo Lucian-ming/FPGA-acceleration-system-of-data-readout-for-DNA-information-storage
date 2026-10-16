@@ -27,7 +27,7 @@ tools/run_vivado_build.sh \
   report_dir="$HW_RUN/reports" stage1_p_ways=16 stage1_pipe_tree=1
 ```
 
-**未实测这条 Vivado 构建命令**：本次任务按要求从当天已有硬件包开始，没有重跑综合与实现。查看入口参数的 `tools/run_vivado_build.sh --help` 为 ✔ 实测、退出 0。实际硬件构建成功判据为：新 `export/` 中 XSA、`top_bd_wrapper.bit` 和 `hardware_build_config.txt` 均非空；`reports/timing.rpt` 达到 100 MHz 收敛条件（WNS/WHS ≥ 0、TNS/THS=0、失败端点为 0）；配置记录与 XSA 的 part、生成版本、HWH 几何和 P_WAYS/PIPE_TREE 一致。下一步的软件入口会再次核对 XSA、独立 bit 与配置文件的一致性。
+缺口：**硬件 Vivado 从零构建这一段尚未实测**。本次任务按要求从当天已有硬件包开始，没有重跑综合与实现。查看入口参数的 `tools/run_vivado_build.sh --help` 为 ✔ 实测、退出 0。实际硬件构建成功判据为：新 `export/` 中 XSA、`top_bd_wrapper.bit` 和 `hardware_build_config.txt` 均非空；`reports/timing.rpt` 达到 100 MHz 收敛条件（WNS/WHS ≥ 0、TNS/THS=0、失败端点为 0）；配置记录与 XSA 的 part、生成版本、HWH 几何和 P_WAYS/PIPE_TREE 一致。下一步的软件入口会再次核对 XSA、独立 bit 与配置文件的一致性。
 
 ### 2. 由硬件包生成软件制品包
 

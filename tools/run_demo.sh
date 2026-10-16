@@ -68,28 +68,74 @@ banner() {
 }
 note() { printf '  \033[2m%s\033[0m\n' "$*"; }
 
+regression_log_complete() {
+    local log="$1"
+    grep -Fq '[REPORT] 完整报告已生成至:' "$log" \
+        && grep -Fq '[JSON]   结构化结果已保存至:' "$log" \
+        && { grep -Fq '[NOTICE]' "$log" || grep -Fq '[ALL PASSED]' "$log"; }
+}
+
+classify_scene_result() {
+    local got="$1" command_rc="$2" report_complete="$3"
+    if [[ -z "$got" ]]; then
+        actual="TOOL_ERROR"
+        reason="日志缺少匹配判据结果（命令退出码 $command_rc）"
+    elif (( ! report_complete )); then
+        actual="TOOL_ERROR"
+        reason="回归未留下完整报告/JSON/结束标记（命令退出码 $command_rc）"
+    elif (( command_rc != 0 && command_rc != 1 )); then
+        actual="TOOL_ERROR"
+        reason="回归命令异常退出码 $command_rc"
+    elif (( command_rc == 1 )) && [[ "$got" != "False" ]]; then
+        actual="TOOL_ERROR"
+        reason="命令 rc=1 与匹配=$got 不一致"
+    elif (( command_rc == 0 )) && [[ "$got" != "True" ]]; then
+        actual="TOOL_ERROR"
+        reason="命令 rc=0 与匹配=$got 不一致"
+    elif [[ "$got" == "True" ]]; then
+        actual="PASS"
+        reason=""
+    else
+        actual="FAIL"
+        reason=""
+    fi
+}
+
 # 每一幕：跑一个数据集，现场打印哈希与判定
 # $1=数据集 test_id  $2=幕标题  $3=预期结果(PASS/FAIL)
-declare -a SCENE_NAME SCENE_EXPECT SCENE_ACTUAL
+declare -a SCENE_NAME SCENE_EXPECT SCENE_ACTUAL SCENE_RC
+overall_rc=0
 scene() {
     local ds="$1" title="$2" expect="$3"
     banner "$title"
     local log="$OUT_DIR/${ds}.log"
+    local command_rc
     if timeout 600 python3 tools/run_multi_payload_regression.py \
             --mode board --extended --dataset "$ds" \
             --ip "$BOARD_IP" --port "$BOARD_PORT" \
-            --out-dir "$OUT_DIR/$ds" > "$log" 2>&1; then :; fi
+            --out-dir "$OUT_DIR/$ds" > "$log" 2>&1; then
+        command_rc=0
+    else
+        command_rc=$?
+    fi
 
     # 现场把哈希与误码打出来（全部来自本次板端回传）
     grep -E "结果: 误码|恢复 SHA|预期 SHA" "$log" | sed 's/^/  /' || true
     local got
     got="$(grep -oE '匹配=(True|False)' "$log" | tail -1 | cut -d= -f2)"
-    local actual="FAIL"; [[ "$got" == "True" ]] && actual="PASS"
+    local report_complete=0
+    regression_log_complete "$log" && report_complete=1
+    local actual reason=""
+    classify_scene_result "$got" "$command_rc" "$report_complete"
 
-    SCENE_NAME+=("$title"); SCENE_EXPECT+=("$expect"); SCENE_ACTUAL+=("$actual")
-    if [[ "$actual" == "$expect" ]]; then
+    SCENE_NAME+=("$title"); SCENE_EXPECT+=("$expect"); SCENE_ACTUAL+=("$actual"); SCENE_RC+=("$command_rc")
+    if [[ "$actual" == "TOOL_ERROR" ]]; then
+        overall_rc=1
+        printf '  \033[31m▶ 本幕工具失败：%s；不能据此判定预期结果 %s\033[0m\n' "$reason" "$expect"
+    elif [[ "$actual" == "$expect" ]]; then
         printf '  \033[32m▶ 本幕结果：%s（与预期一致）\033[0m\n' "$actual"
     else
+        overall_rc=1
         printf '  \033[31m▶ 本幕结果：%s，但预期是 %s —— 与留证不符，需当场说明\033[0m\n' \
                "$actual" "$expect"
     fi
@@ -110,12 +156,12 @@ if (( ! QUICK )); then
 fi
 
 banner "演示汇总"
-printf '  %-52s %-8s %s\n' "幕次" "预期" "实测"
+printf '  %-52s %-8s %-12s %s\n' "幕次" "预期" "实测" "命令 rc"
 for i in "${!SCENE_NAME[@]}"; do
     color=$'\033[32m'
     [[ "${SCENE_EXPECT[$i]}" != "${SCENE_ACTUAL[$i]}" ]] && color=$'\033[31m'
-    printf "  %-52s %-8s ${color}%s\033[0m\n" \
-        "${SCENE_NAME[$i]}" "${SCENE_EXPECT[$i]}" "${SCENE_ACTUAL[$i]}"
+    printf "  %-52s %-8s ${color}%-12s\033[0m %s\n" \
+        "${SCENE_NAME[$i]}" "${SCENE_EXPECT[$i]}" "${SCENE_ACTUAL[$i]}" "${SCENE_RC[$i]}"
 done
 cat <<EOF
 
@@ -128,3 +174,4 @@ cat <<EOF
 
   留证目录：$OUT_DIR
 EOF
+exit "$overall_rc"

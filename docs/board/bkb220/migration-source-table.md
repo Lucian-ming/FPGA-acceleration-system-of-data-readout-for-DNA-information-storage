@@ -1,6 +1,6 @@
 # BKB220 板级来源表与 PS7 配置草案
 
-更新：2026-10-13。本表最初用于 F2 配置核对与 F3 启动规划，§1–§8 保留当时的来源核对记录。现 `hw/boards/bkb220.tcl` 的 BKB220 profile 为 `ready=1`；P4/P16 整机 route、P4 G3、P16 板测、性能矩阵和 v2 数据集对照已有记录。迁移仍有明确边界：8 h 长稳、v2 `score_min=67`、新载荷四级逐级取证、冷启动、UART 反向、功耗和 F9 未完成。后续各节按证据日期记录，不将旧草案状态当作当前状态。
+更新：2026-10-16。本表最初用于 F2 配置核对与 F3 启动规划，§1–§8 保留当时的来源核对记录。现 `hw/boards/bkb220.tcl` 的 BKB220 profile 为 `ready=1`；P4/P16 整机 route、P4 G3、P16 板测、性能矩阵和 v2 数据集对照已有记录。8 h 长稳已完成（8.005 h、1750 轮全过）；v2 `score_min=67` 为 26 PASS / 16 `SAFE_NOCONV` / 0 静默错误字节；SD 冷启动已通过 G3（仅 SD 路径，启动来源为推断且未抓到 FSBL 日志），UART 反向于 2026-10-14 实测通过。仍未完成：新载荷四级板端取证整体闭环（已有 5 份黄金向量及 `D1_binary_pattern` 4/4 试点）、QSPI 冷启动、功耗实测和 F9。后续各节按证据日期记录，不将旧草案状态当作当前状态。
 
 来源状态标签（用于保留当时的核对记录）严格区分：
 
@@ -626,7 +626,7 @@ PASS    串口收到板端输出              — 7781 个字符
 
 - 制品包：`hw/build/bkb220-p4-enet0-software-20261012T140800Z-board-migrate/`（P4 4/0、SE150 150/50/807/957/64、`part=xc7z020clg400-2`、`legacy=false`、`SHA256SUMS` 59 项全 OK）
 - 留证：`D:\bkb220_board_smoke\g3_runs\20261012T142924Z\`（含 `uart.log`，其中可见 **`autonegotiation complete`** —— §11/§12 那条链的修复判据达成）
-- 通道：**Windows 2026.1 XSDB 烧录 22 产出的制品**（`D:/xilinx/2026.1/Vitis/bin/xsdb.bat`，`--device xc7z020`，CH340 无、用 **COM10** 抓 PS UART），符合 [07 §3a](07-board-build-and-acceptance.md) 的工具链分工。
+- 通道：**Windows 2026.1 XSDB 烧录 22 产出的制品**（`D:/xilinx/2026.1/Vitis/bin/xsdb.bat`，`--device xc7z020`，CH340 无、用 **COM10** 抓 PS UART），符合 [07 §3a](../../07-board-build-and-acceptance.md) 的工具链分工。
 
 **可以对外说**：BKB220（xc7z020）上，P4/SE150/100MHz 的同源硬软包完成真实下载与端到端任务，板端回传经 LDPC 后重建的 JPEG SHA-256 与判据 `fcd0cf90…f2c3` **逐位相同**，四级 DDR 逐级取证通过。
 
@@ -1007,7 +1007,7 @@ SKIP  板端应用层就绪（CAPS）— 前置步骤已失败
 ### 18.4 边界（相对 §17.4 更新）
 
 - ✅ **已完成**：challenge 集板端测试及 P16 对同一 42 例的复测（见 §18.5，P4/P16 与软件判定三方 42/42 一致；其中 8 个 challenge 例仍以 LDPC 不收敛失败）。
-- ❌ **仍未测**：v2 `score_min=67`；四级逐级取证对新载荷（`board_stage_check.py` 仍写死 R0.83 黄金向量）；8 h 长稳。2 h 长稳已完成，见 [2 h 长稳记录](../benchmarks/bkb220-p16-soak-2h.md)。
+- ❌ **仍未测**：v2 `score_min=67`；四级逐级取证对新载荷（`board_stage_check.py` 仍写死 R0.83 黄金向量）；8 h 长稳。2 h 长稳已完成，见 [2 h 长稳记录](../../benchmarks/bkb220-p16-soak-2h.md)。
 - 数据仍是 **in-silico 模拟测序**，非湿实验数据；噪声模型为该包自述，本项目未独立标定。
 - 板端与软件一致**只说明两者跑的是同一套算法且判据同源**；它**不证明**该算法在真实测序误差下的恢复率，也不构成对论文中 FBA/软判决方法的评价。
 - 本轮**未测量**功耗与硬件周期（`hardware_cycles`/`power_w` 无采集）。
@@ -1028,7 +1028,7 @@ SKIP  板端应用层就绪（CAPS）— 前置步骤已失败
 
 ### 18.6 顺带得到的真载荷性能交叉验证
 
-同一轮扫描里，客户端对每例打印了板端结果耗时（与 [性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md) 的 `t_result` 同口径：POST → 8100 B 收齐，不含上传与 LDPC）：
+同一轮扫描里，客户端对每例打印了板端结果耗时（与 [性能矩阵](../../benchmarks/bkb220-p4-p16-performance-matrix.md) 的 `t_result` 同口径：POST → 8100 B 收齐，不含上传与 LDPC）：
 
 | | 中位 | 最小 | 最大 |
 | --- | ---: | ---: | ---: |

@@ -1,6 +1,6 @@
 # 技能包审阅与补齐记录
 
-审阅日期：2026-10-12。范围为本目录入口和 8 个技能包 README、两个随包脚本；事实核对以 `docs/03-status.md` 当前断点、`docs/board/bkb220/migration-source-table.md` §9–§15、`docs/benchmarks/bkb220-p4-p16-100mhz-build.md`、`docs/05-implementation-plan.md` 与 `tools/readme.md` 为准。旧板记录作为历史保留，不覆盖当前 BKB220/P16 状态。
+审阅日期：2026-10-12。范围为本目录入口和 8 个技能包 README、两个随包脚本；事实核对以 `docs/03-status.md` 当前断点、`docs/board/bkb220/migration-source-table.md` §9–§15、`docs/benchmarks/bkb220-p4-p16-100mhz-build.md`、`docs/05-implementation-plan.md` 与 `tools/README.md` 为准。旧板记录作为历史保留，不覆盖当前 BKB220/P16 状态。
 
 ## 逐包结论
 
@@ -41,15 +41,15 @@
 - **问题 / 触发**：多级数据通路端到端结果正确，但担心中间级错误被投票、纠错等机制吸收；触发条件非常明确。
 - **步骤**：逐级导出、参考比较、故障注入、脏轮→干净轮可照做；给出了中间结果和容差写法。
 - **会红吗**：要求故障注入必须使判据变红、复位用不同参数验证，具备鉴别力原则；每个新设计仍需选择自己的注入点。
-- **时效性**：原来的“14/15 不变、图片哈希不变”只适用于主机黄金模型，先前表述容易被误解为板上也不敏感。已限定主机 `make_golden.py` 范围，并说明板上 `wm_regions` BRAM 是 Stage1 实际比较对象。新增当前 BKB220 P16 smoke、全量三轮、四级取证及 1500/64800 bit 脏轮鉴别力证据；原始运行目录明确标作仓库外。
+- **时效性**：原来的“14/15 不变、图片哈希不变”只适用于主机黄金模型，先前表述容易被误解为板上也不敏感。已限定主机 `tools/make_golden.py` 范围，并说明板上 `wm_regions` BRAM 是 Stage1 实际比较对象。新增当前 BKB220 P16 smoke、全量三轮、四级取证及 1500/64800 bit 脏轮鉴别力证据；原始运行目录明确标作仓库外。
 - **结论**：鉴别力边界和新板 P16 证据已补。
 
 ### 6. `ip-packaging-hygiene`
 
 - **问题 / 触发**：IP 打包、仿真和综合可能引用同名模块的不同变体；触发明确。
 - **步骤**：`component.xml`、清单、回归引用、零引用文件与删除出口都写清了。静态门禁要求显式 HDL 文件，不适合通配源集，失效条件已注明。
-- **会红吗**：规则明确映射到 `check_ip_packaging.sh` 并接入 `run_sim.sh`；仍须在每次修改后运行并保留退出码，文档自身不是门禁。
-- **时效性**：旧 2-way/4-way 事故保留为历史。已删除没有依据的“此后一年内”时长说法；补充当前 P4（4/0）和 P16（16/1）身份必须由 `component.xml` / `PACKAGED_VARIANTS.txt`、回归源集和 manifest 三方核对，并提醒 CAPS/TCP 分不出 P4/P16。
+- **会红吗**：规则明确映射到 `tools/check_ip_packaging.sh` 并接入 `tools/run_sim.sh`；仍须在每次修改后运行并保留退出码，文档自身不是门禁。
+- **时效性**：旧 2-way/4-way 事故保留为历史。已删除没有依据的“此后一年内”时长说法；补充当前 P4（4/0）和 P16（16/1）身份必须由 `hw/ip/Dna_accelerator_core_1_0/component.xml` / `hw/ip/PACKAGED_VARIANTS.txt`、回归源集和 manifest 三方核对，并提醒 CAPS/TCP 分不出 P4/P16。
 - **结论**：已有规则有效；新增 P16 识别判据。
 
 ### 7. `ai-agent-collaboration`

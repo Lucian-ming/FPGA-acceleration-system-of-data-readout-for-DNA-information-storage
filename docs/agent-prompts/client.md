@@ -19,7 +19,7 @@
 | `native_ldpc.py` | 177 | 纯 Python DVB-S2 R=5/6 硬判决译码参考实现 |
 | `c_ldpc.py` | 162 | C 加速后端（ctypes 载 `libc_ldpc.so`） |
 | `protocol.py` | 154 | 线上协议 |
-| `tests/test_client_core.py` | ~400 | 7 个 unittest 类 |
+| `clients/python/tests/test_client_core.py` | ~400 | 7 个 unittest 类 |
 
 ---
 
@@ -35,7 +35,7 @@ $ python3 -m unittest discover -s clients/python/tests -p "test_*.py"
 Ran 25 tests ... OK
 ```
 
-原因：`tests/test_client_core.py` 的 `if __name__ == "__main__": unittest.main()`
+原因：`clients/python/tests/test_client_core.py` 的 `if __name__ == "__main__": unittest.main()`
 在**第 200 行**，而 `SE250GeometryTests`（204 行）与 `CLDPCAndAdaptivityTests`（352 行）
 定义在它**后面**。模块自上而下执行 ⇒ `unittest.main()` 被调用时这两个类还不存在，
 **13 个测试（25 个中的 13 个）静默不跑**。
@@ -56,7 +56,7 @@ Ran 25 tests ... OK
 
 它自称 Bit-Exact，`run_g3.sh` 用的也是 `fast_readout` 这条快路径，
 GUI/CLI 走的是 `first.py` 那条。**两条路如果分叉，没有任何测试会红。**
-现有 `tests/test_client_core.py` 里 `fast_readout` 出现 0 次。
+现有 `clients/python/tests/test_client_core.py` 里 `fast_readout` 出现 0 次。
 
 ### G4 三个 LDPC 后端**没有真实交叉比对**
 
@@ -81,7 +81,7 @@ GUI/CLI 走的是 `first.py` 那条。**两条路如果分叉，没有任何测�
 | 项 | 内容 | 验收判据 |
 | --- | --- | --- |
 | **P0-1** | 修 G1：把 `unittest.main()` 挪到文件末尾（或删掉，改由统一入口发现） | 直接跑与 discover 都是 **25/25 PASS** |
-| **P0-2** | 加统一测试入口 `tools/test_client.sh`：先做语法检查、再 discovery 跑全部客户端测试；**断言收集到的用例数不少于登记值**（防「新增测试没被收到」重演） | 一条命令 PASS/FAIL；用例数下限写死在脚本里并有注释说明为何 |
+| **P0-2** | 加统一测试入口 `tools/test_client.sh`：先做语法检查、再 discovery 跑全部客户端测试；**断言实际执行数（收集数减去 skip）不少于登记下限**，跳过项不计入下限，全部跳过必须失败 | 一条命令 PASS/FAIL；`MIN_TESTS` 对实际执行数设下限，全跳过失败；下限写死在脚本里并有注释说明为何 |
 | **P0-3** | 登记进 `tools/README.md`；并在 `AGENTS.md`／`docs/06` 的相应位置指过去 | 卫生门禁 PASS（未登记脚本会红） |
 | **P1-1** | 补 G3：`fast_readout` vs `first.py` 的**逐位等价**回归——真实 FASTQ/plain 样本 + 边界（空文件、非 4 的整数倍、含 N、大小写、`--orient both/forward`、`read_bps 150/250`） | 每一组两路输出**逐字节相同**；不符即 FAIL 并打印首个不符偏移 |
 | **P1-2** | 补 G4：三个后端的**真实**交叉比对（native 必跑；c_accel 存在时必跑；external 仅在 `resources` 齐全时跑，否则明确 skip 并记账） | 同一输入的载荷 SHA 三方相同；缺失后端要**显式报告跳过**而不是静默通过 |
@@ -110,7 +110,7 @@ GUI/CLI 走的是 `first.py` 那条。**两条路如果分叉，没有任何测�
 **Git**：**任何 Git 写操作都不要做**（add/commit/push/rebase 一律禁止），由 main 按路径提交。
 
 **第一轮只做 P0**（一轮一出口，不要一次铺开）：
-1. 修 `tests/test_client_core.py` 的 `unittest.main()` 位置问题；
+1. 修 `clients/python/tests/test_client_core.py` 的 `unittest.main()` 位置问题；
 2. 新增 `tools/test_client.sh`；
 3. 登记 `tools/README.md`。
 

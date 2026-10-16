@@ -79,6 +79,7 @@ python3 "$REPO_ROOT/tools/m2_chain.py" prepare-stage1 \
 DNA="$REPO_ROOT/hw/ip/Dna_accelerator_core_1_0/hdl"
 VOTER="$REPO_ROOT/hw/ip/differential_voter_1_0/hdl"
 DEC="$REPO_ROOT/hw/ip/desparsification_decoder_1_0/hdl"
+IPTB="$REPO_ROOT/hw/sim/ip_tb"
 
 compile_snapshot() {
     local name="$1" top="$2" snapshot="$3"
@@ -97,7 +98,7 @@ compile_snapshot() {
 }
 
 compile_snapshot stage1_compile tb_srpe_batch stage1_full_sim \
-    "$DNA/srpe_batch.v" "$DNA/tb_srpe_batch.v" \
+    "$DNA/srpe_batch.v" "$IPTB/tb_srpe_batch.v" \
     || fail "Stage1 compile/elaborate failed"
 
 run_stage1_batch() {
@@ -162,7 +163,7 @@ python3 "$REPO_ROOT/tools/m2_chain.py" stage2 \
     || fail "could not derive downstream scoreboard from actual Stage1"
 
 compile_snapshot stage2_voter tb_differential_voter stage2_full_sim \
-    "$VOTER/differential_voter_v1_0.v" "$VOTER/tb_differential_voter.v" \
+    "$VOTER/differential_voter_v1_0.v" "$IPTB/tb_differential_voter.v" \
     || fail "Stage2 compile/elaborate failed"
 (
     cd "$OUT_ROOT/stage2_voter" || exit 1
@@ -185,7 +186,7 @@ python3 "$REPO_ROOT/tools/m2_chain.py" xor \
 
 compile_snapshot stage3_decoder tb_desparsifier stage3_full_sim \
     "$DEC/desparsification_decoder_v1_0.v" "$DEC/desparsify_datapath.v" \
-    "$DEC/tb_desparsifier.v" || fail "Stage3 compile/elaborate failed"
+    "$IPTB/tb_desparsifier.v" || fail "Stage3 compile/elaborate failed"
 (
     cd "$OUT_ROOT/stage3_decoder" || exit 1
     timeout --foreground "$TIMEOUT_SEC" "$XSIM" stage3_full_sim -runall \

@@ -16,7 +16,7 @@
 # 边界：板端耗时是**客户端打印值**（墙钟），不是硬件周期计数；`hardware_cycles`/`power_w` 仍为 null。
 # **烧的是哪个包由调用者负责**——本脚本不烧录、也不核验板上跑的是哪份固件，
 # 所以做 A/B 时必须在两次扫描之间自己换包，并把包 SHA 记进 <tag>。
-set -u
+set -euo pipefail
 cd /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 TAG="$1"
 IPPORT="${2:-192.168.1.10:7}"
@@ -31,13 +31,30 @@ for LIM in 2048 8192 32768 full; do
     ARGS=(--ip "$IP" --port "$PORT" --reads "$READS" --watermark "$WM"
           --output "/tmp/${TAG}-${LIM}-${REP}.bits.txt" --no-post --batch 1000)
     [[ "$LIM" == "full" ]] || ARGS+=(--limit "$LIM")
-    LINE="$(timeout 300 python3 clients/python/first.py "${ARGS[@]}" 2>&1 \
-            | /bin/grep -E '^\s+Reads:' | tail -1)"
+    if ! LINE="$(timeout 300 python3 clients/python/first.py "${ARGS[@]}" 2>&1 \
+            | /bin/grep -E '^\s+Reads:' | tail -1)"; then
+      echo "ERROR: upload measurement failed (command, timeout, or missing Reads line): limit=$LIM rep=$REP" >&2
+      exit 1
+    fi
     # Reads: 104 batches, 4144640 bytes, 0.27s, 123.36 Mbps
-    B="$(echo "$LINE" | awk '{print $2}')"
-    BY="$(echo "$LINE" | awk '{print $4}' | tr -d ',')"
-    T="$(echo "$LINE" | awk '{print $6}' | tr -d 's,')"
-    M="$(echo "$LINE" | awk '{print $7}')"
+    if [[ ! "$LINE" =~ ^[[:space:]]+Reads:[[:space:]]+([0-9]+)[[:space:]]+batches,[[:space:]]+([0-9,]+)[[:space:]]+bytes,[[:space:]]+([0-9]+([.][0-9]+)?)s,[[:space:]]+([0-9]+([.][0-9]+)?)[[:space:]]+Mbps[[:space:]]*$ ]]; then
+      echo "ERROR: malformed Reads measurement: ${LINE:-<empty>}" >&2
+      exit 1
+    fi
+    B="${BASH_REMATCH[1]}"
+    BY_RAW="${BASH_REMATCH[2]}"
+    T="${BASH_REMATCH[3]}"
+    M="${BASH_REMATCH[5]}"
+    if [[ ! "$BY_RAW" =~ ^[0-9]+$ && ! "$BY_RAW" =~ ^[0-9]{1,3}(,[0-9]{3})+$ ]]; then
+      echo "ERROR: invalid byte-count grouping: $BY_RAW" >&2
+      exit 1
+    fi
+    BY="${BY_RAW//,/}"
+    if ! awk -v b="$B" -v by="$BY" -v t="$T" -v m="$M" \
+            'BEGIN { exit !(b > 0 && by > 0 && t > 0 && m > 0) }'; then
+      echo "ERROR: non-positive/invalid measurement fields: batches=$B bytes=$BY seconds=$T Mbps=$M" >&2
+      exit 1
+    fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$TAG" "$LIM" "$REP" "$B" "$BY" "$T" "$M" >> "$OUT"
     echo "  $TAG limit=$LIM rep=$REP -> ${T}s (${M} Mbps)"
   done

@@ -33,6 +33,31 @@ info() { printf '    %s\n' "$*"; }
 
 echo "=== 仓库卫生检查 ==="
 
+# 只把 README 表格首列中的反引号条目当作登记。board 目录的 basename
+# 只在明确的 tools/board/ 小节内有效；也接受表格首列直接写完整路径。
+readme_registers_tool() {
+    local path="$1"
+    local basename="${path##*/}"
+    local is_board=0
+    [[ "$path" == tools/board/* ]] && is_board=1
+    awk -v basename="$basename" -v path="$path" -v is_board="$is_board" '
+        /^##[[:space:]]/ { heading=$0 }
+        /^\|/ {
+            cell=$0
+            sub(/^\|[[:space:]]*/, "", cell)
+            sub(/[[:space:]]*\|.*/, "", cell)
+            count=split(cell, token, "`")
+            for (i=2; i<=count; i+=2) {
+                if (token[i] == path ||
+                    (token[i] == basename && (!is_board || heading ~ /tools\/board\//))) {
+                    found=1
+                }
+            }
+        }
+        END { exit !found }
+    ' tools/README.md
+}
+
 # --- 1. 根目录不得有工具生成的残留 ------------------------------------------
 STRAY="$(find . -maxdepth 1 -type f \( -name '*.log' -o -name '*.jou' -o -name '*.str' \
          -o -name '*.pb' -o -name '*.wdb' -o -name 'ref.bin' -o -name 'reads.bin' \) 2>/dev/null)"
@@ -47,10 +72,9 @@ fi
 # --- 2. tools/ 下每个脚本都必须可被发现 --------------------------------------
 # 「一个无人可见的脚本，等于它得出的结论不存在」——不是比喻，已付过一次代价。
 UNDOC=""
-for f in tools/*.py tools/*.sh tools/*.ps1 tools/board/*.py tools/board/*.tcl tools/board/*.ps1; do
+for f in tools/*.py tools/*.sh tools/*.ps1 tools/*.tcl tools/board/*.py tools/board/*.tcl tools/board/*.ps1 tools/board/*.sh; do
     [[ -f "$f" ]] || continue
-    bn="$(basename "$f")"
-    grep -q "$bn" tools/README.md 2>/dev/null || UNDOC+=" $bn"
+    readme_registers_tool "$f" || UNDOC+=" $f"
 done
 if [[ -n "$UNDOC" ]]; then
     bad "未登记进 tools/README.md 的脚本：$UNDOC"
@@ -120,39 +144,63 @@ fi
 #
 # docs/archive/ 整个排除：归档文档引用的是它写作当时的行号，那是正确的历史记录。
 STALE_REF=""
-while IFS= read -r hit; do
-    [[ -n "$hit" ]] || continue
-    src="${hit%%:*}"                       # 出处文件
-    ref="${hit##*:::}"                     # 被引用的 path:line
-    f="${ref%%:*}"; ln="${ref##*:}"
-    resolved=""
-    for pre in "" sw/app/ tools/ tools/board/ clients/python/ hw/scripts/ hw/sim/ hw/sim/ip_tb/ \
-               hw/experimental/ hw/experimental/unused_axi_wrappers/ sw/scripts/ \
-               hw/ip/Dna_accelerator_core_1_0/hdl/ hw/ip/differential_voter_1_0/hdl/ \
-               hw/ip/desparsification_decoder_1_0/hdl/; do
-        [[ -f "$pre$f" ]] && { resolved="$pre$f"; break; }
+LINE_REF_PATTERN='[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+'
+scan_line_references() {
+    local -a includes=() roots=()
+    local status=0
+    while (($#)); do
+        if [[ "$1" == --include=* ]]; then
+            includes+=("$1")
+        else
+            roots+=("$1")
+        fi
+        shift
     done
-    if [[ -z "$resolved" ]]; then
-        STALE_REF+=$'\n'"      悬空  $ref        （出自 $src）"
-    else
-        tot="$(wc -l < "$resolved")"
-        (( ln > tot )) && STALE_REF+=$'\n'"      越界  $ref  实际 $tot 行  （出自 $src）"
-    fi
-done < <(
-    # 豁免两类**历史记录**：本规则的用意是「现行文档别写行号，行号会静默过期」，
-    # 而这两类里的行号是**当时的人/模型真的这么写的**，改写等于伪造留证——
-    # 比行号过期严重得多。豁免的是"记录"，不是"结论"：结论仍写进 docs/ 并被本检查覆盖。
-    #   docs/archive/                      —— 已退休的项目材料
-    #   docs/submission/llm-collaboration/ —— 竞赛要求的 LLM 交互逐字记录（2026-10-14 建）
-    grep -rn --include='*.md' -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' docs/ 2>/dev/null \
-        | grep -v '^docs/archive/' \
-        | grep -v '^docs/submission/llm-collaboration/' \
-        | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
-    grep -rn --include='*.c' --include='*.h' --include='*.v' --include='*.py' --include='*.sh' \
-        -oE '[A-Za-z0-9_/.-]+\.(c|h|v|sv|py|sh|tcl|xml):[0-9]+' \
-        sw/app/ hw/ip/ tools/ clients/python/ 2>/dev/null \
-        | sed -E 's#^([^:]+):[0-9]+:#\1:::#'
-)
+    grep -rn "${includes[@]}" -oE "$LINE_REF_PATTERN" "${roots[@]}"
+    status=$?
+    # grep=1 means no matches; codes above 1 mean the scan could not read its inputs.
+    (( status == 0 || status == 1 ))
+}
+
+SCAN_FAILED=0
+LINE_REF_HITS="$(
+    # 不吞掉读取错误；任一分组失败都令整次扫描失败，不能把空输出当作通过。
+    scan_line_references --include='*.md' docs/ || SCAN_FAILED=1
+    scan_line_references --include='*.c' --include='*.h' --include='*.v' --include='*.sv' \
+        --include='*.py' --include='*.sh' \
+        sw/app/ hw/ip/ hw/sim/ tools/ clients/python/ hw/scripts/ sw/scripts/ || SCAN_FAILED=1
+    # Tcl/PowerShell 入口还存在于 hw/sim/ 与 tools/；递归扫描这四个目录。
+    scan_line_references --include='*.tcl' --include='*.ps1' \
+        hw/scripts/ sw/scripts/ hw/sim/ tools/ || SCAN_FAILED=1
+    (( SCAN_FAILED == 0 ))
+)"
+if (( $? != 0 )); then
+    bad "扫描文件行号引用失败；拒绝按空结果通过"
+else
+    while IFS= read -r hit; do
+        [[ -n "$hit" ]] || continue
+        hit="$(sed -E 's#^([^:]+):[0-9]+:#\1:::#' <<< "$hit")"
+        src="${hit%%:*}"                       # 出处文件
+        # 豁免两类**历史记录**：这里的行号是当时真实写下的，改写等于伪造留证。
+        [[ "$src" == docs/archive/* ]] && continue
+        [[ "$src" == docs/submission/llm-collaboration/* ]] && continue
+        ref="${hit##*:::}"                     # 被引用的 path:line
+        f="${ref%%:*}"; ln="${ref##*:}"
+        resolved=""
+        for pre in "" sw/app/ tools/ tools/board/ clients/python/ hw/scripts/ hw/sim/ hw/sim/ip_tb/ \
+                   hw/experimental/ hw/experimental/unused_axi_wrappers/ sw/scripts/ \
+                   hw/ip/Dna_accelerator_core_1_0/hdl/ hw/ip/differential_voter_1_0/hdl/ \
+                   hw/ip/desparsification_decoder_1_0/hdl/; do
+            [[ -f "$pre$f" ]] && { resolved="$pre$f"; break; }
+        done
+        if [[ -z "$resolved" ]]; then
+            STALE_REF+=$'\n'"      悬空  $ref        （出自 $src）"
+        else
+            tot="$(wc -l < "$resolved")"
+            (( ln > tot )) && STALE_REF+=$'\n'"      越界  $ref  实际 $tot 行  （出自 $src）"
+        fi
+    done < <(printf '%s\n' "$LINE_REF_HITS")
+fi
 if [[ -n "$STALE_REF" ]]; then
     bad "现行文档/源码里有悬空或越界的「文件:行号」引用：$STALE_REF"
     info "修法：改按标识符引用（函数名/状态名/模块名）。行号引用会静默过期，"
@@ -192,8 +240,29 @@ UNDOC_ATTIC=""
 if [[ -d "tools/attic" ]]; then
     for f in tools/attic/*.py tools/attic/*.sh; do
         [[ -f "$f" ]] || continue
-        bn="$(basename "$f")"
-        grep -q "$bn" tools/README.md 2>/dev/null || UNDOC_ATTIC+=" $bn"
+        if ! readme_registers_tool "$f"; then
+            # Attic 表登记为指向归档源码的 Markdown 链接；检查链接所在表格行。
+            if ! awk -v basename="${f##*/}" '
+                /^\|/ {
+                    cell=$0
+                    sub(/^\|[[:space:]]*/, "", cell)
+                    sub(/[[:space:]]*\|.*/, "", cell)
+                    label="[" basename "]("; start=index(cell, label)
+                    if (start) {
+                        target=substr(cell, start + length(label))
+                        end_pos=index(target, ")")
+                        if (end_pos > 1) {
+                            target=substr(target, 1, end_pos - 1)
+                            n=split(target, part, "/")
+                            if (part[n] == basename) found=1
+                        }
+                    }
+                }
+                END { exit !found }
+            ' tools/README.md; then
+                UNDOC_ATTIC+=" ${f##*/}"
+            fi
+        fi
     done
 fi
 if [[ -n "$UNDOC_ATTIC" ]]; then

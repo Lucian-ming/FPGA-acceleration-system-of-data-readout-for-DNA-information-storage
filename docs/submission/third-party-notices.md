@@ -8,8 +8,8 @@
 
 盘点方法：
 
-- 对仓库 955 条 Git 跟踪路径按扩展名和二进制签名盘点，重点检查资源二进制、板卡 PDF、压缩包、图片、数据集、黄金向量和导出制品。
-- 阅读根目录 LICENSE、clients/python/resources/SOURCES.json 和 readme.txt、板卡资料 README 与 SHA256SUMS、数据集 manifest 与 SHA256SUMS、data/MANIFEST.md、hw/build/export/README.md 与 SHA256SUMS。
+- 对 2026-10-16 当前 Git 索引中的 925 条跟踪路径按扩展名和二进制签名盘点，重点检查资源二进制、板卡 PDF、压缩包、图片、数据集、黄金向量和导出制品。该总数按 `git ls-files -z` 计数；与本页盘点日期一致。
+- 阅读根目录 LICENSE、clients/python/resources/SOURCES.json 和 readme.txt、板卡资料 README 与 SHA256SUMS、数据集 manifest 与 SHA256SUMS、data/MANIFEST.md；旧 `hw/build/export/README.md` 与 `SHA256SUMS` 作为历史盘点记录参考（该目录当前已不在工作树，见 [v1.0 发布记录](../reference/release-v1.0.md)）。
 - 对仓库内 7 份跟踪 PDF 提取全文，检索版权、许可、保留权利等文字；对 ECO LED 压缩包检查成员清单；对可见的本地 BSP 副本阅读 lwIP 随附 COPYING。
 - 未联网、未下载、未安装软件。没有在素材内找到可用授权文本的，明确列为“未能确定”，不把常见上游许可当作该文件已获证实的许可。
 
@@ -47,7 +47,7 @@ SOURCES.json 已提供资源哈希和用途；它是溯源记录，不是许可�
 | （旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）03_examples/eco_led-official-example.zip；SHA-256 d85dfd6490440518d2952ba1eaa666fe97036b8ab989abcb803b4a1c44c176b6 | 官方 LED 示例附件：https://admin.shaonianxue.cn/wp-content/uploads/2022/04/2022041010402381.zip；来源元数据见 media_led_2261.json | 未能确定。只检查压缩包成员清单；包内没有 LICENSE、COPYING、NOTICE 或 README 授权说明。包含 Verilog、XDC、生成 bitstream 和 Vivado 工程输出 | 不确定 | 对外提交建议删除压缩包并保留上游链接；若需要分发源代码，先逐文件确认许可并补齐原始声明 |
 | （旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）04_photos/eco_r5-connector-labels.jpg；SHA-256 3a94cd4505da543a832700cd30faf6331fcb05b70a5e91a7b9f2135d99266a1a | ECO 产品资料页 https://z.shaonianxue.cn/product/962.html；图片文件的单独媒体 URL 未记录 | 未能确定。项目 README 将其列为板卡资料图片，没有许可文本；未找到可证明图片授权的记录 | 不确定 | 对外展示改用项目自行拍摄的板卡照片或上游链接；未确认授权前不复制该图 |
 | （旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）04_photos/eco-board-intro.png；SHA-256 8496297a716b17d9b27e875f2f243f32fd974702290f087da5d6a81a2b47b39c | ECO 产品资料页 https://z.shaonianxue.cn/product/962.html；图片文件的单独媒体 URL 未记录 | 未能确定。没有独立许可文件或图片授权记录 | 不确定 | 建议用自制图或官方页面链接替代，未确认授权前不随对外提交 |
-| docs/submission/competition-guide-2026-fpga-amd.pdf；SHA-256 c6ad82acd4f7bdcd13bd412e232ed85d05f2a87dd5e2cdd04f9d219f88b569fc | 本机未跟踪副本。既有 compliance-notes.md 记录了 D:\下载 下的原始指南路径，但没有公共来源 URL | 未能确定。对本地 PDF 全文检索未找到版权或再分发许可声明；竞赛规则的事实用途不等于对文档原件的再分发许可 | 不确定 | 作为本地竞赛规则核对材料留存；公开提交时优先引用组委会来源链接，原件授权未确定前不主动附入对外包 |
+| docs/submission/competition-guide-2026-fpga-amd.pdf；SHA-256 c6ad82acd4f7bdcd13bd412e232ed85d05f2a87dd5e2cdd04f9d219f88b569fc | 当前由 Git 跟踪；原件来源路径记录于既有 compliance-notes.md，但没有公共来源 URL | 未能确定。对 PDF 全文检索未找到版权或再分发许可声明；竞赛规则的事实用途不等于对文档原件的再分发许可 | 不确定 | 原件已纳入仓库；是否进入最终对外提交包尚未决定。公开提交时可优先引用组委会来源链接，原件授权未确认前不应把“已入库”视作“可再分发” |
 
 ## 4. 图片、历史演示和测试数据
 
@@ -68,7 +68,7 @@ SOURCES.json 已提供资源哈希和用途；它是溯源记录，不是许可�
 
 | 素材 | 来源 | 许可判断与依据 | 能否再分发 | 本次处置建议 |
 | --- | --- | --- | --- | --- |
-| hw/build/export/BOOT.bin；SHA-256 2c2ca645a90643b7fe86b9299a5e29c7195990561455ba5943bb93c7dbd20887；dna_accel.xsa；3b4f79a88773284a1ef3f904857232049451b4e7f7bf3902b6c396e26d35bc02；dna_lwip_app_b27.elf；58d84ad3cb0d0849399ca346d4804567dd1463350115f86b472fe6ad3e35af36；fsbl.elf；7d7c1c78ab252d7a1279acc6f8731553f798f61e54d21fd8b4bf071a1240432a；top_bd_wrapper.bit；fd5c401c288a0cb630c2c57990faeac6506d3807390f225159fb6b7d71ddae06 | hw/build/export/README.md 说明这是旧 ZYNQ ECO/P4 发布基线，由 Vivado/Vitis 和 AMD/Xilinx IP 生成；逐项哈希在同目录 SHA256SUMS | 未能确定整体制品的再分发许可。制品混合项目设计与厂商生成 IP、FSBL/BSP 或工具派生内容；当前目录没有覆盖全部嵌入部分的授权声明 | 不确定 | 当前 Git 已跟踪这些历史制品；本次不改动。对外比赛包建议仅本地构建/验收使用，不额外复制；要发布需按当前 Vitis/Vivado、IP 与 BSP 条款逐项确认 |
+| 历史 `hw/build/export/` 中的 BOOT.bin（SHA-256 2c2ca645a90643b7fe86b9299a5e29c7195990561455ba5943bb93c7dbd20887）、dna_accel.xsa（3b4f79a88773284a1ef3f904857232049451b4e7f7bf3902b6c396e26d35bc02）、dna_lwip_app_b27.elf（58d84ad3cb0d0849399ca346d4804567dd1463350115f86b472fe6ad3e35af36）、fsbl.elf（7d7c1c78ab252d7a1279acc6f8731553f798f61e54d21fd8b4bf071a1240432a）、top_bd_wrapper.bit（fd5c401c288a0cb630c2c57990faeac6506d3807390f225159fb6b7d71ddae06） | 历史 `hw/build/export/README.md` 将其记录为旧 ZYNQ ECO/P4 发布基线，由 Vivado/Vitis 和 AMD/Xilinx IP 生成；对应 SHA-256 见该目录的历史 `SHA256SUMS` 记录。依据 [v1.0 发布记录](../reference/release-v1.0.md)，旧发布包已从工作树移出并备份到仓库外 | 未能确定整体制品的再分发许可。制品混合项目设计与厂商生成 IP、FSBL/BSP 或工具派生内容；历史目录没有覆盖全部嵌入部分的授权声明 | 不确定 | 这些历史制品当前不在工作树，已备份到仓库外；本次只更新现状，不改变许可审查结论。对外比赛包建议仅本地构建/验收使用，不额外复制；要发布需按对应 Vivado/Vitis、IP 与 BSP 条款逐项确认 |
 | hw/build/<run-id>/workspace/**/libsrc/lwip211_v1_8/src/lwip-2.1.1/ 的本机生成副本；当前扫描到 31 份内容相同的 COPYING，SHA-256 434d4cf7ba9338b06fd42b6bfe2c52301585df7c3a1a7f41a4f9d62ecd69e085 | Vitis 2022.2 生成的本地 BSP 工作区副本；版本路径标注 lwIP 2.1.1 | 可确定为随附 COPYING 文本中的三条件 BSD 风格许可：再分发源码/二进制须保留版权、条件和免责声明，并遵守不以作者名背书的条件。文件没有 SPDX 标识符，因此这里按原文描述，不额外声称 SPDX 代码 | 可以，须随代码/二进制附带该 COPYING 条款 | 这些副本位于被忽略的构建工作区，不随 Git 提交；若以后打包工作区，必须保留 COPYING 和适用声明 |
 | hw/build/<run-id>/workspace/**/bsp/**/libsrc/ 与 Vivado 生成仿真库；本机 hw/build 当前约 109,194 个文件，未为整个忽略目录生成哈希清单 | 本地 Vitis/Vivado 2022.2 构建输出；包含 AMD/Xilinx 驱动、BSP 与仿真支持文件 | 未能确定为整个目录建立完整许可映射。搜索常见 LICENSE/COPYING/NOTICE 文件名发现 31 份同一 lwIP COPYING；其余厂商代码须按具体组件和工具许可核对，不能由 lwIP 条款覆盖 | 不确定 | 仅本地构建用，不要整体压缩进对外提交包；若要分发单个 BSP/仿真文件，先按文件来源补充许可清单 |
 | archive/；本机历史目录，未被 Git 跟踪，共 19 个文件；逐文件 SHA-256 见第 6 节 | 2025 历史提交包、R0.83 数据压缩包与演示文件；目录中没有第三方许可台账 | 未能确定。目录混有图片、PDF、演示视频、EXE、FASTQ、RAR 与生成结果；没有足以证明第三方素材授权的索引 | 不确定 | 仅历史本机归档，不并入本次对外提交；保留原档案，不在此任务中移动或删除 |
@@ -104,6 +104,6 @@ archive/ 不在 Git 跟踪范围。下列文件名与 SHA-256 记录的是本机
 - 已跟踪源码只发现 tests/host/shim/lwip/err.h 与 tcp.h 两个主机侧接口桩；它们是供项目主机测试使用的最小声明，不是 vendored lwIP 实现。未发现跟踪字体文件（TTF/OTF/WOFF）。
 - clients/python/requirements.txt 声明 numpy 和 Pillow，但没有将这些第三方 Python 包源码或 wheel vendoring 到仓库；本清单不代表已解析运行时安装包的各自许可。
 - 本机 hw/build 和 archive 均有不跟踪内容。它们在 Git 提交中被排除，但不代表把这些目录另行打包时可以再分发。
-- 竞赛指南本机有一份未跟踪 PDF 副本，但其官方来源 URL 与再分发条件未记录；厂商额外授权、MinGW 原始发行版和 R0.83 上游来源也仍未核实。本清单不声称已核实这些外部条件。
+- 竞赛指南 PDF 当前由 Git 跟踪，但其公开来源 URL 与再分发条件未记录；它是否进入最终对外提交包仍未定。厂商额外授权、MinGW 原始发行版和 R0.83 上游来源也仍未核实。本清单不声称已核实这些外部条件。
 
 因此，建议对外提交优先携带项目自制源码、合成测试数据及其 MIT 许可与可复现入口；对外部解码器、LDPC 表、厂商资料、原始数据、历史媒体和预编译硬件制品，先取得明确许可，或用来源链接、项目自制替代物替换。

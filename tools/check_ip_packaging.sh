@@ -31,7 +31,23 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 WRITE_MANIFEST=0
-[[ "${1:-}" == "--write-manifest" ]] && WRITE_MANIFEST=1
+case "$#" in
+    0) ;;
+    1)
+        if [[ "$1" == "--write-manifest" ]]; then
+            WRITE_MANIFEST=1
+        else
+            echo "未知参数: $1" >&2
+            echo "用法: $0 [--write-manifest]" >&2
+            exit 2
+        fi
+        ;;
+    *)
+        echo "参数过多: $*" >&2
+        echo "用法: $0 [--write-manifest]" >&2
+        exit 2
+        ;;
+esac
 
 if (( WRITE_MANIFEST )); then
     {
@@ -53,6 +69,28 @@ FAIL=0
 bad()  { printf '\033[31m  ✗ %s\033[0m\n' "$*"; FAIL=1; }
 ok()   { printf '\033[32m  ✓ %s\033[0m\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
+
+# component.xml 的文件集通过 spirit:file/spirit:name 列出相对路径。
+# 从 XML 文件节点取路径，包含 foo.v 这样的无目录前缀文件名。
+component_file_references() {
+    python3 - "$1" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+ns = {"s": "http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009"}
+root = ET.parse(sys.argv[1]).getroot()
+paths = set()
+for node in root.findall(".//s:fileSets/s:fileSet/s:file", ns):
+    path = node.findtext("s:name", namespaces=ns)
+    if not path:
+        raise SystemExit(f"component.xml 的 spirit:file 缺少 spirit:name: {sys.argv[1]}")
+    paths.add(path)
+if not paths:
+    raise SystemExit(f"component.xml 没有 spirit:file 节点: {sys.argv[1]}")
+for path in sorted(paths):
+    print(path)
+PY
+}
 
 echo "=== IP 打包卫生检查 ==="
 
@@ -90,6 +128,11 @@ for d in hw/ip/*/hdl; do
              [[ -n "$m" ]] && echo "$m $(basename "$f")"
            done | sort | awk '{c[$1]=c[$1]" "$2; n[$1]++} END{for(k in n) if(n[k]>1) print k":"c[k]}')"
     if [[ -n "$dup" ]]; then
+        cx="$(dirname "$d")/component.xml"
+        packed_references=""
+        if ! packed_references="$(component_file_references "$cx")"; then
+            bad "$ip: 无法解析 component.xml 的 spirit:file 引用"
+        fi
         # 同名变体共存本身是允许的（2-way / 4-way 需要并排存在做 A/B 仿真），
         # **有歧义才是错**：只要 component.xml 恰好打包其中一个，综合结果就是确定的。
         # 所以这里只在「同一组同名文件里被打包了不止一个」时判失败。
@@ -100,7 +143,7 @@ for d in hw/ip/*/hdl; do
             mod="${grp%%:*}"; files="${grp#*:}"
             packed=0; packed_name=""
             for bn in $files; do
-                if grep -q "hdl/$bn" "$(dirname "$d")/component.xml" 2>/dev/null; then
+                if grep -Fxq "hdl/$bn" <<< "$packed_references"; then
                     packed=$((packed+1)); packed_name="$bn"
                 fi
             done
@@ -121,11 +164,14 @@ done
 for cx in hw/ip/*/component.xml; do
     ip="$(basename "$(dirname "$cx")")"
     missing=""
+    if ! file_references="$(component_file_references "$cx")"; then
+        bad "$ip: 无法解析 component.xml 的 spirit:file 引用"
+        continue
+    fi
     while read -r rel; do
         [[ -z "$rel" ]] && continue
         [[ -f "$(dirname "$cx")/$rel" ]] || missing+=" $rel"
-    done < <(grep -oE '<spirit:name>[^<]*\.v</spirit:name>' "$cx" \
-             | sed -E 's|</?spirit:name>||g' | sort -u)
+    done <<< "$file_references"
     if [[ -n "$missing" ]]; then
         bad "$ip: component.xml 引用了不存在的文件：$missing"
     else
@@ -182,15 +228,27 @@ fi
 # 而两个 4-way 的 TB 就躺在 hw/sim/ 里从没接进回归。
 # 这类缺陷不产生任何错误答案，所以整套验证金字塔对它失明，必须单独设门禁。
 SIM_ENTRY="tools/run_sim.sh"
+SIM_COMPILED_SOURCES=""
+if ! SIM_COMPILED_SOURCES="$(bash "$SIM_ENTRY" --list-compiled-sources all)"; then
+    bad "$SIM_ENTRY 无法枚举实际编译源文件，拒绝判定回归覆盖"
+    SIM_COMPILED_SOURCES=""
+else
+    SIM_COMPILED_SOURCES="$(printf '%s\n' "$SIM_COMPILED_SOURCES" | LC_ALL=C sort -u)"
+fi
 for cx in hw/ip/*/component.xml; do
     ip="$(basename "$(dirname "$cx")")"
     uncovered=""
-    while read -r rel; do
+    if ! file_references="$(component_file_references "$cx")"; then
+        bad "$ip: 无法解析 component.xml 的 spirit:file 引用，拒绝判定回归覆盖"
+        continue
+    fi
+    while IFS= read -r rel; do
         [[ -z "$rel" ]] && continue
-        bn="$(basename "$rel")"
-        grep -q "$bn" "$SIM_ENTRY" 2>/dev/null || uncovered+=" $bn"
-    done < <(grep -oE '<spirit:name>hdl/[^<]*\.v</spirit:name>' "$cx" \
-             | sed -E 's|</?spirit:name>||g' | sort -u)
+        [[ "$rel" == *.v || "$rel" == *.sv ]] || continue
+        if ! grep -Fxq "hw/ip/$ip/$rel" <<< "$SIM_COMPILED_SOURCES"; then
+            uncovered+=" ${rel#hdl/}"
+        fi
+    done <<< "$file_references"
     if [[ -n "$uncovered" ]]; then
         bad "$ip: 打包进比特流但**回归没覆盖**的文件：$uncovered"
         info "测了不会进比特流的那份实现，等于没测。请在 $SIM_ENTRY 里加用例。"

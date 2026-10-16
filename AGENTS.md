@@ -341,7 +341,7 @@ tools/agent_view.sh done   --agent "<agent 名>" --doing "..." --next "..."
     行号，源码里加几行**纯注释**就会让调试段变、整文件 SHA 变，而机器码一个字节没动
     （`40ba34f` 给 `echo.c` 加了 24 行注释，`export/` 的 ELF 从此没重建过，
     于是 `9006d0ca…` 对不上重建结果）。正确判据是 `objcopy --only-section` 按
-    `.text`/`.data`/`.rodata` 逐段比对，见 `hw/build/export/README.md`。
+    `.text`/`.data`/`.rodata` 逐段比对，见 `docs/09-evidence-ledger.md`。
     Vivado 的报告与 checkpoint 同理（带时间戳、路径、工具版本），要比就比网表。
   - **黄金向量：整文件哈希恰恰是正确判据。** 它们是纯函数产物、不含时间戳，
     `tests/golden/**/SHA256SUMS` 就是靠这个守住的——`make_golden.py` 改成逐票饱和后

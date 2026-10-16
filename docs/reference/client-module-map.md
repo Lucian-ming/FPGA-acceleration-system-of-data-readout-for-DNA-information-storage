@@ -88,7 +88,7 @@ flowchart TD
    - `tools/profile_host.py`：导入 `first.py` 评估端到端流程与分解基线；
    - `tools/run_multi_payload_regression.py`：调用 `first.py` 执行多数据集真实通信与打桩验证。
 2. **测试用例覆盖**：
-   - `tools/test_client.sh`：发现客户端 unittest；当前入口下限为 28 项，收集总数包含跳过项，因此不能单独据此推断用例均已执行。
+   - `tools/test_client.sh`：发现客户端 unittest；当前下限为实际执行 28 项，跳过项不计入下限；若所有用例均跳过，入口失败。
 3. **文档与日志记载**：
    - 其余数十处散落在历史审计文档（如 `docs/archive/`）与压测日志说明中，记录历史演进过程。
 

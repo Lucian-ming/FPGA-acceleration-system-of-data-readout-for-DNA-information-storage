@@ -18,7 +18,9 @@ import ctypes
 import hashlib
 import json
 import os
+import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -80,7 +82,6 @@ def get_c_align_both_lib():
     if _c_align_both_lib is not None:
         return _c_align_both_lib
 
-    so_path = Path("/tmp/libalign_both_robust.so")
     c_src = r"""
 #include <stdint.h>
 #include <stdlib.h>
@@ -177,14 +178,31 @@ void align_reads_both_c(
     free(rl);
 }
 """
-    if not so_path.exists():
-        import subprocess
-        c_path = Path("/tmp/align_both_robust.c")
-        c_path.write_text(c_src, encoding="utf-8")
-        subprocess.run(
-            ["gcc", "-O3", "-shared", "-fPIC", "-fopenmp", str(c_path), "-o", str(so_path)],
-            check=True,
-        )
+    compiler_args = ("-O3", "-shared", "-fPIC", "-fopenmp")
+    compiler_version = subprocess.run(
+        ["gcc", "--version"], check=True, capture_output=True, text=True
+    ).stdout.splitlines()[0]
+    cache_key = hashlib.sha256(
+        b"align-both-cache-v1\0"
+        + c_src.encode("utf-8")
+        + b"\0"
+        + "\0".join(compiler_args).encode("ascii")
+        + b"\0"
+        + compiler_version.encode("utf-8")
+    ).hexdigest()
+    so_path = Path(f"/tmp/libalign_both_robust_{cache_key}.so")
+    if not so_path.is_file():
+        with tempfile.TemporaryDirectory(prefix="align-both-robust-", dir="/tmp") as tmp:
+            tmp_dir = Path(tmp)
+            c_path = tmp_dir / "align_both_robust.c"
+            tmp_so_path = tmp_dir / "libalign_both_robust.so"
+            c_path.write_text(c_src, encoding="utf-8")
+            subprocess.run(
+                ["gcc", *compiler_args, str(c_path), "-o", str(tmp_so_path)],
+                check=True,
+            )
+            # 内容寻址的最终路径只会出现完整构建结果；并发进程可安全覆盖同版本文件。
+            os.replace(tmp_so_path, so_path)
 
     lib = ctypes.CDLL(str(so_path))
     lib.align_reads_both_c.argtypes = [

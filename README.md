@@ -33,11 +33,14 @@ BKB220 配置已为 `ready=1`。P4/P16 均完成 100 MHz 整机 route、bit/XSA 
 
 ```bash
 bash tools/verify_repo_binding.sh --remote
+bash tools/check_repo_hygiene.sh
 bash tools/check_ip_packaging.sh
 python3 -m unittest discover -s tests/host -p 'test_g3_*.py' -v
 bash tests/host/run_host_tests.sh --worktree
 bash tools/run_sim.sh stage1_production
 ```
+
+`check_repo_hygiene.sh` 检查根目录工具残留、工具登记、现用文档编号与归档去号、重复水印、`logs/` 忽略覆盖、文件行号引用、`sw/app/` 与 workspace 同名文件一致性、attic 登记、实验目录清单及已跟踪文件重复 SHA-256。`check_ip_packaging.sh` 检查 IP `hdl/` 内容、重复模块打包歧义、`component.xml` 引用和孤儿文件、打包变体清单、回归覆盖，并核对 Stage1 生产参数/源集/GUI/静态选择及 P-way 源码约束。细项以两个脚本为准，入口见[工具索引](tools/README.md)。
 
 正式LC50长测：`SIM_CASE_TIMEOUT=3600 bash tools/run_sim.sh stage1_production_full`；Windows2026.1的可复现XSim入口见运行手册。LC6短测不能替代LC50。起点参赛脚本附件重复告警已收敛为唯一源引用，过程见[整理记录](docs/reference/workspace-cleanup-2026-10-10.md)；旧失败日志保留。
 

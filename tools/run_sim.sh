@@ -14,12 +14,19 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
-WHICH="${1:-all}"
+LIST_COMPILE_SOURCES=0
+if [[ "${1:-}" == "--list-compiled-sources" ]]; then
+    LIST_COMPILE_SOURCES=1
+    [[ "$#" -eq 2 ]] || { echo "用法: $0 --list-compiled-sources <仿真项>" >&2; exit 2; }
+    WHICH="$2"
+else
+    WHICH="${1:-all}"
+    [[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
+fi
 case "$WHICH" in
     all|packaging|hygiene|datapath|axi|ldpc_decoder|stage1|stage1_4way|stage1_pway|stage1_production|stage1_production_full|stage1_state_split|core_4way|ingress|dna_axil|stage2|host|syntax) ;;
     *) echo "未知仿真项: $WHICH" >&2; exit 2 ;;
 esac
-[[ "$#" -le 1 ]] || { echo "只接受一个仿真项参数" >&2; exit 2; }
 SIM_STAGE1_CYCLE_COUNTERS="${SIM_STAGE1_CYCLE_COUNTERS:-0}"
 if [[ "$SIM_STAGE1_CYCLE_COUNTERS" != 0 && "$SIM_STAGE1_CYCLE_COUNTERS" != 1 ]]; then
     echo "SIM_STAGE1_CYCLE_COUNTERS 必须是 0 或 1" >&2
@@ -31,12 +38,17 @@ if [[ "$SIM_STAGE1_CYCLE_COUNTERS" == 1 ]]; then
 fi
 VVP_ARGS=()
 # 每次运行保留编译、配置、源码hash和失败输出，不在退出时删除证据。
-BUILD="${SIM_LOG_DIR:-logs/iverilog/run_$(date +%Y%m%d_%H%M%S)_${BASHPID}_${WHICH}}"
-mkdir -p "$BUILD" || exit 1
-CASE_TIMEOUT="${SIM_CASE_TIMEOUT:-600}"
-echo "仿真入口: $WHICH；证据目录: $BUILD；每项超时: ${CASE_TIMEOUT}s"
-printf 'entry=%s\ntimeout_seconds=%s\nstage1_cycle_counters=%s\n' \
-    "$WHICH" "$CASE_TIMEOUT" "$SIM_STAGE1_CYCLE_COUNTERS" > "$BUILD/run-config.txt"
+if (( LIST_COMPILE_SOURCES )); then
+    BUILD=""
+    CASE_TIMEOUT=0
+else
+    BUILD="${SIM_LOG_DIR:-logs/iverilog/run_$(date +%Y%m%d_%H%M%S)_${BASHPID}_${WHICH}}"
+    mkdir -p "$BUILD" || exit 1
+    CASE_TIMEOUT="${SIM_CASE_TIMEOUT:-600}"
+    echo "仿真入口: $WHICH；证据目录: $BUILD；每项超时: ${CASE_TIMEOUT}s"
+    printf 'entry=%s\ntimeout_seconds=%s\nstage1_cycle_counters=%s\n' \
+        "$WHICH" "$CASE_TIMEOUT" "$SIM_STAGE1_CYCLE_COUNTERS" > "$BUILD/run-config.txt"
+fi
 
 PASS=0
 FAIL=0
@@ -47,6 +59,13 @@ IPTB=hw/sim/ip_tb
 
 run_case() {
     local name="$1"; shift
+    if (( LIST_COMPILE_SOURCES )); then
+        for source in "$@"; do
+            [[ ( "$source" == *.v || "$source" == *.sv ) && -f "$source" ]] \
+                && printf '%s\n' "$source"
+        done
+        return 0
+    fi
     local log="$BUILD/$name.log"
     local status
     printf '\n=== %s ===\n' "$name"
@@ -72,7 +91,7 @@ run_case() {
     fi
 }
 
-if [[ "$WHICH" != packaging && "$WHICH" != hygiene && "$WHICH" != syntax \
+if (( ! LIST_COMPILE_SOURCES )) && [[ "$WHICH" != packaging && "$WHICH" != hygiene && "$WHICH" != syntax \
       && "$WHICH" != stage1_state_split ]] \
    && [ ! -f tests/golden/sparse_ideal.hex ]; then
     echo "缺少黄金向量，请先运行： python3 tools/make_golden.py"
@@ -83,9 +102,9 @@ fi
 # component.xml 引用的文件必须存在、不许有孤儿文件、打包变体须与清单一致。
 # 放在最前面：这些问题会让综合工具「看到的设计」与你以为的不是同一个，
 # 后面所有仿真判据都建立在错误前提上。
-if [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ] \
+if (( ! LIST_COMPILE_SOURCES )) && { [ "$WHICH" = "all" ] || [ "$WHICH" = "packaging" ] \
    || [ "$WHICH" = "stage1_production" ] || [ "$WHICH" = "stage1_production_full" ] \
-   || [ "$WHICH" = "stage1_state_split" ]; then
+   || [ "$WHICH" = "stage1_state_split" ]; }; then
     if bash tools/check_ip_packaging.sh > "$BUILD/packaging.log" 2>&1; then
         cat "$BUILD/packaging.log"
         PASS=$((PASS+1))
@@ -97,7 +116,7 @@ fi
 
 # 仓库卫生门禁：根目录残留、工具登记、文档编号、共享数据副本、logs 忽略覆盖。
 # 与打包门禁分开：那个管「综合工具看到什么」，这个管「仓库状态是否自洽」。
-if [ "$WHICH" = "all" ] || [ "$WHICH" = "hygiene" ]; then
+if (( ! LIST_COMPILE_SOURCES )) && { [ "$WHICH" = "all" ] || [ "$WHICH" = "hygiene" ]; }; then
     if bash tools/check_repo_hygiene.sh; then
         PASS=$((PASS+1))
     else
@@ -159,31 +178,38 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_pway" ]; then
         "${COUNTER_DEFINE[@]}" \
         -DSRPE_BATCH_4WAY_MODNAME=srpe_batch_4way -DCFG_P_WAYS=16 -DCFG_PIPE_TREE=1 \
         "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" hw/sim/tb_srpe_batch_pway.v
-    if [[ "$SIM_STAGE1_CYCLE_COUNTERS" == 1 ]]; then
+    if [[ "$SIM_STAGE1_CYCLE_COUNTERS" == 1 ]] || \
+       { (( LIST_COMPILE_SOURCES )) && [[ "$WHICH" == all ]]; }; then
         run_case stage1_cycle_counters "${COUNTER_DEFINE[@]}" \
             "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_cycle_counters.v"
     else
-        echo "[STAGE1 COUNTERS] SKIP tb_stage1_cycle_counters.v requires SIM_STAGE1_CYCLE_COUNTERS=1; disabled 0x0C readback is checked by stage1_production."
+        (( LIST_COMPILE_SOURCES )) || echo "[STAGE1 COUNTERS] SKIP tb_stage1_cycle_counters.v requires SIM_STAGE1_CYCLE_COUNTERS=1; disabled 0x0C readback is checked by stage1_production."
     fi
 fi
 
-if [ "$WHICH" = "stage1_state_split" ]; then
+if [ "$WHICH" = "stage1_state_split" ] || \
+   { (( LIST_COMPILE_SOURCES )) && [ "$WHICH" = "all" ]; }; then
     # LC50 单个 64-read 引擎批次正好完成 50*51=2,550 个位置块；
     # TB 层次采样 srpe_batch_pway.st，测量状态占用而不改 RTL。
-    STATE_FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
-    mkdir -p "$STATE_FIXTURE_DIR"
-    if python3 tools/board/generate_stage1_fixture.py --num-lc 50 \
-        --out-dir "$STATE_FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
-        cat "$BUILD/fixture-generation.log"
-        sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
-        find "$STATE_FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
-        VVP_ARGS=("+fixture_dir=$STATE_FIXTURE_DIR")
+    if (( LIST_COMPILE_SOURCES )); then
         run_case stage1_state_split -DCFG_NUM_LC=50 \
             "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_state_split.v"
-        VVP_ARGS=()
     else
-        cat "$BUILD/fixture-generation.log"
-        echo "  ✗ Stage1 状态分解 fixture 生成失败"; FAIL=$((FAIL+1))
+        STATE_FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
+        mkdir -p "$STATE_FIXTURE_DIR"
+        if python3 tools/board/generate_stage1_fixture.py --num-lc 50 \
+            --out-dir "$STATE_FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
+            cat "$BUILD/fixture-generation.log"
+            sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
+            find "$STATE_FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
+            VVP_ARGS=("+fixture_dir=$STATE_FIXTURE_DIR")
+            run_case stage1_state_split -DCFG_NUM_LC=50 \
+                "$A1/srpe_batch_pway.v" "$IPTB/tb_stage1_state_split.v"
+            VVP_ARGS=()
+        else
+            cat "$BUILD/fixture-generation.log"
+            echo "  ✗ Stage1 状态分解 fixture 生成失败"; FAIL=$((FAIL+1))
+        fi
     fi
 fi
 
@@ -195,31 +221,43 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage1_production" ] \
     # BASES_PER_CYCLE），不再是构建期参数，故本入口就是 K=2 的判据，无需额外档位。
     PROD_LC=6
     [[ "$WHICH" == stage1_production_full ]] && PROD_LC=50
-    echo "生产配置: READ_BPS=150 NUM_LC=$PROD_LC STRIDE=807 REF_LEN=957 BATCH=64 P4=4/0 P16=16/1 (K=2 写死)"
-    printf 'read_bps=150\nnum_lc=%s\nstride=807\nref_len=957\nbatch=64\np4=4/0\np16=16/1\nbases_per_cycle=2\n' \
-        "$PROD_LC" >> "$BUILD/run-config.txt"
-    FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
-    printf '%q ' python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
-        --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.command.txt"
-    printf '\n' >> "$BUILD/fixture-generation.command.txt"
-    if python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
-        --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
-        cat "$BUILD/fixture-generation.log"
-        sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
-        find "$FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
-        VVP_ARGS=("+fixture_dir=$FIXTURE_DIR")
-        run_case dna_stage1_p16_equivalence "${COUNTER_DEFINE[@]}" -DCFG_NUM_LC="$PROD_LC" \
-            "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
-            "$IPTB/tb_dna_stage1_p16_equivalence.v"
-        run_case dna_stage1_p16_interface "${COUNTER_DEFINE[@]}" -DCFG_NUM_LC="$PROD_LC" \
-            "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v" \
-            "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
-            "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
-            "$A1/Dna_accelerator_core_v1_0.v" "$IPTB/tb_dna_stage1_p16_interface.v"
-        VVP_ARGS=()
+    PROD_EQUIVALENCE_ARGS=(
+        -DCFG_NUM_LC="$PROD_LC"
+        "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v"
+        "$IPTB/tb_dna_stage1_p16_equivalence.v"
+    )
+    PROD_INTERFACE_ARGS=(
+        -DCFG_NUM_LC="$PROD_LC"
+        "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
+        "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v"
+        "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v"
+        "$A1/Dna_accelerator_core_v1_0.v" "$IPTB/tb_dna_stage1_p16_interface.v"
+    )
+    if (( LIST_COMPILE_SOURCES )); then
+        # 清单模式复用与正式测试相同的 run_case 参数，不生成 fixture 或运行仿真。
+        run_case dna_stage1_p16_equivalence "${COUNTER_DEFINE[@]}" "${PROD_EQUIVALENCE_ARGS[@]}"
+        run_case dna_stage1_p16_interface "${COUNTER_DEFINE[@]}" "${PROD_INTERFACE_ARGS[@]}"
     else
-        cat "$BUILD/fixture-generation.log"
-        echo "  ✗ Stage1独立fixture生成失败"; FAIL=$((FAIL+1))
+        echo "生产配置: READ_BPS=150 NUM_LC=$PROD_LC STRIDE=807 REF_LEN=957 BATCH=64 P4=4/0 P16=16/1 (K=2 写死)"
+        printf 'read_bps=150\nnum_lc=%s\nstride=807\nref_len=957\nbatch=64\np4=4/0\np16=16/1\nbases_per_cycle=2\n' \
+            "$PROD_LC" >> "$BUILD/run-config.txt"
+        FIXTURE_DIR="$(cd "$BUILD" && pwd)/fixtures"
+        printf '%q ' python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
+            --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.command.txt"
+        printf '\n' >> "$BUILD/fixture-generation.command.txt"
+        if python3 tools/board/generate_stage1_fixture.py --num-lc "$PROD_LC" \
+            --out-dir "$FIXTURE_DIR" > "$BUILD/fixture-generation.log" 2>&1; then
+            cat "$BUILD/fixture-generation.log"
+            sha256sum tools/board/generate_stage1_fixture.py > "$BUILD/fixture-generator.sha256"
+            find "$FIXTURE_DIR" -maxdepth 1 -type f -print0 | sort -z | xargs -0 sha256sum > "$BUILD/fixtures.sha256"
+            VVP_ARGS=("+fixture_dir=$FIXTURE_DIR")
+            run_case dna_stage1_p16_equivalence "${COUNTER_DEFINE[@]}" "${PROD_EQUIVALENCE_ARGS[@]}"
+            run_case dna_stage1_p16_interface "${COUNTER_DEFINE[@]}" "${PROD_INTERFACE_ARGS[@]}"
+            VVP_ARGS=()
+        else
+            cat "$BUILD/fixture-generation.log"
+            echo "  ✗ Stage1独立fixture生成失败"; FAIL=$((FAIL+1))
+        fi
     fi
 fi
 
@@ -259,7 +297,7 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "stage2" ]; then
     run_case differential_voter "$V/differential_voter_v1_0.v" "$IPTB/tb_differential_voter.v"
 fi
 
-if [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; then
+if (( ! LIST_COMPILE_SOURCES )) && { [ "$WHICH" = "all" ] || [ "$WHICH" = "host" ]; }; then
     # PS 侧纯计算逻辑的主机单元测试（与固件共用头文件）
     printf '\n=== wm_expand（PS 侧水印展开，主机单元测试）===\n'
     if gcc -O2 -I sw/app -o "$BUILD/test_wm" tools/test_wm_expand.c 2>&1 \
@@ -313,9 +351,16 @@ fi
 
 if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
     # 语法体检：三个当前综合顶层（不是功能验证）
-    printf '\n=== 语法检查（三个综合顶层）===\n'
+    (( LIST_COMPILE_SOURCES )) || printf '\n=== 语法检查（三个综合顶层）===\n'
     check() {  # 名称 + 该顶层的完整文件集
         local label="$1"; shift
+        if (( LIST_COMPILE_SOURCES )); then
+            for source in "$@"; do
+                [[ ( "$source" == *.v || "$source" == *.sv ) && -f "$source" ]] \
+                    && printf '%s\n' "$source"
+            done
+            return 0
+        fi
         if iverilog -g2005 -t null "$@" 2>/dev/null; then
             echo "  ✓ $label"; PASS=$((PASS+1))
         else
@@ -332,7 +377,9 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
         "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
         "$A1/Dna_accelerator_core_v1_0_S_AXI_LITE_CTRL.v" \
         "$A1/fifo_sync_sdpram_b64.v" "$A1/s2mm_pack64.v"
-    if iverilog -g2005 -t null -s Dna_accelerator_core_v1_0 \
+    if (( LIST_COMPILE_SOURCES )); then
+        : # 与上面的 P16 syntax check 是同一源文件集合。
+    elif iverilog -g2005 -t null -s Dna_accelerator_core_v1_0 \
         -P Dna_accelerator_core_v1_0.C_STAGE1_P_WAYS=16 \
         -P Dna_accelerator_core_v1_0.C_STAGE1_PIPE_TREE=0 \
         "$A1/Dna_accelerator_core_v1_0.v" "$A1/srpe_batch_4way.v" "$A1/srpe_batch_pway.v" \
@@ -345,6 +392,10 @@ if [ "$WHICH" = "all" ] || [ "$WHICH" = "syntax" ]; then
     fi
     check differential_voter        hw/ip/differential_voter_1_0/hdl/differential_voter_v1_0.v
     check desparsification_decoder  "$D/desparsification_decoder_v1_0.v" "$D/desparsify_datapath.v"
+fi
+
+if (( LIST_COMPILE_SOURCES )); then
+    exit 0
 fi
 
 printf '\n==================================================\n'

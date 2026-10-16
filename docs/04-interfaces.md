@@ -163,7 +163,7 @@ Stage1 计数器索引如下，计数在每个新任务的 `start` 上升沿清�
 | 0x10 | RW | `OUT_BEATS` 输出拍数（81,000 bit → 1,266） |
 | 0x14 | RW | `TOTAL_READS` **本次任务实际记录数**（含补零尾批；2026-08-16 起 PS 下发 `conn->total_reads_received`，不再用 108,000 宏） |
 | 0x18 / 0x24 / 0x2C / 0x38 | R | 调试：状态计数 / 写计数 / 错误标志 / 最后 RRESP |
-| 0x30 | RW | `SCORE_MIN` 比对分阈值（2026-08-16 新增，D1 方案B）：`score < SCORE_MIN` 的记录在解析后直接跳过、不投票，补零记录（score=0）随之丢弃。复位默认 0=不过滤。PS 固定写 `VOTER_SCORE_MIN=67`（与 `stage2_expect.hex` 的生成阈值 `int(0.45×150)` 严格一致）。注意实施计划原写 0x18，但 0x18 已被 DBG_STATE 占用 |
+| 0x30 | RW | `SCORE_MIN` 比对分阈值：PS 将 `PKT_CONFIG` 解析出的 `conn->cfg.score_min` 写入此寄存器；阈值由本次任务配置提供，固件不固定写 67。`score < SCORE_MIN` 的记录在解析后直接跳过、不投票，补零记录（score=0）随之丢弃。复位默认 0=不过滤。注意实施计划原写 0x18，但 0x18 已被 DBG_STATE 占用 |
 | 0x40 | R | `CYCLES_TOTAL` 【P7】总任务周期数（10 ns @ 100 MHz） |
 | 0x44 | R | `CYCLES_INIT` 【P7】BRAM 清零周期数 |
 | 0x48 | R | `CYCLES_READ` 【P7】DDR 读周期数 |
@@ -184,8 +184,6 @@ Stage1 计数器索引如下，计数在每个新任务的 `start` 上升沿清�
 | 0x1C | `CYCLES_RD_BUSY` 【P7】读引擎活动周期数 |
 | 0x20 | `CYCLES_WR_BUSY` 【P7】写引擎活动周期数 |
 | 0x24 | `CYCLES_RD_WAIT` 【P7】读等待 DDR 延迟周期数 |
-
-> ⚠️ `bd.tcl` 注释把 Voter 与 Decoder 的地址写反了；以 XSA 内 `design_1.hwh` 为准。
 
 ## 4. DDR 布局（`sw/app/echo.h`，当前容量为129,600条记录）
 

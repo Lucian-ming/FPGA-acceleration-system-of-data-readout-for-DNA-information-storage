@@ -153,9 +153,6 @@ XSim 那条路有 `tools/prune_xsim.sh`（保留最近 N 轮、日志自动归�
   虽然旧板已换掉，但这份数据与新板无关、且仍被引用；
 - **`archive/` 未删**（228 MB）——已备份，等用户明确；它受 `AGENTS.md` 与 `README.md` 只读保护，
   且 P9 报告记着"按用户指令与红线要求不删也不自行移动"；
-- **旧板 profile 与构建系统分支未动**——`hw/boards/zynq_eco_7010.tcl`、`hw/scripts/build.tcl`
-  里的 `zynq_eco_7010` 分支**是构建系统的 legacy 默认路径**（`board zynq_eco_7010` 是默认值、
-  `if {$board ne "zynq_eco_7010"}` 是分支条件）。删它是**重写构建逻辑**，不是清理。
-  已用 `dry_run` 验证两块板的配置检查都仍 `BUILD_CONFIG_PASS`；
+- **旧板 profile 与构建系统分支未动（原记录已被后续提交 `ffc4b5d` 取代）**——原执行记录曾称 `hw/boards/zynq_eco_7010.tcl`、`hw/scripts/build.tcl` 中的 `zynq_eco_7010` 分支是 legacy 默认路径，并记载当时 dry-run 的两块板配置检查均为 `BUILD_CONFIG_PASS`；这些内容仅反映原记录写成时的状态。`ffc4b5d` 后，`hw/scripts/build.tcl` 默认 `board=bkb220`，`hw/boards/load_board.tcl` 按显式 board ID 加载现存 profile，旧板不再是构建默认值；
 - **`docs/archive/history/**` 里指向旧板资料的引用未改**——那是历史快照，当时的路径就是那样；
 - **`docs/submission/llm-collaboration/**` 一律未动**——逐字证据。

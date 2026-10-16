@@ -200,8 +200,9 @@ d['software']['variant_of']={'reference_package':ref,'reference_elf_sha256':refe
 note=('由 tools/build_sw_variant.sh 派生：bit/XSA/ps7_init/FSBL 与参考包逐字节相同，'
       '仅应用 ELF 与 BOOT.bin 因编译配置不同而重打。')
 d['software']['variant_note']=note+('label='+label if label else '')
-for t in ('manifest.json','artifact_manifest.json'):
-    json.dump(d, open(p.rsplit('/',1)[0]+'/'+t,'w'), ensure_ascii=False, indent=1)
+with open(p, 'w', encoding='utf-8') as f:
+    json.dump(d, f, ensure_ascii=False, indent=1)
+    f.write('\n')
 print('manifest 已更新')
 PY
 
@@ -214,6 +215,34 @@ if (( SYNC_SRC )); then
     || { echo "source_manifest 重新生成失败" >&2; exit 1; }
   echo "  source_manifest 已按当前工作树重建（--sync-src）"
 fi
+
+# manifest.json 描述包元数据；artifact_manifest.json 使用独立的制品哈希 schema。
+# source_manifest 在 --sync-src 时会刷新，因此等它稳定后再同步两个清单的引用哈希。
+python3 - "$OUT_ABS" <<'PY'
+import hashlib, json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+manifest_path = root / 'manifest.json'
+manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+export_dir = root / 'export'
+artifacts = {
+    path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+    for path in sorted(export_dir.iterdir()) if path.is_file()
+}
+artifact_manifest = {
+    'schema_version': 1,
+    'scope': 'exported-software-package-artifacts',
+    'source_manifest': manifest['source_manifest'],
+    'artifacts_sha256': artifacts,
+}
+artifact_path = root / 'artifact_manifest.json'
+artifact_path.write_text(json.dumps(artifact_manifest, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+manifest['artifact_manifest'] = {
+    'path': 'artifact_manifest.json',
+    'sha256': hashlib.sha256(artifact_path.read_bytes()).hexdigest(),
+}
+manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+print(f"artifact_manifest 已按独立 schema 更新（{len(artifacts)} 个 export 文件）")
+PY
 
 ( cd "$OUT_ABS" && find . -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort \
     | xargs -d '\n' sha256sum > SHA256SUMS )

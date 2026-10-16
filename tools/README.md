@@ -22,7 +22,7 @@
 | --- | --- |
 | `run_g3.sh` | **板级验收唯一入口**。必须显式传入 `--artifact-dir`，完整制品包须有 manifest；无清单包直接拒绝。烧录 → 下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
-| `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际收集数不少于 28；该数是 unittest 收集总数，包含跳过用例 |
+| `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际执行数不少于 28；跳过项不计入下限，全跳过会失败 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
 | `verify_repo_binding.sh` | Git 绑定门禁，动手前必跑 |
 | `agent_view.sh` | 多 agent 看板；**禁止手工编辑 `view.md`** |
@@ -46,6 +46,7 @@
 | `g3_uart_cap.ps1` / `g3_uart_cap.py` | Windows COM 与 WSL `/dev/ttyUSBn` 串口采集器；端口必须显式传入，记录接收量，禁止默认 COM6 |
 | `g3_xsdb.ps1` | Windows XSDB参数桥接，安装/留证路径含空格时分别传参，供G3调用 |
 | `generate_stage1_fixture.py` | 独立NumPy逐符号枚举Stage1 oracle；生产LC50与显式LC6短测，定向807/末区域/补零/并列向量 |
+| `create_stage1_xsim_input.py` | 为**Windows 2026.1 正式 Stage1 XSim** 制作**带 SHA 的只读构建输入**：先 `generate_stage1_fixture.py --num-lc 50` 生成 oracle，再把生产 RTL/TB/fixture 复制成一份带 14 文件 SHA 清单的输入目录，供 `run_stage1_xsim.ps1` 消费。存在理由：正式仿真的输入必须是**不可变、可核验**的，不能就地拿工作树跑 |
 | `g3_performance_matrix.py` | 同板P4/P16多规模≥3次性能矩阵；明确t_result/上传/LDPC/整轮边界，未采集硬件周期时null |
 | `g3_upload_sweep.sh` | **读段上传段的多档 × 多次扫描**（`--no-post`，**只测上传、不触发流水线、不判正确性**）：4 档规模各 3 次，出耗时与吞吐。用来区分上传段是被「轮询周期/接收窗口」还是「停等」限速。**不烧录**——A/B 时换包由调用者负责。见 [上传段 benchmark](../docs/benchmarks/bkb220-p16-speed-a-upload.md) |
 | `g3_soak.py` | **新板长稳（2h/8h）编排**：按**实际墙钟**循环跑 `run_g3.sh` 完整判据轮（全量输入、`--skip-boot`、唯一判据 SHA），逐轮写 TSV，每 N 轮插一次畸变包恢复探针。**不烧录**——调用方须先真烧录本包并把包 SHA 记进 `--tag`；`hardware_cycles`/`power_w` 恒 null，板端耗时是客户端打印值，不得反推。墙钟达标≠全部轮次通过：有失败轮仍继续跑（观察能否恢复），但最终 verdict 会红 |
@@ -108,14 +109,15 @@
 | `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；当前板为 `bkb220`，`build_dir` 必须显式给出，禁止直接写入共享构建根/导出/报告目录。`stage1_cycle_counters=0|1` 默认关闭Stage1硬件周期仪表；需测量时显式设为1 |
 | `build_sw_variant.sh` | **PS 编译宏 A/B 的完整变体包构建器**：复制一份已验收包 → 只在新包副本的 Makefile 里追加 `-D` 宏 → 重建应用 ELF → 重打 BOOT.bin → 写 manifest 派生字段 → 重签并自检 SHA256SUMS。可用 `--define FW_DIAG_VERBOSE=0 --sync-src` 构建安静诊断版（`sw/app/fw_diag.h` 默认值仍为 1，保持出厂日志行为）。**核验并拒绝**新包 bit 与参考包不同（本脚本不改硬件制品）。存在理由：`run_g3.sh` 禁止 `--elf` 指向包外文件，所以任何 PS 侧编译期改动的 A/B 都必须有自己的完整包。只证明新包自洽且与参考包同源，**不证明**它在板上通过 |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
+| `run_stage1_xsim.ps1` | **Windows 2026.1 正式 Stage1 XSim 入口**：`-InputDir <带 SHA 的输入目录> -RunDir <新 run 目录>`。输入须由 `tools/board/create_stage1_xsim_input.py` 制作（不接受就地工作树）。LC50 模块与真实包装接口已通过，结果见 [stage1-16way-ip-integration](../docs/benchmarks/stage1-16way-ip-integration.md) |
 | `test_ldpc_perm.sh` | **PS 侧位级置换的主机单元测试**（不需要板子）。重新生成并校验 `sw/app/ldpc_perm_table.c` → 用 gcc 编 `sw/app/ldpc_perm.c` + 生成的表 → 与 `native_ldpc.deinterleave` 在**板端真实回传样本**与随机/全 0/全 1/交替模式上**逐位比对**，含往返还原。存在理由：板上缺解交织只表现为「核不收敛」，信号弱、定位慢；置换是纯数据变换，可以在主机上被穷尽核验。**只证明 C 实现 == Python 参考，不证明板上正确**（那要 G3 + 串口出现 `converged=1`） |
 | `gen_ldpc_perm_table.py` | 从 `clients/python/resources/permutation64800` 生成 `sw/app/ldpc_perm_table.c`（`inv` 表，语义 `natural[c] = rx[inv[c]]`，u16×64800 = 126.6 KiB）。生成前断言输入是排列，生成后断言逆变换正确且与 `deinterleave` 逐位一致。`--check` 只校验现有文件是否最新（**检入的门禁用法**：手改或源表变更会被抓出来） |
 | `write_source_manifest.py` | 为制品包写/刷新 `reports/source_manifest.json`（`files`: 源码相对路径 → SHA256）并同步 `manifest.json` 的 `source_manifest.sha256`；`--resign` 会顺带重签并自检 SHA256SUMS。范围固定为「决定 bit 与 ELF 的源」。存在理由：**没有它，包里 bit/ELF 出自哪份源码就只剩人嘴说**；`g3_artifacts.py` 只校验这份清单的**格式**，查不出「清单与包内源码不一致」——`build_sw_variant.sh --sync-src` 以前正是这个隐患（已由本工具接入修掉） |
 | `rebuild_software_package.py` | 从 `hw/build/` 下含 XSA 的硬件包生成独立软件验收包：用 Vitis 2022.2 XSCT 生成平台/BSP/FSBL，先 `platform generate` 物化 BSP 头，再设置并复核 `TCP_WND=32768`；跳过 XSCT app create/build，应用一律使用同安装树 ARM GCC 与 `write_fallback_makefile` 编译，优化级别固定为 `-O2`，CFLAGS 同时写入摘要与 manifest；随后生成 ELF/BOOT/readback/manifest/SHA256SUMS 并运行 G3 strict `--plan-only`。只读输入硬件包，不连板、不烧录。完整实测命令和环境边界见 [`docs/submission/reproduce-artifacts.md`](../docs/submission/reproduce-artifacts.md) |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
 | `prune_iverilog.sh` | iverilog 仿真历史生成物的常态化修剪工具（2026-10-16 补）。**默认只剥「编译出来的仿真器二进制」、保留全部留证**——iverilog 每次都会重新编译，删二进制不损失可复现性；`--keep N` 才整目录修剪（默认关闭，因为有些 run 目录被文档当留证引用）。存在理由：XSim 那条路早有 `prune_xsim.sh`，**iverilog 这条路一直是空的**，于是 `logs/iverilog/` 一路涨到 444 MB（其中 432 MB 是 83 个编译产物）。手删不是机制，不补工具下个月还会涨回来 |
-| `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
-| `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记（含 `.ps1`）、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
+| `check_ip_packaging.sh` | IP 打包卫生门禁：`hdl/` 仅含 `.v` 且无 TB；同名模块实现的打包选择无歧义；`component.xml` 引用文件存在且无孤儿；打包变体与清单一致；**打包实现必须被回归覆盖**。另核对 Stage1 参数在 XML/HDL/GUI 间一致，并检查指定 TB 文件名存在（不解析 TB 内参数值）；同时检查生产源集与静态选择、P-way 源码 SHA/默认几何及 K=2 约束（已接入 `run_sim.sh`） |
+| `check_repo_hygiene.sh` | 仓库卫生门禁：根目录工具残留、工具登记、现用文档编号/归档去号、重复水印、`logs/` 忽略覆盖、文件行号引用悬空或越界、`sw/app/` 与 workspace 同名文件逐字节一致、attic 脚本登记、实验目录清单与实际文件一致，以及按脚本豁免范围检查已跟踪文件重复 SHA-256（已接入 `run_sim.sh`） |
 
 
 用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；`rebuild_software_package.py` 已从当日 BKB220 P16 XSA 实际重建软件包并通过 SHA 与 G3 plan-only 门禁。旧ECO XSA软件兼容探针仅保留历史结论，原包已移出当前仓库；不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。

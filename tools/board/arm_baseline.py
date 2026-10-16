@@ -24,6 +24,10 @@
 
 留证：`D:\\dna_board_smoke\\arm_baseline\\<run-id>\\`（report.json、串口无关，结果全在 DDR）。
 依赖：`sw/workspace/dna_platform_b27/` 的 BSP（由 `sw/scripts/create_vitis.tcl` 生成，与生产固件同一份）。
+
+兼容范围：仅支持 BKB220 / XC7Z020 平台，且所选 XSA 的 PS DDR、时钟、MIO 与地址图必须
+和上述固定 BSP、`sw/linker/lscript.ld` 及脚本中的 DDR 地址一致。`--xsa` 只提取
+`ps7_init.tcl`，不会按 XSA 重建 BSP、链接规格或地址；其他平台和不一致配置不受支持。
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import struct
 import subprocess
 import sys
@@ -49,6 +54,7 @@ ARM_GCC = "/tools/Xilinx/Vitis/2022.2/gnu/aarch32/lin/gcc-arm-none-eabi/bin/arm-
 READS = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM = REPO / "data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
 DEFAULT_XSA = REPO / "hw/build/bkb220-v1.0-release-20261016T104902Z-board-migrate/export/dna_accel.xsa"
+BSP_PLATFORM_XSA = REPO / "sw/workspace/dna_platform_b27/export/dna_platform_b27/hw/dna_accel.xsa"
 WIN_ROOT_UNIX = Path("/mnt/d/dna_board_smoke")
 WIN_ROOT_WIN = "D:/dna_board_smoke"
 XSDB_BAT = r"D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat"
@@ -56,6 +62,8 @@ XSDB_BAT = r"D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat"
 HDR, REF, READS_ADDR, RES, SUM = 0x08000000, 0x08001000, 0x08010000, 0x09000000, 0x09F00000
 MAGIC_IN, MAGIC_DONE, MAGIC_BAD = 0xAB5E0001, 0xAB5E00D0, 0xAB5E0BAD
 RB, L = 150, 40500
+SUPPORTED_PART = "xc7z020clg400-2"
+PLATFORM_MEMBERS = ("ps7_init.tcl", "top_bd.hwh", "sysdef.xml")
 
 
 def sh(cmd, **kw):
@@ -63,6 +71,56 @@ def sh(cmd, **kw):
     if r.returncode != 0:
         raise RuntimeError(f"命令失败: {' '.join(map(str, cmd))}\n{r.stdout}\n{r.stderr}")
     return r
+
+
+def xsa_platform_snapshot(path: Path) -> tuple[str, dict[str, bytes]]:
+    """从 XSA 读取器件与 PS/地址图快照；缺元数据时不猜测兼容性。"""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            missing = [name for name in ("ps7_init.html", *PLATFORM_MEMBERS)
+                       if name not in archive.namelist()]
+            if missing:
+                raise ValueError(f"{path} 缺少平台元数据：{', '.join(missing)}")
+            ps_html = archive.read("ps7_init.html").decode("utf-8", errors="replace")
+            parts = re.findall(
+                r"part number:\s*(xc7z[0-9]+[a-z]+[0-9]+-[0-9]+)",
+                ps_html,
+                re.IGNORECASE,
+            )
+            if not parts or len({part.lower() for part in parts}) != 1:
+                raise ValueError(f"{path} 无法唯一确定 FPGA 器件型号")
+            snapshot = {name: archive.read(name) for name in PLATFORM_MEMBERS}
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"不是有效 XSA 压缩包：{path}") from exc
+    return parts[0].lower(), snapshot
+
+
+def validate_xsa_compatibility(xsa: Path) -> None:
+    """要求所选 XSA 与固定 BSP 的器件、PS 初始化及地址图快照完全一致。"""
+    if not BSP_PLATFORM_XSA.is_file():
+        raise ValueError(
+            f"找不到固定 BSP 对应的平台 XSA：{BSP_PLATFORM_XSA}；"
+            "无法证明 BSP 与所选 XSA 一致，拒绝继续"
+        )
+
+    selected_part, selected_snapshot = xsa_platform_snapshot(xsa)
+    bsp_part, bsp_snapshot = xsa_platform_snapshot(BSP_PLATFORM_XSA)
+    mismatches = []
+    if selected_part != SUPPORTED_PART:
+        mismatches.append(f"所选 XSA 器件为 {selected_part}，仅支持 {SUPPORTED_PART}")
+    if bsp_part != SUPPORTED_PART:
+        mismatches.append(f"固定 BSP 平台器件为 {bsp_part}，仅支持 {SUPPORTED_PART}")
+    if selected_part != bsp_part:
+        mismatches.append(f"所选 XSA 器件 {selected_part} 与 BSP 器件 {bsp_part} 不同")
+    for name in PLATFORM_MEMBERS:
+        if selected_snapshot[name] != bsp_snapshot[name]:
+            mismatches.append(f"所选 XSA 与 BSP 的 {name} 不一致")
+    if mismatches:
+        raise ValueError(
+            "平台配置不匹配，拒绝使用固定 BSP/链接脚本/DDR 地址继续构建或上板：\n  - "
+            + "\n  - ".join(mismatches)
+            + f"\n所选 XSA：{xsa}\nBSP 平台 XSA：{BSP_PLATFORM_XSA}"
+        )
 
 
 def build():
@@ -97,16 +155,25 @@ def xsdb(script: Path, cwd: Path) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(
+        description="同片 ARM Cortex-A9 Stage1 基线（仅支持 BKB220 / XC7Z020 平台）",
+        epilog=("兼容范围：仅支持 BKB220 / XC7Z020CLG400-2。BSP、链接规格与 DDR 地址固定，"
+                "不会按 --xsa 自动重建。所选 XSA 必须与固定 BSP 平台 XSA 的"
+                " ps7_init.tcl、top_bd.hwh、sysdef.xml 完全一致；缺少元数据或任一项不一致均拒绝运行。"),
+    )
     ap.add_argument("--reads", type=int, default=64)
     ap.add_argument("--timeout", type=int, default=1800, help="等待板端完成的秒数上限")
     ap.add_argument("--tag", default="")
     ap.add_argument("--xsa", type=Path, default=DEFAULT_XSA,
-                    help=f"硬件平台 XSA（默认 {DEFAULT_XSA}；文件不存在时明确报错）")
+                    help=f"BKB220/XC7Z020 兼容平台 XSA（仅提取 ps7_init.tcl；默认 {DEFAULT_XSA}）")
     a = ap.parse_args()
     xsa = a.xsa.expanduser().resolve()
     if not xsa.is_file():
         ap.error(f"XSA 不存在：{xsa}；请通过 --xsa 指定当前硬件包的 dna_accel.xsa")
+    try:
+        validate_xsa_compatibility(xsa)
+    except (OSError, ValueError) as exc:
+        ap.error(str(exc))
 
     run = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + (f"-{a.tag}" if a.tag else "")
     out = WIN_ROOT_UNIX / "arm_baseline" / run

@@ -52,7 +52,8 @@ DEF_CODEWORD = DATA / "Source data" / "Encoded_codeword" / "codeword_R083.txt"
 # srpe_batch.v:51 的 REGION_W=6 与 :34 的 bram_sel[5:0] 限死 NUM_LC <= 64。
 DEF_NUM_LC = 50
 
-# 已冻结的 SE150 基线：wm_regions.hex 的 SHA-256。用来识别 docs/20 §3.7 G1 那个坑。
+# 已冻结的 SE150 基线：wm_regions.hex 的 SHA-256。几何误用的历史证据见
+# docs/archive/history/2026/se250-study-2026-08-30.md §3.7 G1。
 SE150_WM_REGIONS_SHA = \
     "f352853912338cd0e0a1787445a341a0a74897948c048328903b2723bbdf7f5e"
 
@@ -68,7 +69,8 @@ def derive_geometry(L: int, read_bps: int, num_lc: int) -> tuple:
 
     这两行以前是写死的 `NUM_LC, STRIDE, REF_LEN = 50, 807, 957`。换数据集时脚本
     **不会报错**，只会静默按 SE150 的几何展开水印区域，`wm_regions.hex` 于是和
-    SE150 一模一样（SHA-256 f352853912338cd0…）——docs/20 §3.7 G1 记录了这个坑。
+    SE150 一模一样（SHA-256 f352853912338cd0…）——历史记录见
+    `docs/archive/history/2026/se250-study-2026-08-30.md` §3.7 G1。
     """
     if not 1 <= num_lc <= 64:
         raise SystemExit(f"NUM_LC={num_lc} 必须在 1..64（srpe_batch.v:51 REGION_W=6）")
@@ -158,16 +160,18 @@ def main(argv=None):
         bytes(pack_lsb_first(wm_bits, 8)))
     print(f"  wm_regions.hex       {NUM_LC}×{REF_LEN} = {len(regions)} 个符号")
 
-    # docs/20 §3.7 G1 的哨兵。旧代码把几何写死成 50/807/957，换数据集时**不报错**，
+    # §3.7 G1 的几何哨兵。旧代码把几何写死成 50/807/957，换数据集时**不报错**，
     # 只是静默按 SE150 展开水印区域。故障注入实测（本文件的参数化提交）表明：
     # 那个缺陷下 15 个产物里有 14 个逐字节相同，dec_input 照样译出 fcd0cf90…f2c3、
     # 码字误码照样是 36/64,800 —— 只有 wm_regions.hex 变。所以这条哨兵是唯一
-    # 抓得住它的判据，放在这里尽早失败，不要先摊一地错产物。
+    # 抓得住它的判据，放在这里尽早失败，不要先摊一地错产物。故障注入证据见
+    # docs/archive/history/2026/se250-study-2026-08-30.md §6「鉴别力实测」。
     if rb != 150 and hashlib.sha256(
             (out / "wm_regions.hex").read_bytes()).hexdigest() == SE150_WM_REGIONS_SHA:
         raise SystemExit(
             f"wm_regions.hex 撞上 SE150 的 {SE150_WM_REGIONS_SHA[:16]}…，"
-            f"但读段是 {rb} bp —— 几何没生效，产物不可用（docs/20 §3.7 G1）")
+            f"但读段是 {rb} bp —— 几何没生效，产物不可用 "
+            "(docs/archive/history/2026/se250-study-2026-08-30.md §3.7 G1)")
 
     # ---- Stage1：正反两个方向都算，RTL 判据用正向，投票用胜者 ----
     if args.jobs > 1:
@@ -300,8 +304,9 @@ def main(argv=None):
         print("  sparse_ideal.hex / stage3_ideal_expect.hex  （无噪声纯函数向量，自检通过）")
 
     # ---- 几何清单 ----
-    # SE150 与 SE250 最终产出【同一个】图片 SHA-256 fcd0cf90…f2c3（docs/20 §2 实跑
-    # 证明），所以哈希本身分不出这批向量用的是哪套几何。判据必须连同「哪套几何、
+    # SE150 与 SE250 最终产出【同一个】图片 SHA-256 fcd0cf90…f2c3（历史实跑见
+    # docs/archive/history/2026/se250-study-2026-08-30.md §2），所以哈希本身分不出这批
+    # 向量用的是哪套几何。判据必须连同「哪套几何、
     # 哪份数据、哪个阈值」一起记录，否则会拿一个通过的哈希去证明它证不了的事。
     if args.manifest:
         def rel(path):
@@ -322,7 +327,8 @@ def main(argv=None):
             "# 本批黄金向量的几何与来源（tools/make_golden.py --manifest 生成）\n"
             "#\n"
             "# 为什么需要这份文件：SE150 与 SE250 产出同一个图片 SHA-256\n"
-            "# fcd0cf90…f2c3（docs/20 §2），哈希分不出用的是哪套几何。引用本目录的\n"
+            "# fcd0cf90…f2c3（docs/archive/history/2026/se250-study-2026-08-30.md §2），\n"
+            "# 哈希分不出用的是哪套几何。引用本目录的\n"
             "# 任何判据时，必须连同下面这些字段一起记录。\n"
             "# 内容只由输入决定（不含时间戳），重跑同一条命令应逐字节相同。\n"
             "\n"

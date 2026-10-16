@@ -64,8 +64,9 @@ data/*
 !data/MANIFEST.sh
 archive/
 
-# 板卡资料包（docs/board/）整体纳入版本管理，只排除体积过大的教学视频；
-# 其 SHA-256 仍记录在 docs/board/zynq-eco-7010/SHA256SUMS.txt 中，可按需另行获取。
+# 当前 BKB220 厂商资料位于 docs/board/bkb220/，SHA-256 清单为 docs/board/bkb220/SHA256SUMS.txt；
+# 旧 ZYNQ ECO 7010 资料原件已于 2026-10-16 移出仓库，历史项目记录见
+# docs/archive/history/2026/board-zynq-eco-7010.md。板卡资料仍整体纳入版本管理，只排除体积过大的教学视频。
 docs/board/**/tutorials/*.mp4
 
 # 编辑器与操作系统本地文件

@@ -123,7 +123,7 @@ def main(argv: list[str]) -> int:
     tsv = out / "soak.tsv"
     log = out / "soak.log"
     if not tsv.exists():
-        tsv.write_text("round\twall_s\tverdict\trecords\tresult_s\tjudge_sha\tmatch\trun_dir\tnote\n")
+        tsv.write_text("round\twall_s\tverdict\trecords\tresult_s\tjudge_sha\tmatch\trun_dir\tnote\tprocess_rc\n")
 
     t0 = time.time()
     deadline = t0 + args.hours * 3600.0
@@ -132,7 +132,7 @@ def main(argv: list[str]) -> int:
     print(f"    tag   {args.tag}")
 
     rnd = 0
-    n_fail = 0
+    recovery_probe_rcs: list[int] = []
     while time.time() < deadline:
         rnd += 1
         rlog = out / f"round{rnd:04d}.out"
@@ -151,14 +151,12 @@ def main(argv: list[str]) -> int:
         info = parse_round(rlog)
         match = "YES" if info["judge_sha"] == args.expect_sha else "NO"
         note = "" if rc == 0 else f"rc={rc}"
-        if info["verdict"] != "PASS":
-            n_fail += 1
         with tsv.open("a") as fh:
             fh.write("\t".join([str(rnd), f"{time.time()-t0:.1f}", info["verdict"],
                                 info["records"], info["result_s"], info["judge_sha"],
-                                match, info["run_dir"], note]) + "\n")
+                                match, info["run_dir"], note, str(rc)]) + "\n")
         print(f"[{time.time()-t0:7.0f}s] 轮 {rnd:4d}  {info['verdict']:4s}  "
-              f"{info['records']:>7s} 条  {info['result_s']:>6s}s  match={match} {note}")
+              f"{info['records']:>7s} 条  {info['result_s']:>6s}s  match={match} rc={rc}")
 
         if args.recovery_every and rnd % args.recovery_every == 0:
             jl = out / "recovery.jsonl"
@@ -166,25 +164,74 @@ def main(argv: list[str]) -> int:
                       "--ip", args.ip, "--port", str(args.port),
                       "--jsonl", str(jl), "--cycles", "1",
                       "--tag", f"{args.tag}-soak-r{rnd}"], log, timeout=600)
+            recovery_probe_rcs.append(prc)
             print(f"          ↳ 畸变包探针 rc={prc}")
 
-    # 收尾：把 TSV 汇成一条可判读的结论（墙钟 + 轮次 + 失败轮 + 退出码）
-    rows = [l.split("\t") for l in tsv.read_text().splitlines()[1:] if l.strip()]
+    # 收尾：必须同时有展示判据 PASS、期望 SHA 命中和 G3 子进程 rc=0。
+    # 兼容旧 TSV 仅用于读取事实：旧表没有 process_rc 的轮次按“退出码未知”处理，
+    # 不能因展示文本 PASS 就补推它们曾以 rc=0 退出。
+    lines = [line for line in tsv.read_text().splitlines() if line.strip()]
+    header = lines[0].split("\t") if lines else []
+    header_idx = {name: i for i, name in enumerate(header)}
+    rows = [line.split("\t") for line in lines[1:]]
+
+    def field(row: list[str], name: str) -> str:
+        idx = header_idx.get(name)
+        return row[idx] if idx is not None and idx < len(row) else ""
+
+    def process_rc(row: list[str]) -> str:
+        # 既有 9 列 TSV 会在运行时追加第 10 列 process_rc；即使旧表头不能改写，
+        # 新行仍可从额外列读取退出码。
+        if len(row) > len(header):
+            return row[-1]
+        idx = header_idx.get("process_rc")
+        if idx is not None and idx < len(row):
+            return row[idx]
+        # 旧格式把非零码留在 note，但成功码从未被记录，故空 note 是未知而非 0。
+        note = field(row, "note")
+        m = re.fullmatch(r"rc=(-?\d+)", note)
+        return m.group(1) if m else ""
+
     wall = time.time() - t0
-    ok = [r for r in rows if r[2] == "PASS" and r[6] == "YES"]
-    verdict = "PASS" if (rows and len(ok) == len(rows) and wall >= args.hours * 3600 * 0.98) else "FAIL"
+    round_statuses = []
+    for row in rows:
+        rc_value = process_rc(row)
+        verdict_value = field(row, "verdict")
+        match_value = field(row, "match")
+        if not re.fullmatch(r"-?\d+", rc_value):
+            round_statuses.append("unverified")
+        elif rc_value != "0":
+            round_statuses.append("fail")
+        elif verdict_value == "PASS" and match_value == "YES":
+            round_statuses.append("pass")
+        elif verdict_value == "FAIL" or match_value == "NO":
+            round_statuses.append("fail")
+        else:
+            round_statuses.append("unverified")
+    ok = [status for status in round_statuses if status == "pass"]
+    rounds_failed = sum(status == "fail" for status in round_statuses)
+    rounds_unverified = sum(status == "unverified" for status in round_statuses)
+    probe_failures = sum(rc != 0 for rc in recovery_probe_rcs)
+    enough_wall = wall >= args.hours * 3600 * 0.98
+    verdict = "PASS" if (rows and len(ok) == len(rows) and not probe_failures and enough_wall) else "FAIL"
     summary = {
         "tag": args.tag, "artifact_dir": args.artifact_dir, "ip": args.ip,
         "target_hours": args.hours, "wall_s": round(wall, 1),
         "rounds": len(rows), "rounds_pass_with_expected_sha": len(ok),
-        "rounds_failed": len(rows) - len(ok), "verdict": verdict,
+        "rounds_failed": rounds_failed, "rounds_unverified": rounds_unverified,
+        "verdict": verdict,
+        "recovery_probes": len(recovery_probe_rcs),
+        "recovery_probes_pass": len(recovery_probe_rcs) - probe_failures,
+        "recovery_probes_failed": probe_failures,
+        "recovery_probe_rcs": recovery_probe_rcs,
+        "wall_time_sufficient": enough_wall,
         "hardware_cycles": None, "power_w": None,
         "note": ("UNMEASURED: 无外部 UART 周期采集、无功率计；result_s 是客户端打印值，"
                  "不得反推周期或功耗"),
     }
     (out / "soak_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1))
     print(f"\n墙钟 {wall/3600:.3f} h（目标 {args.hours} h），{len(rows)} 轮，"
-          f"通过 {len(ok)} 轮，失败 {len(rows)-len(ok)} 轮")
+          f"通过 {len(ok)} 轮，失败 {rounds_failed} 轮，未验证 {rounds_unverified} 轮")
     print(f"长稳结论：{verdict}  → {out/'soak_summary.json'}")
     return 0 if verdict == "PASS" else 1
 

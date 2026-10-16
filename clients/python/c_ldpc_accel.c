@@ -108,6 +108,25 @@ LDPC_API ldpc_decoder_t* ldpc_create(const char* pchk_path, const char* perm_pat
     }
     fclose(fp_perm);
 
+    /* 校验 permutation 是 [0, LDPC_N_BITS) 内的唯一排列，避免后续 natural[] 越界或覆盖。 */
+    uint8_t* perm_seen = (uint8_t*)calloc(LDPC_N_BITS, sizeof(uint8_t));
+    if (!perm_seen) {
+        free(pchk_raw);
+        free(perm_raw);
+        return NULL;
+    }
+    for (int i = 0; i < LDPC_N_BITS; i++) {
+        uint32_t value = perm_raw[i];
+        if (value >= LDPC_N_BITS || perm_seen[value]) {
+            free(perm_seen);
+            free(pchk_raw);
+            free(perm_raw);
+            return NULL;
+        }
+        perm_seen[value] = 1;
+    }
+    free(perm_seen);
+
     ldpc_decoder_t* dec = (ldpc_decoder_t*)calloc(1, sizeof(ldpc_decoder_t));
     if (!dec) {
         free(pchk_raw);

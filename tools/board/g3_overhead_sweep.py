@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 import sys
 import time
@@ -114,9 +115,16 @@ def main(argv=None):
     ap.add_argument("--out-dir", default=None)
     args = ap.parse_args(argv)
 
+    limits = [int(x) for x in args.limits.split(",") if x.strip()]
+    if args.repeat < 1:
+        ap.error("--repeat 必须至少为 1")
+    if args.timeout <= 0:
+        ap.error("--timeout 必须大于 0")
+    if len(limits) < 2 or any(limit <= 0 for limit in limits) or len(set(limits)) != len(limits):
+        ap.error("--limits 必须包含至少两个互不重复的正整数档位")
+
     caps = query_board_caps(args.ip, args.port)
 
-    limits = [int(x) for x in args.limits.split(",") if x.strip()]
     run_id = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     out_dir = Path(args.out_dir) if args.out_dir else REPO / "logs" / "overhead_sweep" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -128,26 +136,47 @@ def main(argv=None):
     print("    注意：本工具只测时间，不判正确性；小规模覆盖度不足，LDPC 必然不收敛。\n")
 
     rows = []
+    all_tiers_complete = True
     for lim in limits:
         samples = []
+        failures = []
         for k in range(args.repeat):
             try:
                 r = one_run(args.ip, args.port, lim,
                             out_dir / f"dec_{lim}_{k}.txt", args.timeout)
+                for field in ("t_wm", "t_batches", "t_result", "t_total", "wall"):
+                    value = r[field]
+                    if value is None or not math.isfinite(float(value)):
+                        raise ValueError(f"{field} 不是有限数值: {value!r}")
             except Exception as e:
-                print(f"  [{lim:>5} 条] 第 {k+1} 次失败: {e}")
+                message = f"第 {k+1} 次失败: {e}"
+                failures.append(message)
+                print(f"  [{lim:>5} 条] {message}")
                 continue
             samples.append(r)
             print(f"  [{lim:>5} 条 / {lim*2:>5} 记录] 第 {k+1} 次: "
                   f"水印 {r['t_wm']:.3f}s  读段 {r['t_batches']:.3f}s  "
                   f"结果 {r['t_result']:.3f}s  总 {r['t_total']:.3f}s")
             time.sleep(1.0)   # 让板端连接彻底回收，避免单例 g_conn 抢占
-        if not samples:
+        if len(samples) != args.repeat:
+            all_tiers_complete = False
+            row = {
+                "limit_source_reads": lim,
+                "records": lim * 2,
+                "status": "INCOMPLETE",
+                "expected_n": args.repeat,
+                "n": len(samples),
+                "failures": failures,
+            }
+            rows.append(row)
+            print(f"  -> 样本不足：要求 {args.repeat} 次，只有 {len(samples)} 次；此档不入模型\n")
             continue
         med = {k: statistics.median([s[k] for s in samples])
                for k in ("t_wm", "t_batches", "t_result", "t_total", "wall")}
         med["limit_source_reads"] = lim
         med["records"] = lim * 2
+        med["status"] = "COMPLETE"
+        med["expected_n"] = args.repeat
         med["n"] = len(samples)
         med["t_result_all"] = [s["t_result"] for s in samples]
         rows.append(med)
@@ -156,7 +185,7 @@ def main(argv=None):
     (out_dir / "sweep.json").write_text(
         json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    if len(rows) >= 2:
+    if all_tiers_complete and len(rows) >= 2:
         xs = [r["records"] for r in rows]
         ys = [r["t_result"] for r in rows]
         a, b, r2 = fit_line(xs, ys)
@@ -176,8 +205,17 @@ def main(argv=None):
                   f"—— 差得越多，说明原模型的常数项越不可信")
         (out_dir / "fit.txt").write_text(
             f"all_points  a={a:.6f} b_ms={b*1000:.6f} r2={r2:.6f}\n", encoding="utf-8")
+    else:
+        (out_dir / "fit.txt").write_text(
+            f"no_model status=INCOMPLETE expected_samples_per_tier={args.repeat}\n",
+            encoding="utf-8",
+        )
 
     print(f"\n结果已保存: {out_dir}/sweep.json")
+    if not all_tiers_complete:
+        print("[FAIL] 至少一档未达到 --repeat 样本数；未拟合模型。")
+        return 1
+    print("[PASS] 所有档位均取得完整样本。")
     return 0
 
 

@@ -22,7 +22,8 @@ run_g3.sh 的图片 SHA-256；因此调用方应当在本探针跑完之后**再
 用法：
     python3 tools/board/g3_recovery_probe.py --ip 192.168.1.10 --port 7 \
         --jsonl tests/stress_results/<run>/recovery.jsonl
-退出码 0 = 所有用例注入后板端都恢复；1 = 有用例未恢复。
+退出码 0 = 所有适用用例均已执行且恢复；1 = 已执行故障未恢复；
+退出码 2 = 注入未执行或证据不完整（即使板端随后可握手也不计 PASS）。
 """
 
 from __future__ import annotations
@@ -219,6 +220,7 @@ def main(argv=None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
 
     n_fail = 0
+    n_unexecuted = 0
     seq = 0
     with out.open("a", encoding="utf-8") as fh:
         for cycle in range(1, args.cycles + 1):
@@ -240,10 +242,20 @@ def main(argv=None) -> int:
                 ok, t_rec, attempts, last_err, caps = wait_recovered(
                     args.ip, args.port, args.deadline, args.interval, args.settle)
 
-                if ok:
+                injection_status = "not_applicable" if injector is None else (
+                    "failed" if inj_err else "executed")
+                if inj_err:
+                    # 恢复成功不能证明未发生的注入已被恢复；保留 recovered 事实，
+                    # 但将本用例从 PASS 中摘出并单独统计为未执行/证据不足。
+                    case_status = "not_executed"
+                    failure_class = "inconclusive"
+                    n_unexecuted += 1
+                elif ok:
+                    case_status = "pass"
                     failure_class = "pass"
                 else:
                     # 恢复不了 = 板端连接层没回收 → 功能缺陷，不是工具问题。
+                    case_status = "fail"
                     failure_class = "functional"
                     n_fail += 1
 
@@ -253,6 +265,8 @@ def main(argv=None) -> int:
                     "timestamp_utc": ts,
                     "tag": args.tag,
                     "case": name,
+                    "injection_status": injection_status,
+                    "case_status": case_status,
                     "injection": detail,
                     "board_response": observed,
                     "inject_error": inj_err,
@@ -270,13 +284,17 @@ def main(argv=None) -> int:
                 fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 fh.flush()
 
-                flag = "OK " if ok else "FAIL"
-                print(f"[{flag}] c{cycle} {name:<20} 注入={observed:<28} "
+                flag = {"pass": "OK ", "fail": "FAIL", "not_executed": "UNEXEC"}[case_status]
+                print(f"[{flag}] c{cycle} {name:<20} 注入状态={injection_status:<14} "
+                      f"观察={observed:<28} "
                       f"恢复 {t_rec:5.1f}s / {attempts} 次尝试"
-                      + ("" if ok else f"  ← {last_err}"))
+                      + (f"  ← 注入失败: {inj_err}" if inj_err else
+                         ("" if ok else f"  ← {last_err}")))
 
-    print(f"\n共 {seq} 个用例，未恢复 {n_fail} 个。结构化结果：{out}")
-    return 1 if n_fail else 0
+    print(f"\n共 {seq} 个用例，功能未恢复 {n_fail} 个，注入未执行 {n_unexecuted} 个。结构化结果：{out}")
+    if n_fail:
+        return 1
+    return 2 if n_unexecuted else 0
 
 
 if __name__ == "__main__":

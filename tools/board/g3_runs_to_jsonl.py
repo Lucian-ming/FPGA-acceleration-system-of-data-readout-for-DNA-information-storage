@@ -49,6 +49,12 @@ def parse_summary(run_dir: Path) -> dict:
     """从 summary.txt 取本次 run 的全局参数与逐轮表。"""
     txt = (run_dir / "summary.txt").read_text(encoding="utf-8", errors="replace")
     meta = {"run_name": run_dir.name}
+    expected_match = re.search(r"^任务次数\s*:\s*(\d+)\b", txt, re.M)
+    if not expected_match:
+        raise ValueError(f"{run_dir / 'summary.txt'} 缺少有效的‘任务次数’字段")
+    expected_rounds = int(expected_match.group(1))
+    if expected_rounds <= 0:
+        raise ValueError(f"{run_dir / 'summary.txt'} 任务次数必须为正数")
     for key, pat in (
         ("invocation", r"命令\s*:\s*(.+)"),
         ("judge_score_min", r"判据阈值\s*:\s*score_min=(\d+)"),   # 下面转 int
@@ -67,6 +73,8 @@ def parse_summary(run_dir: Path) -> dict:
     for m in re.finditer(r"^(\d+)\s+(判据轮|弄脏轮)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$",
                          txt, re.M):
         r = int(m.group(1))
+        if r in rows:
+            raise ValueError(f"{run_dir / 'summary.txt'} 第 {r} 轮重复出现")
         rows[r] = {
             "kind": "judge" if m.group(2) == "判据轮" else "dirty",
             "source_reads": int(m.group(3)),
@@ -75,6 +83,15 @@ def parse_summary(run_dir: Path) -> dict:
             "timeout_s": int(m.group(6)),
             "wall_s": None if m.group(7) == "未跑" else int(m.group(7)),
         }
+    expected_ids = set(range(1, expected_rounds + 1))
+    parsed_ids = set(rows)
+    if parsed_ids != expected_ids:
+        missing = sorted(expected_ids - parsed_ids)
+        unexpected = sorted(parsed_ids - expected_ids)
+        raise ValueError(
+            f"{run_dir / 'summary.txt'} 轮次数不匹配：预期 {expected_rounds} 轮，"
+            f"成功解析 {len(rows)} 轮；缺少 {missing}，超出 {unexpected}"
+        )
     meta["rows"] = rows
 
     # 步骤裁决行：用来给每轮定 failure_class，而不是靠猜。
@@ -161,16 +178,20 @@ def main(argv=None) -> int:
     payload_sha = sha256_of(REPO / args.reads_file)
     wm_sha = sha256_of(REPO / args.wm_file)
 
+    parsed_runs = []
+    for rd in args.run_dir:
+        run_dir = Path(rd)
+        if not (run_dir / "summary.txt").is_file():
+            raise FileNotFoundError(f"缺少 summary.txt：{run_dir}")
+        parsed_runs.append((run_dir, parse_summary(run_dir)))
+    if not parsed_runs or not any(meta["rows"] for _, meta in parsed_runs):
+        raise ValueError("没有可输出的有效轮次；拒绝生成空 JSONL")
+
     out = Path(args.jsonl)
     out.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     with out.open("w", encoding="utf-8") as fh:
-        for rd in args.run_dir:
-            run_dir = Path(rd)
-            if not (run_dir / "summary.txt").is_file():
-                print(f"跳过（无 summary.txt）：{run_dir}", file=sys.stderr)
-                continue
-            meta = parse_summary(run_dir)
+        for run_dir, meta in parsed_runs:
             for r in sorted(meta["rows"]):
                 row = meta["rows"][r]
                 first = parse_first_log(run_dir / f"first_run{r}.log")

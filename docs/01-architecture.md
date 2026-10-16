@@ -24,7 +24,7 @@ DNA 信息存储的**读出**（readout）环节：把测序仪产出的大量�
                       └─ 合成/测序 → 51,781 条 x 150 bp  SE150.fastq
 ```
 
-读出侧（本仓库）就是把这条链**倒过来走**。三个主计算核在 PL；在 Stage2 与 Stage3 间，
+读出侧（本仓库）就是把这条链**倒过来走**。Stage1、Stage2、Stage3 与 LDPC 译码核在 PL；在 Stage2 与 Stage3 间，
 当前由 PS 做一次软件 XOR 作为过渡：
 
 | 级 | 载体 | 输入 | 输出 | 作用 |
@@ -33,7 +33,8 @@ DNA 信息存储的**读出**（readout）环节：把测序仪产出的大量�
 | Stage 2 | `differential_voter` (PL) | 48 B/条 | 81,000 bit | 按起点把读段投票叠加，重建共识序列 |
 | Stage 2.5 | `apply_watermark_differential()` (PS) | 共识序列 + 水印 | 81,000 bit 稀疏流 | 逐字节 XOR；是 B3 的过渡实现 |
 | Stage 3 | `desparsification_decoder` (PL) | 81,000 bit | 64,800 bit | 5b→4b 反稀疏化，还原 LDPC 码字 |
-| Stage 4 | PC 端 EXE | 64,800 bit | 54,000 bit + JPEG | DVB-S2 R=5/6 LDPC 硬判决译码 |
+| Stage 4 | `ldpc_decoder_0` (PL；PS 固件调度并搬运码字) | 64,800 bit 码字 | 收敛时输出纠正后的 64,800 bit 码字 | DVB-S2 R=5/6 LDPC 硬判决译码 |
+| PC 在线后处理 | `clients/python/ldpc_pipeline.py` | 板端回传码字 | syndrome 校验、提取 54,000 bit 信息位并打包载荷 | 仅校验与载荷提取，不做迭代纠错 |
 
 > **实现边界**：B3（Stage 2.5）已由 `sw/app/echo.c` 接入 PS 状态机，**运行在 ARM 上而非 PL IP**。
 > 因此本系统**不是纯硬件三级流水**，对外材料（架构图、答辩稿）必须如实标注这一级在 PS 侧。
@@ -43,6 +44,8 @@ DNA 信息存储的**读出**（readout）环节：把测序仪产出的大量�
 > （「Stage2 输出 ⊕ 水印 vs `sparse_expect.hex`」一项即是它），
 > 2026-09-10 多轮 `tools/run_g3.sh` 均 PASS，端到端图片 SHA-256
 > `fcd0cf90…f2c3` 逐位相同。当前状态以 [03](03-status.md) 为准。
+>
+> **LDPC 边界**：固件 `PIPE_LDPC_PREP/RUN/READBACK` 状态通过 AXI-Lite 装载、启动并读回 PL 译码器；只有译码收敛时才把纠正码字写回结果缓冲。错误、不收敛或超时时保留 Stage3 原码字。PC 在线客户端只验 syndrome、提取信息位并生成载荷；校验失败即拒绝结果，不用 PC 译码器兜底。仓库保留的 Windows `R5_6_LDPC_hard_decoder.exe` 不是当前在线客户端的运行依赖，`native_ldpc.hard_decode` 属于离线工具路径。
 
 ---
 
@@ -54,14 +57,13 @@ PC (Python GUI/CLI)
 ARM Cortex-A9 (裸机 + lwIP)  ── GEM0 ── PHY
   │  AXI-DMA (SG 模式, MM2S/S2MM)      GP0=控制  HP0=数据
   ├─ Stage1 DNA core     0x43C0_0000   AXIS 进 / AXIS 出（走 DMA）
+  ├─ Stage2 Voter        0x43C2_0000   AXI-Lite 控制 + AXI4 Master 自取 DDR
   ├─ Stage3 Desparsifier 0x43C1_0000   AXI-Lite 控制 + AXI4 Master 自取 DDR
-  └─ Stage2 Voter        0x43C2_0000   AXI-Lite 控制 + AXI4 Master 自取 DDR
+  └─ Stage4 LDPC decoder 0x43C3_0000   AXI-Lite 控制；PS 逐字装载/读回码字
 DDR3 512MB：水印 / 读段 / 各级中间结果（地址表见 docs/04-interfaces.md）
 ```
 
 地址来自 XSA 内 `design_1.hwh`，器件 `xc7z010clg400-1`，PL 100 MHz。
-注意 `hw/scripts/bd.tcl` 注释里把 Stage2/Stage3 的地址写反了。
-
 数据流不是链式直连，而是**每一级都经过 DDR 中转**，由 PS 逐级配置寄存器、启动、轮询 done：
 
 ```
@@ -71,7 +73,9 @@ PC → DDR(reads) → [DMA MM2S] → Stage1 → [DMA S2MM] → DDR(48B/read)
                                               ↓ PS：共识 XOR 水印（B3，10,125 B）
                                         DDR(81,000 bit 稀疏流)
                                               ↓ Stage3 自己读 DDR
-                                        DDR(64,800 bit) → PS → TCP → PC → LDPC → JPEG
+                                        DDR(64,800 bit) → PS 解交织/装载 → PL 片上 LDPC
+                                              ↓ PS 读回/交织后写回
+                                        DDR(64,800 bit) → TCP → PC 验 syndrome/提取信息位/生成载荷
 ```
 
 ---
@@ -153,8 +157,15 @@ r[k] = grp[4:1] ^ {4{grp[0]}};          // 第一个 bit=取反标志
 
 ---
 
-## 6. Stage 4：LDPC（PC 端）
+## 6. Stage 4：LDPC（PL 译码，PS 调度）
 
-`clients/python/resources/R5_6_LDPC_hard_decoder.exe`（Windows x86-64，无源码）
-读取 `dec_input.txt`（64,800 个 '0'/'1' 字符）、`dvb_s2_r5_6.pchk`、`permutation64800`，
-以硬判决模式输出 54,000 bit 和 JPEG。这是目前唯一的 LDPC 实现载体，也是可维护性上的最大风险。
+BD 实例 `ldpc_decoder_0` 运行 DVB-S2 R=5/6 硬判决译码。PS 固件在 `PIPE_LDPC_PREP` 解交织输入，
+经 AXI-Lite 分批装载 64,800 bit，启动并轮询译码；收敛后读回并交织纠正码字，写回结果缓冲。
+错误、不收敛或超时路径保留 Stage3 原码字，由 PC 端的 syndrome 校验将未纠正结果判为失败。
+
+### PC 在线后处理边界
+
+在线客户端接收 64,800 bit 结果后只做解包/解交织、syndrome 校验、提取 54,000 bit 信息位，
+再按配置字节数打包载荷；未指定字节数时沿用 JPEG EOI 截断。在线路径没有第二次迭代译码，
+也不会对 syndrome 非零的结果做软件补救。旧 Windows `R5_6_LDPC_hard_decoder.exe` 仍作为资源保留，
+但资源说明确认它不在当前客户端运行路径；`native_ldpc.hard_decode` 仅供离线数据集、黄金数据及工具使用。

@@ -21,6 +21,9 @@ VIVADO=${VIVADO:-$VIVADO_ROOT/bin/vivado}
 XSIM=${XSIM:-$VIVADO_ROOT/bin/xsim}
 PYTHON=${PYTHON:-python3}
 KEEP=${KEEP:-3}
+# M3_BOARD 选择 hw/boards/<board>.tcl（默认 bkb220）；M3_PART_NAME 显式覆盖 profile 器件。
+BOARD=${M3_BOARD:-bkb220}
+PART_NAME=${M3_PART_NAME:-}
 NO_PRUNE=0
 WHICH="all"
 
@@ -103,7 +106,8 @@ gen_project() {
     local casedir="$1" tb_top="$2" tb_src="$3" bd_sel="${4:-prod}"
     local log="$casedir/vivado.log"
     mkdir -p "$casedir"
-    local args=(outdir="$casedir" stage=bd1 bd_script_sel="$bd_sel")
+    local args=(outdir="$casedir" stage=bd1 bd_script_sel="$bd_sel" board="$BOARD")
+    [[ -n "$PART_NAME" ]] && args+=(part_name="$PART_NAME")
     [[ -n "$tb_top" ]] && args+=(tb_top="$tb_top")
     [[ -n "$tb_src" ]] && args+=(tb_srcs="$tb_src")
     (

@@ -30,7 +30,8 @@ SOFTWARE.
 公开分享这些素材前须按各自来源的许可处理：
 
 - `data/R0.83_data/`：原始测序与水印数据（AGENTS.md 规定只读、不默认分发）。
-- `docs/board/zynq-eco-7010/`、`docs/board/bkb220/`：厂商板级资料（BKB220 手册与原理图）。
+- `docs/board/bkb220/`：当前 BKB220 厂商板级资料（产品手册与原理图），各自保留来源许可。
+- 旧 ZYNQ ECO 7010 厂商资料原件已于 2026-10-16 移出仓库；仅保留历史项目记录 `docs/archive/history/2026/board-zynq-eco-7010.md`，不作为当前板卡素材目录。若引用该记录中保留的第三方内容，仍须遵守其来源条款。
 - `docs/submission/`、`archive/`：参赛提交与历史资产，其中含第三方数据与图片。
 - `hw/build/export/`：历史发布制品（含第三方编码产出的镜像）。
 - 任何由 Xilinx/AMD 工具生成的 IP、BSP、FSBL、BOOT 等派生文件，其条款随上游工具。

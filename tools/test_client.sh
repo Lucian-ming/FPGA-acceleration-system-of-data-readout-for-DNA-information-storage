@@ -7,8 +7,7 @@ cd "$REPO"
 CLIENT_DIR="$REPO/clients/python"
 TEST_DIR="$CLIENT_DIR/tests"
 MIN_TESTS=28
-# unittest discovery 当前实测收集 28 项（含本轮 3 个板端校验/载荷判据）；
-# 此数来自最终输出的 “Ran 28 tests”，新增用例后须同步提高下限。
+# unittest discovery 的最低实际执行数（跳过项不计入）；新增用例后须同步提高下限。
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -32,48 +31,42 @@ UNITTEST_RC=$?
 set -e
 cat "$TEST_LOG"
 
-ACTUAL_TESTS="$(python3 - "$TEST_LOG" <<'PY'
+TEST_STATS="$(python3 - "$TEST_LOG" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 output = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-matches = re.findall(r"^Ran (\d+) tests? in .+$", output, flags=re.MULTILINE)
-print(matches[-1] if matches else 0)
-PY
-)"
-printf '实际收集用例数：%s（下限：%d）\n' "$ACTUAL_TESTS" "$MIN_TESTS"
-
-python3 - "$TEST_LOG" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-output = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
-summary = re.findall(r"^(?:OK|FAILED)(?: \(([^)]*)\))?$", output, flags=re.MULTILINE)
-if not summary:
-    print("测试统计：通过=未知，失败=未知，跳过=未知（无法解析 unittest 摘要）")
-    raise SystemExit(0)
-
 ran = re.findall(r"^Ran (\d+) tests? in .+$", output, flags=re.MULTILINE)
+summaries = re.findall(r"^(?:OK|FAILED)(?: \(([^)]*)\))?$", output, flags=re.MULTILINE)
 total = int(ran[-1]) if ran else 0
+summary = summaries[-1] if summaries else ""
 counts = {
     name: int(value)
-    for name, value in re.findall(r"(failures|errors|skipped)=(\d+)", summary[-1])
+    for name, value in re.findall(r"(failures|errors|skipped)=(\d+)", summary)
 }
+skipped = counts.get("skipped", 0)
 failures = counts.get("failures", 0)
 errors = counts.get("errors", 0)
-skipped = counts.get("skipped", 0)
 failed = failures + errors
-passed = max(0, total - failed - skipped)
-print(
-    f"测试统计：通过={passed}，失败={failed}（failures={failures}, errors={errors}），"
-    f"跳过={skipped}"
-)
+executed = max(0, total - skipped)
+passed = max(0, executed - failed)
+print("|".join(map(str, (total, executed, skipped, passed, failed, failures, errors, int(bool(ran and summaries))))))
 PY
+)"
+IFS='|' read -r COLLECTED_TESTS EXECUTED_TESTS SKIPPED_TESTS PASSED_TESTS FAILED_TESTS FAILURES ERRORS SUMMARY_PARSED <<< "$TEST_STATS"
+printf '测试计数：收集=%s，实际执行=%s，跳过=%s（实际执行下限：%d）\n' \
+    "$COLLECTED_TESTS" "$EXECUTED_TESTS" "$SKIPPED_TESTS" "$MIN_TESTS"
+printf '测试统计：通过=%s，失败=%s（failures=%s, errors=%s），跳过=%s\n' \
+    "$PASSED_TESTS" "$FAILED_TESTS" "$FAILURES" "$ERRORS" "$SKIPPED_TESTS"
 
-if ((ACTUAL_TESTS < MIN_TESTS)); then
-    echo "FAIL: 收集到的客户端测试少于登记下限 $MIN_TESTS"
+if ((SUMMARY_PARSED != 1)); then
+    echo "FAIL: 无法解析 unittest 的 Ran 行或 OK/FAILED 摘要"
+    exit 1
+fi
+
+if ((EXECUTED_TESTS < MIN_TESTS)); then
+    echo "FAIL: 实际执行的客户端测试少于登记下限 $MIN_TESTS（跳过项不计入）"
     exit 1
 fi
 

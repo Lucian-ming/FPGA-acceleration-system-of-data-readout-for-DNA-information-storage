@@ -10,7 +10,7 @@
 | [04接口](04-interfaces.md) | TCP/寄存器/DMA/DDR契约 | 05 |
 | [05完整执行计划](05-implementation-plan.md) | 全项目地图、F0～F9、子Agent、监控、Git/清理 | 04、06、11、13、14、15、19 |
 | [06验证与压力](06-verification-plan.md) | 逐层判据、故障/连续/长稳、统计 | 08、12 |
-| [07板级与迁移](07-board-build-and-acceptance.md) | 旧板/BKB220、PS7、硬软制品、P4/P16上板 | 09、20 |
+| [07板级与迁移](07-board-build-and-acceptance.md) | 旧板/BKB220、PS7、硬软制品、P4/P16上板 | 09 |
 | [08性能与策略](08-performance-and-strategy.md) | 最新公平基线、旧推导边界、测量优先级 | 07、17 |
 | [09证据台账](09-evidence-ledger.md) | 可使用结论→原始证据/复现/限制；历史审计索引 | 16、18 |
 
@@ -29,6 +29,7 @@
 
 ## 本轮证据与历史
 
+- [项目历史导航索引](reference/project-history.md)：按日期和原始资料入口追溯历史；当前状态仍以03、结论边界仍以09为准。
 - [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)、[同板P4/P16六档性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)（性能分正式口径）、[P16故障注入探针](benchmarks/bkb220-p16-fault-probes.md)（守卫/畸变包/中途断网 + 判据轮）、[P16长稳2小时](benchmarks/bkb220-p16-soak-2h.md)、[P16精细时间预算](benchmarks/bkb220-p16-time-budget.md)（speed 主线底稿）、[LDPC行引擎OOC探针](benchmarks/ldpc-row-engine-ooc-probe.md)、[LDPC L4译码器原型](benchmarks/ldpc-decoder-l4.md)（功能对黄金 + 时序收敛）。
 - docs/board：对应资料和板测小证据；docs/benchmarks：可复查的性能/功能摘要。
 - [本次合并归档索引](archive/history/2026/pre-bkb220-handoff-2026-10-10/README.md)：旧20份文档、原名→当前入口、快照校验清单。
