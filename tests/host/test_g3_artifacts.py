@@ -14,6 +14,8 @@ from pathlib import Path
 REPO=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('g3_artifacts',REPO/'tools/board/g3_artifacts.py')
 g3=importlib.util.module_from_spec(spec);spec.loader.exec_module(g3)
+FIXTURE_ARTIFACTS={'bit':'top_bd_wrapper.bit','xsa':'dna_accel.xsa',
+    'elf':'dna_lwip_app_b27.elf','fsbl':'fsbl.elf','boot':'BOOT.bin'}
 
 class ArtifactTests(unittest.TestCase):
     def setUp(self):
@@ -22,7 +24,7 @@ class ArtifactTests(unittest.TestCase):
         self.params=dict(zip(g3.PARAMS,(150,50,807,957,64,16,1)))
         self.part='xc7z020clg400-2'
         self.manifest={'schema_version':1,'board_id':'bkb220','part':self.part,
-            'parameters':copy.deepcopy(self.params),'artifacts':g3.LEGACY_FILES.copy(),
+            'parameters':copy.deepcopy(self.params),'artifacts':FIXTURE_ARTIFACTS.copy(),
             'tool_versions':{'vivado':'2026.1','vitis':'2026.1'},
             'source_manifest':{'path':'source_manifest.json','sha256':''}}
         self.source={'files':{'hw/scripts/bd.tcl':'a'*64}}
@@ -33,14 +35,14 @@ class ArtifactTests(unittest.TestCase):
         self.write()
     def tearDown(self):self.temp.cleanup()
     def write(self):
-        for k,n in g3.LEGACY_FILES.items():
+        for k,n in FIXTURE_ARTIFACTS.items():
             if k!='xsa':(self.root/n).write_bytes(self.embedded_bit if k=='bit' else b'fixture-'+k.encode())
         info={'devices':[{'part':{'name':self.xsa_part}}],'files':[{'name':'inside.bit','type':'FULL_BIT'}],'generatedVersion':'2026.1'}
         system=f'<SYSTEMINFO DEVICE="{self.xsa_part[2:7]}" PACKAGE="clg400" SPEEDGRADE="-2"/>' if self.include_system else ''
         hwh=f'<EDKSYSTEM>{system}<MODULE MODTYPE="Dna_accelerator_core"><PARAMETERS>'
         hwh+=''.join(f'<PARAMETER NAME="{k}" VALUE="{v}"/>' for k,v in self.xsa_params.items())
         hwh+='</PARAMETERS></MODULE></EDKSYSTEM>'
-        with zipfile.ZipFile(self.root/g3.LEGACY_FILES['xsa'],'w') as z:
+        with zipfile.ZipFile(self.root/FIXTURE_ARTIFACTS['xsa'],'w') as z:
             z.writestr('xsa.json',json.dumps(info));z.writestr('ps7_init.tcl','fixture-init')
             z.writestr('inside.bit',self.embedded_bit);z.writestr('system.hwh',hwh)
         (self.root/'source_manifest.json').write_text(json.dumps(self.source))
@@ -55,17 +57,15 @@ class ArtifactTests(unittest.TestCase):
         info=g3.validate(self.root,device='xc7z020');self.assertEqual(info['parameters']['C_STAGE1_P_WAYS'],16)
     def test_wrong_target(self):self.rejected('目标器件',device='xc7z010')
     def test_missing_xsa(self):
-        (self.root/g3.LEGACY_FILES['xsa']).unlink();self.rejected('不存在')
+        (self.root/FIXTURE_ARTIFACTS['xsa']).unlink();self.rejected('不存在')
     def test_missing_manifest(self):
-        (self.root/'manifest.json').unlink();self.sums();self.rejected('缺 manifest')
-    def test_legacy_z020_refused(self):
-        (self.root/'manifest.json').unlink();self.sums();self.rejected('只允许旧',allow_legacy=True)
+        (self.root/'manifest.json').unlink();self.sums();self.rejected('缺 manifest.json')
     def test_hash_failure(self):
-        (self.root/g3.LEGACY_FILES['elf']).write_bytes(b'wrong');self.rejected('校验失败')
+        (self.root/FIXTURE_ARTIFACTS['elf']).write_bytes(b'wrong');self.rejected('校验失败')
     def test_missing_hash_entry(self):
         p=self.root/'SHA256SUMS';p.write_text('\n'.join(l for l in p.read_text().splitlines() if 'fsbl.elf' not in l));self.rejected('未被 SHA256SUMS')
     def test_embedded_bit_mismatch(self):
-        (self.root/g3.LEGACY_FILES['bit']).write_bytes(b'other-bit');self.sums();self.rejected('内置 bit')
+        (self.root/FIXTURE_ARTIFACTS['bit']).write_bytes(b'other-bit');self.sums();self.rejected('内置 bit')
     def test_part_manifest_mismatch(self):
         self.manifest['part']='xc7z010clg400-1';self.write();self.rejected('part 与 XSA')
     def test_param_mismatch(self):
@@ -103,12 +103,11 @@ class ArtifactTests(unittest.TestCase):
             self.assertEqual(p.returncode,0,p.stderr);self.assertEqual((Path(temp_stage)/'ps7_init.tcl').read_text(),'fixture-init')
     def test_plan_new_no_hardware(self):
         p=self.plan('--device','xc7z020');self.assertEqual(p.returncode,0,p.stderr);self.assertIn('不打开串口',p.stdout)
-    def test_plan_z020_without_artifact_dir_refuses_legacy_fallback(self):
+    def test_plan_z020_without_artifact_dir_requires_package(self):
         p=subprocess.run(['bash','tools/run_g3.sh','--device','xc7z020','--ip','127.0.0.1',
             '--plan-only','--skip-boot','--skip-dump','--no-uart'],cwd=REPO,capture_output=True,text=True)
         self.assertEqual(p.returncode,2,p.stdout+p.stderr)
-        self.assertIn('新板严格验收模式必须显式传 --artifact-dir',p.stderr)
-        self.assertIn('拒绝默认 hw/build/export legacy 回退',p.stderr)
+        self.assertIn('必须显式传 --artifact-dir 指定完整制品包',p.stderr)
     def test_plan_wsl_xsdb_local_path_and_server_url(self):
         p=self.plan('--xsdb','/bin/true','--hw-server','TCP:127.0.0.1:3132',
                     '--win-root','/tmp/g3-wsl-fixture','--device','xc7z020','--ip','127.0.0.1')
@@ -123,9 +122,10 @@ class ArtifactTests(unittest.TestCase):
         p=self.plan('--win-root','relative/path');self.assertEqual(p.returncode,2);self.assertIn('路径转换失败',p.stderr)
     def test_single_bit_override_refused(self):
         p=self.root/'separate.bit';p.write_bytes(b'other');self.rejected('覆盖 bit',bit_override=str(p))
-    def test_plan_legacy_default(self):
+    def test_plan_without_artifact_dir_refused(self):
         p=subprocess.run(['bash','tools/run_g3.sh','--plan-only','--skip-boot','--skip-dump','--no-uart'],cwd=REPO,capture_output=True,text=True)
-        self.assertEqual(p.returncode,0,p.stderr);self.assertIn('legacy',p.stdout)
+        self.assertEqual(p.returncode,2,p.stdout+p.stderr)
+        self.assertIn('必须显式传 --artifact-dir 指定完整制品包',p.stderr)
     def plan(self,*extra,skip_tools=True):
         cmd=['bash','tools/run_g3.sh','--artifact-dir',str(self.root),'--plan-only','--no-uart','--ip','127.0.0.1']
         if skip_tools:cmd+=['--skip-boot','--skip-dump']

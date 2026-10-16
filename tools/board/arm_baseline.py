@@ -20,7 +20,7 @@
 ## 用法
 
     python3 tools/board/arm_baseline.py --reads 64            # 默认 64 条
-    python3 tools/board/arm_baseline.py --reads 256 --tag x
+    python3 tools/board/arm_baseline.py --reads 256 --tag x --xsa /path/to/dna_accel.xsa
 
 留证：`D:\\dna_board_smoke\\arm_baseline\\<run-id>\\`（report.json、串口无关，结果全在 DDR）。
 依赖：`sw/workspace/dna_platform_b27/` 的 BSP（由 `sw/scripts/create_vitis.tcl` 生成，与生产固件同一份）。
@@ -48,7 +48,7 @@ LDS = REPO / "sw" / "linker" / "lscript.ld"
 ARM_GCC = "/tools/Xilinx/Vitis/2022.2/gnu/aarch32/lin/gcc-arm-none-eabi/bin/arm-none-eabi-gcc"
 READS = REPO / "data/R0.83_data/Sequencing data/DNA-40.5Kb-MC-SE150.fastq"
 WM = REPO / "data/R0.83_data/Source data/Watermark sequences/r0.83_watermark.txt"
-XSA = REPO / "hw/build/export/dna_accel.xsa"
+DEFAULT_XSA = REPO / "hw/build/bkb220-v1.0-release-20261016T104902Z-board-migrate/export/dna_accel.xsa"
 WIN_ROOT_UNIX = Path("/mnt/d/dna_board_smoke")
 WIN_ROOT_WIN = "D:/dna_board_smoke"
 XSDB_BAT = r"D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat"
@@ -101,7 +101,12 @@ def main() -> int:
     ap.add_argument("--reads", type=int, default=64)
     ap.add_argument("--timeout", type=int, default=1800, help="等待板端完成的秒数上限")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--xsa", type=Path, default=DEFAULT_XSA,
+                    help=f"硬件平台 XSA（默认 {DEFAULT_XSA}；文件不存在时明确报错）")
     a = ap.parse_args()
+    xsa = a.xsa.expanduser().resolve()
+    if not xsa.is_file():
+        ap.error(f"XSA 不存在：{xsa}；请通过 --xsa 指定当前硬件包的 dna_accel.xsa")
 
     run = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + (f"-{a.tag}" if a.tag else "")
     out = WIN_ROOT_UNIX / "arm_baseline" / run
@@ -111,7 +116,7 @@ def main() -> int:
 
     host, elf = build()
     (out / "arm_baseline.elf").write_bytes(elf.read_bytes())
-    with zipfile.ZipFile(XSA) as z:
+    with zipfile.ZipFile(xsa) as z:
         (out / "ps7_init.tcl").write_bytes(z.read("ps7_init.tcl"))
     prepare(a.reads, out)
     sh([str(host), str(out / "ref.bin"), str(out / "reads.bin"), str(a.reads), str(out / "expect.bin")])

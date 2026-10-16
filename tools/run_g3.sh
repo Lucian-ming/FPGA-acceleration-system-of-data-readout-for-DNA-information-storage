@@ -29,43 +29,37 @@
 #
 # 制品选择与证据边界
 # ------------------
-# 默认兼容旧 hw/build/export；xc7z020 或 --strict-artifacts 验收必须显式指定完整包。
+# 所有验收都必须显式指定完整制品包；必须有 manifest、SHA256SUMS 和同源 bit/XSA/软件制品。
 # bit/XSA/ELF/FSBL/BOOT/manifest/source_manifest 均校验SHA，且核对XSA实际part、
 # 内置bit和HWH生产参数。ps7_init只从选中XSA提取，禁止新bit+旧PS7混搭。
 # 校验只证明包内一致；源码到制品的因果关系仍须审查源manifest和构建日志。
 #
 # 用法
 # ----
-#   tools/run_g3.sh                                   # 复现 G3 闭环那组参数（2048 条源读段）
-#   tools/run_g3.sh --limit 4096                      # 分档测量：源读段数翻倍
-#   tools/run_g3.sh --limit 2048 --skip-boot          # 板子已在跑，只重跑任务
+#   tools/run_g3.sh --artifact-dir <export>            # 复现 G3 闭环那组参数（2048 条源读段）
+#   tools/run_g3.sh --artifact-dir <export> --limit 4096 # 分档测量：源读段数翻倍
+#   tools/run_g3.sh --artifact-dir <export> --limit 2048 --skip-boot # 板子已在跑，只重跑任务
 #   tools/run_g3.sh --artifact-dir <export> --xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132 --device xc7z020 --uart-port /dev/ttyUSB2 --win-root /tmp/bkb220-g3
-#   tools/run_g3.sh --win-root D:/dna_board_smoke
-#   tools/run_g3.sh --bit <path>                      # 仅兼容指定所选包内同一bit，禁止独立覆盖
-#   tools/run_g3.sh --elf <path>                      # 仅允许选中包内同一ELF；独立实验也要完整制品包
-#   tools/run_g3.sh --full --result-timeout 1800      # 全量数据集
-#   tools/run_g3.sh --input-bytes 3862 --expect-sha <SHA256> --reads <reads.fastq> --watermark <watermark.txt>
+#   tools/run_g3.sh --artifact-dir <export> --win-root D:/dna_board_smoke
+#   tools/run_g3.sh --artifact-dir <export> --bit <path> # 仅允许所选包内同一bit，禁止独立覆盖
+#   tools/run_g3.sh --artifact-dir <export> --elf <path> # 仅允许选中包内同一ELF
+#   tools/run_g3.sh --artifact-dir <export> --full --result-timeout 1800 # 全量数据集
+#   tools/run_g3.sh --artifact-dir <export> --input-bytes 3862 --expect-sha <SHA256> --reads <reads.fastq> --watermark <watermark.txt>
 #                                                     # 任意载荷按外部元数据字节数截断并比较 SHA
-#   tools/run_g3.sh --runs 2                          # 同一次上电内连续跑两次任务（状态复位判据）
-#   tools/run_g3.sh --runs 2 --first-run-score-min 0  # 第一轮弄脏 Voter 累加器，第二轮才是判据
-#   tools/run_g3.sh --runs 2 --first-run-limit full --first-run-score-min 0
+#   tools/run_g3.sh --artifact-dir <export> --runs 2 # 同一次上电内连续跑两次任务（状态复位判据）
+#   tools/run_g3.sh --artifact-dir <export> --runs 2 --first-run-score-min 0 # 第一轮弄脏累加器
+#   tools/run_g3.sh --artifact-dir <export> --runs 2 --first-run-limit full --first-run-score-min 0
 #                                                     # 跨规模：先全量（弄脏），再回到默认小规模判据
-#   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67
+#   tools/run_g3.sh --artifact-dir <export> --runs 6 --run-score-mins 0,67,60,67,0,67
 #                                                     # 多轮：奇数轮弄脏、偶数轮判据（每轮换 score_min）
-#   tools/run_g3.sh --runs 3 --run-limits full,2048,full --run-score-mins 0,67,67
+#   tools/run_g3.sh --artifact-dir <export> --runs 3 --run-limits full,2048,full --run-score-mins 0,67,67
 #                                                     # 逐轮指定条数与阈值（'-' = 用全局默认，'full' = 全量）
-#   tools/run_g3.sh --runs 6 --run-score-mins 0,67,60,67,0,67 --plan-only
+#   tools/run_g3.sh --artifact-dir <export> --runs 6 --run-score-mins 0,67,60,67,0,67 --plan-only
 #                                                     # 只打印逐轮计划，不碰板子（自查参数）
 #   tools/run_g3.sh --offline-recheck <已有 G3 留证目录>
 #                                                     # 只读复算三层判据，不访问硬件
 #   tools/run_g3.sh --ready-deadline 150              # 板端就绪探针（CAPS 握手）多等一会儿
 #
-# 旧ECO默认环境（新板按docs/07-board-build-and-acceptance.md和实际目标核对）
-# --------------------------------------
-#   Windows 侧 D:\dev_tools\Vivado_Lab\2022.2\bin\xsdb.bat，从 WSL 用 cmd.exe /c 调用；
-#   工作目录 D:\dna_board_smoke\；JTAG Digilent 210251A08870，器件 xc7z010_1；
-#   串口 CH340 = COM6@115200（一次只能一个进程占用）；
-#   主机 192.168.1.100/24，板子 192.168.1.10，WSL 可直连 TCP:7。
 # =============================================================================
 set -uo pipefail
 
@@ -79,7 +73,7 @@ INVOCATION="$*"
 # --elf/--bit 仅允许指向完整选中制品包内同一文件，禁止独立覆盖混搭
 ELF_OVERRIDE=""
 BIT_OVERRIDE=""
-ARTIFACT_DIR="hw/build/export"
+ARTIFACT_DIR=""
 ARTIFACT_EXPLICIT=0
 STRICT_ARTIFACTS=0
 ALLOW_UART_SKIP=0
@@ -211,7 +205,6 @@ if [[ -n "$OFFLINE_RECHECK_DIR" ]]; then
     [[ -n "$INPUT_BYTES" ]] && RECHECK_ARGS+=(--input-bytes "$INPUT_BYTES")
     exec python3 tools/board/g3_judge.py "${RECHECK_ARGS[@]}"
 fi
-
 # ---------------------------------------------------------------------------
 # 记账：每一步的 PASS/FAIL 都登记，最后统一裁决。
 # ---------------------------------------------------------------------------
@@ -270,8 +263,8 @@ else
     XSDB_BAT="$(printf '%s\n' "$PAIR" | head -1)"
     XSDB_UNIX="$(printf '%s\n' "$PAIR" | tail -1)"
 fi
-if (( STRICT_ARTIFACTS && ! ARTIFACT_EXPLICIT )); then
-    die "新板严格验收模式必须显式传 --artifact-dir；拒绝默认 hw/build/export legacy 回退"
+if (( ! ARTIFACT_EXPLICIT )) || [[ -z "$ARTIFACT_DIR" ]]; then
+    die "必须显式传 --artifact-dir 指定完整制品包；当前不接受缺少 manifest 的旧包回退"
 fi
 if (( STRICT_ARTIFACTS && ! IP_EXPLICIT )); then
     die "新板严格验收模式必须显式传 --ip <实测板端IP>"
@@ -419,7 +412,6 @@ done
 
 # 计划模式也运行只读制品/工具门禁，避免批准后才发现 XSA/PS7 混搭。
 ARTIFACT_ARGS=(--artifact-dir "$ARTIFACT_DIR" --read-bps "$READ_BPS")
-if (( ! ARTIFACT_EXPLICIT && ! STRICT_ARTIFACTS )); then ARTIFACT_ARGS+=(--allow-legacy); fi
 [[ -n "$JTAG_DEVICE" ]] && ARTIFACT_ARGS+=(--device "$JTAG_DEVICE")
 [[ -n "$BIT_OVERRIDE" ]] && ARTIFACT_ARGS+=(--bit "$BIT_OVERRIDE")
 [[ -n "$ELF_OVERRIDE" ]] && ARTIFACT_ARGS+=(--elf "$ELF_OVERRIDE")
@@ -965,7 +957,7 @@ SUMMARY="$RUN_DIR/summary.txt"
     echo "bitstream   : $(sha256sum "$RUN_DIR/top_bd_wrapper.bit" | awk '{print $1}')"
     echo "ELF         : $(sha256sum "$RUN_DIR/dna_lwip_app.elf" | awk '{print $1}')"
     echo "制品目录    : $ARTIFACT_DIR"
-    echo "制品严格模式: $([[ "$STRICT_ARTIFACTS" -eq 1 ]] && echo '是（legacy 禁止）' || echo '否（兼容旧板入口）')"
+    echo "制品清单门禁: manifest 与完整同源包必需"
     echo "目标器件    : $JTAG_DEVICE"
     echo "XSDB        : $XSDB_BAT"
     echo "XSDB 模式   : $XSDB_MODE"

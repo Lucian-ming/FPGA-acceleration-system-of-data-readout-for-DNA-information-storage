@@ -5,7 +5,7 @@ proc dna_load_board {repo_root board_id} {
   }
   set config_path [file join $repo_root hw boards ${board_id}.tcl]
   if {![file isfile $config_path] || $board_id eq "load_board"} {
-    error "未知板配置 '$board_id'；禁止回退到 ECO PS7"
+    error "未知板配置 '$board_id'；禁止静默回退到其他板配置"
   }
   source $config_path
   foreach key {id ready part} {

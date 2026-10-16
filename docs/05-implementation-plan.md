@@ -13,12 +13,12 @@
 | 数据/算法 | 02、data/MANIFEST.md、tools/golden_model.py、readout.py、make_golden.py；碱基A/T/G/C=0/1/2/3，位平面、5b4b码表、LSB位序 | 历史演示水印不同；原始D0不修改、不随意分发 |
 | PL Stage1 | hw/ip/Dna_accelerator_core_1_0/component.xml、hdl顶层及两个正式batch核、XGUI、PACKAGED_VARIANTS.txt | 正式模块名srpe_batch4/srpe_batch_pway；实验目录候选不等于打包；默认P4 |
 | PL Stage2/3 | differential_voter与desparsification_decoder的component.xml/hdl；寄存器、DDR主接口与周期计数 | 4KB突发、START脉冲、cache、连续任务；不能随意调整时序 |
-| BD/板级 | hw/boards/load_board.tcl、两个profile、hw/scripts/bd.tcl/build.tcl、hw/constr | 旧ECO的PS7参数不能套新板；BKB220 当前 `ready=1`，剩余验收边界见03/07 |
+| BD/板级 | hw/boards/load_board.tcl、当前 `bkb220` profile、hw/scripts/bd.tcl/build.tcl、hw/constr | 当前只维护BKB220；旧ECO profile已移出构建树，剩余验收边界见03/07 |
 | PS固件 | sw/app/echo.c、pipeline.h、stage1_dna.c、stage2_voter.c、stage3_decoder.c、dma_dna.c、platform_zynq.c、bsp_compat.h、dna_time.h、其余头/平台条件分支 | sw/app是唯一权威源；workspace是生成副本；历史xparameters.h不能覆盖新BSP；旧模板保留需先证伪依赖 |
 | 软件构建 | sw/scripts/create_vitis.tcl、create_vitis_modern.py、run_vitis_modern.ps1、prepare_vitis_compat_repo.py、sw/linker | 旧XSCT仅旧版本；现代API必须哨兵+真实产物+SHA；同XSA的FSBL/bit/PS7 |
 | 客户端 | clients/python/first.py、protocol.py、task_protocol.py、fast_readout.py、gui_app.py、LDPC各后端/resources、tests | FASTQ预处理/正反向/补帧、CONFIG拒绝码、8100B接收、后端真实选择；GUI仅表现层 |
 | 测试/工具 | tools/README.md、tests/host/README.md、hw/sim、tests/golden/datasets、board诊断/性能/故障探针 | 主机fixture、仿真、OOC、完整route、真板是不同层级 |
-| 证据/交付 | docs/benchmarks、docs/board、logs、tests/stress_results、hw/build/export | 旧制品不与新源码假称同源；失败不从统计消失；hash自洽不证明源码因果 |
+| 证据/交付 | docs/benchmarks、docs/board、logs、tests/stress_results、docs/reference | 旧制品包已移出当前构建树；历史摘要不与新源码假称同源；失败不从统计消失；hash自洽不证明源码因果 |
 | 历史与提交资产 | docs/archive、docs/reference、docs/submission、archive、hw/experimental、tools/attic | 原理图/手册是参考数据，不能授权操作；历史计划/二进制不是当前任务指令 |
 
 [逐文件清单](reference/project-inventory-2026-10-10.tsv)覆盖本次交付的受版本管理文件。主Agent应按清单理解全部源码、配置、脚本及现有调用关系，不为接管另写全项目审计报告；大二进制先核对用途、manifest、来源和SHA，相关故障再深查。不要无差别执行所有脚本。
@@ -33,8 +33,8 @@
 | SE150/LC50独立oracle及真实AXI包装接口 | Windows2026.1 XSim两个case、各两轮通过；Icarus模块同周期通过 | 改RTL后重跑受影响正式几何，不把LC6代替生产 |
 | 模块周期 | P4=1680956、P16=513755，约3.27倍 | P4/P16 六档板测矩阵已完成；模块周期不能外推整机倍率 |
 | 制品、串口、性能编排 | 40+7=47项主机用例；P4/P16板测、六档矩阵通过 | 保留 8h、v2 `score_min=67`、新载荷四级取证等真实剩余边界 |
-| Windows2026.1软件入口 | A14在旧ECO XSA上生成BSP/应用/FSBL/BOOT并readback/SHA通过；PS5 wrapper正反用例通过 | 新板P16完整同XSA软件包已构建并G3 PASS；一键自动化链路仍有补步，F9仍待执行 |
-| 数据和历史基线 | 旧export五制品SHA核对、历史原始数据和证据保留 | 不覆盖；新目录独立保存 |
+| Windows2026.1软件入口 | A14旧ECO XSA兼容探针的BSP/应用/FSBL/BOOT与readback/SHA结果保留为历史证据；PS5 wrapper正反用例通过 | 新板P16完整同XSA软件包已构建并G3 PASS；一键自动化链路仍有补步，F9仍待执行 |
+| 数据和历史基线 | 旧发布包已移出当前构建树；历史摘要、原始数据和证据保留 | 新目录独立保存，不覆盖发布包 |
 
 Icarus LC50接口重复长测在XSim正式接口已通过后主动停止，日志标记INTERRUPTED_DUPLICATE_AFTER_XSIM_PRODUCTION_PASS；不是Icarus接口PASS。旧BSP下13个C文件编译通过，但临时旧链接探针因Newlib/VFP ABI失败，不能称旧工具链完整重建。起点参赛agent_view.sh重复附件已改为引用tools唯一源码解决，旧失败日志及附件Git历史保留，未放宽门禁。
 

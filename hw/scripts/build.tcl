@@ -1,9 +1,9 @@
-# 可复现构建：tools/run_vivado_build.sh board=zynq_eco_7010 part_name=xc7z010clg400-1
-# 新板需明确 board、独立 build_dir/export_dir/report_dir；dry_run=1 只检查配置。
-# 与工具版本绑定的生成目录必须独立，不能覆盖旧发布制品。
+# 可复现构建：tools/run_vivado_build.sh board=bkb220 part_name=xc7z020clg400-2
+# 默认 board=bkb220；build_dir 必须独立指定；dry_run=1 只检查配置。
+# 与工具版本绑定的生成目录必须独立，不能覆盖共享构建根与既有发布包。
 set _here [file normalize [file dirname [info script]]]
 set repo_root [file normalize [file join $_here ../..]]
-set opts [dict create proj_name dna_accel board zynq_eco_7010 part_name {} clk_mhz 100 \
+set opts [dict create proj_name dna_accel board bkb220 part_name {} clk_mhz 100 \
   build_dir {} export_dir {} report_dir {} stage1_p_ways 4 stage1_pipe_tree 0 \
   stage1_cycle_counters 0 jobs 8 dry_run 0]
 foreach arg $::argv {
@@ -28,14 +28,17 @@ set ::dna_board_config [dna_load_board $repo_root $board]
 set expected_part [dict get $::dna_board_config part]
 if {$part_name eq ""} {set part_name $expected_part}
 if {$part_name ne $expected_part} {error "part_name=$part_name 与板配置 $board 的 $expected_part 不匹配"}
-if {$board eq "zynq_eco_7010" && $stage1_p_ways != 4} {error "7010基线只支持P4；P16请选择已验证的7020板配置"}
-if {$build_dir eq ""} {
-  if {$board ne "zynq_eco_7010"} {error "新板必须显式指定独立 build_dir"}
-  set build_dir [file join $repo_root hw build]
-}
+if {$build_dir eq ""} {error "必须显式指定独立 build_dir；不设默认，避免覆盖共享的 hw/build 根与既有发布包"}
 proc dna_build_path {repo_root path} {
   if {[file pathtype $path] ne "absolute"} {set path [file join $repo_root $path]}
   return [file normalize $path]
+}
+proc dna_path_in_tree {path root} {
+  set path [file normalize $path]
+  set root [file normalize $root]
+  if {$path eq $root} {return 1}
+  set prefix "${root}/"
+  return [expr {[string first $prefix $path] == 0}]
 }
 set proj_wk [dna_build_path $repo_root $build_dir]
 set bd_script [file join $repo_root hw scripts bd.tcl]
@@ -49,11 +52,11 @@ foreach pair {{export_dir DNA_EXPORT_DIR} {report_dir DNA_REPORT_DIR}} {
   if {[dict get $opts $key] eq "" && [info exists ::env($env_key)] && $::env($env_key) ne ""} {set $key $::env($env_key)}
   set $key [dna_build_path $repo_root [set $key]]
 }
-if {$board ne "zynq_eco_7010" || $stage1_p_ways != 4} {
-  set old_build [file normalize [file join $repo_root hw build]]
-  if {$proj_wk eq $old_build || $export_dir eq [file join $old_build export] || $report_dir eq [file join $old_build reports]} {
-    error "新板/P16不能覆盖ECO发布目录；请指定独立输出目录"
-  }
+set shared_build [file normalize [file join $repo_root hw build]]
+set shared_export [file join $shared_build export]
+set shared_reports [file join $shared_build reports]
+if {$proj_wk eq $shared_build || [dna_path_in_tree $export_dir $shared_export] || [dna_path_in_tree $report_dir $shared_reports]} {
+  error "拒绝将输出直接写入共享构建根或其共享导出/报告目录；请指定独立输出目录"
 }
 set xsa_out [file join $export_dir ${proj_name}.xsa]
 set ip_repo [file join $repo_root hw ip]

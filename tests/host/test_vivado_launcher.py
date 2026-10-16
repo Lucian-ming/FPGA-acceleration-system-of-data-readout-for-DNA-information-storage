@@ -29,7 +29,7 @@ class LauncherTests(unittest.TestCase):
         return subprocess.run(['bash',str(LAUNCHER),*args],cwd=self.base,env=self.environment,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=15)
     def test_explicit_root_wins_over_path(self):
         self.environment['VIVADO_ROOT']=str(self.root_tool.parent.parent)
-        result=self.run_launcher('board=zynq_eco_7010','dry_run=1')
+        result=self.run_launcher('board=bkb220','part_name=xc7z020clg400-2',f'build_dir={self.base/"build"}','dry_run=1')
         self.assertEqual(result.returncode,0,result.stdout)
         lines=self.record.read_text().splitlines()
         self.assertEqual(lines[0],'root')
@@ -38,7 +38,7 @@ class LauncherTests(unittest.TestCase):
     def test_explicit_binary_wins_over_root(self):
         self.environment['VIVADO_ROOT']=str(self.root_tool.parent.parent)
         self.environment['VIVADO']=str(self.fake('explicit tools','explicit'))
-        result=self.run_launcher('board=zynq_eco_7010','dry_run=1')
+        result=self.run_launcher('board=bkb220','part_name=xc7z020clg400-2',f'build_dir={self.base/"build"}','dry_run=1')
         self.assertEqual(result.returncode,0,result.stdout)
         self.assertEqual(self.record.read_text().splitlines()[0],'explicit')
     def test_invalid_explicit_root_never_falls_back_to_path(self):
@@ -51,6 +51,8 @@ class LauncherTests(unittest.TestCase):
         result=self.run_launcher('--help')
         self.assertEqual(result.returncode,0,result.stdout)
         self.assertIn('2022.2',result.stdout)
+        self.assertIn('board=bkb220',result.stdout)
+        self.assertNotIn('zynq_eco',result.stdout)
         self.assertFalse(self.record.exists())
 
 if __name__=='__main__':unittest.main(verbosity=2)

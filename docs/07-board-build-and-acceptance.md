@@ -8,8 +8,8 @@
 |---|---|---|
 | 器件 | xc7z010clg400-1，实际已有板测 | 已按 `xc7z020clg400-2` 完成构建与板测；芯片顶标、工业级温度等级和 PCB 修订仍未逐项核实 |
 | PS7/DDR | 单颗16bit MT41J256M16HA-125、512MiB，详细资料在（旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库） | 原理图已入库，PS7 配置经 Vivado 2022.2 校验，DDR 写读及实板运行已通过；DDR 板级延迟与 DQS-to-CLK 仍未单独表征 |
-| 时钟/UART/GEM/PHY/MIO/XDC | hw/boards/zynq_eco_7010.tcl保留原已知配置 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
-| 制品/正确性 | hw/build/export历史五项SHA可核对，SE150真板闭环 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
+| 时钟/UART/GEM/PHY/MIO/XDC | 已退役；旧 profile 与板卡资料于 2026-10-16 移出当前构建树，不作为构建目标 | **已由原理图补齐**：PS_CLK 33.333MHz、UART0=MIO14/15、ENET0=RGMII、PHY=RTL8211E-VL、MDIO=MIO52/53、**PHY 地址=1**、PHY 复位接 PS_POR_B。XDC 复用 hw/constr/top.xdc（无 PL 外部引脚） |
+| 制品/正确性 | 历史旧包五项 SHA 摘要仍可查，原包已移出当前仓库；SE150 真板闭环属于历史证据 | P4/P16 均完成整机 route、bit/XSA 构建；P4 G3 PASS，P16 smoke、全量、故障探针、42 例 v2 数据集和正式上传包 G3 有记录；六档矩阵已完成 |
 | 连接 | 历史板测设备路径不能直接沿用 | **2026-10-12 已实测**：JTAG 单目标 xc7z020/IDCODE `0x23727093`；PS UART 为 UART0/MIO14-15、FT4232H C 通道（Windows COM10 / WSL `/dev/ttyUSB2`）；ENET0 为 RTL8211E、1000BASE-T 全双工。开发在 WSL 2022.2，Windows 2026.1 只负责烧录/下载/调试 22 产物（见 §3a） |
 
 产品手册与用户提供的原理图已收录：[bkb220-product-manual-v1.1.pdf](board/bkb220/bkb220-product-manual-v1.1.pdf)、[原理图](board/bkb220/BK_B220_SchDoc.pdf)、[资料来源与SHA校验](board/bkb220/README.md)。原理图已用于核实 MIO、PHY 与复位配置；厂商 board_files/PS7 preset/例程及实物完整料号、PCB 修订仍未确认，手册示例不替代现场证据。
@@ -18,19 +18,19 @@
 
 hw/boards/load_board.tcl统一选profile。未知板、ready=0、缺uart/xdc/source_refs/ps7_properties均拒绝create_project。BKB220 profile 已由 main 审核来源表并置 `ready=1`；P4/P16 构建和实板判据见对应 benchmark。该值表示配置可用于构建，不代表所有迁移终态门禁已关闭。
 
-SE150生产：READ_BPS150、NUM_LC50、STRIDE807、REF_LEN957、BATCH64；PL100MHz；旧板/新板P4=4/0，P16=16/1，拒绝7010/P16或非法组合。每种板/路数/工具版本用独立build/export/report目录，不覆盖旧发布路径。构建后核对实际IP七参数，保存硬件summary、工具版本、完整器件/PCB与资料来源。
+SE150生产：READ_BPS150、NUM_LC50、STRIDE807、REF_LEN957、BATCH64；PL100MHz；当前仅支持 BKB220，P4=4/0、P16=16/1，拒绝其他非法组合。`build_dir` 必须显式指定；export/report 默认位于该独立目录下，也不得直接落入共享 `hw/build` 根、`hw/build/export` 或 `hw/build/reports`。构建后核对实际IP七参数，保存硬件summary、工具版本、完整器件/PCB与资料来源。
 
 完整route必须WNS/WHS≥0、TNS/THS=0、失败端点0、DRC/路由/约束合法；遇到Decoder→HP或其他真实关键路径按受影响接口回归修复，不加无依据false path，不降频冒充100MHz。
 
 ## 3. 工具链和同源制品
 
-用户指定的开发顺序（2026-10-11）：硬件与软件开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试 22 产物。P16 完整同 XSA 包已有 G3 记录；从硬件包到软件验收包的补步现已收敛到 `tools/rebuild_software_package.py`。2026-10-14 从当天硬件包实际重建后，SHA 与 `run_g3.sh --strict-artifacts --plan-only` 均通过；XSCT `app create` 的 socket 错误由同树 ARM GCC 回退处理。该次为只读制品门禁，不表示新重建包已上板。复现步骤与完整边界见[制品复现说明](submission/reproduce-artifacts.md)和[任务报告](../logs/submission/vitis-chain.md)。旧 ECO XSA 软件兼容探针继续保留；22 主线优化报告完成后再独立复核 Windows 2026.1 完整开发链，按下面三阶段门禁执行。
+用户指定的开发顺序（2026-10-11）：硬件与软件开发全部在 WSL 使用 Vivado/Vitis 2022.2，Windows 2026.1 只负责烧录、下载和调试 22 产物。P16 完整同 XSA 包已有 G3 记录；从硬件包到软件验收包的补步现已收敛到 `tools/rebuild_software_package.py`。2026-10-14 从当天硬件包实际重建后，SHA 与 `run_g3.sh --strict-artifacts --plan-only` 均通过；XSCT `app create` 的 socket 错误由同树 ARM GCC 回退处理。该次为只读制品门禁，不表示新重建包已上板。复现步骤与完整边界见[制品复现说明](submission/reproduce-artifacts.md)和[任务报告](../logs/submission/vitis-chain.md)。旧 ECO XSA 兼容探针结果仅保留为历史证据；原包已移出当前仓库，不可作为当前构建输入。22 主线优化报告完成后再独立复核 Windows 2026.1 完整开发链，按下面三阶段门禁执行。
 
 1. **22主开发**：显式VIVADO_ROOT=/tools/Xilinx/Vivado/2022.2，使用现有run_vivado_build.sh、XSim与独立build/export/report目录。已有 P16 同 XSA 包及本次重建包均覆盖 bit、ps7_init、BSP、应用 ELF、FSBL、BOOT/readback、SHA 与 manifest；本次自动化入口已实际验证平台/BSP生成、socket回退和 plan-only 门禁。托管式 `app create` 本机限制仍保留为已知偏差；不把一次 launcher exit 0 当成功，也不把 plan-only 写成板端通过。
 2. **26下载**：Windows实际hw_server/XSDB2026.1仅下载22产生的bit、同XSA的ps7_init和ELF。run_g3.sh显式--artifact-dir、--xsdb、--device、--uart-port和实际IP。Hardware Manager只下载PL不能证明PS软件就绪；混合版本下载兼容性必须经真实UART/CAPS/DDR/GEM/G3验证。
 3. **最后26开发复核**：22主线通过后，board在同一冻结HEAD/参数/输入上独立用Windows2026.1重建完整P4/P16硬件和同XSA软件包，rtl复核100MHz整机时序，verify复核功能/接口、新板G3、连续恢复、性能矩阵与长稳。独立目录及带SHA只读输入快照，不原地升级22工程；每包核验同源SHA，跨版本按功能/STA/统计比较，不能要求bit/ELF整文件SHA相等。未通过则保持22为发布主线并保存26失败，不能宣称26开发可靠。
 
-Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且可能退出0，软件必须用create_vitis_modern.py/run_vitis_modern.ps1。它已在旧ECO XSA完成实际软件构建，只是兼容证据；下面现代API/BOM规则适用于最后26软件重建或main明确指定的辅助探针，不是提前改用26主开发。
+Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且可能退出0，软件必须用create_vitis_modern.py/run_vitis_modern.ps1。旧ECO XSA曾完成实际软件构建，该结果仅作历史兼容证据且原包已移出当前仓库；下面现代API/BOM规则适用于最后26软件重建或main明确指定的辅助探针，不是提前改用26主开发。
 
 完整新包须有bit、含bit的XSA、同XSA的ps7_init.tcl、BSP、应用ELF、FSBL、BOOT.bin、readback、SHA256SUMS、硬/软件summary和G3 artifact_manifest.json。实际manifest字段以g3_artifacts.py读取为准，必须记录完整part、board、工具/源码SHA、几何和P_WAYS/PIPE_TREE，并验证XSA内bit和HWH七参数。
 
@@ -87,7 +87,7 @@ Windows Vivado/Vitis2026.1位于D:/xilinx/2026.1；2026.1 XSCT已实测禁用且
 | 正式可选P4/P16、源集、参数/包装 | 打包与2022.2真实catalog通过；[集成摘要](benchmarks/stage1-16way-ip-integration.md) |
 | LC50模块与真实包装接口 | Windows2026.1 XSim两个case各两轮PASS，Icarus模块同周期；约3.27倍仅模块周期 |
 | G3严格制品选择、串口与性能入口 | 47项主机fixture/替身测试通过；[主机摘要](benchmarks/bkb220-host-verification.md) |
-| Windows2026.1软件路线 | 旧ECO XSA A14：BSP/应用/FSBL/BOOT/readback/六SHA PASS；不是新板制品 |
+| Windows2026.1软件路线 | 历史旧ECO XSA A14：BSP/应用/FSBL/BOOT/readback/六SHA PASS；原XSA包已移出当前仓库，不是新板制品 |
 | **BKB220 F4 整机 G3** | **P4 PASS（7/7）**（[来源表 §13](board/bkb220/migration-source-table.md)）：同源包真实下载并端到端跑通，**图片 SHA `fcd0cf90…f2c3` 逐位相同**、四级 DDR 取证通过、CAPS READY。后续 P16 smoke、全量三轮、连续/状态复位、故障探针及 v2 数据集对照已完成；正式 P16 上传配置包 G3 PASS，见相应 benchmark。 |
 | **BKB220 P4/P16 整机 100MHz 构建** | **PASS**（[benchmark](benchmarks/bkb220-p4-p16-100mhz-build.md)）：均为 `Physopt postRoute`，P4 WNS+0.680/WHS+0.036、P16 WNS+0.617/WHS+0.017，**失败端点均 0**，DRC 各 **0 errors**，`clk_fpga_0`=100.000 MHz，XSA 内 `PART=xc7z020clg400-2`；P16 33,987 LUT（63.89%）。P4/P16 已有对应板测。 |
 | **BKB220 PS7 catalog 验证** | 29 属性经 Vivado 2022.2 逐条检查（[来源表 §8](board/bkb220/migration-source-table.md)）。`MT41K256M16TW-107` **被 catalog 拒绝**，改用 `Custom` + 自定义容量/时序；`xc7z020clg400-2` 在库中，但手册的工业级条目未确认 |

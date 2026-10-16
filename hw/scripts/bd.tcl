@@ -29,23 +29,13 @@ create_bd_design "top_bd"
 set ps_0 [create_bd_cell -type ip -vlnv xilinx.com:ip:processing_system7 ps_0]
 apply_bd_automation -rule xilinx.com:bd_rule:processing_system7 -config { make_external "FIXED_IO, DDR" } [get_bd_cells ps_0]
 
-# 板级参数来源（2026-08-29 修正）：
-#   - DDR3 以 **ZYNQ ECO（R6）实物** 为准，资料见 （旧板 ZYNQ ECO 7010 资料，2026-10-16 已归档移出仓库）。
-#     该板只有一颗 16 bit 的 MT41J256M16HA-125，硬件规格说明书明确写着
-#     「配置 DDR3 必须是 16 位，默认配置 32 位，如果不更改不能运行」。
-#     Vivado 预设中与之同组织、同速率的型号是 MT41J256M16 RE-125（仅 die revision 不同）。
-#   - 其余 PS 外设（GEM0 MIO16..27、MDIO MIO52..53、UART1 MIO48..49、Bank 电压、
-#     FCLK0 100 MHz、晶振 33.3333 MHz）与只读历史快照 design_2_wrapper.xsa
-#     （SHA-256 79c64736...e6eb33）的 design_1.hwh 一致，且经 ECO 资料逐项复核通过。
-#   - ⚠️ 历史 XSA 自身的 DDR 是 32 bit 双颗 MT41J128M16，属于**另一块板**；
-#     它不再是 DDR 配置的依据，禁止据其回退本节。
-#   - 历史 XSA 未声明 BOARD，不能套用其他开发板 preset。
-# build.tcl 传入已验证的显式配置；直接 source 时仅保留 ECO 历史默认。
+# 板级 PS7 参数来自当前受支持的 hw/boards/bkb220.tcl profile。
+# 正常构建由 build.tcl 显式传入配置；直接 source 时使用当前 BKB220 profile。
 if {![info exists ::dna_board_config]} {
   set _bd_here [file normalize [file dirname [info script]]]
   set _bd_root [file normalize [file join $_bd_here ../..]]
   source [file join $_bd_root hw boards load_board.tcl]
-  set ::dna_board_config [dna_load_board $_bd_root zynq_eco_7010]
+  set ::dna_board_config [dna_load_board $_bd_root bkb220]
 }
 set_property -dict [dict get $::dna_board_config ps7_properties] [get_bd_cells ps_0]
 

@@ -135,15 +135,15 @@ DDR 时序参考：Micron-authored [4Gb x4/x8/x16 DDR3L SDRAM datasheet, Rev. R]
 
 F3 最小项仅覆盖 JTAG、PS UART、DDR、GEM0 与 CAPS；不会证明 QSPI/SD 冷启动、USB host/slave、生产 G3、P4/P16 timing 或性能。每个失败保留独立日志和报告；修复后重跑受影响步骤，不删除失败证据。
 
-## 6. 板级入口审计与 ready=0 守卫
+## 6. 板级入口审计与 ready 守卫
 
 | 入口 | 审计结论 |
 |---|---|
 | `hw/boards/load_board.tcl` / `dna_load_board` | `id`、`ready`、`part` 是最先检查的必填字段；`id` 必须等于所选 profile 名。仅当 `ready` 字符串等于 `1` 时才继续检查非空 `uart`、`xdc`、`source_refs`、`ps7_properties`；通过后附加规范化的 `config_path` 并返回 dict。`pending` 不在 ready=1 的字段循环里，但 `ready!=1` 错误会读取它来说明拒绝原因，因此此 profile 保留该字段。非法板名、缺 profile、ID 不符和未 ready 都明确 `error`。 |
-| `hw/boards/bkb220.tcl` | profile 有完整字段 `id/ready/part/uart/xdc/source_refs/ps7_properties/pending`，`ready=0`。`ps7_properties` 是候选草案，不会绕过守卫；pending 列出未核对的资料和 PS7 参数。 |
-| `hw/boards/zynq_eco_7010.tcl` | 旧 ECO 的已验证基线；含旧板 DDR/MIO/时钟延迟，不作为 BKB220 的数值来源。 |
-| `hw/scripts/build.tcl` / `dna_load_board` | 先解析参数和 P4/P16/100MHz 约束，随后调用 `dna_load_board`、核 part、XDC 与目录；`dry_run` 判断及 `create_project` 都在 loader 之后。因而 BKB220 `ready=0` 时在 `create_project` 前清晰失败，也不会 mkdir 构建目录。 |
-| `hw/scripts/bd.tcl` | build 传入已验证的 `::dna_board_config` 后使用其中 `ps7_properties`。如果直接 source 且没有传入配置，脚本有历史兼容分支会选择 `zynq_eco_7010`；因此新板必须从 build/load_board 入口调用，不能把该 fallback 当 BKB220 默认。 |
+| `hw/boards/bkb220.tcl` | profile 有完整字段 `id/ready/part/uart/xdc/source_refs/ps7_properties/pending`，当前 `ready=1`。`pending` 保留尚未核对的顶标、DDR 时序和冷启动事项；ready=1 表示允许构建，不代表全部迁移门禁关闭。 |
+| 旧 ZYNQ ECO profile（2026-10-16 移出当前构建树） | 旧板 DDR/MIO/时钟延迟只作历史参考，不作为 BKB220 的数值来源或当前构建输入。 |
+| `hw/scripts/build.tcl` / `dna_load_board` | 默认选择 BKB220，先解析参数和 P4/P16/100MHz 约束，随后调用 `dna_load_board`、核 part、XDC 与输出目录；`build_dir` 必须显式给出，且共享构建根/导出/报告目录受保护。`dry_run` 与 `create_project` 都在上述检查之后，因此配置检查不会创建工程目录。 |
+| `hw/scripts/bd.tcl` | build 传入已验证的 `::dna_board_config` 后使用其中 `ps7_properties`。如果直接 source 且没有传入配置，脚本会加载当前唯一受支持的 BKB220 profile；生产构建仍应从 build/load_board 入口调用。 |
 | `tools/run_vivado_build.sh` | 选择显式 Vivado/VIVADO_ROOT/PATH，创建 `logs/vivado/<run-id>/` 再调用 Vivado；入口帮助已指出可用 `tclsh hw/scripts/build.tcl board=... dry_run=1` 做配置预检。此任务直接调用 tclsh，不启动 Vivado。 |
 | `hw/constr/top.xdc` | 当前仅有说明注释；顶层没有 PL 外部引脚。PL 时钟由 BD 中 PS7 `FCLK_CLK0` 经 `clk_wiz_0` 输出，PS 固定 IO/DDR 由 PS7 及 BD 参数管理。因此候选 profile 复用 `hw/constr/top.xdc`，不把手册中的 PL U18/F16/F17 接入本系统顶层。 |
 

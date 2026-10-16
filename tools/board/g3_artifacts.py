@@ -13,8 +13,7 @@ from pathlib import Path
 
 GEOMETRY = ("READ_BPS", "NUM_LC", "STRIDE", "REF_LEN", "BATCH")
 PARAMS = GEOMETRY + ("C_STAGE1_P_WAYS", "C_STAGE1_PIPE_TREE")
-LEGACY_FILES = {"bit": "top_bd_wrapper.bit", "xsa": "dna_accel.xsa",
-                "elf": "dna_lwip_app_b27.elf", "fsbl": "fsbl.elf", "boot": "BOOT.bin"}
+REQUIRED_ARTIFACT_KEYS = ("bit", "xsa", "elf", "fsbl", "boot")
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -86,60 +85,52 @@ def inspect_xsa(path: Path) -> dict:
                 "bit_sha256": hashlib.sha256(bit).hexdigest(),
                 "tool_version": info.get("generatedVersion")}
 
-def validate(root: Path, *, allow_legacy=False, device=None, read_bps=150,
+def validate(root: Path, *, device=None, read_bps=150,
              bit_override=None, elf_override=None) -> dict:
     root = root.resolve()
-    sums = check_sums(root)
     manifest_path = root / "manifest.json"
-    legacy = not manifest_path.is_file()
-    if legacy and not allow_legacy:
-        raise ValueError("新制品包缺 manifest.json；禁止自动降级为旧板")
-    if legacy:
-        files = LEGACY_FILES.copy()
-        manifest = {"board_id": "zynq-eco-7010-legacy", "parameters": {}}
-    else:
-        if "manifest.json" not in sums:
-            raise ValueError("manifest.json 未被 SHA256SUMS 覆盖")
-        manifest = json.loads(manifest_path.read_text())
-        if manifest.get("schema_version") != 1:
-            raise ValueError("manifest schema_version 必须为 1")
-        files = manifest.get("artifacts", {})
-        if set(LEGACY_FILES) - set(files):
-            raise ValueError("manifest 缺 bit/xsa/elf/fsbl/boot 完整制品")
-        source = manifest.get("source_manifest", {})
-        if not source.get("path") or source.get("sha256") != sums.get(source["path"]):
-            raise ValueError("缺少被 SHA256SUMS 覆盖的 source_manifest 及其哈希")
-        source_data = json.loads(bundle_path(root, source["path"]).read_text())
-        source_files = source_data.get("files")
-        if not isinstance(source_files, dict) or not source_files:
-            raise ValueError("source_manifest.files 必须是非空相对路径->SHA256字典")
-        for name, digest in source_files.items():
-            if not isinstance(name, str) or not name or Path(name).is_absolute() or ".." in Path(name).parts or "\\" in name or ":" in name:
-                raise ValueError("source_manifest包含非法源码相对路径")
-            if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
-                raise ValueError("source_manifest包含非法SHA256")
-        versions = manifest.get("tool_versions")
-        if not isinstance(versions, dict) or not versions or any(not isinstance(k,str) or not k or not isinstance(v,str) or not v.strip() for k,v in versions.items()):
-            raise ValueError("tool_versions必须为非空工具名->版本字符串字典")
-        if any(not re.fullmatch(r"20\d{2}\.\d+(?:\.\d+)?",versions.get(k,"")) for k in ("vivado","vitis")):
-            raise ValueError("tool_versions缺少可核验vivado/vitis版本(如2026.1)")
-        if not manifest.get("board_id"):
-            raise ValueError("manifest 缺 board_id/tool_versions")
-    paths = {k: bundle_path(root, files[k]) for k in LEGACY_FILES}
+    if not manifest_path.is_file():
+        raise ValueError("缺 manifest.json；拒绝接受无清单制品包")
+    sums = check_sums(root)
+    if "manifest.json" not in sums:
+        raise ValueError("manifest.json 未被 SHA256SUMS 覆盖")
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("schema_version") != 1:
+        raise ValueError("manifest schema_version 必须为 1")
+    files = manifest.get("artifacts", {})
+    if not isinstance(files, dict) or set(REQUIRED_ARTIFACT_KEYS) - set(files):
+        raise ValueError("manifest 缺 bit/xsa/elf/fsbl/boot 完整制品")
+    source = manifest.get("source_manifest", {})
+    if not source.get("path") or source.get("sha256") != sums.get(source["path"]):
+        raise ValueError("缺少被 SHA256SUMS 覆盖的 source_manifest 及其哈希")
+    source_data = json.loads(bundle_path(root, source["path"]).read_text())
+    source_files = source_data.get("files")
+    if not isinstance(source_files, dict) or not source_files:
+        raise ValueError("source_manifest.files 必须是非空相对路径->SHA256字典")
+    for name, digest in source_files.items():
+        if not isinstance(name, str) or not name or Path(name).is_absolute() or ".." in Path(name).parts or "\\" in name or ":" in name:
+            raise ValueError("source_manifest包含非法源码相对路径")
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("source_manifest包含非法SHA256")
+    versions = manifest.get("tool_versions")
+    if not isinstance(versions, dict) or not versions or any(not isinstance(k,str) or not k or not isinstance(v,str) or not v.strip() for k,v in versions.items()):
+        raise ValueError("tool_versions必须为非空工具名->版本字符串字典")
+    if any(not re.fullmatch(r"20\d{2}\.\d+(?:\.\d+)?",versions.get(k,"")) for k in ("vivado","vitis")):
+        raise ValueError("tool_versions缺少可核验vivado/vitis版本(如2026.1)")
+    if not manifest.get("board_id"):
+        raise ValueError("manifest 缺 board_id/tool_versions")
+    paths = {k: bundle_path(root, files[k]) for k in REQUIRED_ARTIFACT_KEYS}
     for name in files.values():
         if name not in sums:
             raise ValueError(f"制品未被 SHA256SUMS 覆盖: {name}")
     actual = inspect_xsa(paths["xsa"])
-    if legacy and not actual["part"].startswith("xc7z010"):
-        raise ValueError("无 manifest 的兼容入口只允许旧 XC7Z010")
-    if not legacy:
-        if manifest["tool_versions"]["vivado"] != actual["tool_version"]:
-            raise ValueError("manifest Vivado版本与XSA generatedVersion不符")
-        if manifest.get("part", "").lower() != actual["part"]:
-            raise ValueError("manifest part 与 XSA 实际 part 不符")
-        expected = manifest.get("parameters", {})
-        if any(p not in expected or int(expected[p]) != actual["parameters"].get(p) for p in PARAMS):
-            raise ValueError("manifest 参数与 XSA HWH 不符或缺少 P_WAYS/PIPE_TREE 证据")
+    if manifest["tool_versions"]["vivado"] != actual["tool_version"]:
+        raise ValueError("manifest Vivado版本与XSA generatedVersion不符")
+    if manifest.get("part", "").lower() != actual["part"]:
+        raise ValueError("manifest part 与 XSA 实际 part 不符")
+    expected = manifest.get("parameters", {})
+    if any(p not in expected or int(expected[p]) != actual["parameters"].get(p) for p in PARAMS):
+        raise ValueError("manifest 参数与 XSA HWH 不符或缺少 P_WAYS/PIPE_TREE 证据")
     if device and not (actual["part"] == device.lower() or re.match(r"^xc7z\d{3}$", device.lower()) and actual["part"].startswith(device.lower())):
         raise ValueError(f"目标器件 {device} 与 XSA {actual['part']} 不符")
     if actual["parameters"]["READ_BPS"] != read_bps:
@@ -150,12 +141,11 @@ def validate(root: Path, *, allow_legacy=False, device=None, read_bps=150,
     required_geometry = {150:(150,50,807,957,64),250:(250,50,805,1055,64)}
     if geometry != required_geometry.get(read_bps):
         raise ValueError(f"G3正式生产几何不符: {geometry}，禁止简化LC6制品用于真板验收")
-    if not legacy:
-        architecture=(actual["parameters"]["C_STAGE1_P_WAYS"],actual["parameters"]["C_STAGE1_PIPE_TREE"])
-        if architecture not in ((4,0),(16,1)):
-            raise ValueError("G3只接受P4/0或P16/1生产架构")
-        if architecture==(16,1) and actual["part"].startswith("xc7z010"):
-            raise ValueError("XC7Z010禁止P16生产制品")
+    architecture=(actual["parameters"]["C_STAGE1_P_WAYS"],actual["parameters"]["C_STAGE1_PIPE_TREE"])
+    if architecture not in ((4,0),(16,1)):
+        raise ValueError("G3只接受P4/0或P16/1生产架构")
+    if architecture==(16,1) and actual["part"].startswith("xc7z010"):
+        raise ValueError("XC7Z010禁止P16生产制品")
     if bit_override and Path(bit_override).resolve() != paths["bit"]:
         raise ValueError("单独覆盖 bit 会混用 XSA；请生成完整制品包并用 --artifact-dir")
     if elf_override and Path(elf_override).resolve() != paths["elf"]:
@@ -165,9 +155,9 @@ def validate(root: Path, *, allow_legacy=False, device=None, read_bps=150,
     return {"artifact_dir": str(root), "board_id": manifest["board_id"],
             "part": actual["part"], "device": re.match(r"xc7z\d{3}", actual["part"]).group(),
             "parameters": actual["parameters"], "xsa_tool_version": actual["tool_version"],
-            "legacy": legacy, "artifacts": {k: str(v) for k, v in paths.items()},
+            "artifacts": {k: str(v) for k, v in paths.items()},
             "hashes": {k: sha(v) for k, v in paths.items()},
-            "manifest_sha256": sha(manifest_path) if not legacy else None,
+            "manifest_sha256": sha(manifest_path),
             "provenance_note": "哈希核验证明制品包一致性；不独立证明构建日志与源码的因果关系，须审查构建源manifest及日志。",
             "_ps7": actual["ps7"]}
 
@@ -200,7 +190,6 @@ def choose_uart(devices: list[dict], explicit: str | None = None) -> str:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--artifact-dir", required=True)
-    ap.add_argument("--allow-legacy", action="store_true")
     ap.add_argument("--device")
     ap.add_argument("--read-bps", type=int, default=150)
     ap.add_argument("--bit")
@@ -208,8 +197,7 @@ def main():
     ap.add_argument("--stage", type=Path)
     args = ap.parse_args()
     try:
-        result = validate(Path(args.artifact_dir), allow_legacy=args.allow_legacy,
-                          device=args.device, read_bps=args.read_bps,
+        result = validate(Path(args.artifact_dir), device=args.device, read_bps=args.read_bps,
                           bit_override=args.bit, elf_override=args.elf)
         ps7 = result.pop("_ps7")
         if args.stage:

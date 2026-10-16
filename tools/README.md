@@ -20,7 +20,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_g3.sh` | **板级验收唯一入口**。烧录 → 下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
+| `run_g3.sh` | **板级验收唯一入口**。必须显式传入 `--artifact-dir`，完整制品包须有 manifest；无清单包直接拒绝。烧录 → 下发任务 → 板端 syndrome 全零架构判据 → 从板端合法码字提取载荷比 SHA（系统判据）→ 主机旧译码诊断 → 四级 DDR 取证；**架构判据与系统判据都须过才是 G3 通过**，主机译码只记录、不得覆盖板端未纠对。默认 JPEG 按 EOI 截断，任意载荷用 `--input-bytes N --expect-sha SHA`。`--offline-recheck <run-dir>` 只读复算历史留证，不触板；`xc7z020` 严格模式及串口规则不变 |
 | `run_sim.sh` | **RTL + 主机侧回归**。含 IP 打包门禁、三级 TB、行为轨迹判据、LDPC 自检、语法检查 |
 | `test_client.sh` | 客户端统一检查入口：语法检查后运行 unittest discovery，并要求实际收集数不少于 28；该数是 unittest 收集总数，包含跳过用例 |
 | `run_demo.sh` | 答辩现场演示：现场换 payload + 故障红灯，四幕哈希均当场产生 |
@@ -41,7 +41,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `g3_artifacts.py` | 完整制品目录、SHA、XSA内bit/器件/生产几何与manifest核验；只读预检，不将哈希自洽当作源码因果证明 |
+| `g3_artifacts.py` | 强制 manifest 的完整制品目录、SHA、XSA内bit/器件/生产几何核验；无旧包回退；只读预检，不将哈希自洽当作源码因果证明 |
 | `g3_judge.py` | G3 三层判据：复用客户端 syndrome 校验，保留 `ldpc_decode.py` 旧口径诊断；`run_g3.sh --offline-recheck <run-dir>` 可只读复算历史留证，不接触硬件 |
 | `g3_uart_cap.ps1` / `g3_uart_cap.py` | Windows COM 与 WSL `/dev/ttyUSBn` 串口采集器；端口必须显式传入，记录接收量，禁止默认 COM6 |
 | `g3_xsdb.ps1` | Windows XSDB参数桥接，安装/留证路径含空格时分别传参，供G3调用 |
@@ -55,7 +55,7 @@
 | `g3_config_guard_probe.py` | **配置/容量守卫故障注入**：手工拼 CONFIG 字节绕开客户端全部校验，直打固件守卫。2026-09-11 实测 **7/7 通过**：超容量/非 64 对齐/零条数均被 `rc=5` 拒绝，`read_bps=250` 被 `rc=2` 拒绝。⚠️ 注意 `PKT_CONFIG_OK` 只是应答，payload 里的 u32 **才是理由码，0 才是接受**——初版探针把拒绝当成接受，得出过错误结论 |
 | `g3_runs_to_jsonl.py` | run 目录收敛成结构化 JSONL |
 | `read_pipe_counters.tcl` | **不依赖串口**、用 XSDB 读固件内 poll 计数器；从本轮 ELF 的 `pipe_poll_steps` / `wm_poll_steps` / `pipe_state` 符号经 `arm-none-eabi-nm` 解析。`--addresses` 仅供显式排错，无旧地址兜底 |
-| `arm_baseline.py` | **同片 ARM 纯软件 Stage1 基线**：编译 `sw/bench_arm/`（主机参考 + A9 裸机 NEON 版），XSDB 复位 PS、`dow -data` 读段进 DDR、运行并读回，与主机参考逐条比对后才报耗时。**会复位整板**，跑前确认板上没有其他任务。2026-09-22 实测 12.10 ms/记录（单核），见 `docs/benchmarks/measured_arm_baseline.md` |
+| `arm_baseline.py` | **同片 ARM 纯软件 Stage1 基线**：编译 `sw/bench_arm/`（主机参考 + A9 裸机 NEON 版），XSDB 复位 PS、`dow -data` 读段进 DDR、运行并读回，与主机参考逐条比对后才报耗时。XSA 可通过 `--xsa` 指定；默认包缺失时明确报错。**会复位整板**，跑前确认板上没有其他任务。2026-09-22 实测 12.10 ms/记录（单核），见 `docs/benchmarks/measured_arm_baseline.md` |
 | `bkb220_f3_bringup.sh` | **BKB220 F3 最小启动判据入口**（2026-10-12 新增）：真实 FT4232H/USB 前置检查 → 被动抓 `/dev/ttyUSB1/2/3` → `rst -system` + `source ps7_init.tcl` + `ps7_init`/`ps7_post_config` → 读回 DDR/UART/GEM/MIO/时钟寄存器 → 汇总哪个通道收到字节；PS7 初始化命令或寄存器读失败会失败退出；可选 `--ddr-window <基址>,<字节数>` 做指定窗口 walking-1 与固定 pattern 写读比对。**触板路径见 `docs/07` §3a 的工具链分工：开发在 WSL 2022.2；Windows 2026.1 只负责烧录。** 本脚本按 **WSL 路径**实现（`usbipd` 直通 + Linux 2022.2 hw_server），那是 F3 实际跑通的路径；若要归 Windows 烧录，则改用 COM10 + Windows XSDB。边界：`ps7_post_config` 退出 0 不等于 DDR PASS；指定窗口回环不等于全容量/温压验证；串口没字节不等于该通道不是 PS UART；JTAG 启动通过不证明 QSPI/SD 冷启动通过 |
 
 ## 数据集与鲁棒性
@@ -105,7 +105,7 @@
 
 | 脚本 | 用途 |
 | --- | --- |
-| `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；显式board/part_name/独立build与export目录，未验证BKB220配置拒绝构建。`stage1_cycle_counters=0|1` 默认关闭Stage1硬件周期仪表；需测量时显式设为1 |
+| `run_vivado_build.sh` | Vivado 整机构建（日志不落仓库根）；当前板为 `bkb220`，`build_dir` 必须显式给出，禁止直接写入共享构建根/导出/报告目录。`stage1_cycle_counters=0|1` 默认关闭Stage1硬件周期仪表；需测量时显式设为1 |
 | `build_sw_variant.sh` | **PS 编译宏 A/B 的完整变体包构建器**：复制一份已验收包 → 只在新包副本的 Makefile 里追加 `-D` 宏 → 重建应用 ELF → 重打 BOOT.bin → 写 manifest 派生字段 → 重签并自检 SHA256SUMS。可用 `--define FW_DIAG_VERBOSE=0 --sync-src` 构建安静诊断版（`sw/app/fw_diag.h` 默认值仍为 1，保持出厂日志行为）。**核验并拒绝**新包 bit 与参考包不同（本脚本不改硬件制品）。存在理由：`run_g3.sh` 禁止 `--elf` 指向包外文件，所以任何 PS 侧编译期改动的 A/B 都必须有自己的完整包。只证明新包自洽且与参考包同源，**不证明**它在板上通过 |
 | `run_xsim.sh` / `run_m2_full.sh` / `run_m2_quick.sh` / `run_m3_bd.sh` | XSim 与多级串联仿真 |
 | `test_ldpc_perm.sh` | **PS 侧位级置换的主机单元测试**（不需要板子）。重新生成并校验 `sw/app/ldpc_perm_table.c` → 用 gcc 编 `sw/app/ldpc_perm.c` + 生成的表 → 与 `native_ldpc.deinterleave` 在**板端真实回传样本**与随机/全 0/全 1/交替模式上**逐位比对**，含往返还原。存在理由：板上缺解交织只表现为「核不收敛」，信号弱、定位慢；置换是纯数据变换，可以在主机上被穷尽核验。**只证明 C 实现 == Python 参考，不证明板上正确**（那要 G3 + 串口出现 `converged=1`） |
@@ -118,7 +118,7 @@
 | `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记（含 `.ps1`）、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
 
 
-用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；`rebuild_software_package.py` 已从当日 BKB220 P16 XSA 实际重建软件包并通过 SHA 与 G3 plan-only 门禁。已有Windows2026.1旧ECO XSA软件兼容探针继续保留，但不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
+用户指定的开发顺序（2026-10-11）：先用WSL Vivado2022.2完成硬件开发，PS软件也以补齐后的WSL Vitis2022.2为主；Windows2026.1负责下载/调试。WSL Vitis2022.2已从现有Vivado维护入口补齐：Vivado2022.2、XSCT2022.2.0必需命令及ARM GCC11.2.0实际Cortex-A9 ARM32对象编译通过；`rebuild_software_package.py` 已从当日 BKB220 P16 XSA 实际重建软件包并通过 SHA 与 G3 plan-only 门禁。旧ECO XSA软件兼容探针仅保留历史结论，原包已移出当前仓库；不替代22主线或新板验收。22主线稳定后，最后独立验证Windows2026.1完整硬件及软件开发链路，规则见07。
 
 WSL22使用显式VIVADO_ROOT，启动器选择顺序为VIVADO→VIVADO_ROOT→PATH，显式根目录错误即拒绝，不默默切换工具版本。BKB220 P16 完整同 XSA 包已有 G3 记录，自动软件打包入口已从当日硬件包重建并通过只读制品门禁；留证见[制品复现说明](../docs/submission/reproduce-artifacts.md)和[任务报告](../logs/submission/vitis-chain.md)。`create_vitis.tcl` 的首次 `platform generate` 与第二次 BSP 生成已由新入口调用和校验；XSCT `app create` 的 socket 错误由同树 ARM GCC 明示回退。新重建包尚无板端 G3 证据。Windows26软件入口`create_vitis_modern.py/run_vitis_modern.ps1`用于最后26重建或明确辅助探针。2026.1 XSCT禁用且可能exit0；完整工具/同源门禁见[07](../docs/07-board-build-and-acceptance.md)。
 
@@ -137,8 +137,8 @@ Windows2026.1 正式 Stage1 XSim 输入由 tools/board/create_stage1_xsim_input.
 
 ## 新板执行前的旧平台风险（2026-10-10核对）
 
-- 旧stress_test_suite.py/switch_export.sh已成对退出现用区并归档。新板长稳由main/verify围绕run_g3.sh --artifact-dir完整包、显式工具/目标/串口和现用故障探针编排；按实际运行时长判断2h/8h，保留逐轮证据，不自动切SE250或覆盖旧export。
-- board/arm_baseline.py固定旧BSP/XSA/GCC/XSDB并复位整板；新板先适配，必须持板资源。
+- 旧stress_test_suite.py/switch_export.sh已成对退出现用区并归档。新板长稳由main/verify围绕run_g3.sh --artifact-dir完整包、显式工具/目标/串口和现用故障探针编排；按实际运行时长判断2h/8h，保留逐轮证据，不自动切SE250或覆盖已有发布包。
+- board/arm_baseline.py仍固定BSP/GCC/XSDB并复位整板，XSA通过 `--xsa` 覆盖、默认新包缺失时明确失败；运行仍需持板资源。
 - run_multi_payload_regression.py的board模式及run_demo.sh主要发TCP任务，不下载/复位，仍须实际新板IP/固件/阈值确认；golden/check-dumps离线。
 - run_robustness_scan.py的board_equivalent是软件模拟，不是新板证据；故障探针主动注入错误流量，不是只读健康检查。
 

@@ -18,18 +18,14 @@ set _here [file normalize [file dirname [info script]]]
 set _root [file normalize "$_here/../.."]
 set ws   "$_root/sw/workspace"
 
-# 自动搜 XSA（优先使用 -tclargs 指定）
+# 自动搜 hw/build 下的硬件包 XSA（优先使用 -tclargs 指定；多个候选时要求显式选择）
 proc _find_xsa {} {
-  set cand {}
-  foreach p [list \
-    "$::_root/hw/build/export/*.xsa" \
-    "$::_root/*.xsa" \
-    "$::_root/hw/**/*.xsa" \
-  ] {
-    set g [glob -nocomplain -types f $p]
-    set cand [concat $cand $g]
+  set pattern [file join $::_root hw build * export *.xsa]
+  set cand [glob -nocomplain -types f $pattern]
+  if {[llength $cand] > 1} {
+    error "找到多个硬件包 XSA；请显式传入 -tclargs xsa=/abs/path/to/xxx.xsa：$cand"
   }
-  if {[llength $cand] > 0} {
+  if {[llength $cand] == 1} {
     return [file normalize [lindex $cand 0]]
   }
   return ""
@@ -74,9 +70,11 @@ foreach command {setws platform domain app bsp importsources} {
 
 if {$xsa eq ""} { set xsa [_find_xsa] }
 if {$xsa eq ""} {
-  puts "FATAL: XSA not found. Use -tclargs xsa=/abs/path/to/xxx.xsa"
+  puts "FATAL: 未找到硬件包 XSA（搜索 hw/build/*/export/*.xsa）；请传 -tclargs xsa=/abs/path/to/xxx.xsa"
   return -code error
 }
+set xsa [file normalize $xsa]
+if {![file isfile $xsa]} {error "指定 XSA 不存在：$xsa"}
 
 puts "===> XSCT starting"
 puts "     XSA : $xsa"
