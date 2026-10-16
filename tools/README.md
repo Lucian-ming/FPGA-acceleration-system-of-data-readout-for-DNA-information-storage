@@ -113,6 +113,7 @@
 | `write_source_manifest.py` | 为制品包写/刷新 `reports/source_manifest.json`（`files`: 源码相对路径 → SHA256）并同步 `manifest.json` 的 `source_manifest.sha256`；`--resign` 会顺带重签并自检 SHA256SUMS。范围固定为「决定 bit 与 ELF 的源」。存在理由：**没有它，包里 bit/ELF 出自哪份源码就只剩人嘴说**；`g3_artifacts.py` 只校验这份清单的**格式**，查不出「清单与包内源码不一致」——`build_sw_variant.sh --sync-src` 以前正是这个隐患（已由本工具接入修掉） |
 | `rebuild_software_package.py` | 从 `hw/build/` 下含 XSA 的硬件包生成独立软件验收包：用 Vitis 2022.2 XSCT 生成平台/BSP/FSBL，先 `platform generate` 物化 BSP 头，再设置并复核 `TCP_WND=32768`；跳过 XSCT app create/build，应用一律使用同安装树 ARM GCC 与 `write_fallback_makefile` 编译，优化级别固定为 `-O2`，CFLAGS 同时写入摘要与 manifest；随后生成 ELF/BOOT/readback/manifest/SHA256SUMS 并运行 G3 strict `--plan-only`。只读输入硬件包，不连板、不烧录。完整实测命令和环境边界见 [`docs/submission/reproduce-artifacts.md`](../docs/submission/reproduce-artifacts.md) |
 | `prune_xsim.sh` | XSim 仿真历史生成物保留窗口与常态化修剪工具（docs/05 的清理条款，默认 keep 3 并归集日志） |
+| `prune_iverilog.sh` | iverilog 仿真历史生成物的常态化修剪工具（2026-10-16 补）。**默认只剥「编译出来的仿真器二进制」、保留全部留证**——iverilog 每次都会重新编译，删二进制不损失可复现性；`--keep N` 才整目录修剪（默认关闭，因为有些 run 目录被文档当留证引用）。存在理由：XSim 那条路早有 `prune_xsim.sh`，**iverilog 这条路一直是空的**，于是 `logs/iverilog/` 一路涨到 444 MB（其中 432 MB 是 83 个编译产物）。手删不是机制，不补工具下个月还会涨回来 |
 | `check_ip_packaging.sh` | IP 打包卫生门禁：hdl 内无 TB、同名模块只打包一个、引用文件存在、无孤儿、打包变体与清单一致、**打包的实现必须被回归覆盖**（已接入 `run_sim.sh`） |
 | `check_repo_hygiene.sh` | 仓库卫生门禁：根目录残留、工具登记（含 `.ps1`）、文档编号、共享数据副本、`logs/` 的 `.gitignore` 覆盖（已接入 `run_sim.sh`） |
 
