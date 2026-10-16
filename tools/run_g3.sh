@@ -21,6 +21,8 @@
 #     回答「载荷出来的就是期望的那一份吗」。它挡住的是**合法但错误的码字**：
 #     syndrome 全零、架构 PASS，可是载荷不是期望的。
 #   · 诊断层：主机译码 + SHA 的旧口径，**只记录**，任何情况下都不参与裁决。
+#   · 四级检查器退出码 3 表示 UNVERIFIED（没有可用黄金基准）：它表示未取证，
+#     不能据此判硬件 FAIL，也不抵消架构与系统判据；退出码 1 或其他非零仍判步骤 FAIL。
 # ⚠️ 早先的写法只让架构判据决定裁决。那比旧口径（「只对译码后的板端回传作判定」）
 #    **更宽**——上面第二类错误会被判 PASS，所以已经改掉。反过来，系统判据也**不能**
 #    在架构 FAIL 时独自救场，那正是要杜绝的 PC 兜底。
@@ -219,6 +221,16 @@ FAILED=0
 step_ok()   { STEP_NAMES+=("$1"); STEP_STATES+=("PASS"); STEP_NOTES+=("${2:-}"); }
 step_bad()  { STEP_NAMES+=("$1"); STEP_STATES+=("FAIL"); STEP_NOTES+=("${2:-}"); FAILED=1; }
 step_skip() { STEP_NAMES+=("$1"); STEP_STATES+=("SKIP"); STEP_NOTES+=("${2:-}"); }
+record_stage_check_result() {
+    local status="$1"
+    case "$status" in
+        0) step_ok "四级逐级取证（board_stage_check.py）" ;;
+        3) step_skip "四级逐级取证（board_stage_check.py）" \
+            "本轮四级未取证（退出码 3；UNVERIFIED 不判硬件 FAIL），见 $RUN_DIR/stage_check.log" ;;
+        *) step_bad "四级逐级取证（board_stage_check.py）" \
+            "board_stage_check.py 退出码 $status；见 $RUN_DIR/stage_check.log" ;;
+    esac
+}
 
 say()  { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
@@ -881,6 +893,7 @@ fi
 # ---------------------------------------------------------------------------
 # 7. 逐级取证：只读导出四级 DDR 快照（不复位、不重烧）
 # ---------------------------------------------------------------------------
+READS_SHA="$(sha256sum "$READS_FILE" | awk '{print $1}')"
 say "7/7 逐级取证（XSDB 只读 DDR，不复位不重烧）"
 if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
     if [[ "$XSDB_MODE" == "wsl" ]]; then
@@ -894,10 +907,11 @@ if (( DO_DUMP )) && (( RUNS_COMPLETED > 0 )); then
     if [[ $? -eq 0 ]] && grep -q "DUMP> stage3 done" "$RUN_DIR/dump.out"; then
         info "四级快照已导出到 $RUN_DIR"
         if python3 tools/board_stage_check.py --dump-dir "$RUN_DIR" --reads "$STAGE1_DUMP_RECORDS" --read-bps "$READ_BPS" \
+                --reads-sha256 "$READS_SHA" \
                 > "$RUN_DIR/stage_check.log" 2>&1; then
-            step_ok "四级逐级取证（board_stage_check.py）"
+            record_stage_check_result 0
         else
-            step_bad "四级逐级取证（board_stage_check.py）" "见 $RUN_DIR/stage_check.log"
+            record_stage_check_result "$?"
         fi
         sed -n '/^===/,$p' "$RUN_DIR/stage_check.log" | sed 's/^/    /'
     else
@@ -923,7 +937,6 @@ if (( UART_CAPTURE_STARTED )); then
     fi
 fi
 
-READS_SHA="$(sha256sum "$READS_FILE" | awk '{print $1}')"
 WM_SHA="$(sha256sum "$WM_FILE" | awk '{print $1}')"
 
 # ---------------------------------------------------------------------------

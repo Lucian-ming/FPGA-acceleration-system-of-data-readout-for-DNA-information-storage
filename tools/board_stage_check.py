@@ -19,7 +19,7 @@
     #   xsdb.bat D:\\dna_board_smoke\\dump_ddr.tcl
     python3 tools/board_stage_check.py --dump-dir <G3留证目录>
     python3 tools/board_stage_check.py --dump-dir <手工dump目录> \\
-        --payload-sha256 <期望载荷SHA256>
+        --payload-sha256 <期望载荷SHA256> --reads-sha256 <本次FASTQ的SHA256>
     python3 tools/board_stage_check.py --dump-dir <目录> --golden-dir tests/golden
         # 显式强制使用指定基准；没有匹配基准时必须保留 UNVERIFIED
 
@@ -122,14 +122,30 @@ def find_payload_sha256(dump_dir: Path, explicit: str | None) -> str | None:
     return None
 
 
-def load_baseline_dir(payload_sha256: str, read_bps: int) -> Path | None:
-    """只按显式登记的载荷 SHA 和读长匹配，绝不默认套用 R0.83 基准。"""
+def load_baseline_dir(payload_sha256: str, read_bps: int,
+                      reads_sha256: str | None = None) -> Path | None:
+    """按载荷 SHA 和读长查表；可选读段 SHA 区分同载荷的任务输入。"""
     manifest = json.loads(BASELINE_MANIFEST.read_text(encoding="utf-8"))
+    legacy_match = None
+    has_keyed_entries = False
     for entry in manifest.get("baselines", []):
-        if (entry.get("payload_sha256", "").lower() == payload_sha256
-                and int(entry.get("read_bps", -1)) == read_bps):
-            return (GOLDEN / entry["golden_dir"]).resolve()
-    return None
+        if (entry.get("payload_sha256", "").lower() != payload_sha256
+                or int(entry.get("read_bps", -1)) != read_bps):
+            continue
+        entry_reads_sha256 = entry.get("reads_sha256")
+        if entry_reads_sha256:
+            has_keyed_entries = True
+            if reads_sha256 and entry_reads_sha256.lower() == reads_sha256.lower():
+                return (GOLDEN / entry["golden_dir"]).resolve()
+        elif legacy_match is None:
+            # 旧条目没有读段身份时保持既有行为；若同时存在精确读段匹配，
+            # 上面的带 SHA 条目优先，避免被较宽泛的旧条目遮住。
+            legacy_match = (GOLDEN / entry["golden_dir"]).resolve()
+    if reads_sha256 and has_keyed_entries:
+        # 已提供本次读段 SHA 且该载荷/读长存在 keyed 条目时，未知 SHA 不能
+        # 回退到宽泛的旧条目，否则会把未登记任务错误地套进旧黄金。
+        return None
+    return legacy_match
 
 
 def find_dataset_ids(payload_sha256: str) -> list[str]:
@@ -279,7 +295,8 @@ def check_stage3(dump_dir: Path, golden_dir: Path) -> Result:
 
 
 def unverified_checks(read_bps: int, payload_sha256: str | None,
-                      dataset_ids: list[str]) -> list[Result]:
+                      dataset_ids: list[str],
+                      reads_sha256: str | None = None) -> list[Result]:
     if payload_sha256:
         identity = f"payload SHA-256 {payload_sha256}"
         if dataset_ids:
@@ -288,7 +305,11 @@ def unverified_checks(read_bps: int, payload_sha256: str | None,
             identity += "（仓库数据集 manifest 未识别）"
     else:
         identity = "未提供载荷 SHA-256，无法识别适用的黄金包"
-    reason = f"{identity}；tests/golden 未登记 read_bps={read_bps} 的四级基准，本级未取证"
+    if reads_sha256:
+        reason = (f"{identity}；tests/golden 未登记 read_bps={read_bps} 且 reads_sha256="
+                  f"{reads_sha256} 的四级基准，本级未取证")
+    else:
+        reason = f"{identity}；tests/golden 未登记 read_bps={read_bps} 的四级基准，本级未取证"
     checks = [
         Result("展开水印 @0x10040000  vs  wm_regions.hex"),
         Result("Stage1 输出 @0x10600000  vs  stage2_in.hex"),
@@ -312,7 +333,15 @@ def main() -> int:
                     help="显式指定黄金目录；指定后按用户要求强制比较")
     ap.add_argument("--payload-sha256", default=None,
                     help="手工 dump 没有 G3 层报告时指定期望载荷 SHA-256")
+    ap.add_argument("--reads-sha256", default=None,
+                    help="可选：本次读段文件的 SHA-256，用于区分同载荷的任务")
     args = ap.parse_args()
+
+    if args.reads_sha256 is not None:
+        args.reads_sha256 = args.reads_sha256.lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", args.reads_sha256):
+            print("FATAL: --reads-sha256 必须是 64 位十六进制 SHA-256", file=sys.stderr)
+            return 2
 
     if not args.dump_dir.is_dir():
         print(f"FATAL: 找不到 dump 目录 {args.dump_dir}", file=sys.stderr)
@@ -342,8 +371,10 @@ def main() -> int:
             golden_dir = args.golden_dir.resolve()
             baseline_source = "--golden-dir 显式指定"
         elif payload_sha256:
-            golden_dir = load_baseline_dir(payload_sha256, args.read_bps)
-            baseline_source = "BOARD_STAGE_BASELINES.json 按载荷 SHA 与读长匹配"
+            golden_dir = load_baseline_dir(payload_sha256, args.read_bps, args.reads_sha256)
+            baseline_source = "BOARD_STAGE_BASELINES.json 按载荷 SHA 与读长查找"
+            if args.reads_sha256:
+                baseline_source = "BOARD_STAGE_BASELINES.json 按载荷 SHA、读长与读段 SHA 查找"
         else:
             golden_dir = None
             baseline_source = "缺少载荷身份"
@@ -353,10 +384,12 @@ def main() -> int:
 
     print(f"dump 目录：{args.dump_dir}")
     print(f"期望载荷 SHA256：{payload_sha256 or '未提供'}")
+    if args.reads_sha256:
+        print(f"读段 SHA256：{args.reads_sha256}")
     if golden_dir is None:
         dataset_ids = find_dataset_ids(payload_sha256) if payload_sha256 else []
         print(f"黄金向量：无可比基准（{baseline_source}；read_bps={args.read_bps}）")
-        checks = unverified_checks(args.read_bps, payload_sha256, dataset_ids)
+        checks = unverified_checks(args.read_bps, payload_sha256, dataset_ids, args.reads_sha256)
         for c in checks:
             c.render()
         print("\n" + "=" * 60)
