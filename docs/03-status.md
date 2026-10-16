@@ -716,7 +716,9 @@ LUT as Logic 需 **62,588** / Slice LUTs 需 **63,352**，可用 53,200（发布
 **必须连板测一起定**，不能顺手改。
 
 ⚠️ **仍未上板/未做**：冷启动（QSPI/SD）、功耗实测、
-新载荷四级板端取证（D1/D2 暂无四级黄金向量；检查器对缺基准显示 `UNVERIFIED`）。
+新载荷四级板端取证（**已备好 5 份黄金并完成 `D1_binary_pattern` 板端试点 4/4 PASS**，
+见[新载荷四级黄金](board/bkb220/four-level-golden-new-payloads.md)；`D1_text_manifesto` 与
+`D2_controlled_noise` **载荷 SHA 相同**、基准表区分不了，**故意不登记**以免假 FAIL）。
 
 **2026-10-16 当日关掉两项**：8 h 长稳跑满（1750 轮 / 0 失败 / 墙钟 8.005 h，
 见 [8 h 留证](benchmarks/bkb220-p16-soak-8h.md)）；v2 `score_min=67` 42 例跑完
