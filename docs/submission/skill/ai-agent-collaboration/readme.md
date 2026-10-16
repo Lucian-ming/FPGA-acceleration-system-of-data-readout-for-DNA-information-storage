@@ -1,8 +1,9 @@
 # 技能包：多个 AI agent 同时改一个仓库时，怎么不互相踩
 
 > 参赛提交物，不是本仓库的开发规范（见上级 README）。
-> 仓库内看板脚本的唯一权威源是 [`tools/agent_view.sh`](../../../../tools/agent_view.sh)（Bash，不含本题目内容）。本技能子目录没有携带脚本副本；将 `docs/submission/skill/` 单独复制出去时，须另行提供该脚本才能直接运行下面的命令。
-> 2026-10-10去掉本目录逐字节重复副本；原附件在Git历史及本机备份保留，功能源码没有变化。
+> 仓库内看板脚本的**唯一权威源**是 [`tools/agent_view.sh`](../../../../tools/agent_view.sh)（Bash，不含本题目内容）。
+> **本目录另带一份 `agent_view.sh` 快照**：因为上级说明写明「打包提交时把本目录整体复制为参赛包根下的 `skill/`」，不随包的话本技能被单独复制出去就**跑不起来**。**快照只为可运行，权威源始终是仓库那份；两者不一致时以仓库为准。**
+> （2026-10-10 曾去掉本目录的重复副本；2026-10-16 因上述打包场景重新放入，并加了头部说明以防被当成第二权威源。）
 
 ## 适用场景
 
@@ -19,14 +20,14 @@
 
 ```bash
 # 开工前（拿到任务的第一件事）
-tools/agent_view.sh start  --agent voter-opt --doing "在做什么" --why "为解决什么问题" --next "下一步"
+./agent_view.sh start  --agent voter-opt --doing "在做什么" --why "为解决什么问题" --next "下一步"
 # 换子任务 / 结论变化 / 启动长任务前
-tools/agent_view.sh update --agent voter-opt --doing "..." --next "..."
+./agent_view.sh update --agent voter-opt --doing "..." --next "..."
 # 受阻（把「在等什么」写进 --next）
-tools/agent_view.sh block  --agent voter-opt --doing "..." --why "..." --next "等用户确认选哪块板"
+./agent_view.sh block  --agent voter-opt --doing "..." --why "..." --next "等用户确认选哪块板"
 # 交接前最后一件事
-tools/agent_view.sh done   --agent voter-opt --doing "..." --next "..."
-tools/agent_view.sh show                       # 看当前看板
+./agent_view.sh done   --agent voter-opt --doing "..." --next "..."
+./agent_view.sh show                       # 看当前看板
 ```
 
 脚本用 `flock` 串行化写入，支持并发；渲染出一份 `view.md`，人只看它就够了。设计要点：

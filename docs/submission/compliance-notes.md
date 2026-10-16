@@ -61,9 +61,16 @@ $ git ls-files | (含非 ASCII)   →  0 个
 ## 3. 技能包（`skill/README.md`）
 
 - `docs/submission/skill/` 下**已有索引与 8 个独立包**（含 `fpga-timing-probe/`）。
-- 待确认两处：① 竞赛要求的是 `skill/README.md`，而现有索引若叫 `readme.md`，
-  在**大小写敏感的提交环境**下是不同文件；② `agent_view.sh` 未随包提供。
-- **这两条归入技能包的正式整理**，不属本次核查范围。
+**2026-10-16 两处均已处置（main 决）**：
+
+- ① **索引已改名为 `README.md`**（`git mv` 保历史；索引内部相对链接已复核无断链）。
+  依据：竞赛要求与本项目 `docs/05`、派发给子 Agent 的 prompt 里**都写的是 `skill/README.md`**；
+  而「文件/目录名纯英文小写」是通则。**两者只有在 `README.md` 属惯例例外时才不冲突**，
+  故按「具体要求优先」处理。⚠️ **8 个子包仍保留小写 `readme.md`**（它们的名字由我们自己定、受小写规则约束）。
+  **残留不确定**：仍无竞赛原文可比对；若原文实为「一律小写」，这处需再调。
+- ② **`agent_view.sh` 已随包**（`ai-agent-collaboration/agent_view.sh` 快照）。
+  依据：上级 `skill/README.md` 写明打包时**整体复制**本目录，不随包则该技能跑不起来。
+  快照头部与包内 README 均标明权威源是仓库 `tools/agent_view.sh`。
 
 ## 4. 其它
 
