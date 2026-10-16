@@ -17,6 +17,9 @@ hw/build/xsim/
 # P4/P16 整机工程更大。这些是可重建的大生成物——只把可复现 Tcl 入口、报告摘要与
 # 时序/资源结论入库，工程目录本身不入库、也不自动删除。
 hw/build/bkb220-ps7-probe/
+# v1.0 定版包与后续新命名包（2026-10-16）：上面按旧名前缀的规则匹配不到
+hw/build/bkb220-v1.0-*/
+hw/build/bkb220-v*-*/
 hw/build/bkb220-p4-*/
 hw/build/bkb220-p16-*/
 sw/workspace/
