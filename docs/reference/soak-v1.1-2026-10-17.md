@@ -186,6 +186,69 @@
 即使 §11 的假设成立，**本次长稳仍然是 FAIL**：无界重试是固件缺陷，不是测试方法问题。
 在真实 8 h 达标前，v1.1 不得被宣布长稳通过。
 
+## 11a. 第三场（`soak-v1.1-20261017T0848Z`，soak4）最终结果：**FAIL，但判据轮 1690/1690 全过**
+
+| 项 | 值 |
+| --- | --- |
+| `verdict` | **FAIL** |
+| 墙钟 | **27,531.7 s = 7 h 38 m 52 s** |
+| 门槛 | 28,224 s（7 h 50 m 24 s）⇒ **短 692.3 s（11 m 32 s）** |
+| 轮数 | **1690，全部 PASS**（`rounds_failed = 0`） |
+| 恢复探针 | **169 次 / 168 过 / 1 未执行** |
+| `stop_reason` | `stopped_early_after_recovery_probe_failure_at_round_1690` |
+| 启动身份 | PASS（`db5705fb4d0bc003`） |
+
+### 失败点：探针 `idle_then_close` 的**注入步骤**超时
+
+`recovery.jsonl` 最后一批（`tag=…-soak-r1690`）第 8 例：
+
+```text
+case: idle_then_close
+injection_status: failed      case_status: not_executed
+inject_error: timeout: timed out      inject_s: 5.648
+recovered: true               recovery_s: 2.01      failure_class: inconclusive
+```
+
+- `inj_idle_then_close()` 的第一行是 `socket.create_connection((ip, port), timeout=5)`。
+  **5.648 s 与 5 s 超时吻合 ⇒ 是 TCP 连接建立超时**，不是"发出去没回应"。
+- **紧接着的 `second_connection` 与 `flood_bad_headers` 两例都 PASS**（各约 3 s，恢复 2.0 s），
+  板子之后一直健康（收工时 ping 与 CAPS 均正常）。
+- ⇒ 这是**板端接受新连接的一次瞬时无响应（>5 s）**，随后自行恢复；**不是崩溃，也不是持续故障**。
+
+### 已排除的解释
+
+| 假设 | 结论 |
+| --- | --- |
+| 主机端口 / TIME_WAIT 耗尽 | **排除**：到板端仅 6 个 `TIME-WAIT`，临时端口 4096 个 |
+| PCB 池耗尽 | **排除**：`MEMP_NUM_TCP_PCB=32`、`PBUF_POOL_SIZE=256`；16 s/轮下同时最多约 8 个 TIME_WAIT |
+| 判据轮本身有问题 | **排除**：1690 轮架构 `0/10800` + 系统 SHA 全匹配 |
+
+### 为什么这一场仍然判 FAIL（**不改判据**）
+
+两条既有条件同时不满足：① 有 1 次恢复探针失败；② 墙钟**低于 7 h 50 m 24 s 的最低线**
+（因为探针失败在 1690 轮处止损，差 11 分半没跑满）。
+
+### 一个必须正视的统计事实
+
+本场探针共 **1690 个用例**，失败 **1 个** ⇒ 单例失败率约 **0.06%**。
+按这个量级，一场 8 h 长稳（≈169 次探针 × 10 例）**期望就会碰上约 1 次**。
+⇒ **直接重跑有相当概率以同样方式再 FAIL**。
+在重跑之前，应先弄清这 5 秒里板端为什么没有接受连接（见 §11b），
+否则只是重复消耗 8 小时。
+
+## 11b. 待查：连接接受偶发超时（**未定位**）
+
+已知：发生在一次 `reset_mid_caps`（发 RST）之后；`g_server_pcb` 的 `accept_callback` 路径、
+`tcp_abort` 后的 PCB 回收、ARP 条目老化，三者都还没有证据区分。
+**建议的下一步不是直接重跑**，而是：
+
+1. 在**不换固件**的前提下，用 `tools/board/g3_recovery_probe.py` 单独做**高密度短测**
+   （例如连续 200 次 `idle_then_close` + `reset_mid_caps` 交替），把复现概率放大；
+2. 若复现，再决定是固件问题（`accept_callback` / PCB 回收）还是探针的超时设置过紧；
+3. 只有在①无法复现、或②确认是探针侧问题时，才值得再花 8 h 重跑。
+
+⚠️ 这属于**改测试工具或改固件**的范畴，需用户拍板；本文不擅自改动。
+
 ## 12. 如果重跑仍失败：**v1.2 最小修复提案**（只写方案，**未实施**）
 
 ⚠️ 本节是**待用户拍板的提案**，不是已经做的改动。它会**改变交付物**（新固件包、新 `fw_build_id`），
