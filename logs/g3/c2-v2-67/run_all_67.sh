@@ -28,7 +28,9 @@
 set -u
 cd /home/lucian/projects/FPGA/FpgaAccelerationSystemOfDataReadout
 
-D="/mnt/e/桌面/dna-multimedia-simulation-v2-20261013"
+# 2026-10-17：数据集已从 E 盘桌面并入仓库内 data/test-sets/（逐文件 SHA-256 校验后
+# 删除桌面原件）。默认指向项目内副本；如数据在别处，用 DATASETS_ROOT 覆盖。
+D="${DATASETS_ROOT:-$PWD/data/test-sets/dna-multimedia-simulation-v2-20261013}"
 P="${ARTIFACT:-}"
 OUT="${OUTDIR:-}"
 SCORE_MIN="${SCORE_MIN:-67}"
