@@ -266,9 +266,41 @@ unable to determine type of EMAC with baseaddress 0xE000B000
 
 - ⚠️ **它失败关闭了**（没有假装通过）——这正是加这道核对的目的。
 
+### 5.3 2026-10-17：**SD 启动模式下 JTAG 复位/烧录会与 BootROM 竞态**（新增）
+
+- **现象**：同一份 v1.1-fwid 包，在 SD 启动模式下第一次 `run_g3.sh`（含真烧录）**烧录成功、身份核对 PASS**；
+  紧接着第二次执行时，`dow` 报
+  `Memory write error at 0x100000. AP transaction timeout`，
+  随后**板上网络全断**（`ping` 100% 丢包），JTAG 只剩
+  `DAP (APB AP transaction error, DAP status 0x30000021)`、**没有 Cortex-A9 目标**。
+
+- **根因**：`rst -system` 复位 PS 后，**SD 启动模式下 BootROM 立刻从 SD 卡启动**
+  （FSBL → PL 配置 → 应用），与 JTAG 随后的 `ps7_init` / `dow` **争用 DDR/AXI**。
+  第一次成功、第二次失败，是竞态的时序差异，不是制品问题。
+
+- **处置（两步，实测有效）**：
+  1. `targets -set 1; rst -system`
+     —— ⚠️ 必须**按目标索引**选 DAP；`targets -set -filter {name =~ "DAP"}`
+     **匹配不到**（实际名字带状态后缀），只有 `*Cortex-A9*#0*` 这类通配能匹配。
+     执行后链恢复，出现 `ARM Cortex-A9 MPCore #0 (Vector Catch)`。
+  2. 对该 A9 目标 `con` —— PS 从 SD 正常启动，**4 秒内 `ping` 通**，CAPS 全字段匹配。
+
+- ⚠️ **结论性约束**：`boot.tcl` 的 `rst -system → fpga → ps7_init → dow` 只能在
+  **JTAG 启动模式（`BOOT_MODE=0`）** 下安全使用。**SD 模式下不要做 JTAG 复位或烧录**；
+  长稳/回归一律用 `--skip-boot`，让固件由 SD 冷启动提供。
+
+### 5.4 2026-10-17：串口权限 —— `/dev/ttyUSB*` 属 `plugdev`，本账号不在组内（新增）
+
+- **现象**：`OPEN_FAIL PermissionError: [Errno 13] Permission denied: '/dev/ttyUSB2'`，
+  G3 在「串口实录」步骤 **FAIL（失败关闭）**，后续 CAPS/四级取证被 SKIP。
+- **处置**：`sudo -n chmod 666 /dev/ttyUSB*`。**每次 USB 重新枚举后都要重做**
+  （`usbipd attach` 之后节点权限是 `root:plugdev 660`）。
+- 仍然按 `bInterfaceNumber=02` 认 PS UART（**通道 C**），不要用固定名字。
+
 ## 6. 边界（**不要读成"v1.1 全部验收完成"**）
 
-- **SD 冷启动未做**（见 §4）；**QSPI 冷启动从未做过**；
+- **SD 冷启动已做且 PASS**（见 §4，`BOOT_MODE=0x00000005`）；**QSPI 冷启动从未做过**；
+  （2026-10-17 更正：此处原写「SD 冷启动未做」，是早期草稿残留，与 §4 结论矛盾。）
 
 - **功耗从未测**（无仪器）；
 
