@@ -152,6 +152,21 @@
 | **串口 0 字节** | 关键：`[RESULT] Sending…` 与 `[B29-DIAG] … retry #N` 都用 `xil_printf`，而 `fw_diag.h` 在 `FW_DIAG_LEVEL=1` 下把 `xil_printf` **编译成空操作**（只有 `FW_ERR_PRINTF` 在 1 级仍输出）。**所以卡在这里时串口必然是 0 字节** |
 | 30 s 停滞看门狗没触发 | 看门狗在 `stage1_dna.c` 的 STAGE1 状态里；此时流水线已完成，代码在 `send_result` |
 
+### 11.2b 全仓审计：无界循环**只有这两处**
+
+对 `sw/app/*.c` 的全部 `for (;;)` / `while (...)` 逐条核对上限后，结果收敛：
+
+| 位置 | 是否有上限 |
+| --- | --- |
+| `echo.c:802` 发头部 `for (;;)` | ❌ **无** |
+| `echo.c:826` 发正文 `while (sent < result_size)` | ❌ **无** |
+| `echo.c:869` 等 ACK 排空 | ✅ 2000 ms |
+| `echo.c:314` 解析循环 | ✅ 每次循环消耗缓冲或 break |
+| `stage3_decoder.c:335` `for (;;)` | ✅ 墙钟 `DECODER_CLEANUP_IDLE_TIMEOUT_US` |
+| `main.c:350` `for (;;)` | 主轮询循环，本应在 |
+
+⇒ 只盯着 `send_result` 是有依据的，不是先入为主。
+
 ### 11.3 触发条件（推测）
 
 只要 TCP 发送窗口不再打开——对端不 ACK、链路瞬断、EMAC TX BD 耗尽——重试就永不退出。
