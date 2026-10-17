@@ -129,7 +129,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | F1 | 高熵 payload @ 出厂门限 60 | 原始误码 2,671 bit，LDPC 50 轮未收敛 | **已知边界**，稳定 0/3 复现；@65 可恢复 | `logs/multi_payload/repeat3_*/` |
 | F2 | 8-way / 128×4 展开 | LUT 外推 ~125% | **资源证伪**，不再排期 | [08 §2.2 资源证伪](08-performance-and-strategy.md#22-资源证伪)，原7010资源报告在合并归档competition-strategy.md中 |
 | F3 | 流式阶段批量推进（两次尝试） | `submitted=640 > ring free=512`，Stage1 挂死 ~30 s | **放弃**：剩余收益上限仅 1.11x | `g3_runs/20260910T113222Z`、`115133Z` 的 `uart.log` |
-| F4 | v1.1 的 8 h 长稳 | **未完成**：只跑到 **18.3 分钟 / 69 轮全 PASS**，目标 8.0 h 未达 | 不是 8 h 长稳证据；须另行重跑 | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261016T2215Z/`；`docs/reference/board-v1.1-acceptance-2026-10-16.md` §3 |
+| F4 | v1.1 的 8 h 长稳 | **未完成，且 2026-10-17 的正式尝试 FAIL**：第 1008 轮板子整体失联（网络与 JTAG 调试口同时不可达），**4.906 h / 1007 轮成功**后按连续 3 轮失败止损；更早一次仅 18.3 分钟被断电叫停 | 不是 8 h 长稳证据；**不得用 v1.0 的 8.005 h 替代** | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261016T2215Z/`、`/mnt/d/bkb220_board_smoke/soak-v1.1-20261017T0347Z/`；`docs/reference/soak-v1.1-2026-10-17.md` |
 | F5 | QSPI 冷启动 | 未做 | 不构成 QSPI 启动验收 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§6、7 |
 | F6 | 板端功耗 | 未测（无仪器） | 不得据此声称低功耗或能效优势 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §6 |
 | F7 | SD 启动序列的 FSBL/BootROM 串口证据 | **5 次尝试均未取得启动序列**；现有 FT4232H USB 重枚举路径结构性取不到启动输出 | SD 冷启动本身有 `BOOT_MODE` 与固件身份证据；本项只登记串口取证失败 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§4.2、4.3 |
