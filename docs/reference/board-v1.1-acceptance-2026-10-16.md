@@ -31,7 +31,12 @@
 
 ## 1. G3 三层判据：PASS
 
-留证：`/mnt/d/bkb220_board_smoke/g3_runs/20261016T140322Z-v11-fwid-run3/`
+留证：`/mnt/d/bkb220_board_smoke/g3_runs/20261016T140746Z-v11-fwid-run3/`
+
+> 更正（2026-10-17）：此处原写 `20261016T140322Z-v11-fwid-run3`，**该路径不存在**——
+> 是把 run2 的时间戳与 run3 的后缀拼错了。实际 `140322Z` 是 `-v11-fwid-run2`（无 dump/judge，
+> 属中止轮），真正的 PASS 轮是 `140746Z-v11-fwid-run3`（含 `dump.out`、`g3_layers_run1.txt`、
+> `summary.txt`，架构与系统判据均 PASS）。已按磁盘实况更正。
 
 | 步骤 | 结果 |
 | --- | --- |

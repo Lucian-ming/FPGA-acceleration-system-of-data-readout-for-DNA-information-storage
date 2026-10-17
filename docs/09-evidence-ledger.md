@@ -25,6 +25,8 @@
 | C1 | SE150 真实测序数据端到端恢复原始图像，逐位一致 | 图片 SHA-256 `fcd0cf90…f2c3` | `g3_runs/20260910T*` 多轮 | `tools/run_g3.sh --limit 2048` |
 | C2 | 四级中间结果逐字节吻合，不只是最终哈希对 | Stage1/Stage2⊕水印/Stage3 分别对黄金向量 | 同上，`board_stage_check.py` | 同上（脚本第 7/7 步） |
 | C3 | 4-Way 与 2-Way 在生产几何下与**独立黄金模型**逐条一致 | 分数严格相等 + 位置属同分并列最大集，64/64 | `logs/iverilog/run_20260909_005333_*` | 见 `docs/benchmarks/stage1_4way_ip_integration.md` §6.3 |
+| C4 | v1.1 制品在板端通过 G3 三层判据 | 架构 syndrome 全零 `0/10800` + 系统载荷 SHA-256 `fcd0cf90…b1f2c3`；`fw_build_id` `db5705fb4d0bc003` | 制品 `hw/build/bkb220-v1.1-release-20261016T134556Z-fwid`；`/mnt/d/bkb220_board_smoke/g3_runs/20261016T140746Z-v11-fwid-run3/`；`docs/board/bkb220/v2-42cases-v1.1-2026-10-16.md` | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §1 |
+| C5 | v1.1 从 SD 卡冷启动并通过板端判据 | `BOOT_MODE (0xF800025C) = 0x00000005`（SD）；固件身份匹配 `db5705fb4d0bc003`；架构 syndrome 全零 `0/10800`、系统载荷 SHA-256 `fcd0cf90…b1f2c3` | `/mnt/d/bkb220_board_smoke/g3_runs/20261016T144713Z-sd-v1.1-cold-boot/`；`docs/reference/board-v1.1-acceptance-2026-10-16.md` §4 | 同上 §4 |
 
 **C2 的适用边界**：现有四级板端黄金包是 R0.83 的 SE150（`tests/golden/`）和 SE250（`tests/golden/se250/`）；`tests/golden/ldpc/` 是独立译码器向量，不是四级板端基准。`tools/board_stage_check.py` 按 G3 层报告中的期望载荷 SHA 与读长选择基准。未登记的 D1/D2 载荷会逐级标成 `UNVERIFIED` 并以退出码 3 结束，不能解读成硬件 FAIL 或 PASS。新载荷的四级板端证据仍须另行生成黄金包并上板取得。
 
@@ -47,6 +49,7 @@
 | G4 | **误接受率有定义且已测**：`score_min=67` 时干净数据 FAR **0.44%**、FRR 0% | 逐记录判真/诱饵/错位，FAR = 垃圾票占被接受记录的比例 | `docs/benchmarks/measured_g5_false_accept.md`、`logs/g5_matrix/run1/` | `python3 tools/g5_false_accept.py --dataset tests/datasets/D1_text_manifesto --limit 2048` |
 | G5 | **替换错误不影响误接受率，插删才是主因** | sub 0→4% 时 FAR@67 恒 ~0.5%；ins=del 0.1% 时升到 8.9%，且成因由「诱饵」变为「真错位」 | 同上，7 个噪声点 × 3 种子 | `bash tools/run_g5_matrix.sh` |
 | G6 | **阈值法在纯替换下的边界是 sub ≈ 4%** | 真记录最低分与诱饵最高分的间隔在 4% 处归零（+4.0 → ±0.0） | 同上 §3.1 | 同上 |
+| G7 | v1.1 的 v2 `score_min=67` 42 例与 v1.0 **逐例一致** | **26 PASS / 16 SAFE_NOCONV / 0 危险**；42 例 verdict 不同数为 0 | `docs/board/bkb220/v2-42cases-v1.1-2026-10-16.md`；`logs/g3/c2-v2-67-v1.1/` | `logs/g3/c2-v2-67/run_all_67.sh` |
 
 **G2 的具体数字**（这是比「6/7 通过」更强的证据）：
 
@@ -104,6 +107,8 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | E3 | 异常连接可恢复 | 断网/半截包头/坏 magic/RST 注入后恢复恒 2.02 s | `tests/stress_results/g6_postfault_*/` |
 | E4 | 判据有鉴别力，不是只会报 PASS | 故障注入会红；`wm_regions.hex` 几何哨兵 | `tools/make_golden.py` 内置哨兵 |
 | E5 | 演示不依赖预生成结果 | 四幕现场出哈希，含一幕**预期红灯** | `tools/run_demo.sh`，2026-09-10 实跑 |
+| E6 | v1.1 首次从零完成整机 Vivado 构建，时序收敛且实现等价 | Setup WNS **+0.411**、Hold WHS **+0.021**、失败端点 **0**；v1.0/v1.1 `util.rpt` 除文件头外逐行相同 | `docs/reference/build-v1.1-2026-10-16.md` §§3、5 | `tools/run_vivado_build.sh` |
+| E7 | `source_manifest` 的 `__pycache__` 污染是已知缺陷 | 清单生成逻辑已修；已有 v1.1 包未重建，污染仍在该包清单中 | `docs/reference/build-v1.1-2026-10-16.md` §7；`docs/reference/pre-board-audit-2026-10-16.md` §5 | 见来源文档 |
 
 > **E1 的方法学（重要）**：**整文件 SHA-256 发现不了制品与源码不同源。**
 > 2026-09-10 实测：出厂 `SHA256SUMS` 当时完全自洽，但那份 ELF **不含**源码里
@@ -124,6 +129,10 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | F1 | 高熵 payload @ 出厂门限 60 | 原始误码 2,671 bit，LDPC 50 轮未收敛 | **已知边界**，稳定 0/3 复现；@65 可恢复 | `logs/multi_payload/repeat3_*/` |
 | F2 | 8-way / 128×4 展开 | LUT 外推 ~125% | **资源证伪**，不再排期 | [08 §2.2 资源证伪](08-performance-and-strategy.md#22-资源证伪)，原7010资源报告在合并归档competition-strategy.md中 |
 | F3 | 流式阶段批量推进（两次尝试） | `submitted=640 > ring free=512`，Stage1 挂死 ~30 s | **放弃**：剩余收益上限仅 1.11x | `g3_runs/20260910T113222Z`、`115133Z` 的 `uart.log` |
+| F4 | v1.1 的 8 h 长稳 | **未完成**：只跑到 **18.3 分钟 / 69 轮全 PASS**，目标 8.0 h 未达 | 不是 8 h 长稳证据；须另行重跑 | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261016T2215Z/`；`docs/reference/board-v1.1-acceptance-2026-10-16.md` §3 |
+| F5 | QSPI 冷启动 | 未做 | 不构成 QSPI 启动验收 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§6、7 |
+| F6 | 板端功耗 | 未测（无仪器） | 不得据此声称低功耗或能效优势 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §6 |
+| F7 | SD 启动序列的 FSBL/BootROM 串口证据 | **5 次尝试均未取得启动序列**；现有 FT4232H USB 重枚举路径结构性取不到启动输出 | SD 冷启动本身有 `BOOT_MODE` 与固件身份证据；本项只登记串口取证失败 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§4.2、4.3 |
 
 > **F3 的教训**：原设计「一帧一个 poll」不只是浪费，**它同时是 BD 环的节流机制**。
 > 两次失败都用错了控制变量（第二次用 RX ring 余量，但 `ring free` 恒为 512，
