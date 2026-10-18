@@ -131,7 +131,6 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | F1 | 高熵 payload @ 出厂门限 60 | 原始误码 2,671 bit，LDPC 50 轮未收敛 | **已知边界**，稳定 0/3 复现；@65 可恢复 | `logs/multi_payload/repeat3_*/` |
 | F2 | 8-way / 128×4 展开 | LUT 外推 ~125% | **资源证伪**，不再排期 | [08 §2.2 资源证伪](08-performance-and-strategy.md#22-资源证伪)，原7010资源报告在合并归档competition-strategy.md中 |
 | F3 | 流式阶段批量推进（两次尝试） | `submitted=640 > ring free=512`，Stage1 挂死 ~30 s | **放弃**：剩余收益上限仅 1.11x | `g3_runs/20260910T113222Z`、`115133Z` 的 `uart.log` |
-| F4 | `send_result()` 的两处重试**没有时间上限**（代码风险，本轮长稳未触发） | `echo.c:802` 发头部 `for(;;)`、`echo.c:826` 发正文 `while (sent < result_size)` 在 `tcp_sndbuf()==0` 时无限 `usleep(1000)` 重试；它由 `poll_callback` 的 `PROC_DONE` 分支同步调用 ⇒ 窗口不打开时回调不返回、lwIP 饿死、板端网络整体失联 | 全仓审计确认 `sw/app` 的无界循环只有这两处；建议 v1.2 加 30 s 墙钟上限并 `tcp_abort` 回 `PROC_IDLE`（需拍板，会换制品） | `docs/reference/soak-v1.1-pass-2026-10-18.md` §6 |
 | F5 | QSPI 冷启动 | 未做 | 不构成 QSPI 启动验收 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§6、7 |
 | F6 | 板端功耗 | 未测（无仪器） | 不得据此声称低功耗或能效优势 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §6 |
 | F7 | SD 启动序列的 FSBL/BootROM 串口证据 | **5 次尝试均未取得启动序列**；现有 FT4232H USB 重枚举路径结构性取不到启动输出 | SD 冷启动本身有 `BOOT_MODE` 与固件身份证据；本项只登记串口取证失败 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§4.2、4.3 |
