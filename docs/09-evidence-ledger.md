@@ -51,6 +51,7 @@
 | G5 | **替换错误不影响误接受率，插删才是主因** | sub 0→4% 时 FAR@67 恒 ~0.5%；ins=del 0.1% 时升到 8.9%，且成因由「诱饵」变为「真错位」 | 同上，7 个噪声点 × 3 种子 | `bash tools/run_g5_matrix.sh` |
 | G6 | **阈值法在纯替换下的边界是 sub ≈ 4%** | 真记录最低分与诱饵最高分的间隔在 4% 处归零（+4.0 → ±0.0） | 同上 §3.1 | 同上 |
 | G7 | v1.1 的 v2 `score_min=67` 42 例与 v1.0 **逐例一致** | **26 PASS / 16 SAFE_NOCONV / 0 危险**；42 例 verdict 不同数为 0 | `docs/board/bkb220/v2-42cases-v1.1-2026-10-16.md`；`logs/g3/c2-v2-67-v1.1/` | `logs/g3/c2-v2-67/run_all_67.sh` |
+| G8 | v1.1 的 8 h 长稳：**1736 轮连续判据零失败 + 173 次恢复探针全过** | `verdict=PASS`、`wall_s=28810.3`（8 h 0 m 10.3 s）、`rounds_failed=0`、`recovery_probes_failed=0`、`stop_reason=wall_clock_target_reached`、`stopped_early=false`；启动 `fw_build_id` 核对 PASS | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261018T0239Z/`（`soak.tsv`、`recovery.jsonl`、1736 个 `roundNNNN.out`） | `docs/reference/soak-v1.1-pass-2026-10-18.md` |
 
 **G2 的具体数字**（这是比「6/7 通过」更强的证据）：
 
@@ -130,7 +131,7 @@ D1高熵@60 2671/2671/2671   D1高熵@65 236/236/236   D2 20/20/20
 | F1 | 高熵 payload @ 出厂门限 60 | 原始误码 2,671 bit，LDPC 50 轮未收敛 | **已知边界**，稳定 0/3 复现；@65 可恢复 | `logs/multi_payload/repeat3_*/` |
 | F2 | 8-way / 128×4 展开 | LUT 外推 ~125% | **资源证伪**，不再排期 | [08 §2.2 资源证伪](08-performance-and-strategy.md#22-资源证伪)，原7010资源报告在合并归档competition-strategy.md中 |
 | F3 | 流式阶段批量推进（两次尝试） | `submitted=640 > ring free=512`，Stage1 挂死 ~30 s | **放弃**：剩余收益上限仅 1.11x | `g3_runs/20260910T113222Z`、`115133Z` 的 `uart.log` |
-| F4 | v1.1 的 8 h 长稳 | **仍未完成；2026-10-17 两次正式尝试均 FAIL**。① 第 1008 轮板子整体失联（网络与 JTAG 调试口同时不可达），**4.906 h / 1007 轮成功**后止损；② 第三次 **1690 轮判据全部 PASS**，但恢复探针 `idle_then_close` 的 `connect()` 5 s 超时，墙钟 **7 h 38 m 52 s**，低于最低线 11 分半且 1 次探针失败 ⇒ FAIL。**2026-10-18 更正归因：该超时是主机断电/休眠，不是板端缺陷**（复现探针时钟跳变 `inject_s≈5.5 h` / `Network is unreachable`；恢复后 100 例 99 过、`idle_then_close` 0/10 超时）。更早一次仅 18.3 分钟被断电叫停 | 不是 8 h 长稳证据；**不得用 v1.0 的 8.005 h 替代**。裁决不变（未跑满最低墙钟），用户决定不再重跑 | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261016T2215Z/`、`…/soak-v1.1-20261017T0347Z/`、`…/soak-v1.1-20261017T0848Z/`；`docs/reference/soak-v1.1-2026-10-17.md` |
+| F4 | v1.1 的 8 h 长稳（**已于 2026-10-18 通过**） | 前四次尝试均未通过，作为负结果保留：① 2026-10-16 仅 18.3 分钟被断电叫停；② 2026-10-17 第 1008 轮板子整体失联（网络与 JTAG 同时不可达），4.906 h 后止损；③ 同日主机侧残留 `g3_uart_cap.py` 抢占串口，判据其实全过，作废；④ 同日 1690 轮判据全过，但恢复探针 `connect()` 超时（**已查明为主机断电/休眠**），墙钟差 11 分半。**第五次（2026-10-18）PASS**：1736 轮 / 0 失败 / 173 探针全过 / 墙钟 8 h 0 m 10.3 s | ② 的板端整体失联**至今未解释**（`send_result` 无界重试是候选假设，未复现也未证伪）；不得只引用第五场 | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261018T0239Z/`；`docs/reference/soak-v1.1-pass-2026-10-18.md`；`docs/reference/soak-v1.1-2026-10-17.md` |
 | F5 | QSPI 冷启动 | 未做 | 不构成 QSPI 启动验收 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§6、7 |
 | F6 | 板端功耗 | 未测（无仪器） | 不得据此声称低功耗或能效优势 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §6 |
 | F7 | SD 启动序列的 FSBL/BootROM 串口证据 | **5 次尝试均未取得启动序列**；现有 FT4232H USB 重枚举路径结构性取不到启动输出 | SD 冷启动本身有 `BOOT_MODE` 与固件身份证据；本项只登记串口取证失败 | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §§4.2、4.3 |
