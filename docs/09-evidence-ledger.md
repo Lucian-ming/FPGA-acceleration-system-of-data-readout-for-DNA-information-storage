@@ -27,6 +27,7 @@
 | C3 | 4-Way 与 2-Way 在生产几何下与**独立黄金模型**逐条一致 | 分数严格相等 + 位置属同分并列最大集，64/64 | `logs/iverilog/run_20260909_005333_*` | 见 `docs/benchmarks/stage1_4way_ip_integration.md` §6.3 |
 | C4 | v1.1 制品在板端通过 G3 三层判据 | 架构 syndrome 全零 `0/10800` + 系统载荷 SHA-256 `fcd0cf90…b1f2c3`；`fw_build_id` `db5705fb4d0bc003` | 制品 `hw/build/bkb220-v1.1-release-20261016T134556Z-fwid`；`/mnt/d/bkb220_board_smoke/g3_runs/20261016T140746Z-v11-fwid-run3/`；`docs/board/bkb220/v2-42cases-v1.1-2026-10-16.md` | `docs/reference/board-v1.1-acceptance-2026-10-16.md` §1 |
 | C5 | v1.1 从 SD 卡冷启动并通过板端判据 | `BOOT_MODE (0xF800025C) = 0x00000005`（SD）；固件身份匹配 `db5705fb4d0bc003`；架构 syndrome 全零 `0/10800`、系统载荷 SHA-256 `fcd0cf90…b1f2c3` | `/mnt/d/bkb220_board_smoke/g3_runs/20261016T144713Z-sd-v1.1-cold-boot/`；`docs/reference/board-v1.1-acceptance-2026-10-16.md` §4 | 同上 §4 |
+| C6 | 5 个新载荷在 v1.1 上完成**板端四级逐级取证** | 5/5 场次：架构 `0/10800` PASS + 系统载荷 SHA PASS + 四级 4/4 PASS；水印 47850/47850、Stage2 1265/1266（0.01%） | `g3_runs/20261018T023312Z`（D1_text）、`…T023408Z`（D1_structured_sparse）、`…T023419Z`（D1_random_entropy）、`…T023430Z`（D2_controlled_noise）、`…T023524Z`（D1_binary_pattern）；`docs/board/bkb220/four-level-golden-new-payloads.md` §9 | 同上 §9 |
 
 **C2 的适用边界**：现有四级板端黄金包是 R0.83 的 SE150（`tests/golden/`）和 SE250（`tests/golden/se250/`）；`tests/golden/ldpc/` 是独立译码器向量，不是四级板端基准。`tools/board_stage_check.py` 按 G3 层报告中的期望载荷 SHA 与读长选择基准。未登记的 D1/D2 载荷会逐级标成 `UNVERIFIED` 并以退出码 3 结束，不能解读成硬件 FAIL 或 PASS。新载荷的四级板端证据仍须另行生成黄金包并上板取得。
 

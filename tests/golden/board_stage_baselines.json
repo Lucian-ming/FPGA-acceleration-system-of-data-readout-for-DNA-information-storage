@@ -33,6 +33,22 @@
    "read_bps": 150,
    "golden_dir": "d1_random_entropy_se150",
    "score_min": 65
+  },
+  {
+   "payload_id": "D1_text_manifesto",
+   "payload_sha256": "101d89599e84011f30816dea901c43d96bd2a1654a5252dbf47e9c0cc8601ccf",
+   "read_bps": 150,
+   "golden_dir": "d1_text_manifesto_se150",
+   "score_min": 67,
+   "reads_sha256": "7453803b55071eef7af7cc5a831f0fad23eebfe6b5ca63207057a553f316b07c"
+  },
+  {
+   "payload_id": "D2_controlled_noise",
+   "payload_sha256": "101d89599e84011f30816dea901c43d96bd2a1654a5252dbf47e9c0cc8601ccf",
+   "read_bps": 150,
+   "golden_dir": "d2_controlled_noise_se150",
+   "score_min": 65,
+   "reads_sha256": "b621ec199d71785c7452b0655f295d5c21ad52ea1f433e0502d98de0519c8641"
   }
  ]
 }

@@ -165,3 +165,90 @@ bash tools/run_g3.sh --artifact-dir <推广包> --strict-artifacts \
   "与板端一致"只说明两者同源且逐位吻合，**不证明**模型算法在真实测序误差下的正确性。
 - 数据仍是 **in-silico 模拟测序**。
 - 未做：登记后的**完整回归**（确保登记没有把别的载荷判红）。
+
+---
+
+# 9. 2026-10-18：登记阻塞解除，**5 个载荷的板端四级取证全部完成**
+
+## 9.1 §5 的阻塞是怎么解除的
+
+§5 建议的修法已经落地：
+
+- `tools/board_stage_check.py::load_baseline_dir()` 支持可选字段 **`reads_sha256`**
+  （条目有该字段时**必须精确匹配**；没有该字段的条目不提供回退）；
+- `tools/run_g3.sh` 已在取 dump 时把本次 FASTQ 的 SHA-256 作为 `--reads-sha256` 传给检查器
+  （`READS_SHA="$(sha256sum "$READS_FILE")"`）。
+
+⇒ `D1_text_manifesto` 与 `D2_controlled_noise` 载荷 SHA 相同的问题**不再阻碍登记**。
+
+## 9.2 本次新登记的两条
+
+`tests/golden/board_stage_baselines.json`（`read_bps=150`）：
+
+| 载荷 | golden_dir | `score_min` | `reads_sha256` |
+| --- | --- | ---: | --- |
+| `D1_text_manifesto` | `d1_text_manifesto_se150` | 67 | `7453803b55071eef7af7cc5a831f0fad23eebfe6b5ca63207057a553f316b07c` |
+| `D2_controlled_noise` | `d2_controlled_noise_se150` | 65 | `b621ec199d71785c7452b0655f295d5c21ad52ea1f433e0502d98de0519c8641` |
+
+两份载荷 SHA 都是 `101d8959…`（同一载荷、不同噪声），靠 `reads_sha256` 区分。
+`tests/golden/SHA256SUMS` 中 `board_stage_baselines.json` 一行已同步刷新。
+
+## 9.3 离线验证（先验，不能省）
+
+按 §2.3 的配方，用项目自己的译码器把每份黄金的 `dec_input.txt` 译回载荷并比对 SHA：
+
+| 黄金目录 | `--input-bytes` | 结果 |
+| --- | ---: | --- |
+| `d1_binary_pattern_se150` | 4096 | ✅ SHA 相符 |
+| `d1_structured_sparse_se150` | 6750 | ✅ |
+| `d1_random_entropy_se150` | 6750 | ✅ |
+| `d1_text_manifesto_se150` | 5000 | ✅ |
+| `d2_controlled_noise_se150` | 5000 | ✅ |
+
+## 9.4 板端结果：**5/5 载荷三层判据 PASS + 四级 4/4 PASS**（全部 v1.1 制品）
+
+统一口径：`--limit 4096`、`--skip-boot`、制品 `hw/build/bkb220-v1.1-release-20261016T134556Z-fwid`
+（`fw_build_id db5705fb4d0bc003`）。`--input-bytes` 取该载荷的真实字节数。
+
+| 载荷 | 留证 run | 架构判据 | 系统判据 | 水印字 | Stage1 整条 48B | Stage3 整字 |
+| --- | --- | --- | --- | ---: | ---: | ---: |
+| `D1_binary_pattern` | `g3_runs/20261018T023524Z` | `0/10800` PASS | PASS | 47850/47850 | 4007/4096（码字 4096/4096、score 4096/4096） | 1010/1012（0.01%） |
+| `D1_structured_sparse` | `g3_runs/20261018T023408Z` | `0/10800` PASS | PASS | 47850/47850 | 4025/4096（码字/score 均 4096/4096） | 1010/1012（0.02%） |
+| `D1_random_entropy` | `g3_runs/20261018T023419Z` | `0/10800` PASS | PASS | 47850/47850 | 4008/4096（码字/score 均 4096/4096） | 996/1012（**0.36%**） |
+| `D1_text_manifesto` | `g3_runs/20261018T023312Z` | `0/10800` PASS | PASS | 47850/47850 | 4014/4096（码字/score 均 4096/4096） | 1010/1012（0.02%） |
+| `D2_controlled_noise` | `g3_runs/20261018T023430Z` | `0/10800` PASS | PASS | 47850/47850 | 4012/4096（码字/score 均 4096/4096） | 1009/1012（0.02%） |
+
+- **Stage2 输出 ⊕ 水印**：五场均为 **1265/1266，比特误码 0.01%**。
+- **四级逐级取证：5/5 场次均为「4/4 级全部通过」**。
+- 每场的逐级原始数字在各 run 目录的 `stage_check.log`；完整命令在 `summary.txt` 与 `uart.log` 同目录。
+
+## 9.5 关键验证点：`reads_sha256` **真的生效了**
+
+`D1_text_manifesto` 与 `D2_controlled_noise` 的载荷 SHA 相同，如果判别没生效，
+两场必然至少有一场被判红。实际两场 `stage_check.log` 分别写着：
+
+```text
+黄金向量：…/tests/golden/d1_text_manifesto_se150 （读段 SHA=7453803b…）
+黄金向量：…/tests/golden/d2_controlled_noise_se150 （读段 SHA=b621ec19…）
+```
+
+⇒ 登记不是"看起来对"，而是**按读段身份真正区分开了**。
+`D1_binary_pattern` 的 `matches` 也是按同一机制选中 `d1_binary_pattern_se150`。
+
+## 9.6 边界（**不要读成"新载荷算法在真实测序下已验证"**）
+
+- 数据仍是 **in-silico 模拟测序**；
+- 黄金由 `make_golden.py`（软件模型）生成，**不是独立参考实现**；
+  "与板端一致"只说明两者同源且逐位吻合；
+- `D1_random_entropy` 的 Stage3 比特误码 **0.36%**（比其他载荷高一个量级），
+  四级检查器仍判 PASS —— **硬判据是系统判据（载荷 SHA），不是逐级比对**；
+- **`--limit` 必须与黄金生成时一致（本次均为 4096 源读段）**，换 `--limit` 必须重生成黄金（§3.1）；
+- 非 JPEG 载荷必须传 `--input-bytes`（§3.3），本次四个都传了。
+
+## 9.7 改动清单
+
+| 文件 | 改动 |
+| --- | --- |
+| `tests/golden/board_stage_baselines.json` | 新增 `D1_text_manifesto`、`D2_controlled_noise` 两条（带 `reads_sha256`） |
+| `tests/golden/SHA256SUMS` | 刷新 `board_stage_baselines.json` 的 SHA-256 行 |
+| 本文件 | 新增第 9 节 |
