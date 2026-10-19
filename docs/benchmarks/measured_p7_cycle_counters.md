@@ -1,5 +1,8 @@
 # P7 硬件周期计数器实测：拆解 62.9% 非 Stage1 耗时真相
 
+> ⚠️ **2026-10-19**：文中引用的 `D:\dna_board_smoke\g3_runs\` 原始日志已按用户要求清理，
+> 目录内容不再存在。本文的测量结论与数字保留，引用原始日志的路径已失效。
+
 > **评测日期**：2026-09-11  
 > **比特流**：`hw/build/export/top_bd_wrapper.bit`（SHA-256 `fd5c401c…`，WNS = +0.167 ns @ 100 MHz）  
 > **固件**：`hw/build/export/dna_lwip_app_b27.elf`（SHA-256 `b10665ca…`）  

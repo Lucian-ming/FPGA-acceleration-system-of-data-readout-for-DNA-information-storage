@@ -65,6 +65,7 @@ v1.0 制品包的 `reports/source_manifest.json` 记录了构建时的源码身�
 - **45 个历史包的 `export/` 已整包备份**到
   `D:\bkb220_cleanup_backup_20261016T104516Z\artifacts\<包名>\`
   （**296 个文件逐字节校验通过**）；
+  ⚠️ **2026-10-19：该备份目录已按用户要求删除**，上述历史包不再有可用副本；
 - 备份里还有旧板资料 `board-docs\`（20 MB）与 `archive\`（228 MB，**未删，等用户决定**）。
 
 ⚠️ **因此**：`docs/03-status.md` 与 `docs/09-evidence-ledger.md` 里指向历史包的留证指针
