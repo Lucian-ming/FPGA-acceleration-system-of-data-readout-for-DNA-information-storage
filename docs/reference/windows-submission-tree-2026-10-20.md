@@ -18,6 +18,7 @@
 dna-accel-bkb220/
 ├── readme.md            项目说明、目录对照、复现步骤、命名例外
 ├── license
+├── .gitignore / .gitattributes          源码仓库用的忽略与换行/二进制规则
 ├── src/                 工作树根（脚本按自身位置推根）
 │   ├── hw/  sw/  clients/  tools/  tests/  data/
 ├── build/
@@ -28,7 +29,7 @@ dna-accel-bkb220/
 │   └── artifact/                        run_g3.sh 可直接使用的完整制品包
 ├── board/  data/  sim/                 推荐结构的说明与入口
 ├── skill/                              技能包（8 个）
-└── report/                             设计报告 + 大模型协作记录 + 第三方声明
+└── report/                             设计报告 + 大模型协作记录（子 Agent + 主会话）+ 第三方声明
 ```
 
 不随包：`docs/`（本仓库文档）、`AGENTS.md`、`CLAUDE.md`、`archive/`、`logs/`、
@@ -108,7 +109,9 @@ dna-accel-bkb220/
 
 - 许可：`dvb_s2_r5_6.pchk` 与 `permutation64800` 的文件级来源仍待补；R0.83 数据的权利人
   与再分发授权仍未确认（见 `report/third-party-notices.md` §7）。
-- 主会话的 LLM 协作记录尚未补入 `report/llm-collaboration/`。
+- 主会话 LLM 协作记录已补入 `report/llm-collaboration/main-session/`：150 组
+  「提示 → 本轮最终回复」加 4 个主会话纠错案例；工具调用与工具输出未收录，
+  完整 JSONL 只在本机。
 - 逐轮/逐例原始记录不随包；报告给出统计与判据，可用 `src/tools/run_g3.sh` 复跑。
 - 长稳（8h / 1736 轮）证据来自 v1.1 制品，不适用于 2026.1 制品；
   2026.1 制品目前只有单轮 + 取证轮，未重跑长稳。
