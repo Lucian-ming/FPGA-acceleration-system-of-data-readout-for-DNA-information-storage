@@ -37,11 +37,12 @@ dna-accel-bkb220/
 
 ## 3. 命名
 
-自研源码与目录全小写、无版本号；例外三类，均在 `readme.md` 注明：
+自研源码与目录全小写、无版本号；例外四类，均在 `readme.md` 注明：
 
 1. 4 个 Vivado IP 目录保留 `_1_0`（Vivado 按 `<IP名>_<版本>` 解析 HDL 路径）；
 2. `BOOT.bin`（Bootgen 固定输出）、`SHA256SUMS`（校验清单惯例）；
-3. `build/sw-repo/` 下第三方 lwIP 源码保留原始文件名。
+3. `build/sw-repo/` 下第三方 lwIP 源码保留原始文件名；
+4. `skill/README.md`：指南 §3.3.5.2 点名技能索引为该名，故只此一个文件保留大写。
 
 ## 4. 2026.1 构建结果（提交树内实测）
 
@@ -56,12 +57,12 @@ dna-accel-bkb220/
 | XSA | `46fd1858c0f070b77f89dd9a158524a1cb88d007683311db43a58b39ddd24893` |
 | ELF | `e71554ac3c911d3536c788e89677154002f283c625ba09136d648c4173a9b176` |
 | BOOT.bin | `bbf358a78f20e0596e03e826b7a5c29ebcf8bb3f4a7987f0a8de873c24e4b7a3` |
-| manifest | `50d41f4090d7300a48d5c2f06347d3f4e092c44af2a912be5b433e23486a0aed`（2026-10-20 路径清理后重签 `source_manifest`；bit/ELF/BOOT 未变） |
+| manifest | `bb7ff5433ae09711508e31ef35fb35d8c826b3aebd2481b12c39a5a0e49dec72`（2026-10-20 路径清理后重签 `source_manifest`；bit/ELF/BOOT 未变） |
 
 与随包 2022.2 参考报告（LUT 36,289 / FF 37,595 / WNS +0.411 ns）相比，
 资源与时序差异来自工具版本，功能等价性由两级取证确认（见 §5）。
 
-## 5. 板端验证（同一制品，六轮，全部 PASS）
+## 5. 板端验证（同一制品，七轮，全部 PASS）
 
 | 轮次 | 驱动方式 | 结果 |
 | --- | --- | --- |
@@ -70,7 +71,8 @@ dna-accel-bkb220/
 | `20261020T030433Z` | **Windows 原生**：Git Bash × Vitis 2026.1 `xsdb` × 本机 `hw_server` × `COM10` | 三层 PASS + **四级逐级取证 4/4** |
 | `20261020T031743Z` | 同上（重签 source_manifest 后，manifest `c38f3a3e…`） | 三层 PASS + **四级逐级取证 4/4** |
 | `20261020T032441Z` | 同上（manifest `91876564…`，路径清理完毕） | 三层 PASS + **四级逐级取证 4/4** |
-| `20261020T060315Z` | 同上（最终 manifest `50d41f40…`，Vitis 入口去硬编码后） | 三层 PASS + **四级逐级取证 4/4** |
+| `20261020T060315Z` | 同上（manifest `50d41f40…`，Vitis 入口去硬编码后） | 三层 PASS + **四级逐级取证 4/4** |
+| `soak-2h`（manifest `bb7ff543…`） | 同上（最终重签版本） | **2 h 长稳：262 轮全 PASS、0 失败、26 次恢复探针全过** |
 
 四级数字（后两轮完全一致）：
 
@@ -104,18 +106,21 @@ dna-accel-bkb220/
 | 测试脚本中的宿主机留证路径 | 改为环境变量 `BKB220_BOARD_EVIDENCE`，缺省时跳过 |
 | `arm_baseline.py` | **删除**：依赖旧板 Vivado Lab 2022.2 / `dna_platform_b27` BSP 与硬编码路径，在新板上可能用旧 `ps7_init` 误复位 |
 | Vitis / XSDB 包装脚本的安装路径默认值 | 改为 `XILINX_VITIS` / `XILINX_VIVADO` 环境变量；`run_g3.sh` 的 `nm` 改由 `--xsdb` 推导，推导失败即报错 |
-| `source_manifest` | 清理后重签（104 条源码），`manifest.json` 最终为 `50d41f40…`，并复跑板测（§5 后三轮） |
+| `source_manifest` | 清理后重签（104 条源码），`manifest.json` 最终为 `bb7ff543…`，并由 2 h 长稳的 262 轮原生 G3 复验 |
 
 ## 7. 已记录的限制
 
-- 许可：`dvb_s2_r5_6.pchk` 与 `permutation64800` 的文件级来源仍待补；R0.83 数据的权利人
-  与再分发授权仍未确认（见 `report/third-party-notices.md` §7）。
+- 许可：`dvb_s2_r5_6.pchk` 与 `permutation64800` 的**文件级**来源仍待补。已查明二者随
+  2025-11-07 的 PC 端译码器包（`LDPC_R5_6_decoder_hard.cpp` 编译的 EXE + Radford Neal
+  LDPC 软件包的 `mod2sparse_*` 例程）首次上传；矩阵内容与 ETSI EN 302 307-1 Table B.9
+  一致，但数据文件自身的下载/生成出处未记录。R0.83 数据的权利人与再分发授权仍未确认
+  （见 `report/third-party-notices.md` §7）。
 - 主会话 LLM 协作记录已补入 `report/llm-collaboration/main-session/`：150 组
   「提示 → 本轮最终回复」加 4 个主会话纠错案例；工具调用与工具输出未收录，
   完整 JSONL 只在本机。
 - 逐轮/逐例原始记录不随包；报告给出统计与判据，可用 `src/tools/run_g3.sh` 复跑。
-- 长稳（8h / 1736 轮）证据来自 v1.1 制品，不适用于 2026.1 制品；
-  2026.1 制品目前只有单轮 + 取证轮，未重跑长稳。
+- 长稳：2026.1 制品已完成 **2 h（262 轮）** 长稳；**8 h / 1736 轮**证据仍只属于 v1.1 制品，
+  不能外推到 2026.1。
 
 ## 7. 复跑入口
 
