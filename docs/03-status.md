@@ -23,6 +23,13 @@ BKB220 已到货并连接，main 已在 JTAG 上核实：
 
 **用户 2026-10-12 明确的分工：开发全部在 WSL 用 2022.2；Windows 里的 2026.1 只负责烧录。**
 
+> **2026-10-20 更新（已取代上句在提交口径上的含义）**：按用户新要求，Windows 侧另建
+> **自包含提交树** `D:\dna-accel-bkb220`，用 Vivado/Vitis **2026.1 原生构建全文**（含 PS 软件），
+> 并在 Windows 原生环境完成板测（Git Bash × 2026.1 `xsdb` × 本机 `hw_server` × `COM10`），
+> 三层判据与四级取证均 PASS。WSL 仓库仍是开发源与判据权威，**同步方向为 WSL → Windows**。
+> 记录见 [windows-submission-tree-2026-10-20.md](reference/windows-submission-tree-2026-10-20.md)。
+> 下表中"2026.1 只烧录 / F9 复核"仍描述**当时的分工**，不再是提交线的工作方式。
+
 | 用途 | 工具链 | 位置 |
 |---|---|---|
 | **RTL / BD / 约束 / 综合 / 实现 / 时序 / bit / XSA** | **Vivado 2022.2** | WSL `/tools/Xilinx/Vivado/2022.2` |
