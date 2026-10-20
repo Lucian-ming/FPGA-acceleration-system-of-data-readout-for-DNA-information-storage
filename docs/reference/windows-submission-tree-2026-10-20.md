@@ -55,18 +55,20 @@ dna-accel-bkb220/
 | XSA | `46fd1858c0f070b77f89dd9a158524a1cb88d007683311db43a58b39ddd24893` |
 | ELF | `e71554ac3c911d3536c788e89677154002f283c625ba09136d648c4173a9b176` |
 | BOOT.bin | `bbf358a78f20e0596e03e826b7a5c29ebcf8bb3f4a7987f0a8de873c24e4b7a3` |
-| manifest | `c2d151e07552e94d7be3b8b3f3aed5355ca9d5ead1462e2b8e3828e56696ae6a` |
+| manifest | `9187656411e9a874cf0291d41b2af3362c89809864b9cc88826daf2024665480`（2026-10-20 路径清理后重签 `source_manifest`；bit/ELF/BOOT 未变） |
 
 与随包 2022.2 参考报告（LUT 36,289 / FF 37,595 / WNS +0.411 ns）相比，
 资源与时序差异来自工具版本，功能等价性由两级取证确认（见 §5）。
 
-## 5. 板端验证（同一制品，三轮，全部 PASS）
+## 5. 板端验证（同一制品，五轮，全部 PASS）
 
 | 轮次 | 驱动方式 | 结果 |
 | --- | --- | --- |
 | `20261020T025652Z` | WSL xsdb + hw_server（usbip） | 三层判据 PASS：烧录、`fw_build_id`、CAPS、架构 0/10800、系统 SHA |
 | `20261020T025814Z` | 同上 | 三层 PASS + **四级逐级取证 4/4** |
 | `20261020T030433Z` | **Windows 原生**：Git Bash × Vitis 2026.1 `xsdb` × 本机 `hw_server` × `COM10` | 三层 PASS + **四级逐级取证 4/4** |
+| `20261020T031743Z` | 同上（重签 source_manifest 后，manifest `c38f3a3e…`） | 三层 PASS + **四级逐级取证 4/4** |
+| `20261020T032441Z` | 同上（最终 manifest `91876564…`，包内路径清理完毕） | 三层 PASS + **四级逐级取证 4/4** |
 
 四级数字（后两轮完全一致）：
 
@@ -88,10 +90,24 @@ dna-accel-bkb220/
 绝对路径，与"提交内容只引用项目内文件"的口径冲突；结论与数字已写入
 `report/design-report.md` §12。
 
-## 6. 已记录的限制
+## 6. 提交包整理与许可处置（2026-10-20，用户拍板）
 
-- 许可待定项：外部 LDPC `.pchk`、MinGW DLL、未使用的译码器 EXE、R0.83 数据的再分发口径
-  （见 `report/third-party-notices.md`）。
+| 项 | 处置 |
+| --- | --- |
+| 未使用的 `r5_6_ldpc_hard_decoder.exe` + 3 个 MinGW DLL | **从包中删除**；哈希写入 `sources.json` 的 `removed_files` |
+| `dvb_s2_r5_6.pchk`、`permutation64800` | **保留**；按 DVB-S2 标准出处标注，来源信息待补 |
+| R0.83 原始数据与派生黄金向量 | **保留**（比赛评审用途，非公开再分发），权属状态如实写明 |
+| 42 例多媒体测试集 | **保留**，逐资产来源/许可写入 `src/data/test-sets/multimedia/sources.json` |
+| 61 个中文文件名（`期望结果.txt`/`参考输出.jpg`） | 改为 `expected.txt`/`reference.jpg`，引用同步 |
+| 测试脚本中的宿主机留证路径 | 改为环境变量 `BKB220_BOARD_EVIDENCE`，缺省时跳过 |
+| `arm_baseline.py` | **删除**：依赖旧板 Vivado Lab 2022.2 / `dna_platform_b27` BSP 与硬编码路径，在新板上可能用旧 `ps7_init` 误复位 |
+| Vitis / XSDB 包装脚本的安装路径默认值 | 改为 `XILINX_VITIS` / `XILINX_VIVADO` 环境变量；`run_g3.sh` 的 `nm` 改由 `--xsdb` 推导，推导失败即报错 |
+| `source_manifest` | 清理后重签（104 条源码），`manifest.json` 最终为 `91876564…`，并复跑板测（§5 后两轮） |
+
+## 7. 已记录的限制
+
+- 许可：`dvb_s2_r5_6.pchk` 与 `permutation64800` 的文件级来源仍待补；R0.83 数据的权利人
+  与再分发授权仍未确认（见 `report/third-party-notices.md` §7）。
 - 主会话的 LLM 协作记录尚未补入 `report/llm-collaboration/`。
 - 逐轮/逐例原始记录不随包；报告给出统计与判据，可用 `src/tools/run_g3.sh` 复跑。
 - 长稳（8h / 1736 轮）证据来自 v1.1 制品，不适用于 2026.1 制品；
