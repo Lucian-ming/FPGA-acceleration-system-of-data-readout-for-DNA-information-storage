@@ -104,7 +104,7 @@ Stage1 停顿 ~30 s 直接 FAIL）。**「一次 poll 一步」不只是浪费�
 
 <details><summary>2026-09-10 实测前的推测记录（保留追溯）</summary>
 
-`docs/benchmarks/measured_cpu_vs_fpga.md` §3.3 的板端模型
+`docs/benchmarks/measured_cpu_vs_fpga.md`（CPU 数据已删除，FPGA 模型保留）原 §3.3 的板端模型
 `T = 4.25 s + 0.58 ms × N_records` 中，**常数项在 2,048 读段任务里占 63% 的时间**，
 但它从未被分解测量。该文把它解释为「lwIP TCP 握手、CAPS/CONFIG 交互、DMA 启动开销与
 Voter 累加器初始化」，**这个解释在数量级上不成立**：
@@ -131,14 +131,13 @@ Voter 累加器初始化」，**这个解释在数量级上不成立**：
 > **2026-09-10 收口（见 [17](competition-strategy.md)）**：Stage1 展开在
 > XC7Z010 上已到天花板。4-way 整机 LUT 15,483/17,600 = 88.0%，8-way 外推约 125%，
 > **放不下**；且用本项目自有实测外推，全量 4-way 约 1,267 reads/s，
-> 仍慢于单核 CPU 1,364.9 reads/s 约 1.08 倍，慢于 16 线程 11.1 倍。
-> CPU 16 线程跑完全量仅 3.70 s，**小于板端 4.25 s 固定开销本身**——
-> 即使 Stage1 速度无穷大也无法追平。**因此本项不再以「超过 CPU」为目标**，
+> （CPU 对照已按 2026-10-20 要求改用 48 核服务器基线；旧的笔记本 16 线程数据已删除。）
+> **因此本项不再以「超过 CPU」为目标**，
 > 后续投入转向 P0。
 
 W1-A 已重构 `tools/run_cpu_benchmark.py` 并通过单测（commit `f7c898d`）：建立 MEASURED / HISTORICAL / ESTIMATED 严格三级分型，功耗标记未测，彻底清除虚假 FPGA 常量与未实测能效比。
 W2-R 已完成 4-way 边界缺陷修复（`<= STRIDE`）与两拍流水化时序闭环（commit `5af3fa3`，详见 `docs/benchmarks/stage1-4way-timing-closure.md`）：全量 50 区域仿真相对 2-way 提速 1.929x 且 100% 逐位一致，Vivado OOC 实测 WNS @ 100MHz 达 **+2.197 ns**，RAMB36 保持为 8 块，LUT 仅占用 8,673（49.3%），证明 4-way 具备在 7010 芯片上的落地可行性。
-W3-A 现场物理板卡实测（commit `f0d6af0`，详见 `docs/benchmarks/measured_cpu_vs_fpga.md`）：真实物理板卡 2-way 100MHz 在 2,048/4,096/8,192 源读段 × 3 轮实测（9/9 轮哈希全 PASS）中，纯计算吞吐为 304～591 reads/s（拟合模型：$T \approx 4.25\text{s} + 0.58\text{ms} \times N_{\text{records}}$）；同期宿主 CPU (i5-13500H) C 优化单核吞吐为 1,364.9 reads/s，16 线程达 14,003.1 reads/s。**实测定论：现行 100MHz 2-way FPGA 纯计算吞吐尚未击败优化多核 CPU，严禁宣称加速优势；无外置功率计前功耗统一标记 UNMEASURED / N/A**。
+W3-A 现场物理板卡实测（commit `f0d6af0`，详见 `docs/benchmarks/measured_cpu_vs_fpga.md`）：真实物理板卡 2-way 100MHz 在 2,048/4,096/8,192 源读段 × 3 轮实测（9/9 轮哈希全 PASS）中，纯计算吞吐为 304～591 reads/s（拟合模型：$T \approx 4.25\text{s} + 0.58\text{ms} \times N_{\text{records}}$）；CPU 对照已按 2026-10-20 要求改用 48 核服务器基线（见 `docs/benchmarks/server-baseline-2026-10-20/README.md`），旧的笔记本 16 线程数据已删除。**实测定论：跨边界倍率不得写成加速优势；无外置功率计前功耗统一标记 UNMEASURED / N/A**。
 W4-B 4-Way 顶层 IP 核集成与端到端接口仿真（详见 `docs/benchmarks/stage1_4way_ip_integration.md`）：交付 `hw/ip/Dna_accelerator_core_1_0/hdl/Dna_accelerator_core_4way.v` 与测试平台 `hw/sim/tb_accelerator_core_4way.v`；在完整 AXI-Lite、S_AXIS_DATA（256 深度 FIFO）与 M_AXIS_RESULT（随机背压注入）总线下，全量 64 条读段比对结果与 2-Way 100% 逐位全等，零丢拍、零悬挂。
 
 W5-V 2026-09-09 main 复核，修正 W4-B 的三处口径（详见 `docs/benchmarks/stage1_4way_ip_integration.md` §6）：
@@ -381,15 +380,14 @@ G3 2,048 与**全量 SE150 103,616 条记录**均 PASS，哈希 `fcd0cf90…f2c3
 板端每记录成本比 1.218x  ←→  仿真核心加速比 1.929x
 ```
 
-**⚠️ 这推翻了一个长期沿用的假设。** `measured_cpu_vs_fpga.md` §3.3 写
+**⚠️ 这推翻了一个长期沿用的假设。** `measured_cpu_vs_fpga.md`（CPU 数据已删除，FPGA 模型保留）原 §3.3 写
 「0.58 ms = 0.470(Stage1) + 0.11(DMA)」，即假定 **Stage1 占 81%**；
 由两条斜率反解，**板端实测 Stage1 只占 37.1%**，其余 62.9% 是
 DMA/Voter/poll/回写。Amdahl 上限 `1/(0.629+0.371/1.929)=1.22x`，
 与实测 1.218x 吻合。那个 0.470 ms 是理论周期推算，不是测量。
 
-**后果**：全量外推 4-way 为 **1,055 reads/s**，仍慢于单核 CPU（0.77x）、
-慢于 16 线程 13.3x——**比 [17](competition-strategy.md) §1 原先「打平单核」的
-外推更差**，因为那次也用了 81% 的错误假设。
+**后果**：全量外推 4-way 为 **1,055 reads/s**，（旧的 CPU 对照数据已删除；现行基线见 `server-baseline-2026-10-20`。）
+**这比原先「打平单核」的外推更差**，因为那次也用了 81% 的错误假设。
 
 **推论**：要兑现 4-way 的收益必须先压缩那 62.9%，而不是继续加宽 Stage1；
 即使 8-way 放得下，端到端上限也只有 1.35x——**这再次印证关闭 8-way 是对的**。
@@ -516,7 +514,7 @@ G5 的出口门禁要一条「阈值 → 正确率/耗时/**误接受率**」曲
 
 ```text
 T = 0.480 s + 0.2451 ms x N_records    R^2 = 0.99957
-全量 SE150 中位数 25.69 s = 2,016 reads/s：单核 CPU 1,364.9 的 1.48x；16 线程 14,003.1 仍快 6.9x
+全量 SE150 中位数 25.69 s = 2,016 reads/s（CPU 对照数据已删除；现行基线见 server-baseline-2026-10-20）
 ```
 
 **瓶颈重新定位（推翻两个旧结论）**：
@@ -541,7 +539,7 @@ LUT 已占 89.2%，路数到顶。换 XC7Z020 做 8/16-way 的收益不再被 Am
 参数化引擎 `hw/experimental/srpe_batch_pway.v`（未打包）在生产几何下与生产 4-way **逐位一致**、
 与黄金模型吻合；P=4 时逐周期相同。XC7Z020 OOC 布线：**16 路 + 流水选优树 26,867 LUT（50.5%）、
 WNS +0.705 ns**；比对周期 3.30x；32 路放不下。估算整机约 64% LUT、SE150 全量约 8.6 s
-（单核 CPU 的约 4.4x，仍慢于 16 线程约 2.3x）。详见
+（旧的 CPU 对照数据已删除）。详见
 [stage1-pway-7020-probe.md](../../../../benchmarks/stage1-pway-7020-probe.md)。
 **下一步卡在选板**：须有具体 7020 板卡才能重建 BD/PS7 并上板。
 

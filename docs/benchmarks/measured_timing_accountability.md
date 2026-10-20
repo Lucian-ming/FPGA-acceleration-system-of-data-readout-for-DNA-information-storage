@@ -101,7 +101,8 @@ G1 另一条门禁：**同一输入重复运行的计时波动可解释**。
 
 ## 4. 上位机资源占用（G2 门禁「峰值内存、CPU 占用和网络吞吐有记录」）
 
-同机实测（i5-13500H，WSL2），`resource.getrusage` + `/proc/<pid>/status` 50 ms 采样：
+采集环境：开发机（WSL2），`resource.getrusage` + `/proc/<pid>/status` 50 ms 采样。
+该表只记录上位机资源占用，**不作为 CPU 基线**；基线见 `server-baseline-2026-10-20/README.md`：
 
 | 规模 | 墙钟 | CPU 时间 | CPU 占用（单核归一） | 峰值 RSS | 读段上传 |
 |---|---:|---:|---:|---:|---:|

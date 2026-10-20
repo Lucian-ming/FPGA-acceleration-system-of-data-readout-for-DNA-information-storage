@@ -249,7 +249,7 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 | 评分项 | 分值 | 本项目现状 | 计划里对应哪一步 |
 |---|---|---|---|
 | 创新性与应用价值 | **30** | DNA 信息存储读出、in-silico 模拟测序数据、PS/PL/PC 闭环；不是湿实验 | P5 报告与叙述（把"创新点"提炼出来，不是堆功能） |
-| 性能与资源 | 20 | 新板同板六档矩阵**已完成**：矩阵测量 P16 全量中位 **8.9486s vs P4 26.5393s（2.97×）**，每条记录成本 **0.2519→0.0814 ms（3.10×）**，固定开销 0.4529→0.4182s 基本不变。该值是矩阵时段的测量；上传转正记录中的最新同小时参考 `t_result` 为 **9.33 s**。 | 正式矩阵口径见 `docs/benchmarks/bkb220-p4-p16-performance-matrix.md`；当前处理段 PL 约占 87.8%。Stage1 K2 已有 OOC 与整机 route 证据，相关后续工作仍在进行。P16 仍慢于 16 线程 CPU |
+| 性能与资源 | 20 | 新板同板六档矩阵**已完成**：矩阵测量 P16 全量中位 **8.9486s vs P4 26.5393s（2.97×）**，每条记录成本 **0.2519→0.0814 ms（3.10×）**，固定开销 0.4529→0.4182s 基本不变。该值是矩阵时段的测量；上传转正记录中的最新同小时参考 `t_result` 为 **9.33 s**。 | 正式矩阵口径见 `docs/benchmarks/bkb220-p4-p16-performance-matrix.md`；当前处理段 PL 约占 87.8%。Stage1 K2 已有 OOC 与整机 route 证据，相关后续工作仍在进行。CPU 对照已改用 48 核服务器基线（16 线程数据已删除） |
 | 功能正确性 | 20 | P4/P16 route、G3、全量/连续恢复、故障探针、六档矩阵及 v2 42 例对照已有记录；`score_min=67` 为 26 PASS / 16 `SAFE_NOCONV` / 0 静默错误字节 | 新载荷四级完整取证、QSPI 冷启动仍待完成；SD 冷启动已做但依据有限，UART 反向已测 |
 | **大模型协作与技能包** | **15** | 本项目**全程由多 Agent（codex-luna/gpt-6-luna）协作完成**；`docs/submission/skill/` 已有 8 个技能包；`docs/agent-prompts/` 与 `logs/agents/*/prompt.txt` 有真实提示词 | **P2-B 补齐「LLM 交互记录 + skill 包」**——这 15 分目前没被当回事 |
 | 文档与可复现 | 15 | 证据台账、复现命令、判据边界极强 | P5；补"工具版本说明"一节 |
@@ -316,16 +316,11 @@ python3 tools/board/g3_performance_matrix.py --artifact-dir <已加载完整制�
 
 ### P3 的目标改为可量化的「打过 CPU」
 
-公平 CPU 基线（[ARM 基线](benchmarks/measured_arm_baseline.md) §4，i5-13500H 历史实测，SE150 全量 103,616 记录）：
-
-| 实现 | 全量耗时 | 相对 P16 |
-| --- | ---: | ---: |
-| i5-13500H 单核 C | 37.9 s | P16 快 **4.24×** |
-| **i5-13500H 16 线程 C** | **3.70 s** | 对照值 |
-| BKB220 P16（矩阵时段测量） | 8.9486 s | 该时段数值比值约 2.42× |
-| BKB220 P16（最新同小时参考 `t_result`） | 9.33 s | 该时段数值比值约 2.52× |
-
-8.9486 s 是矩阵时段测量，不作为当前值。最新同小时参考 `t_result` 为 9.33 s；与 CPU 历史基准 3.70 s 作数值对照时仍慢约 2.52×，但两者测量口径不同，不能把该比值写成严格公平加速比。
+CPU 基线（2026-10-20 起唯一）：项目 48 核服务器
+（Intel Xeon Gold 5220R ×48 @2.20 GHz），675 条读段 / 41.07 s / 滑动相关 16.6 条/s；
+原始记录与口径见 [server-baseline-2026-10-20](benchmarks/server-baseline-2026-10-20/README.md)。
+该基线与 P16 的 `t_result` 输入规模和计时边界不同，**不相除、不写成加速比**。
+旧的笔记本 16 线程数据已按要求删除。
 按 `TX_STREAM` 那 5892 ms 的量级，**这一目标在机制上是有希望的**——但必须先量清楚 RX BD 环到底被什么卡住
 （环容量 / 每 BD 的 cache 操作 / lwIP 收包路径 / 客户端上传节奏），**先量后改**。
 
@@ -395,10 +390,10 @@ TX_STREAM 压缩**已尝试四次并放弃**，结论是「真正约束是**硬�
   本组所有"每块拍数"折算成"占 Stage1 时间百分比 / 秒数"的地方，分母都要重算——
   见 [`stage1-block-overhead-plan.md`](benchmarks/stage1-block-overhead-plan.md) 的"分母更正"一节。
 - **K=4**：`S_RUN` 150→38 拍，每块 176→**64** 拍；整机外推 **40k～48k LUT**（上限 53,200，**高端只剩约 5.2k 余量**），
-  BRAM 需奇偶 bank 拆读段 + 4 bank 读水印；**全量估算 ≈ 3.91 s**（再与 7 拍选优排空重叠 ≈ **3.60 s**，目标 3.70 s）。
+  BRAM 需奇偶 bank 拆读段 + 4 bank 读水印；**全量估算 ≈ 3.91 s**（再与 7 拍选优排空重叠 ≈ **3.60 s**；目标以实测为准）。
 - **后续验证进度**：K=1/2/4 OOC 探针已通过；K=2 整机 route 已通过（35,285 LUT、WNS +0.978 ns、失败端点 0）。原 P16 基线 WNS +0.617 ns、布线占比 84.5% 是此前设计门槛观察；K=4 整机 route、板测和正式功能回归仍未完成。
 - **探针复核入口**：结果和源集见 `docs/benchmarks/stage1-multibase-ooc-probe.md`。已通过的 OOC 不需为重复而重跑；若后续改动影响该变体，则按 `docs/submission/skill/fpga-timing-probe/ooc_probe.tcl` 的约束重新验证。`SYNTH_IMPL=1` 才执行 route，综合-only 的 WNS 不作收敛判据。
 - **能变红的判据**：OOC —— WNS/WHS ≥ 0、失败端点 0、Stage1 LUT ≤ 40,000、K=4 RAMB36 ≤ 12；
   整机 —— 完整 route、LUT ≤ 48,000、DRC 0 errors；上板 —— 全量 103,616 条 ≥3 轮
-  SHA 逐位 `fcd0cf90…b1f2c3`，且端到端低于 **3.70 s**。
+  SHA 逐位 `fcd0cf90…b1f2c3`，且端到端低于当前基线并留出可复核的余量。
 - **当前剩余**：已完成的 OOC/K2 route 不代表 Stage1 优化整体完成；K4 整机 route、板测与正式功能回归仍待验证。结构性 RTL 改动（参数化、接顶层/`component.xml`/`PACKAGED_VARIANTS.txt`、整机 route、全量回归）必须逐层验收；**改了不验的 RTL 不进主线**。

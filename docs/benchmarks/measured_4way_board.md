@@ -67,7 +67,7 @@ PASS  四级逐级取证
 
 > ### ⚠️ 这推翻了文档里一个长期沿用的假设
 >
-> `docs/benchmarks/measured_cpu_vs_fpga.md` §3.3 写的是
+> `docs/benchmarks/measured_cpu_vs_fpga.md`（CPU 数据已删除，FPGA 模型保留）原 §3.3 写的是
 > 「`0.58 ms = 0.470 ms(Stage1 比对) + 0.11 ms(S2MM DMA + DDR 回写)`」，
 > 即**假定 Stage1 占每记录成本的 81%**。
 >
@@ -85,11 +85,7 @@ PASS  四级逐级取证
 | 2-way | 58.4 s | 886 reads/s |
 | 4-way | **49.1 s** | **1,055 reads/s** |
 
-对照 CPU（`measured_cpu_vs_fpga.md`）：单核 1,364.9 reads/s、16 线程 14,003.1。
-
-**4-way 上板后仍慢于单核 CPU（0.77x），慢于多核 13.3x。**
-这比 [17](../archive/history/2026/pre-bkb220-handoff-2026-10-10/competition-strategy.md) §1 原先基于 1.929x 外推的「打平单核」
-**更差**——因为那次外推同样用了 81% 的错误假设。
+CPU 对照已按 2026-10-20 要求改用项目 **48 核服务器**基线（675 条 / 41.07 s / 滑动相关 16.6 条/s，见 `server-baseline-2026-10-20/README.md`）。该基线与本表 reads/s 的输入规模和边界不同，**不相除**。旧的笔记本 16 线程数据已删除。
 
 ---
 

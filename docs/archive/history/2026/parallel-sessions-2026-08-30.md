@@ -120,7 +120,7 @@ tools/agent_view.sh start --agent "<上表名字>" --doing "..." --why "..." --n
   （两个会话共享工作区，未提交的 RTL 被另一方烤进了 bitstream）。
 - 三方都会改 `docs/archive/history/2026/pre-bkb220-handoff-2026-10-10/status.md`，**提交前务必 `git pull --rebase`**，
   不要用 `git add -A`，按文件显式 `add`。
-- 机器 16 线程，避免同时启动两个大型综合；长任务启动前先 `agent_view.sh update`。
+- 开发机资源有限，避免同时启动两个大型综合；长任务启动前先 `agent_view.sh update`。
 
 ---
 

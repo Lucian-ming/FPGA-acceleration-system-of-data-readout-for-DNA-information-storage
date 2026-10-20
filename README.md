@@ -13,7 +13,7 @@ PC FASTQ/水印 → TCP → PS裸机/lwIP/AXI-DMA
 
 BKB220 配置已为 `ready=1`。P4/P16 均完成 100 MHz 整机 route、bit/XSA 构建；P4 完成 G3，P16 完成 smoke、全量、连续/状态复位、故障探针、六档矩阵及 42 例 v2 数据集板端对照。正式 P16 上传配置包已构建并 G3 PASS，上传为 0.40 s；完整软件包可用，但 Vitis 自动化构建路径仍有需补齐的步骤，详见[转正记录](docs/benchmarks/bkb220-p16-upload-promotion.md)。
 
-当前剩余项：v2 的 `score_min=67` 尚未在板上测；8 个 challenge 例仍按软件验证器一致地以 LDPC 不收敛告失败；新载荷四级逐级取证、8 h 长稳（2 h 已完成）、QSPI/SD 冷启动、UART 反向、实测功耗和 F9 独立复核未完成。P16 仍慢于 16 线程 CPU；Stage1 K2 已有 OOC 与整机 route 证据，相关后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见[当前状态与证据边界](docs/03-status.md)。
+当前剩余项：v2 的 `score_min=67` 尚未在板上测；8 个 challenge 例仍按软件验证器一致地以 LDPC 不收敛告失败；新载荷四级逐级取证、8 h 长稳（2 h 已完成）、QSPI/SD 冷启动、UART 反向、实测功耗和 F9 独立复核未完成。CPU 对照已改用 48 核服务器基线（16 线程数据已删除）；Stage1 K2 已有 OOC 与整机 route 证据，相关后续工作仍在进行，不能据此写成 Stage1 优化已完成。详见[当前状态与证据边界](docs/03-status.md)。
 
 ## 许可
 
