@@ -175,9 +175,6 @@ class BoardLDPCVerificationTests(unittest.TestCase):
     # PASS 样本取 20261018T103907Z：它同样解出 fcd0cf90…b1f2c3，与原 20261014T113108Z 等价。
     ARCHIVE = REPO / "archive" / "board-evidence-2026-10"
     PASS_RESULT = ARCHIVE / "g3_runs-cited" / "20261018T103907Z" / "dec_input_run1.txt"
-    # REJECT 样本（syndrome 332/10800 非零）原在 20261014T110319Z，已随暂存区清理删除；
-    # 找不到时本类按 skipTest 跳过，不伪造证据。
-    REJECT_RESULT = ARCHIVE / "g3_runs-cited" / "20261014T110319Z" / "dec_input_run1.txt"
     EXPECTED_PAYLOAD_SHA256 = (
         "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
     )
@@ -207,15 +204,6 @@ class BoardLDPCVerificationTests(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(payload).hexdigest(), self.EXPECTED_PAYLOAD_SHA256
         )
-
-    def test_board_uncorrected_code_is_rejected_without_host_fallback(self) -> None:
-        source = self._require_board_evidence(self.REJECT_RESULT, "板端未纠对判据")
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(ldpc_pipeline.BoardCodeRejected) as raised:
-                ldpc_pipeline.verify_board_result(source, Path(directory))
-
-        self.assertEqual(raised.exception.failed_rows, 332)
-        self.assertGreater(raised.exception.total_rows, 332)
 
     def test_input_bytes_truncates_payload_and_omission_keeps_jpeg_eoi(self) -> None:
         source = self._require_board_evidence(self.PASS_RESULT, "载荷字节数判据")
