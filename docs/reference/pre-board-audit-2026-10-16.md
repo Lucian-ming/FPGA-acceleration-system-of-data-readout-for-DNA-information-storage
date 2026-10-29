@@ -51,7 +51,7 @@ bit `2ec76c7d…`、ELF `1ed635b8…`、XSA `8fb75a31…`；源码 `517f1dc`）�
 | `usbipd` | FT4232H（busid `6-2`）**Attached** |
 | **JTAG 扫描链** | **正常枚举**：`FT4232H 15051A → arm_dap 4ba00477 → xc7z020 23727093` |
 | 板端 CAPS | `version=1 / read_bps=150 / num_lc=50 / stride=807 / max_symbols=40500 / max_reads=129600 / features=1`，`validate_caps` **PASS** |
-| 仓库外依赖 | v2 数据集 `/mnt/e/桌面/dna-multimedia-simulation-v2-20261013` **在**（21 数据集目录 / 42 个 `se150.fastq`）；`/mnt/d/bkb220_board_smoke` **在** |
+| 仓库外依赖 | v2 数据集 `/mnt/e/桌面/dna-multimedia-simulation-v2-20261013` **在**（21 数据集目录 / 42 个 `se150.fastq`）；`/mnt/d/bkb220_board_smoke` **在**（2026-10-30 已清理，本行是当时的审核快照） |
 
 ⚠️ **项目记录里"SD 启动模式下 JTAG 枚举为空"那条——现在不复现**。链正常。该现象仍未解释，**保持警惕**。
 ⚠️ 我的诊断动作**有副作用并已确认无害**：`xsdb` 自起了一个临时 `hw_server`（3121）并短暂持有 USB；

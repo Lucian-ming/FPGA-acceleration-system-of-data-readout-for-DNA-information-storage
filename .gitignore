@@ -106,3 +106,9 @@ tests/stress_results/**/dec_run_*.txt
 clients/dist/
 clients/python/build/
 __pycache__/
+
+# dna-readout-video：成片、TTS/混音中间件、逐场预览与抽帧总 438 MB，不入库；
+# 只提交可复现的脚本（src/）、旁白/分镜/字幕与检查记录。
+dna-readout-video/dna-readout-explainer.mp4
+dna-readout-video/build/
+dna-readout-video/stills/

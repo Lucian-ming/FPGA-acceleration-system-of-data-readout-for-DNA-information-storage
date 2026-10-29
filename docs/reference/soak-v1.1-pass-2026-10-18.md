@@ -13,7 +13,7 @@
 | `fw_build_id` | `db5705fb4d0bc003`（**启动核对 PASS**，期望=实读） |
 | 核对时刻 | `2026-10-18T02:39:07Z`（本地 10:39） |
 | `--tag` | `v11-fwid-db5705fb-bit2ec76c7d-soak5-20261018` |
-| 留证目录 | `/mnt/d/bkb220_board_smoke/soak-v1.1-20261018T0239Z/` |
+| 留证目录 | `archive/board-evidence-2026-10/soak-v1.1-20261018T0239Z/`（仓库根 `archive/` 已被 `.gitignore` 忽略，只在本机） |
 | 板端运行方式 | SD 卡冷启动；每轮 `--skip-boot`（不做 JTAG 复位/烧录） |
 
 ## 2. 结果（`soak_summary.json` 原值）
@@ -48,7 +48,8 @@
 - 每轮 G3 留证：`g3_runs/20261018T0239Z` ~ `g3_runs/20261018T103907Z`；
 - 启动身份：`fw_build_id_startup.json`。
 
-> ⚠️ `logs/` 与 `/mnt/d/` 均不进 Git，提交材料若只留本文，审阅者无法复核逐轮。
+> ⚠️ `logs/` 与 `archive/` 均不进 Git，提交材料若只留本文，审阅者无法复核逐轮。
+> 原始留证 2026-10-30 已从 D 盘暂存区移入仓库根 `archive/board-evidence-2026-10/`（本机，未入 Git）。
 > 这是已知缺陷，见验收文档 §6。
 
 ## 4. 本场之前的尝试

@@ -14,7 +14,7 @@
 ## 1. 板端结果（首跑：G3 PASS 但走兜底）
 
 制品：`hw/build/bkb220-p16-k2-ldpc-sw-20261014T104331Z-board-migrate`（bit `8f0da7bf…`，
-与无 LDPC 的参考包 bit `123c02b3…` 不同）。留证 `/mnt/d/bkb220_board_smoke/g3_runs/20261014T110319Z`。
+与无 LDPC 的参考包 bit `123c02b3…` 不同）。留证 `/mnt/d/bkb220_board_smoke/g3_runs/20261014T110319Z`（已于 2026-10-30 清理，未留存）。
 
 | 判据 | 结果 |
 | --- | --- |
@@ -151,7 +151,7 @@ AXI 边界的**字内位序没有问题**（两条路都等价于「核地址 = 
 
 制品：`hw/build/bkb220-p16-k2-ldpc-perm-20261014T113500Z-board-migrate`
 （ELF `6ec76fc5…`；参考 LDPC 包 ELF `8be9ef4c…`）。
-留证：`/mnt/d/bkb220_board_smoke/g3_runs/20261014T113108Z`。
+留证：`/mnt/d/bkb220_board_smoke/g3_runs/20261014T113108Z`（已于 2026-10-30 清理，未留存）。
 
 ### 3b.1 板端串口（三条日志就是判据）
 
@@ -217,7 +217,7 @@ LDPC 版本因为多了 `DONE_STAGE3 → LDPC_PREP` 的正常步进才被记上�
 4. 主机侧那 5 轮收敛用的是 **Gallager-B 比特翻转**（`tools/ldpc_decode.py`），
    RTL 是 **flooding Min-Sum**；两者**不是同一算法**，所以「轮数相同（都是 5）」
    是巧合而非等价性证明。判等只在**收敛状态**这一层。
-5. 留证目录在 `/mnt/d/bkb220_board_smoke/g3_runs/`（`logs/` 忽略区）。
+5. 留证目录原在 `/mnt/d/bkb220_board_smoke/g3_runs/`（`logs/` 忽略区），2026-10-30 已清理。
 
 ## 5. 制品包口径修正（本轮顺带做的）
 

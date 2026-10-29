@@ -6,7 +6,7 @@ A 阶段（2026-10-12，**P4** 包）已经在 BKB220 上跑过这三个探针�
 
 - 被测包：`hw/build/bkb220-p16-enet0-software-20261012T144141Z-board-migrate`（`C_STAGE1_P_WAYS=16`、`C_STAGE1_PIPE_TREE=1`）；板端身份已由同日的 [P16 v2 扫描](../board/bkb220/migration-source-table.md) 独立确立。
 - 目标：`192.168.1.10:7`；板端 CAPS `read_bps=150 num_lc=50 stride=807 max_reads=129600`。
-- 留证：`logs/g3/b2-probes/`（`logs/` 不入库，文件保留）；板侧运行目录在 `D:\bkb220_board_smoke\g3_runs\20261013T05*Z\`。
+- 留证：`logs/g3/b2-probes/`（`logs/` 不入库，文件保留）；板侧运行目录 `g3_runs/20261013T05*Z`（2026-10-30 已清理，未留存）。
 
 ## 1. 配置 / 容量守卫（`g3_config_guard_probe.py`）：7/7
 

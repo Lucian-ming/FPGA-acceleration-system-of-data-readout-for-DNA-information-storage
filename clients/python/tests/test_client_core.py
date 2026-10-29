@@ -171,12 +171,13 @@ class NetworkProtocolTests(unittest.TestCase):
 class BoardLDPCVerificationTests(unittest.TestCase):
     """板端必须完成 LDPC；PC 端只验证 syndrome 并提取载荷。"""
 
-    PASS_RESULT = Path(
-        "/mnt/d/bkb220_board_smoke/g3_runs/20261014T113108Z/dec_input_run1.txt"
-    )
-    REJECT_RESULT = Path(
-        "/mnt/d/bkb220_board_smoke/g3_runs/20261014T110319Z/dec_input_run1.txt"
-    )
+    # 板端留证：2026-10-30 从 D 盘暂存区移入仓库根 archive/（不进 Git，只在本机）。
+    # PASS 样本取 20261018T103907Z：它同样解出 fcd0cf90…b1f2c3，与原 20261014T113108Z 等价。
+    ARCHIVE = REPO / "archive" / "board-evidence-2026-10"
+    PASS_RESULT = ARCHIVE / "g3_runs-cited" / "20261018T103907Z" / "dec_input_run1.txt"
+    # REJECT 样本（syndrome 332/10800 非零）原在 20261014T110319Z，已随暂存区清理删除；
+    # 找不到时本类按 skipTest 跳过，不伪造证据。
+    REJECT_RESULT = ARCHIVE / "g3_runs-cited" / "20261014T110319Z" / "dec_input_run1.txt"
     EXPECTED_PAYLOAD_SHA256 = (
         "fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3"
     )

@@ -108,10 +108,11 @@ tmp = work / "in.bin"
 cases = []
 
 # 真实样本：本轮板上那份输入
-real = pathlib.Path('/mnt/d/bkb220_board_smoke/g3_runs/20261014T110319Z/dec_input_run1.txt')
+real = pathlib.Path('archive/board-evidence-2026-10/g3_runs-cited/'
+                     '20261018T103907Z/dec_input_run1.txt')
 if real.is_file():
     rx = np.array([1 if c == '1' else 0 for c in real.read_text().strip()], np.uint8)
-    cases.append(("板端真实输入(20261014T110319Z)", rx))
+    cases.append(("板端真实输入(20261018T103907Z)", rx))
 else:
     print("  （跳过板端真实样本：留证目录不可见）")
 

@@ -763,7 +763,7 @@ LUT as Logic 需 **62,588** / Slice LUTs 需 **63,352**，可用 53,200（发布
    （用户 2026-10-12 二度指示，**覆盖**此前「22 主线稳定后立即做 F9/26 复核」的顺序；详见 [05](05-implementation-plan.md) 的「后续总顺序」一节。要点：报告**不早于**优化完成，26 的开发与复核整体后移到优化与报告之后。）
 6. **交付收尾**：冻结 writer、按路径提交推送、同步 03/05/07/09 与提示词及 Windows 镜像、各 agent 看板 `done`。
 
-**断电前现场**：板卡已断电（用户 23:30 断电），FT4232H 归属会随机器重启变化 —— **恢复时按 `docs/07` §3a 重新确认通道**（`usbipd` 归属、`hw_server`、Windows COM10；WSL 按 interface 02 查找设备，`/dev/ttyUSB2` 仅为断电前的一次枚举名）。所有制品与留证都在磁盘上（`hw/build/bkb220-*`、`D:\bkb220_board_smoke\g3_runs\*`），`logs/` 已被 .gitignore 覆盖但文件保留。
+**断电前现场**：板卡已断电（用户 23:30 断电），FT4232H 归属会随机器重启变化 —— **恢复时按 `docs/07` §3a 重新确认通道**（`usbipd` 归属、`hw_server`、Windows COM10；WSL 按 interface 02 查找设备，`/dev/ttyUSB2` 仅为断电前的一次枚举名）。制品在 `hw/build/bkb220-*`；`g3_runs/` 暂存树已于 2026-10-30 清理，长期留存的板端证据在 `archive/board-evidence-2026-10/`（见 `docs/09` 的「留证位置变更」）；`logs/` 已被 .gitignore 覆盖但文件保留。
 
 ## 1c. 2026-10-12 F3 实板结果摘要
 
