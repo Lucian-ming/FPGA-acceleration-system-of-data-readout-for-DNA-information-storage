@@ -27,9 +27,17 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 FAIL=0
+SKIPPED=0
 bad()  { printf '\033[31m  ✗ %s\033[0m\n' "$*"; FAIL=1; }
 ok()   { printf '\033[32m  ✓ %s\033[0m\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
+# 缺前置条件时必须**显式跳过**，不能落到 else 分支被当成 ✓ 打印。
+# 提交包（D:\dna-accel-bkb220）是仓库的裁剪快照：没有 docs/、没有 .git、
+# 没有 hw/experimental/ 与 sw/workspace/，这几节在那里根本没有输入可查。
+# 若静默算通过，就等于把「没检查」伪装成「检查过了」，判据比仓库里这版更弱——
+# 本项目明令禁止任何一层判据被悄悄放宽。所以统一走 skip()：
+# 用不同的符号（⊘）打印、计入末尾汇总，且可被 HYGIENE_REQUIRE_FULL=1 变成失败。
+skip() { printf '\033[33m  ⊘ 跳过 %s\033[0m\n' "$*"; SKIPPED=$((SKIPPED+1)); }
 
 echo "=== 仓库卫生检查 ==="
 
@@ -84,21 +92,29 @@ else
 fi
 
 # --- 3. docs/ 现用文档必须带序号 ---------------------------------------------
-STRAY_DOC="$(ls docs/*.md 2>/dev/null | sed 's|docs/||' \
-             | grep -vE '^[0-9]{2}-|^README\.md$' || true)"
-if [[ -n "$STRAY_DOC" ]]; then
-    bad "docs/ 下有不带序号的现用文档（归档才不带号）：$STRAY_DOC"
+if [[ ! -d docs ]]; then
+    skip "docs/ 现用文档序号：无 docs/ 目录，本项无输入可查"
 else
-    ok "docs/ 现用文档均带序号"
+    STRAY_DOC="$(ls docs/*.md 2>/dev/null | sed 's|docs/||' \
+                 | grep -vE '^[0-9]{2}-|^README\.md$' || true)"
+    if [[ -n "$STRAY_DOC" ]]; then
+        bad "docs/ 下有不带序号的现用文档（归档才不带号）：$STRAY_DOC"
+    else
+        ok "docs/ 现用文档均带序号"
+    fi
 fi
 
 # --- 4. 归档文档必须不带序号 -------------------------------------------------
-NUMBERED_ARCHIVE="$(ls docs/archive/history/*/[0-9][0-9]-*.md 2>/dev/null || true)"
-if [[ -n "$NUMBERED_ARCHIVE" ]]; then
-    bad "归档目录里有带序号的文档（应去号，便于一眼区分是否现行）："
-    echo "$NUMBERED_ARCHIVE" | sed 's/^/      /'
+if [[ ! -d docs/archive ]]; then
+    skip "归档文档去号：无 docs/archive/ 目录，本项无输入可查"
 else
-    ok "归档文档均已去号"
+    NUMBERED_ARCHIVE="$(ls docs/archive/history/*/[0-9][0-9]-*.md 2>/dev/null || true)"
+    if [[ -n "$NUMBERED_ARCHIVE" ]]; then
+        bad "归档目录里有带序号的文档（应去号，便于一眼区分是否现行）："
+        echo "$NUMBERED_ARCHIVE" | sed 's/^/      /'
+    else
+        ok "归档文档均已去号"
+    fi
 fi
 
 # --- 5. 共享数据不得存多份副本 -----------------------------------------------
@@ -114,13 +130,16 @@ fi
 
 # --- 6. 新增的 logs/ 子目录必须已被 .gitignore 覆盖 ---------------------------
 UNIGNORED=""
+[[ -d logs ]] || skip "logs/ 忽略覆盖：无 logs/ 目录，本项无输入可查"
 for d in logs/*/; do
     [[ -d "$d" ]] || continue
     # 目录里有已跟踪文件说明是刻意入库的证据，跳过
     if [[ -n "$(git ls-files "$d" 2>/dev/null)" ]]; then continue; fi
     git check-ignore -q "$d" 2>/dev/null || UNIGNORED+=" ${d%/}"
 done
-if [[ -n "$UNIGNORED" ]]; then
+if [[ ! -d logs ]]; then
+    :
+elif [[ -n "$UNIGNORED" ]]; then
     bad "logs/ 下未被 .gitignore 覆盖的目录：$UNIGNORED"
     info "运行产物动辄几百 MB，漏网一次就可能被误提交进仓库"
 else
@@ -163,9 +182,14 @@ scan_line_references() {
 }
 
 SCAN_FAILED=0
+DOCS_SCAN_ABSENT=0
+# 必须在命令替换**外面**判定：子 shell 里赋的变量传不回父 shell。
+[[ -d docs ]] || DOCS_SCAN_ABSENT=1
 LINE_REF_HITS="$(
     # 不吞掉读取错误；任一分组失败都令整次扫描失败，不能把空输出当作通过。
-    scan_line_references --include='*.md' docs/ || SCAN_FAILED=1
+    if (( ! DOCS_SCAN_ABSENT )); then
+        scan_line_references --include='*.md' docs/ || SCAN_FAILED=1
+    fi
     scan_line_references --include='*.c' --include='*.h' --include='*.v' --include='*.sv' \
         --include='*.py' --include='*.sh' \
         sw/app/ hw/ip/ hw/sim/ tools/ clients/python/ hw/scripts/ sw/scripts/ || SCAN_FAILED=1
@@ -205,6 +229,9 @@ if [[ -n "$STALE_REF" ]]; then
     bad "现行文档/源码里有悬空或越界的「文件:行号」引用：$STALE_REF"
     info "修法：改按标识符引用（函数名/状态名/模块名）。行号引用会静默过期，"
     info "而**内容挪走但行号仍在范围内**的那种过期本检查查不出来——只能靠不写行号。"
+elif (( DOCS_SCAN_ABSENT )); then
+    ok "源码侧「文件:行号」引用均可解析且在范围内"
+    skip "文档侧「文件:行号」引用：无 docs/ 目录，本项无输入可查"
 else
     ok "现行文档/源码的「文件:行号」引用均可解析且在范围内"
 fi
@@ -231,7 +258,7 @@ if [[ -d "$WS_APP" ]]; then
         ok "sw/app/ 与 workspace 同名文件逐字节相同"
     fi
 else
-    ok "sw/app/ 与 workspace 一致性检查：workspace 不存在，已跳过"
+    skip "sw/app 与 workspace 一致性：无 sw/workspace/ 目录，本项无输入可查"
 fi
 
 # --- 9. tools/attic/ 下脚本必须登记进 tools/README.md -------------------------
@@ -265,11 +292,13 @@ if [[ -d "tools/attic" ]]; then
         fi
     done
 fi
-if [[ -n "$UNDOC_ATTIC" ]]; then
+if [[ ! -d tools/attic ]]; then
+    skip "attic 脚本登记：无 tools/attic/ 目录，本项无输入可查"
+elif [[ -n "$UNDOC_ATTIC" ]]; then
     bad "未登记进 tools/README.md 的 attic 脚本：$UNDOC_ATTIC"
     info "退役工具也须在 tools/README.md 单列一节说明原用途与为何归档"
 else
-    ok "tools/attic/ 下脚本均已登记进 README（或 attic 目录为空）"
+    ok "tools/attic/ 下脚本均已登记进 README"
 fi
 
 # --- 10. hw/experimental/README.md 当前内容表必须与目录实际文件一一对应 ------
@@ -311,7 +340,9 @@ for tf in "${EXP_TABLE_FILES[@]}"; do
     fi
 done
 
-if [[ -n "$EXP_MISMATCH" ]]; then
+if [[ ! -d hw/experimental ]]; then
+    skip "hw/experimental 表与目录一致性：无 hw/experimental/ 目录，本项无输入可查"
+elif [[ -n "$EXP_MISMATCH" ]]; then
     bad "hw/experimental/ 实际文件与 README.md「当前内容」表不一致：$EXP_MISMATCH"
     info "表与目录不一致本身就是卫生缺陷；增删实验文件须同步维护 README.md 表"
 else
@@ -326,6 +357,10 @@ fi
 # 另排除 docs/submission/llm-collaboration/ —— 竞赛要求的 LLM 交互**逐字**记录：
 # 两次不同调用产出相同文字是**事实**，删掉一份就等于篡改留证。A1 抓的是
 # 「同一份源码被误复制成多份」，与"历史记录里恰好有重复"是两回事。
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    DUP_TRACKED=""
+    RC=99
+else
 DUP_TRACKED="$(python3 -c "
 import subprocess, hashlib, os, sys
 files = subprocess.check_output(['git', 'ls-files']).decode().splitlines()
@@ -346,7 +381,10 @@ if dups:
     sys.exit(1)
 " 2>&1)"
 RC=$?
-if (( RC != 0 )); then
+fi
+if (( RC == 99 )); then
+    skip "重复 SHA-256 扫描：无 Git 元数据，\"已跟踪文件\"集合不存在，本项无输入可查"
+elif (( RC != 0 )); then
     bad "仓库内存在相同 SHA-256 的已跟踪重复文件："$'\n'"$DUP_TRACKED"
     info "见 docs/05 的清理分类与门禁 与 AGENTS.md 代码卫生 §5 第 2 条；消除冗余副本，保留单一权威源"
 else
@@ -354,8 +392,19 @@ else
 fi
 
 echo
+if (( SKIPPED > 0 )); then
+    info "本次有 ${SKIPPED} 项因缺少前置条件被显式跳过（⊘）。**跳过不等于通过**："
+    info "这些判据在缺少相应目录/元数据的环境里没有输入可查；只有完整仓库里跑才是全量。"
+    if [[ "${HYGIENE_REQUIRE_FULL:-0}" == "1" ]]; then
+        bad "HYGIENE_REQUIRE_FULL=1 要求全量执行，但缺 ${SKIPPED} 项前置条件"
+    fi
+fi
 if (( FAIL )); then
     printf '\033[31m######## 仓库卫生检查 FAIL ########\033[0m\n'
     exit 1
 fi
-printf '\033[32m######## 仓库卫生检查 PASS ########\033[0m\n'
+if (( SKIPPED > 0 )); then
+    printf '\033[32m######## 仓库卫生检查 PASS（%s 项显式跳过，非全量） ########\033[0m\n' "$SKIPPED"
+else
+    printf '\033[32m######## 仓库卫生检查 PASS ########\033[0m\n'
+fi
