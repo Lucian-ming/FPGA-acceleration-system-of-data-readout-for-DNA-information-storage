@@ -55,12 +55,12 @@ def layer_bars(f, a):
     for y, lab, col, lab_long in ((LAY_A, "层 A", C.S2C, "高位平面 · 40,500 bit"),
                                   (LAY_B, "层 B", C.S2C, "低位平面 · 40,500 bit")):
         f.text(lab, 150, y + 2, 20, col, C.SANS, WEIGHT_MEDIUM, alpha=a)
-        f.rect(LAY_X0, y, LAY_X1 - LAY_X0, LAY_H, "#16212A", r=3, alpha=a)
+        f.rect(LAY_X0, y, LAY_X1 - LAY_X0, LAY_H, "#DDD2BE", r=2, alpha=a)
         x = LAY_X0
         while x < LAY_X1:
             f.line(x, y + 3, x, y + LAY_H - 3, col, 1.0, alpha=0.30 * a)
             x += 5.0
-        f.rect_stroke(LAY_X0, y, LAY_X1 - LAY_X0, LAY_H, col, 1.2, r=3,
+        f.rect_stroke(LAY_X0, y, LAY_X1 - LAY_X0, LAY_H, col, 1.2, r=2,
                       alpha=0.55 * a)
         f.text(lab_long, LAY_X1 + 20, y + 2, 20, C.INK3, alpha=a * 0.9)
     f.text("81,000 bit = 2 × 40,500（位平面，不是两份拷贝）", 150, LAY_A - 32,
@@ -112,8 +112,8 @@ def plane_detail(f, a):
 def gauge(f, t, a, value, show_sat=False):
     if a <= 0:
         return
-    f.rect(AXB_X, AXB_Y0, AXB_W, AXB_Y1 - AXB_Y0, "#141E26", r=6, alpha=a)
-    f.rect_stroke(AXB_X, AXB_Y0, AXB_W, AXB_Y1 - AXB_Y0, C.EDGE, 1.2, r=6,
+    f.rect(AXB_X, AXB_Y0, AXB_W, AXB_Y1 - AXB_Y0, "#EDE5D6", r=3, alpha=a)
+    f.rect_stroke(AXB_X, AXB_Y0, AXB_W, AXB_Y1 - AXB_Y0, C.EDGE, 1.2, r=3,
                   alpha=a)
     # 0 线（判决边界）
     y0 = axb_y(0)
@@ -152,10 +152,10 @@ def gauge(f, t, a, value, show_sat=False):
         f.text("为什么是差分", 1200, AXB_Y0 + 4, 22, C.INK2, C.SANS,
                WEIGHT_MEDIUM, alpha=kn)
         lines = ["命中记 +1，未命中记 −1，", "投的是净票数，不是绝对数。",
-                 "读错的碱基方向随机，", "多条读出相加后相互抵消。"]
+                 "相反的票值求和后相互抵消，", "真实信号在多数读出里保持同号。"]
         for i, s in enumerate(lines):
             f.text(s, 1200, AXB_Y0 + 52 + i * 34, 21, C.INK3, alpha=kn * 0.95)
-        f.text("阈值 67 以上的读出才参与投票", 1200, AXB_Y0 + 210, 19, C.S2C,
+        f.text("得分 ≥ 67 的读段才进入投票", 1200, AXB_Y0 + 210, 19, C.S2C,
                alpha=kn * 0.9)
 
 
@@ -259,7 +259,7 @@ def band_score(f, t, a, l5):
     if a <= 0:
         return
     k = ramp(t, l5 + 0.1, l5 + 0.7)
-    f.text("入口门禁：得分低于 67 的记录根本不投票", 150, BAND_Y0 + 2, 22,
+    f.text("入口门禁：得分低于 67 的读段不进入投票", 150, BAND_Y0 + 2, 22,
            C.INK2, alpha=a)
     x0, x1 = 150, 1600
     s_lo, s_hi = 55, 82

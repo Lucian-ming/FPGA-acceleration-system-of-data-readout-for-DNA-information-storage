@@ -97,13 +97,15 @@ def draw(f, t, S):
     # ---- 第三句：两个问号
     if q > 0.01:
         f.rect(0, 0, C.W, C.H, C.BG, alpha=0.72 * q)
-        f.text("它原本是哪一段？", 960, 380, 62, C.INK, C.SANS, WEIGHT_BOLD,
+        f.text("它原本是哪一段？", 960, 380, 62, C.INK, C.SERIF, WEIGHT_BOLD,
                align="center", alpha=q)
-        f.text("又该还原成什么？", 960, 500, 62, C.S1C, C.SANS, WEIGHT_BOLD,
+        f.text("又该还原成什么？", 960, 500, 62, C.S1C, C.SERIF, WEIGHT_BOLD,
                align="center", alpha=ramp(t, l2 + 0.7, l2 + 1.4))
         a2 = ramp(t, l2 + 1.4, l2 + 2.0)
         f.line(760, 640, 1160, 640, C.S1C, 1.6, alpha=0.5 * a2)
-        f.text("这就是三级流水线要回答的两件事", 960, 668, 30, C.INK2,
+        # 不再写"三级流水线"：PL 是四级，还要加 PS 的 Stage 2.5。
+        # 这里只陈述难点本身，别把系统边界说错。
+        f.text("单条读出提供不了位置，也判断不了对错", 960, 668, 30, C.INK2,
                C.SANS, align="center", alpha=a2)
 
 

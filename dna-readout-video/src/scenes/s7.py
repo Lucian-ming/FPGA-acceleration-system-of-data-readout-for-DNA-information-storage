@@ -36,15 +36,15 @@ DIGEST = "fcd0cf90 … f2c3"
 
 
 def gate_a(f, t, a, l1, l2):
-    """判据一：板端回来的 syndrome 必须 10,800 位全零。"""
+    """判据一：客户端本地重算的 10,800 位校验子必须全零。"""
     if a <= 0:
         return
-    f.rect(GA_X, GATE_Y, GA_W, GATE_H, C.PANEL, alpha=0.92 * a, r=12)
-    f.rect_stroke(GA_X, GATE_Y, GA_W, GATE_H, C.OKC, lw=1.4, r=12, alpha=0.34 * a)
+    f.rect(GA_X, GATE_Y, GA_W, GATE_H, C.PANEL, alpha=0.92 * a, r=3)
+    f.rect_stroke(GA_X, GATE_Y, GA_W, GATE_H, C.OKC, lw=1.4, r=3, alpha=0.34 * a)
     f.rect(GA_X, GATE_Y, 4, GATE_H, C.OKC, alpha=0.85 * a, r=2)
     f.text("判据一 · 校验子全零", GA_X + 26, GATE_Y + 20, 24, C.OKC, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
-    f.text("板子回来的 10,800 个校验位", GA_X + GA_W - 26, GATE_Y + 24, 19,
+    f.text("本地重算 10,800 条校验式", GA_X + GA_W - 26, GATE_Y + 24, 19,
            C.INK3, align="right", alpha=a * 0.9)
 
     t0 = l1 + 0.25
@@ -67,7 +67,7 @@ def gate_a(f, t, a, l1, l2):
         k = ramp(t, l2 - 0.5, l2 + 0.2)
         if k > 0:
             f.text("每格 200 bit · 54 格 = 10,800 bit 全为 0",
-                   GRID_X, GRID_Y + NROW * (CELL_H + 10) + 8, 18, C.INK3,
+                   GRID_X, GRID_Y + NROW * (CELL_H + 10) + 2, 18, C.INK3,
                    alpha=k * a * 0.95)
 
     kp = ramp(t, l2 - 0.2, l2 + 0.5)
@@ -82,12 +82,12 @@ def gate_b(f, t, a, l2, l3):
     """判据二：恢复出来的载荷 SHA-256 必须和原文一致。"""
     if a <= 0:
         return
-    f.rect(GB_X, GATE_Y, GB_W, GATE_H, C.PANEL, alpha=0.92 * a, r=12)
-    f.rect_stroke(GB_X, GATE_Y, GB_W, GATE_H, C.OKC, lw=1.4, r=12, alpha=0.34 * a)
+    f.rect(GB_X, GATE_Y, GB_W, GATE_H, C.PANEL, alpha=0.92 * a, r=3)
+    f.rect_stroke(GB_X, GATE_Y, GB_W, GATE_H, C.OKC, lw=1.4, r=3, alpha=0.34 * a)
     f.rect(GB_X, GATE_Y, 4, GATE_H, C.OKC, alpha=0.85 * a, r=2)
     f.text("判据二 · 载荷 SHA-256", GB_X + 26, GATE_Y + 20, 24, C.OKC, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
-    f.text("不是“看起来像”，是逐字节相同", GB_X + GB_W - 26, GATE_Y + 24, 19,
+    f.text("比的是整份载荷的 SHA-256 摘要", GB_X + GB_W - 26, GATE_Y + 24, 19,
            C.INK3, align="right", alpha=a * 0.9)
 
     rows = [("原文", C.INK2), ("恢复后", C.INK2)]
@@ -99,8 +99,8 @@ def gate_b(f, t, a, l2, l3):
         f.text(lab, GB_X + 26, y + 6, 20, C.INK3, alpha=k * a)
         f.text("SHA-256", GB_X + 110, y + 6, 20, C.INK3, C.MONO,
                alpha=k * a * 0.9)
-        f.rect(GB_X + 218, y - 2, 372, 38, C.PANEL_HI, alpha=0.95 * k * a, r=6)
-        f.rect_stroke(GB_X + 218, y - 2, 372, 38, C.EDGE, lw=1.0, r=6,
+        f.rect(GB_X + 218, y - 2, 372, 38, C.PANEL_HI, alpha=0.95 * k * a, r=2)
+        f.rect_stroke(GB_X + 218, y - 2, 372, 38, C.EDGE, lw=1.0, r=2,
                       alpha=0.8 * k * a)
         f.text(DIGEST, GB_X + 236, y + 6, 21, col, C.MONO,
                alpha=k * a * 0.95)
@@ -111,7 +111,7 @@ def gate_b(f, t, a, l2, l3):
                align="center", alpha=ke * a)
         f.text("相等", GB_X + 660, GATE_Y + 90, 21, C.OKC, C.SANS,
                alpha=ke * a)
-        f.line(GB_X + 26, GATE_Y + 132, GB_X + GB_W - 26, GATE_Y + 132, C.EDGE,
+        f.line(GB_X + 26, GATE_Y + 172, GB_X + GB_W - 26, GATE_Y + 172, C.EDGE,
                1.0, alpha=0.6 * ke * a)
 
     kp = ramp(t, l3 - 0.3, l3 + 0.4)
@@ -129,7 +129,7 @@ def path_chain(f, t, a, l3):
         return
     items = [
         ("8,100", "B", "板端回传的结果码字", C.INK),
-        ("54,000", "bit", "取前段作为 LDPC 信息位", C.INK),
+        ("54,000", "bit", "解交织后取末段为信息位", C.INK),
         ("input_bytes", "", "按原文件长度截断", C.INK2),
         ("≤ 6,750", "B", "载荷上限 = 54,000 ÷ 8", C.S3C),
     ]
@@ -139,8 +139,8 @@ def path_chain(f, t, a, l3):
             continue
         x = PATH_X0 + i * (PATH_BW + PATH_GAP)
         y = PATH_Y + (1 - ease_out(k)) * 10
-        f.rect(x, y, PATH_BW, PATH_H, C.PANEL, alpha=0.88 * k * a, r=10)
-        f.rect_stroke(x, y, PATH_BW, PATH_H, C.EDGE, lw=1.2, r=10,
+        f.rect(x, y, PATH_BW, PATH_H, C.PANEL, alpha=0.88 * k * a, r=3)
+        f.rect_stroke(x, y, PATH_BW, PATH_H, C.EDGE, lw=1.2, r=3,
                       alpha=0.9 * k * a)
         f.text(v, x + 24, y + 34, 52 if len(v) < 6 else 40, col, C.MONO,
                WEIGHT_BOLD, alpha=k * a)
@@ -156,16 +156,17 @@ def path_chain(f, t, a, l3):
 
 
 def forensics(f, t, a, l4):
-    """四级取证：只在失败时用来定位，不改判据。"""
+    """四级逐级比对：每轮板上运行都做，用来定位问题出在哪一级。"""
     if a <= 0:
         return
-    f.text("四级取证 · 只在失败时启用", 112, FOR_Y, 24, C.INK2, C.SANS,
+    f.text("四级逐级比对 · 每轮板上运行都做", 112, FOR_Y, 24, C.INK2, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
-    f.text("用来定位是哪一级出的问题，不改变上面的通过判据",
+    f.text("与黄金向量逐级对照，用来定位问题出在哪一级",
            1808, FOR_Y + 2, 19, C.INK3, align="right", alpha=a * 0.9)
 
-    names = ["水印 XOR", "Stage 1 码字", "Stage 2 投票", "Stage 3 解稀"]
-    cols = [C.INK3, C.S1C, C.S2C, C.S3C]
+    # 按数据流排序：Stage 1 → Stage 2 → Stage 2.5（PS 水印）→ Stage 3
+    names = ["Stage 1 码字", "Stage 2 投票", "Stage 2.5 水印", "Stage 3 解稀"]
+    cols = [C.S1C, C.S2C, C.INK3, C.S3C]
     x = 112
     for i, (nm, col) in enumerate(zip(names, cols)):
         k = ramp(t, l4 + 0.2 + 0.18 * i, l4 + 0.6 + 0.18 * i)
@@ -173,8 +174,8 @@ def forensics(f, t, a, l4):
             break
         y = FOR_Y + 44
         w = 404
-        f.rect(x, y, w, FOR_H - 48, C.PANEL, alpha=0.85 * k * a, r=9)
-        f.rect_stroke(x, y, w, FOR_H - 48, col, lw=1.0, r=9, alpha=0.40 * k * a)
+        f.rect(x, y, w, FOR_H - 48, C.PANEL, alpha=0.85 * k * a, r=3)
+        f.rect_stroke(x, y, w, FOR_H - 48, col, lw=1.0, r=3, alpha=0.40 * k * a)
         f.text("%d" % (i + 1), x + 20, y + 18, 22, col, C.MONO, WEIGHT_BOLD,
                alpha=k * a * 0.9)
         f.text(nm, x + 52, y + 17, 22, C.INK2, C.SANS, alpha=k * a)
@@ -186,13 +187,13 @@ def verdict(f, t, a, l4):
     if a <= 0:
         return
     y = VER_Y
-    f.rect(112, y, 796, VER_H, C.OKC, alpha=0.09 * a, r=10)
-    f.rect_stroke(112, y, 796, VER_H, C.OKC, lw=1.2, r=10, alpha=0.45 * a)
+    f.rect(112, y, 796, VER_H, C.OKC, alpha=0.09 * a, r=3)
+    f.rect_stroke(112, y, 796, VER_H, C.OKC, lw=1.2, r=3, alpha=0.45 * a)
     f.text("PASS", 140, y + 22, 32, C.OKC, C.MONO, WEIGHT_BOLD, alpha=a)
     f.text("两道都过 → 输出原始文件", 268, y + 30, 22, C.INK2, alpha=a * 0.95)
 
-    f.rect(940, y, 868, VER_H, C.WARNC, alpha=0.09 * a, r=10)
-    f.rect_stroke(940, y, 868, VER_H, C.WARNC, lw=1.2, r=10, alpha=0.45 * a)
+    f.rect(940, y, 868, VER_H, C.WARNC, alpha=0.09 * a, r=3)
+    f.rect_stroke(940, y, 868, VER_H, C.WARNC, lw=1.2, r=3, alpha=0.45 * a)
     f.text("拒绝", 968, y + 22, 32, C.WARNC, C.SANS, WEIGHT_BOLD, alpha=a)
     f.text("任一不过 → 不出文件（不收敛记为 SAFE_NOCONV）", 1080, y + 30, 21,
            C.INK2, alpha=a * 0.95)

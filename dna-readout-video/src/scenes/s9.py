@@ -25,7 +25,7 @@ NODES = [
 
 
 def chain(f, t, a, l0):
-    """三级硬件 + 一级校验，逐节长出，最后接上文件名。"""
+    """四级流水逐节长出，最后接上文件名。"""
     if a <= 0:
         return
     total = len(NODES) * NODE_W + (len(NODES) - 1) * NODE_GAP
@@ -77,24 +77,24 @@ def draw(f, t, S):
     if ka > 0:
         dy = (1 - ease_out(ka)) * 16
         f.text("从带噪碱基，到可验证的原始数据", C.W / 2, 286 + dy, 62, C.INK,
-               C.SANS, WEIGHT_BOLD, align="center", alpha=ka)
+               C.SERIF, WEIGHT_BOLD, align="center", alpha=ka)
         f.text("DNA 存储读出 FPGA 加速系统", C.W / 2, 372, 26, C.INK2,
                C.SANS, align="center", alpha=ka * 0.85, spacing=1.15)
 
     chain(f, t, 1.0, l0)
 
-    # 第二句：三级硬件 + 一级软件校验
+    # 第二句：PL 四级 + PS 水印 + PC 验收
     kb = ramp(t, l1 + 0.1, l1 + 0.8)
     if kb > 0:
-        f.text("三级硬件流水，一级软件校验", C.W / 2, 640, 40, C.OKC,
+        f.text("四级在 PL，水印在 PS，验收在 PC", C.W / 2, 640, 40, C.OKC,
                C.SANS, WEIGHT_BOLD, align="center", alpha=kb)
-        f.text("每一级都能单独取证，判定标准全部写死在代码里", C.W / 2, 706,
+        f.text("每一级都保留中间结果，判定标准全部写死在代码里", C.W / 2, 706,
                24, C.INK2, C.SANS, align="center", alpha=kb * 0.85)
 
     platform(f, t, ramp(t, l1 + 1.2, l1 + 2.0), l1)
 
-    # 尾部淡出：最后 1.1 s 压暗，给结束留气口
+    # 尾部淡出：最后 1.1 s 收拢到纸色，给结束留气口（白场收尾，与纸面语言一致）
     end = S["start"] + S["dur"]
-    kout = ramp(t, end - 1.1, end - 0.05)
+    kout = ramp(t, end - 1.3, end - 0.05)
     if kout > 0:
-        f.rect(0, 0, C.W, C.H, "#000000", alpha=0.55 * kout)
+        f.rect(0, 0, C.W, C.H, "#F2EBDD", alpha=0.88 * kout)

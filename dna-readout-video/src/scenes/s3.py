@@ -15,7 +15,7 @@ from scenes import common as C
 TITLE = "一级：滑窗比对"
 
 BAR_X, BAR_W = 112, 1696
-BAR_LAB_Y = 250
+BAR_LAB_Y = 240          # 标签行上提：游标三角尖在 BAR_Y-17=271，21px 字实际字高 21
 BAR_Y, BAR_H = 288, 20
 
 Z_X, Z_W = 214, 1594        # 左侧 112..206 留给行标签
@@ -68,16 +68,16 @@ def overview(f, a, cursor_off=None):
            C.MONO, alpha=a * 0.9)
     f.text("候选起点 0 .. 40,350（40,351 个）", BAR_X + BAR_W, BAR_LAB_Y, 21,
            C.INK3, align="right", alpha=a * 0.9)
-    f.rect(BAR_X, BAR_Y, BAR_W, BAR_H, "#16212A", r=3, alpha=a)
+    f.rect(BAR_X, BAR_Y, BAR_W, BAR_H, "#DDD2BE", r=2, alpha=a)
     x = BAR_X
     while x < BAR_X + BAR_W:
-        f.line(x, BAR_Y + 3, x, BAR_Y + BAR_H - 3, "#2C4150", 1.0, alpha=0.55 * a)
+        f.line(x, BAR_Y + 3, x, BAR_Y + BAR_H - 3, "#B3A48A", 1.0, alpha=0.55 * a)
         x += 4.0
-    f.rect_stroke(BAR_X, BAR_Y, BAR_W, BAR_H, "#33454F", lw=1.0, r=3, alpha=a)
+    f.rect_stroke(BAR_X, BAR_Y, BAR_W, BAR_H, "#B3A48A", lw=1.0, r=2, alpha=a)
     for k in range(5):
         off = TOTAL_OFF * k / 4.0
         x = off_to_x(off)
-        f.line(x, BAR_Y + BAR_H, x, BAR_Y + BAR_H + 6, "#3C4E5A", 1.0, alpha=a)
+        f.line(x, BAR_Y + BAR_H, x, BAR_Y + BAR_H + 6, "#9C8E76", 1.0, alpha=a)
         f.text("{:,}".format(int(round(off))), x, BAR_Y + BAR_H + 11, 16,
                C.INK3, C.MONO, align="center", alpha=a * 0.85)
     if cursor_off is not None:
@@ -88,7 +88,7 @@ def overview(f, a, cursor_off=None):
 
 
 def strand(f, x, y, seq, cw, h, alpha=1.0, size=15, letters_below=False,
-           label_col="#5E8CA6", dim=1.0, hi=None):
+           label_col="#5C7F97", dim=1.0, hi=None):
     """一条链：上下两条骨架 + 竖线 + 碱基字母。hi=(起, 止) 为窗口内不下沉的列。"""
     n = len(seq)
     x1 = x + n * cw
@@ -100,7 +100,7 @@ def strand(f, x, y, seq, cw, h, alpha=1.0, size=15, letters_below=False,
         ba = alpha
         if hi and not (hi[0] <= i < hi[1]):
             ba = alpha * dim
-        f.line(cx, y + 2, cx, y + h - 2, "#4A6474", 1.2, alpha=0.40 * alpha)
+        f.line(cx, y + 2, cx, y + h - 2, "#B0A188", 1.2, alpha=0.40 * alpha)
         f.text(b, cx, ly, size, C.BASE_C.get(b, C.INK2), C.MONO, WEIGHT_BOLD,
                align="center", alpha=ba)
 
@@ -116,7 +116,7 @@ def score_layer(f, a, drawn=1.0, cursor_u=None):
 
     for s in (0, 50, 75, 100, 150):
         y = score_to_y(s)
-        f.line(AX_X, y, AX_X + AX_W, y, "#1D2830", 1.0,
+        f.line(AX_X, y, AX_X + AX_W, y, "#B9AC94", 1.0,
                alpha=a * (0.85 if s in (0, 150) else 0.5))
         f.text(str(s), AX_X - 12, y - 10, 16, C.INK3, C.MONO,
                align="right", alpha=a * 0.8)
@@ -219,7 +219,7 @@ def draw(f, t, S):
                 f.rect_stroke(wx, wy0, ww, wy1 - wy0, C.S1C, 1.4, r=6,
                               alpha=0.55 * k * a_read)
         strand(f, Z_X, READ_Y, readseq, CW, LH, alpha=a_read, size=15,
-               letters_below=True, label_col="#7FB4D8")
+               letters_below=True, label_col="#2F5D7C")
         f.text("读出链", 112, READ_Y + 4, 17, C.INK3, alpha=a_read)
         f.text("300 bit", 112, READ_Y + 23, 12, C.INK3, alpha=a_read * 0.8)
 

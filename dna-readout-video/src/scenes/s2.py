@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""S2 — 流水线总览：三级硬件 + 一级软件校验，以及每一级的数据量。"""
+"""S2 — 流水线总览：PL 四级、PS 补水印、PC 验收，以及每一级的数据量。
+
+边界见 docs/01-architecture.md:32-50：Stage 1/2/3 与 LDPC 都在 PL；
+Stage 2.5 的水印异或跑在 PS 的板载 ARM 上；PC 只做验收，不改码字。
+"""
 import math
 
 from engine.gfx import (Frame, clamp, lerp, ramp, ease_out, pulse,
@@ -12,7 +16,7 @@ STAGES = [
     ("Stage 1", "定位", "滑窗比对", C.S1C, "PL"),
     ("Stage 2", "投票", "差分累加", C.S2C, "PL"),
     ("Stage 3", "解稀", "5b → 4b", C.S3C, "PL"),
-    ("LDPC", "纠错", "DVB-S2 R=5/6", C.LDC, "PL"),
+    ("Stage 4", "纠错 · LDPC", "DVB-S2 R=5/6", C.LDC, "PL"),
     ("验收", "双重判据", "校验子 + SHA-256", C.OKC, "上位机"),
 ]
 # 每一级之间的数据量
@@ -26,7 +30,7 @@ def draw(f, t, S):
     C.background(f, t)
     C.chapter(f, 2, "流水线总览", C.S1C, t)
     C.footer(f, 2, 9, t)
-    C.header(f, "三级硬件 + 一级软件校验", t=t)
+    C.header(f, "PL 四级流水，PS 水印，PC 验收", t=t)
 
     l0, l1, l2 = C.ls(S, 0), C.ls(S, 1), C.ls(S, 2)
     n = len(STAGES)
@@ -64,7 +68,7 @@ def draw(f, t, S):
                       r=14, alpha=0.30 * kbox, dash=[7, 7])
         f.text("上位机 PC · Python 客户端", xp + 14, Y - 30, 19, C.OKC, C.SANS,
                alpha=0.85 * kbox)
-        f.text("PS（板载 ARM）只做 Stage2.5 的逐字节水印异或", xl + 14,
+        f.text("PS（板载 ARM）执行 Stage 2.5 逐字节水印异或", xl + 14,
                Y + BH + 74, 18, C.INK3, alpha=0.8 * kbox)
 
     # ---- 箭头 + 数据量
@@ -100,7 +104,7 @@ def draw(f, t, S):
         f.text("上位机（PC）侧", 140, y + 18, 22, C.OKC, C.SANS, WEIGHT_MEDIUM,
                alpha=kout)
         items = [("8,100", "B", "板子返回的结果码字"),
-                 ("54,000", "bit", "取前段作为 LDPC 信息位"),
+                 ("54,000", "bit", "解交织后取末段为信息位"),
                  ("≤ 6,750", "B", "按 input_bytes 截断后的载荷上限")]
         for i, (v, u, lab) in enumerate(items):
             kk = ramp(t, l2 + 0.8 + 0.35 * i, l2 + 1.2 + 0.35 * i)

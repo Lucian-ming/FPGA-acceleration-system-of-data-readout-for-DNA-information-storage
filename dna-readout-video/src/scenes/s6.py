@@ -65,14 +65,14 @@ def codeword(f, t, a, l0, l1):
     f.text("PL 译码器 · DVB-S2 码率 5/6", CW_X + CW_W, CW_Y - 34, 21, C.LDC,
            C.SANS, WEIGHT_MEDIUM, align="right", alpha=a * 0.95)
 
-    f.rect(CW_X, CW_Y, CW_W, CW_H, C.LDC, alpha=0.16 * a, r=6)
-    f.rect_stroke(CW_X, CW_Y, CW_W, CW_H, C.LDC, lw=1.3, r=6, alpha=0.55 * a)
+    f.rect(CW_X, CW_Y, CW_W, CW_H, C.LDC, alpha=0.16 * a, r=2)
+    f.rect_stroke(CW_X, CW_Y, CW_W, CW_H, C.LDC, lw=1.3, r=2, alpha=0.55 * a)
 
     kinf = ramp(t, l0 + 0.5, l0 + 1.2)
-    f.rect(CW_X, CW_Y, INFO_W, CW_H, C.LDC, alpha=0.34 * kinf * a, r=6)
+    f.rect(CW_X, CW_Y, INFO_W, CW_H, C.LDC, alpha=0.34 * kinf * a, r=2)
     if split > 0:
         f.rect(PAR_X, CW_Y, CW_W - INFO_W, CW_H, C.LDC,
-               alpha=0.16 * (split - 0.55) / 0.45 * a, r=6)
+               alpha=0.16 * (split - 0.55) / 0.45 * a, r=2)
         f.line(PAR_X, CW_Y - 6, PAR_X, CW_Y + CW_H + 6, C.INK,
                2.0, alpha=0.75 * split * a)
 
@@ -114,9 +114,8 @@ def ratio_strip(f, t, a, l0, l1):
                alpha=0.20 * kp * a, r=4)
         f.rect_stroke(x, STRIP_Y, STRIP_CW, STRIP_H, C.WARNC, lw=1.2, r=4,
                       alpha=0.70 * kp * a)
-        f.text("5 : 1", gx + (5 * (STRIP_CW + STRIP_GAP) + STRIP_CW) / 2,
-               STRIP_Y - 28, 17, C.INK3, C.MONO, align="center",
-               alpha=kp * a * 0.85)
+        # 组内不再标 "5 : 1"：那行字与上方标题同在 STRIP_Y-30 附近会叠印，
+        # 比例信息由底部两条图例给出，这里留空更干净。
 
     f.text("← 5 个信息位 →", CW_X + 20, STRIP_Y + STRIP_H + 16, 19, C.LDC,
            alpha=ki * a * 0.9)
@@ -132,8 +131,8 @@ def edge_pt(v, c):
 def tanner(f, t, a, l2):
     if a <= 0:
         return
-    f.rect(TG_X, TG_Y, TG_W, TG_H, C.PANEL, alpha=0.88 * a, r=10)
-    f.rect_stroke(TG_X, TG_Y, TG_W, TG_H, C.EDGE, lw=1.2, r=10)
+    f.rect(TG_X, TG_Y, TG_W, TG_H, C.PANEL, alpha=0.88 * a, r=3)
+    f.rect_stroke(TG_X, TG_Y, TG_W, TG_H, C.EDGE, lw=1.2, r=3)
     f.text("Tanner 图 · 变量节点 ↔ 校验节点", TG_X + 20, TG_Y + 14, 22,
            C.LDC, C.SANS, WEIGHT_MEDIUM, alpha=a)
     f.text("示意规模", TG_X + TG_W - 20, TG_Y + 17, 18,
@@ -161,7 +160,9 @@ def tanner(f, t, a, l2):
         f.circle(x, VY, VR, stroke=C.LDC, lw=1.8, alpha=kv * a)
         f.text(V_LAB[i], x, VY - 8, 18, C.LDC, C.MONO, WEIGHT_BOLD,
                align="center", alpha=kv * a)
-        f.text("1 bit", x, VY - 34, 15, C.INK3, align="center",
+        # 圆顶在 VY - VR = 369，15 px 字号的实际字高 13，
+        # 基线框放在 VY - 40 才留得下 4 px 空隙
+        f.text("1 bit", x, VY - 40, 15, C.INK3, align="center",
                alpha=kv * a * 0.75)
 
     kc = ramp(t, l2 + 0.5, l2 + 1.1)
@@ -193,8 +194,8 @@ def tanner(f, t, a, l2):
 def syndrome(f, t, a, l2, l4, l5):
     if a <= 0:
         return
-    f.rect(SP_X, SP_Y, SP_W, SP_H, C.PANEL, alpha=0.88 * a, r=10)
-    f.rect_stroke(SP_X, SP_Y, SP_W, SP_H, C.EDGE, lw=1.2, r=10)
+    f.rect(SP_X, SP_Y, SP_W, SP_H, C.PANEL, alpha=0.88 * a, r=3)
+    f.rect_stroke(SP_X, SP_Y, SP_W, SP_H, C.EDGE, lw=1.2, r=3)
     f.text("迭代与校验子", SP_X + 20, SP_Y + 14, 22, C.LDC, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
 
@@ -236,7 +237,7 @@ def syndrome(f, t, a, l2, l4, l5):
                C.MONO, align="center", alpha=bi * a * 0.9)
 
     kn = ramp(t, l4 + 0.6, l4 + 1.3)
-    f.text("第 3 轮比第 2 轮还高——来回震荡是正常的", CH_X0 - 40,
+    f.text("示意序列：第 3 轮校验子高于第 2 轮", CH_X0 - 40,
            CH_BASE + 38, 17, C.INK3, alpha=kn * a * 0.85)
 
     # 收敛门
@@ -304,7 +305,7 @@ def band_hard(f, t, a, l3):
     f.text("每一位只有 0 或 1，没有可靠度 / 软 LLR", 640, BAND_Y0 + 48, 21,
            C.INK2, alpha=k * a * 0.95)
     k2 = ramp(t, l3 + 1.0, l3 + 1.7)
-    f.text("省一次软信息量化，代价是比软判决少一点纠错增益", 640,
+    f.text("迭代消息只带 0/1 的取向，不带可靠度权重", 640,
            BAND_Y0 + 84, 19, C.INK3, alpha=k2 * a * 0.85)
 
 
@@ -327,21 +328,35 @@ def band_gate(f, t, a, l5):
 def band_noconv(f, t, a, l6):
     if a <= 0:
         return
-    f.text("不收敛时：照样把三级码字交回去，由客户端拒绝", 150, BAND_Y0 + 2,
+    f.text("不收敛时：照样把 Stage 3 码字交回去，由客户端拒绝", 150, BAND_Y0 + 2,
            22, C.INK2, C.SANS, WEIGHT_MEDIUM, alpha=a)
-    k = ramp(t, l6 + 0.3, l6 + 1.0)
-    x = 150
-    x = C.chip(f, x, BAND_Y0 + 44, "三级原码字", C.INK2, 22, 14, 8, alpha=k * a)
-    x = C.chip(f, x, BAND_Y0 + 44, "校验子非零", C.WARNC, 22, 14, 8,
-               alpha=k * a, fill_alpha=0.16)
-    x = C.chip(f, x, BAND_Y0 + 44, "客户端拒绝", C.WARNC, 22, 14, 8,
-               alpha=k * a, fill_alpha=0.16)
-    k2 = ramp(t, l6 + 0.9, l6 + 1.5)
-    C.chip(f, x, BAND_Y0 + 44, "SAFE_NOCONV", C.WARNC, 22, 14, 8,
-           alpha=k2 * a, fill_alpha=0.30)
-    k3 = ramp(t, l6 + 1.6, l6 + 2.3)
-    f.text("有错也宁可报出来，不假装成功", 150, BAND_Y0 + 122, 21, C.INK3,
-           alpha=k3 * a * 0.95)
+    steps = [("Stage 3 原码字", C.INK2, 0.10, 0.14),
+             ("校验子非零", C.WARNC, 0.16, 0.32),
+             ("客户端拒绝", C.WARNC, 0.16, 0.34),
+             ("SAFE_NOCONV", C.WARNC, 0.30, 0.44)]
+    # 四段等分横贯整幅，右端留出结论位
+    xs = [150, 560, 970, 1380]
+    for i, (txt, col, fa, d) in enumerate(steps):
+        kk = ramp(t, l6 + 0.3 + d, l6 + 0.9 + d)
+        if kk <= 0:
+            continue
+        nx = C.chip(f, xs[i], BAND_Y0 + 44, txt, col, 22, 15, 9,
+                    alpha=kk * a, fill_alpha=fa)
+        if i < 3:
+            ka = ramp(t, l6 + 0.42 + d, l6 + 0.95 + d)
+            C.flow_arrow(f, nx + 6, BAND_Y0 + 62, xs[i + 1] - 16,
+                         BAND_Y0 + 62, C.INK3, ka, dur=0.5, lw=2.0)
+    k3 = ramp(t, l6 + 1.4, l6 + 2.1)
+    if k3 > 0:
+        f.line(150, BAND_Y0 + 104, 1708, BAND_Y0 + 104, C.EDGE, 1.0,
+               alpha=0.55 * k3 * a)
+        f.text("非零校验子判为不收敛，如实上报", 150, BAND_Y0 + 120, 21,
+               C.INK3, alpha=k3 * a * 0.95)
+        f.text("不收敛时保留 Stage 3 原码字，由客户端拒收", 1708,
+               BAND_Y0 + 122, 19, C.INK3, align="right",
+               alpha=k3 * a * 0.8)
+
+
 
 
 def draw(f, t, S):
@@ -375,14 +390,16 @@ def draw(f, t, S):
     a_n = ramp(t, l6 - 0.2, l6 + 0.5)
     band_noconv(f, t, a_n, l6)
 
-    # 收束：宁可拒绝
+    # 收束：未收敛即拒收
     k = ramp(t, l7 + 0.2, l7 + 1.0)
     if k > 0:
         f.rect(0, 0, C.W, C.H, C.BG, alpha=0.72 * k)
-        f.rect(180, 392, C.W - 360, 216, C.BG, alpha=0.80 * k, r=16)
-        f.text("宁可拒绝，也不交出没收敛的结果", C.W / 2, 452, 54, C.INK,
+        # 面板要接近不透明：只留 0.72 的底噪会把 Tanner 图与校验子条柱透到标题背后
+        f.rect(183, 397, C.W - 360, 216, "#8C7A5E", alpha=0.07 * k, r=16)
+        f.rect(180, 392, C.W - 360, 216, C.PANEL, alpha=0.97 * k, r=16)
+        f.text("无解就判无解", C.W / 2, 452, 54, C.INK,
                C.SANS, WEIGHT_BOLD, align="center", alpha=k)
         f.line(C.W / 2 - 330, 528, C.W / 2 + 330, 528, C.LDC, 2.0,
                alpha=0.6 * k)
-        f.text("校验子不全零 → 不猜、不装作成功", C.W / 2, 552, 26, C.INK2,
-               C.SANS, align="center", alpha=k * 0.95)
+        f.text("50 轮内校验子未归零 → 保留原码字，客户端判拒收", C.W / 2, 552,
+               26, C.INK2, C.SANS, align="center", alpha=k * 0.95)

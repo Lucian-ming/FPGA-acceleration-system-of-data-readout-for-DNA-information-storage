@@ -12,31 +12,35 @@ from engine.gfx import (Frame, rgba, mix, lerp, clamp, ramp, ramp_lin,
 W, H = 1920, 1080
 FPS = 30
 
-# ---- palette (near-black graphite ground; every colour still carries a label)
-BG = "#08090B"          # 近黑石墨底
-BG2 = "#0C0E11"
-PANEL = "#101317"
-PANEL_HI = "#151A1F"
-EDGE = "#232A31"
-GRID = "#8A97A3"        # 网格线色，靠 alpha 压到几乎不可见
-INK = "#F2F4F6"
-INK2 = "#A2ACB5"
-INK3 = "#6B7680"
+# ---- palette (warm paper ground, ink typography; colour still carries a label)
+# 设计语言：印刷品 / 编辑部。纸是暖白，字是墨，强调色是印刷油墨，只用在
+# 真正需要区分的地方。不做发光、不做霓虹，靠留白、字号层级和发丝线建立秩序。
+BG = "#EFE8DB"          # 纸面底色（暖白）
+BG2 = "#F7F2E8"         # 略亮的一层，用于卡片
+PANEL = "#FBF8F1"       # 卡片/表面
+PANEL_HI = "#E6DCC9"    # 反相填充（位块、轨道）
+EDGE = "#D3C7B0"        # 发丝线
+GRID = "#B9AC94"        # 网格，靠 alpha 压到几乎不可见
+INK = "#241F19"         # 正文墨色
+INK2 = "#574E43"
+INK3 = "#8C8070"
 
-S1C = "#5AA9E6"   # Stage1 滑窗
-S2C = "#7FC8A9"   # Stage2 投票
-S3C = "#E7B65C"   # Stage3 解稀
-LDC = "#B08BE8"   # LDPC
-OKC = "#6FD3C7"   # 验收 / 通过
-WARNC = "#E88B6B" # 拒收 / 提示
+ACCENT = "#C0623E"      # 印刷朱砂，全片唯一的“热”色，只做强调
+S1C = "#2F5D7C"         # Stage1 滑窗 —— 靛蓝
+S2C = "#3D7A5C"         # Stage2 投票 —— 松绿
+S3C = "#A9761F"         # Stage3 解稀 —— 赭黄
+LDC = "#6B4E82"         # LDPC —— 紫
+OKC = "#3F7A55"         # 验收 / 通过
+WARNC = "#AE4A2C"       # 拒收 / 提示
 
-BASE_C = {"A": "#4EA3FF", "T": "#FFB454", "C": "#52D1A4", "G": "#FF7A93"}
+BASE_C = {"A": "#2F5D7C", "T": "#A9761F", "C": "#3D7A5C", "G": "#AE4A2C"}
 COMP = {"A": "T", "T": "A", "C": "G", "G": "C"}
 
 GRAIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                     "assets", "grain.png")
+                     "assets", "paper.png")
 
 SANS = "Noto Sans CJK SC"
+SERIF = "Noto Serif CJK SC"
 MONO = "DejaVu Sans Mono"
 
 DEG = math.pi / 180.0
@@ -44,144 +48,122 @@ DEG = math.pi / 180.0
 
 # ------------------------------------------------------------------ chrome
 def background(f, t, accent=None, drift=True):
-    """Near-black graphite ground.
+    """Warm paper ground.
 
-    分层叠加，让画面有纵深而不抢内容：
-      1. 竖向渐变（顶部略亮，模拟顶光）
-      2. 两个缓慢漂移的柔光斑，颜色跟随本章主色（低到几乎察觉不到）
-      3. 极细网格：120 px 细线 + 480 px 主线，随 t 缓慢横移
-      4. 斜向扫光，每 14 s 掠过一次
-      5. 四周暗角
+    印刷纸面：极浅的顶光渐变、几乎看不见的网格、纸纹与四周极淡的暖色压边。
+    没有发光斑、没有扫光——静止的纸才是可信的背景，动的东西应该只有内容。
     """
     f.clear(BG)
-    f.grad_v(0, 0, H, [(0.0, "#12161A", 1.0), (0.42, BG, 1.0),
-                       (1.0, "#050607", 1.0)])
+    f.grad_v(0, 0, H, [(0.0, "#F6EFE2", 1.0), (0.45, BG, 1.0),
+                       (1.0, "#E4DACA", 1.0)])
     f.rect(0, 0, W, H, None)
 
-    acc = accent or "#8FA6B6"
-    brt = 0.030 + 0.006 * math.sin(t * 0.55)
-    f.glow(560 + 120 * math.sin(t * 0.085), 180 + 60 * math.cos(t * 0.11),
-           980, 620, acc, brt)
-    f.glow(1460 + 110 * math.sin(t * 0.07 + 2.1), 880 + 50 * math.cos(t * 0.09),
-           900, 560, "#5E7C96", brt * 0.55)
+    # 一点点极淡的暖色偏移，让纸不是纯色块
+    acc = accent or ACCENT
+    f.glow(520 + 90 * math.sin(t * 0.05), 120, 1100, 520, "#FFFFFF", 0.20)
+    f.glow(1500 + 80 * math.sin(t * 0.045 + 2.1), 940, 900, 460, acc, 0.022)
 
     if drift:
-        ox = -((t * 5.0) % 480)
-        oy = -((t * 1.6) % 480)
+        ox = -((t * 2.2) % 96)
+        oy = -((t * 0.8) % 96)
     else:
         ox = oy = 0.0
-    x = ox - 480
-    while x < W + 480:
-        f.rect(x, 0, 1, H, GRID, alpha=0.030)
-        x += 120
-    y = oy - 480
-    while y < H + 480:
-        f.rect(0, y, W, 1, GRID, alpha=0.026)
-        y += 120
-    x = ox - 480
-    while x < W + 480:
-        f.rect(x, 0, 1, H, GRID, alpha=0.055)
-        x += 480
-    y = oy - 480
-    while y < H + 480:
-        f.rect(0, y, W, 1, GRID, alpha=0.050)
-        y += 480
+    x = ox - 96
+    while x < W + 96:
+        f.rect(x, 0, 1, H, GRID, alpha=0.085)
+        x += 96
+    y = oy - 96
+    while y < H + 96:
+        f.rect(0, y, W, 1, GRID, alpha=0.070)
+        y += 96
 
-    # 斜向扫光：14 s 一轮
-    sk = ((t % 14.0) / 14.0)
-    sx = -900 + sk * (W + 1800)
-    f.save()
-    f.translate(sx, H / 2)
-    f.rotate(-0.28)
-    f.grad_h(-260, -760, 520, [(0.0, "#FFFFFF", 0.0), (0.5, "#FFFFFF", 0.020),
-                               (1.0, "#FFFFFF", 0.0)])
-    f.rect(-260, -760, 520, 1520, None)
-    f.restore()
+    # 四周压边：暖褐，极淡，只用来把视线收进版面
+    f.grad_v(0, 0, 200, [(0.0, "#8C7A5E", 0.10), (1.0, "#8C7A5E", 0.0)])
+    f.rect(0, 0, W, 200, None)
+    f.grad_v(0, H - 240, 240, [(0.0, "#8C7A5E", 0.0), (1.0, "#8C7A5E", 0.13)])
+    f.rect(0, H - 240, W, 240, None)
+    f.grad_h(0, 0, 260, [(0.0, "#8C7A5E", 0.09), (1.0, "#8C7A5E", 0.0)])
+    f.rect(0, 0, 260, H, None)
+    f.grad_h(W - 260, 0, 260, [(0.0, "#8C7A5E", 0.0), (1.0, "#8C7A5E", 0.09)])
+    f.rect(W - 260, 0, 260, H, None)
 
-    f.grad_v(0, 0, 220, [(0.0, "#000000", 0.42), (1.0, "#000000", 0.0)])
-    f.rect(0, 0, W, 220, None)
-    f.grad_v(0, H - 260, 260, [(0.0, "#000000", 0.0), (1.0, "#000000", 0.50)])
-    f.rect(0, H - 260, W, 260, None)
-    f.grad_h(0, 0, 300, [(0.0, "#000000", 0.46), (1.0, "#000000", 0.0)])
-    f.rect(0, 0, 300, H, None)
-    f.grad_h(W - 300, 0, 300, [(0.0, "#000000", 0.0), (1.0, "#000000", 0.46)])
-    f.rect(W - 300, 0, 300, H, None)
-    # 细颗粒：压住暗部色带，也让大面积黑有质感
-    f.grain(GRAIN, 0.50)
+    f.grain(GRAIN, 0.55)
 
 
-def chapter(f, num, label, accent, t, x=112, y=64):
-    """Top-left chapter chip: a numbered tab + short title."""
+def chapter(f, num, label, accent, t, x=112, y=58):
+    """Running head: mono numeral, hairline, sans label."""
     a = clamp(t / 0.45)
     if a <= 0:
         return
     f.save()
     f.translate(0, (1 - ease_out(a)) * -14)
-    f.glow(x + 10, y + 15, 190, 46, accent, 0.10 * a)
-    f.rect(x, y, 3, 28, accent, alpha=0.95 * a)
-    f.text("%02d" % num, x + 18, y - 4, 22, accent, MONO, WEIGHT_BOLD,
-           alpha=a)
-    f.text(label, x + 62, y - 3, 26, INK2, alpha=a)
+    f.text("%02d" % num, x, y, 19, accent, MONO, WEIGHT_BOLD, alpha=a,
+           spacing=1.25)
+    f.text(label, x + 54, y - 3, 24, INK2, SANS, alpha=a * 0.95)
+    f.line(x, y + 34, x + 232, y + 34, INK3, 1.0, alpha=0.28 * a)
     f.restore()
 
 
-def header(f, text, sub=None, t=0.0, accent=INK, y=104, rule=None):
-    """Big scene headline; optional hairline rule that wipes in beneath it."""
+def header(f, text, sub=None, t=0.0, accent=INK, y=100, rule=None):
+    """Scene headline in serif; hairline rule wipes in beneath it."""
     a = ramp(t, 0.0, 0.55)
     if a <= 0:
         return
-    dy = (1 - ease_out(a)) * 12
-    f.text(text, 112, y + dy, 44, accent, SANS, WEIGHT_BOLD, alpha=a)
-    w = f.measure(text, 44, SANS, WEIGHT_BOLD)[0]
+    dy = (1 - ease_out(a)) * 14
+    size = 54
+    f.text(text, 112, y + dy, size, accent, SERIF, WEIGHT_BOLD, alpha=a)
+    w = f.measure(text, size, SERIF, WEIGHT_BOLD)[0]
     if sub:
-        f.text(sub, 112 + w + 26, y + dy + 12, 26, INK2, SANS,
+        f.text(sub, 112 + w + 30, y + dy + 18, 26, INK2, SANS,
                alpha=a * 0.9)
-        w += 26 + f.measure(sub, 26, SANS)[0]
+        w += 30 + f.measure(sub, 26, SANS)[0]
     if rule is not False:
         k = ramp(t, 0.18, 0.95)
-        col = rule or (accent if accent != INK else "#3A444C")
-        f.line(112, y + 64, 112 + (w + 90) * ease_out(k), y + 64, col, 1.6,
-               alpha=0.55 * a)
+        col = rule or INK
+        f.line(112, y + 78, 112 + (w + 120) * ease_out(k), y + 78, col, 1.4,
+               alpha=0.22 * a)
+        f.line(112, y + 78, 112 + 120 * ease_out(k), y + 78, ACCENT, 2.6,
+               alpha=0.85 * a)
 
 
 def footer(f, page, total, t):
-    f.text("%02d / %02d" % (page, total), W - 112, H - 62, 20, INK3, MONO,
-           align="right")
-    f.line(112, H - 78, W - 112, H - 78, GRID, 1.0, alpha=0.10)
-    f.line(112, H - 78, 112 + 180 * clamp(t / 0.8), H - 78, INK3, 1.4,
-           alpha=0.45)
+    f.line(112, H - 84, W - 112, H - 84, GRID, 1.0, alpha=0.28)
+    f.line(112, H - 84, 112 + 160 * clamp(t / 0.8), H - 84, ACCENT, 2.0,
+           alpha=0.65)
+    f.text("%02d" % page, W - 176, H - 66, 20, INK, MONO, WEIGHT_BOLD,
+           align="left", spacing=1.2)
+    f.text("/ %02d" % total, W - 148, H - 66, 20, INK3, MONO, align="left")
 
 
 def caption(f, text, t, y=None, size=26, alpha=1.0, color=None):
-    """Soft caption that fades up `t` seconds after its cue.
-
-    Sits above the subtitle baseline so it never fights the burned-in line.
-    """
+    """Caption line with a small ochre tick; no plate — the paper is the plate."""
     a = ramp(t, 0.0, 0.55) * alpha
     if a <= 0:
         return
-    yy = H - 168 if y is None else y
+    yy = H - 172 if y is None else y
     dy = (1 - ease_out(ramp(t, 0.0, 0.7))) * 8
     w = f.measure(text, size, SANS)[0]
-    f.rect(W / 2 - w / 2 - 22, yy - 8 + dy, w + 44, size + 20, BG2,
-           alpha=0.72 * a, r=8)
-    f.text(text, W / 2, yy + dy, size, color or INK2, SANS, align="center",
+    x0 = W / 2 - w / 2
+    f.rect(x0 - 26, yy + 6 + dy, 12, 2, ACCENT, alpha=0.85 * a)
+    f.text(text, x0, yy + dy, size, color or INK2, SANS, align="left",
            alpha=a)
 
 
 def panel(f, x, y, w, h, title=None, accent=None, t=1.0, alpha=0.92):
-    f.rect(x, y, w, h, PANEL, alpha=alpha, r=10)
-    f.rect_stroke(x, y, w, h, EDGE, lw=1.2, r=10)
+    f.rect(x + 3, y + 5, w, h, "#8C7A5E", alpha=0.055 * alpha, r=3)
+    f.rect(x, y, w, h, PANEL, alpha=alpha, r=3)
+    f.rect_stroke(x, y, w, h, EDGE, lw=1.1, r=3, alpha=0.95 * alpha)
     if title:
-        f.text(title, x + 20, y + 14, 22, accent or INK2, SANS, WEIGHT_MEDIUM)
+        f.text(title, x + 22, y + 16, 22, accent or INK2, SANS, WEIGHT_MEDIUM)
     return (x, y, w, h)
 
 
 def chip(f, x, y, text, color, size=22, padx=12, pady=7, alpha=1.0,
-         fill_alpha=0.14):
+         fill_alpha=0.10):
     w, h = f.measure(text, size)[0], size + pady * 2
-    f.rect(x, y, w + padx * 2, h + 4, color, alpha=fill_alpha, r=6)
-    f.rect_stroke(x, y, w + padx * 2, h + 4, color, lw=1.0, r=6, alpha=0.5 * alpha)
+    f.rect(x, y, w + padx * 2, h + 4, color, alpha=fill_alpha, r=3)
+    f.rect_stroke(x, y, w + padx * 2, h + 4, color, lw=1.0, r=3,
+                  alpha=0.55 * alpha)
     f.text(text, x + padx, y + pady - 1, size, color, SANS, alpha=alpha)
     return x + w + padx * 2 + 10
 
@@ -253,7 +235,7 @@ def helix(f, cx, cy, length, t, phase=0.0, rad=48, pitch=12.0, period=156.0,
         d_hi = math.cos(k * (x - cx) - ph)
         depth = (d_hi + 1) / 2.0                 # 0..1
         a = rung_alpha * (0.30 + 0.70 * depth) * alpha
-        f.line(x, y_hi, x, y_lo, mix("#2E3F4B", "#9FB6C6", depth),
+        f.line(x, y_hi, x, y_lo, mix("#B8A98F", "#6B5F4C", depth),
                1.2 + 1.8 * depth, alpha=a)
         if bases:
             b = bases[i % len(bases)]
@@ -264,15 +246,15 @@ def helix(f, cx, cy, length, t, phase=0.0, rad=48, pitch=12.0, period=156.0,
                 sz = int(19 * z * thickness)
                 if sz >= 12:
                     f.text(b, x - sz * 0.34, y_hi + (6 if y_hi < y_lo else -sz - 6),
-                           sz, BASE_C.get(b, "#8FA6B6"), MONO, WEIGHT_BOLD,
+                           sz, BASE_C.get(b, "#7A6E5C"), MONO, WEIGHT_BOLD,
                            alpha=a * 1.5)
                     f.text(comp, x - sz * 0.34,
                            y_lo + (6 if y_lo < y_hi else -sz - 6), sz,
-                           BASE_C.get(comp, "#8FA6B6"), MONO, WEIGHT_BOLD,
+                           BASE_C.get(comp, "#7A6E5C"), MONO, WEIGHT_BOLD,
                            alpha=a * 1.5)
 
     # backbones: wide soft underlay + crisp core
-    for sgn, col in ((1, "#7FB4D8"), (-1, "#5E8CA6")):
+    for sgn, col in ((1, "#2F5D7C"), (-1, "#5C7F97")):
         pts = []
         x = x0
         while x <= x1:
@@ -342,8 +324,8 @@ def base_row(f, x, y, seq, cw=26, size=20, alpha=1.0, hl=None, hl_c=None):
                           r=3, alpha=alpha)
 
 
-def bar(f, x, y, w, h, frac, color, track="#1A242C", r=4, alpha=1.0):
-    f.rect(x, y, w, h, track, r=r, alpha=alpha)
+def bar(f, x, y, w, h, frac, color, track=None, r=2, alpha=1.0):
+    f.rect(x, y, w, h, track or PANEL_HI, r=r, alpha=alpha)
     if frac > 0:
         f.rect(x, y, max(2, w * clamp(frac)), h, color, r=r, alpha=alpha)
 

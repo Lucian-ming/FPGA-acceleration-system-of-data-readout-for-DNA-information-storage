@@ -3,7 +3,7 @@
 
 四条横条共用一条时间轴，靠条长直接比较；正确性用 42 个格子，26 绿 / 16 橙，
 不靠颜色单独表达，格子下面同时写 PASS / SAFE_NOCONV。
-两次长稳分属不同版本，两张卡片分开标注、不合并计数。
+长稳只呈现最终版制品的一次记录，不并列、不累加历史版本。
 """
 import math
 
@@ -35,19 +35,19 @@ CELL_X0, CELL_Y0 = 132, 600
 N_PASS, N_SAFE = 26, 16
 
 # ---------------------------------------------------------------- 长稳
-LR_Y, LR_H, LR_W, LR_GAP = 752, 148, 824, 48
+LR_X, LR_Y, LR_W, LR_H = 112, 752, 1696, 148
 
 
 def perf(f, t, a, l0, l1):
     """四路 / 十六路 / K=2 / 最终配置，同一坐标轴比长短。"""
     if a <= 0:
         return
-    f.rect(PF_X, PF_Y, PF_W, PF_H, C.PANEL, alpha=0.90 * a, r=12)
-    f.rect_stroke(PF_X, PF_Y, PF_W, PF_H, C.EDGE, lw=1.2, r=12, alpha=0.9 * a)
-    f.text("整机端到端耗时", PF_X + 20, PF_Y + 16, 23, C.INK2, C.SANS,
-           WEIGHT_MEDIUM, alpha=a)
-    f.text("同一 6,750 B 载荷 · 越小越好", PF_X + PF_W - 20, PF_Y + 20, 19,
-           C.INK3, align="right", alpha=a * 0.9)
+    f.rect(PF_X, PF_Y, PF_W, PF_H, C.PANEL, alpha=0.92 * a, r=3)
+    f.rect_stroke(PF_X, PF_Y, PF_W, PF_H, C.EDGE, lw=1.0, r=3, alpha=0.85 * a)
+    f.text("板端结果段 t_result（中位数）", PF_X + 20, PF_Y + 16, 23, C.INK2,
+           C.SANS, WEIGHT_MEDIUM, alpha=a)
+    f.text("同一 6,624 B 载荷 · 不含上传与 LDPC · 越小越好", PF_X + PF_W - 20,
+           PF_Y + 20, 19, C.INK3, align="right", alpha=a * 0.9)
 
     rows = [
         ("四路并行", "P4", "26.5", 26.5, C.INK3, "1.00×", l0 + 0.15),
@@ -62,7 +62,7 @@ def perf(f, t, a, l0, l1):
         y = PF_ROWS[i]
         f.text(lab, PF_LAB_X, y - 2, 21, C.INK2, C.SANS, alpha=k * a)
         f.text(tag, PF_LAB_X, y + 26, 17, C.INK3, C.MONO, alpha=k * a * 0.85)
-        f.rect(PF_BAR_X, y, PF_BAR_MAX, PF_BH, "#14181C", alpha=0.85 * a, r=5)
+        f.rect(PF_BAR_X, y, PF_BAR_MAX, PF_BH, "#E6DCC9", alpha=0.85 * a, r=2)
         w = PF_BAR_MAX * (sec / PF_TMAX) * ease_out(k)
         f.rect(PF_BAR_X, y, max(3.0, w), PF_BH, col, alpha=0.30 * a, r=5)
         f.rect(PF_BAR_X, y, max(3.0, w), 3, col, alpha=0.85 * k * a, r=2)
@@ -84,8 +84,8 @@ def upload(f, t, a, l2):
     """上传段：4.27 s → 0.40 s。"""
     if a <= 0:
         return
-    f.rect(UP_X, UP_Y, UP_W, UP_H, C.PANEL, alpha=0.90 * a, r=12)
-    f.rect_stroke(UP_X, UP_Y, UP_W, UP_H, C.EDGE, lw=1.2, r=12, alpha=0.9 * a)
+    f.rect(UP_X, UP_Y, UP_W, UP_H, C.PANEL, alpha=0.92 * a, r=3)
+    f.rect_stroke(UP_X, UP_Y, UP_W, UP_H, C.EDGE, lw=1.0, r=3, alpha=0.85 * a)
     f.text("上传段", UP_X + 20, UP_Y + 16, 23, C.INK2, C.SANS, WEIGHT_MEDIUM,
            alpha=a)
     f.text("读入记录 → 板卡", UP_X + UP_W - 20, UP_Y + 20, 18, C.INK3,
@@ -99,7 +99,7 @@ def upload(f, t, a, l2):
             continue
         y = 268 + i * 58
         f.text(lab, UP_X + 20, y - 4, 20, C.INK2, C.SANS, alpha=k * a)
-        f.rect(UP_BAR_X, y, UP_BAR_MAX, PF_BH, "#14181C", alpha=0.85 * a, r=5)
+        f.rect(UP_BAR_X, y, UP_BAR_MAX, PF_BH, "#E6DCC9", alpha=0.85 * a, r=2)
         w = UP_BAR_MAX * (sec / UP_TMAX) * ease_out(k)
         f.rect(UP_BAR_X, y, max(3.0, w), PF_BH, col, alpha=0.30 * a, r=5)
         f.rect(UP_BAR_X, y, max(3.0, w), 3, col, alpha=0.85 * k * a, r=2)
@@ -120,8 +120,8 @@ def correctness(f, t, a, l3):
     """42 个用例：26 PASS，16 安全拒收，0 静默错误。"""
     if a <= 0:
         return
-    f.rect(OK_X, OK_Y, OK_W, OK_H, C.PANEL, alpha=0.90 * a, r=12)
-    f.rect_stroke(OK_X, OK_Y, OK_W, OK_H, C.EDGE, lw=1.2, r=12, alpha=0.9 * a)
+    f.rect(OK_X, OK_Y, OK_W, OK_H, C.PANEL, alpha=0.92 * a, r=3)
+    f.rect_stroke(OK_X, OK_Y, OK_W, OK_H, C.EDGE, lw=1.0, r=3, alpha=0.85 * a)
     f.text("正确性 · 42 个用例", OK_X + 20, OK_Y + 12, 23, C.INK2, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
     f.text("每个用例只按判据落结果，允许拒收，不允许错认", OK_X + OK_W - 20,
@@ -137,8 +137,8 @@ def correctness(f, t, a, l3):
         safe = i >= N_PASS
         col = C.WARNC if safe else C.OKC
         y = CELL_Y0 + (1 - ease_out(k)) * 6
-        f.rect(x, y, CELL_W, CELL_H, col, alpha=0.18 * k * a, r=4)
-        f.rect_stroke(x, y, CELL_W, CELL_H, col, lw=1.0, r=4, alpha=0.55 * k * a)
+        f.rect(x, y, CELL_W, CELL_H, col, alpha=0.20 * k * a, r=3)
+        f.rect_stroke(x, y, CELL_W, CELL_H, col, lw=1.0, r=3, alpha=0.60 * k * a)
         x += CELL_W + CELL_GAP
 
     ka = ramp(t, l3 + 0.9, l3 + 1.4)
@@ -157,28 +157,35 @@ def correctness(f, t, a, l3):
 
 
 def longrun(f, t, a, l4):
-    """两次长稳分属不同版本，分开标注。"""
+    """最终版制品的连续运行记录。只呈现当前版，不并列历史版本。"""
     if a <= 0:
         return
-    cards = [("v1.1 长稳", "8 小时", "1,736 轮", "0 失败", C.OKC, l4 + 0.2),
-             ("2026.1 长稳", "2 小时", "262 轮", "0 失败", C.S1C, l4 + 0.7)]
-    for i, (title, hrs, rounds, fails, col, t_on) in enumerate(cards):
-        k = ramp(t, t_on, t_on + 0.7)
-        if k <= 0:
+    k = ramp(t, l4 + 0.2, l4 + 0.9)
+    if k <= 0:
+        return
+    y = LR_Y + (1 - ease_out(k)) * 12
+    col = C.OKC
+    f.rect(LR_X, y, LR_W, LR_H, C.PANEL, alpha=0.92 * k * a, r=3)
+    f.rect_stroke(LR_X, y, LR_W, LR_H, col, lw=1.0, r=3, alpha=0.38 * k * a)
+    f.rect(LR_X, y, 4, LR_H, col, alpha=0.85 * k * a, r=2)
+    f.text("连续运行", LR_X + 26, y + 18, 22, col, C.SANS, WEIGHT_MEDIUM,
+           alpha=k * a)
+    f.text("当前制品 · 单次不中断", LR_X + 26, y + 50, 19, C.INK3,
+           alpha=k * a * 0.9)
+
+    cols = [("2 小时", "连续时长", 0.0), ("262 轮", "完整轮次", 0.15),
+            ("0", "失败次数", 0.30)]
+    x0 = LR_X + 380
+    step = 430
+    for i, (val, lab, dly) in enumerate(cols):
+        kk = ramp(t, l4 + 0.5 + dly, l4 + 1.1 + dly)
+        if kk <= 0:
             continue
-        x = 112 + i * (LR_W + LR_GAP)
-        y = LR_Y + (1 - ease_out(k)) * 12
-        f.rect(x, y, LR_W, LR_H, C.PANEL, alpha=0.90 * k * a, r=12)
-        f.rect_stroke(x, y, LR_W, LR_H, col, lw=1.2, r=12, alpha=0.40 * k * a)
-        f.rect(x, y, 4, LR_H, col, alpha=0.85 * k * a, r=2)
-        f.text(title, x + 26, y + 18, 22, col, C.SANS, WEIGHT_MEDIUM,
-               alpha=k * a)
-        f.text("分开记录 · 不合并计数", x + LR_W - 24, y + 22, 18, C.INK3,
-               align="right", alpha=k * a * 0.85)
-        C.value_label(f, x + 26, y + 58, hrs, "", 40, C.INK, alpha=k * a)
-        f.text("连续跑 · %s · %s" % (rounds, fails), x + 26, y + 112, 21,
-               C.INK2, alpha=k * a * 0.95)
-        C.chip(f, x + LR_W - 150, y + 62, fails, col, size=20, alpha=k * a)
+        cx = x0 + i * step
+        f.line(cx - 60, y + 26, cx - 60, y + LR_H - 26, C.EDGE, 1.0,
+               alpha=0.55 * kk * a)
+        C.value_label(f, cx, y + 34, val, "", 46, col, alpha=kk * a)
+        f.text(lab, cx, y + 100, 20, C.INK3, alpha=kk * a * 0.95)
 
 
 def draw(f, t, S):

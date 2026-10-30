@@ -61,7 +61,7 @@ YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Sub,Noto Sans CJK SC,34,&H00F2F4F6,&H00F2F4F6,&H90202020,&H70000000,0,0,0,0,100,100,0.6,0,1,2.2,1.6,2,180,180,54,1
+Style: Sub,Noto Sans CJK SC,34,&H00191F24,&H00191F24,&H4CE8F2F7,&H90000000,0,0,0,0,100,100,0.6,0,1,2.6,0.9,2,180,180,54,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

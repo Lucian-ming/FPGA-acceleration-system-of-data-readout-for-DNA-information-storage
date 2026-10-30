@@ -15,7 +15,7 @@ from scenes import common as C
 TITLE = "三级：5 比特转 4 比特"
 
 # ---------------------------------------------------------------- 顶部码流
-STRIP_X, STRIP_Y = 112, 196
+STRIP_X, STRIP_Y = 112, 218
 CELL_W, CELL_GAP = 16, 2
 GROUP_W = 5 * CELL_W + 4 * CELL_GAP          # 88
 GROUP_PITCH = 102
@@ -81,7 +81,7 @@ def strip(f, t, a, l0):
                    align="center", alpha=k * a)
         if is_sel and sel_k > 0:
             f.rect_stroke(gx - 7, STRIP_Y - 7, GROUP_W + 14, 40, C.S3C,
-                          lw=2.0, r=7, alpha=sel_k * a)
+                          lw=2.0, r=3, alpha=sel_k * a)
             f.text("放大", gx + GROUP_W / 2, STRIP_Y + 34, 17, C.S3C,
                    align="center", alpha=sel_k * a * 0.95)
 
@@ -90,8 +90,8 @@ def xgate(f, cy, a, hot=0.0):
     """异或门：方框 + ⊕，左进两路、右出一路。"""
     x = GATE_CX - GATE_W / 2
     y = cy - GATE_W / 2
-    f.rect(x, y, GATE_W, GATE_W, C.PANEL_HI, alpha=0.95 * a, r=8)
-    f.rect_stroke(x, y, GATE_W, GATE_W, C.S3C, lw=1.5 + 1.2 * hot, r=8,
+    f.rect(x, y, GATE_W, GATE_W, C.PANEL_HI, alpha=0.95 * a, r=3)
+    f.rect_stroke(x, y, GATE_W, GATE_W, C.S3C, lw=1.5 + 1.2 * hot, r=3,
                   alpha=(0.42 + 0.58 * hot) * a)
     f.text("⊕", GATE_CX, cy, 26, C.S3C, C.MONO, WEIGHT_BOLD,
            align="center", anchor_mid=True, alpha=a)
@@ -101,8 +101,8 @@ def detail(f, t, a, l1, l2):
     """取一组放大：b0 扇出 + 四个数据位 + 四个异或门 + 输出。"""
     if a <= 0:
         return
-    f.rect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, C.PANEL, alpha=0.9 * a, r=10)
-    f.rect_stroke(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, C.EDGE, lw=1.2, r=10)
+    f.rect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, C.PANEL, alpha=0.9 * a, r=3)
+    f.rect_stroke(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, C.EDGE, lw=1.2, r=3)
     f.text("取出码字 %s 放大" % CODEBOOK[SEL], PANEL_X + 22, PANEL_Y + 16, 22,
            C.S3C, C.MONO, WEIGHT_MEDIUM, alpha=a)
     f.text("b0 = %s · 数据位 %s" % (CODEBOOK[SEL][0], "".join(DATA_BITS)),
@@ -113,8 +113,8 @@ def detail(f, t, a, l1, l2):
     flash = pulse(t, l2 + 2.6, 0.8) * (1.0 if t >= l2 + 2.6 else 0.0)
 
     # ---- b0 方框
-    f.rect(B0_X, B0_Y, B0_W, B0_H, C.S3C, alpha=(0.14 + 0.22 * flash) * a, r=8)
-    f.rect_stroke(B0_X, B0_Y, B0_W, B0_H, C.S3C, lw=1.8 + 1.4 * flash, r=8,
+    f.rect(B0_X, B0_Y, B0_W, B0_H, C.S3C, alpha=(0.14 + 0.22 * flash) * a, r=3)
+    f.rect_stroke(B0_X, B0_Y, B0_W, B0_H, C.S3C, lw=1.8 + 1.4 * flash, r=3,
                   alpha=a)
     f.text("%d" % b0v, B0_X + B0_W / 2, B0_Y + 8, 34, C.S3C, C.MONO,
            WEIGHT_BOLD, align="center", alpha=a)
@@ -189,8 +189,8 @@ def detail(f, t, a, l1, l2):
 def case_panel(f, x, y, w, h, a, b0v, accent, hot, note):
     if a <= 0:
         return
-    f.rect(x, y, w, h, C.PANEL, alpha=(0.86 + 0.10 * hot) * a, r=10)
-    f.rect_stroke(x, y, w, h, accent, lw=1.4 + 1.4 * hot, r=10,
+    f.rect(x, y, w, h, C.PANEL, alpha=(0.86 + 0.10 * hot) * a, r=3)
+    f.rect_stroke(x, y, w, h, accent, lw=1.4 + 1.4 * hot, r=3,
                   alpha=(0.30 + 0.70 * hot) * a)
     f.text("b0 = %d" % b0v, x + 24, y + 18, 26, accent, C.MONO,
            WEIGHT_BOLD, alpha=a * (0.55 + 0.45 * hot))
@@ -326,7 +326,9 @@ def draw(f, t, S):
 
     a_c = ramp(t, l0 + 1.0, l0 + 1.6) * (1.0 - ramp(t, l3 - 0.3, l3 + 0.2))
     band_codebook(f, t, a_c, l0)
-    a_s = ramp(t, l3 - 0.2, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.3, l4 + 0.3))
+    # 两块共用同一批坐标：前一块必须在后一块入场前完全退干净，
+    # 否则两个小标题会叠在同一行 y 上（"分之四" 粘到 "硬件节奏" 后面）
+    a_s = ramp(t, l3 - 0.2, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.65, l4 - 0.15))
     band_size(f, t, a_s, l3)
-    a_e = ramp(t, l4 - 0.2, l4 + 0.5)
+    a_e = ramp(t, l4 - 0.10, l4 + 0.45)
     band_beats(f, t, a_e, l4)
