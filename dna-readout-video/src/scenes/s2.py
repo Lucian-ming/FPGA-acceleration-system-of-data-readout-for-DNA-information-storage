@@ -32,7 +32,7 @@ def draw(f, t, S):
     C.footer(f, 2, 9, t)
     C.header(f, "PL 四级流水，PS 水印，PC 验收", t=t)
 
-    l0, l1, l2 = C.ls(S, 0), C.ls(S, 1), C.ls(S, 2)
+    l0, l1 = C.ls(S, 0), C.ls(S, 1)
     n = len(STAGES)
     total_w = n * BW + (n - 1) * GAP
     xs = [C.W / 2 - total_w / 2 + i * (BW + GAP) for i in range(n)]
@@ -82,21 +82,21 @@ def draw(f, t, S):
         f.text(LINKS[i], (xa + xb) / 2, Y + BH + 26, 17, C.INK2, C.SANS,
                align="center", alpha=k * 0.95, spacing=1.3)
 
-    # ---- 第二句：输入规模与数据量收窄
-    kin = ramp(t, l1 + 0.4, l1 + 1.2)
+    # ---- 第二句前半：输入规模
+    kin = ramp(t, l1 + 0.0, l1 + 0.7)
     if kin > 0:
         f.text("一条任务：", 112, 236, 24, C.INK3, alpha=kin)
         C.value_label(f, 250, 222, "103,616", "", 34, C.INK, alpha=kin)
         f.text("条读出记录", 250, 274, 20, C.INK3, alpha=kin)
         f.text("= 51,781 × 2（正向/反向各一遍）+ 54 条对齐填充",
                500, 236, 20, C.INK3, alpha=kin * 0.9)
-    ksz = ramp(t, l1 + 2.2, l1 + 3.4)
+    ksz = ramp(t, l1 + 1.5, l1 + 2.4)
     if ksz > 0:
         f.text("数据量沿链路收窄", C.W - 112, 236, 22, C.INK3, align="right",
                alpha=ksz)
 
-    # ---- 第三句：8,100 B → 54,000 bit → 载荷
-    kout = ramp(t, l2 + 0.6, l2 + 1.5)
+    # ---- 第二句后半：8,100 B → 54,000 bit → 载荷
+    kout = ramp(t, l1 + 1.9, l1 + 2.7)
     if kout > 0:
         y = 660
         f.rect(112, y, C.W - 224, 150, C.PANEL, alpha=0.9 * kout, r=10)
@@ -107,7 +107,7 @@ def draw(f, t, S):
                  ("54,000", "bit", "解交织后取末段为信息位"),
                  ("≤ 6,750", "B", "按 input_bytes 截断后的载荷上限")]
         for i, (v, u, lab) in enumerate(items):
-            kk = ramp(t, l2 + 0.8 + 0.35 * i, l2 + 1.2 + 0.35 * i)
+            kk = ramp(t, l1 + 2.1 + 0.30 * i, l1 + 2.5 + 0.30 * i)
             if kk <= 0:
                 continue
             x = 200 + i * 580
@@ -119,7 +119,7 @@ def draw(f, t, S):
                        alpha=kk * 0.8)
 
     # ---- 收束：一句话主轴
-    kax = ramp(t, l2 + 3.4, l2 + 4.2)
+    kax = ramp(t, l1 + 3.6, l1 + 4.3)
     if kax > 0:
         f.text("定位 → 投票 → 解稀 → 纠错 → 验收", C.W / 2, 852, 30, C.INK2,
                C.SANS, align="center", alpha=kax * 0.9, spacing=1.1)

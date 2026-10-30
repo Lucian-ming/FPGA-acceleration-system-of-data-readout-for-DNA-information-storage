@@ -257,19 +257,19 @@ def band_size(f, t, a, l3):
     f.text("数据量：压到原来的五分之四", 150, BAND_Y0 + 2, 22, C.INK2,
            C.SANS, WEIGHT_MEDIUM, alpha=a)
 
-    k = ramp(t, l3 + 0.3, l3 + 1.1)
+    k = ramp(t, l3 + 0.2, l3 + 0.85)
     C.bar(f, 400, BAND_Y0 + 50, 760 * k, 24, 1.0, C.INK2, alpha=0.55 * a)
     f.text("输入", 150, BAND_Y0 + 50, 20, C.INK3, alpha=a)
     f.text("81,000 bit", 400 + 772 * k + 4, BAND_Y0 + 50, 20, C.INK2,
            C.MONO, alpha=a)
 
-    k2 = ramp(t, l3 + 1.2, l3 + 2.0)
+    k2 = ramp(t, l3 + 0.95, l3 + 1.65)
     C.bar(f, 400, BAND_Y0 + 108, 608 * k2, 24, 1.0, C.S3C, alpha=0.9 * a)
     f.text("输出", 150, BAND_Y0 + 108, 20, C.INK3, alpha=a)
     f.text("64,800 bit", 400 + 620 * k2 + 4, BAND_Y0 + 108, 20, C.S3C,
            C.MONO, alpha=a)
 
-    k3 = ramp(t, l3 + 2.2, l3 + 2.9)
+    k3 = ramp(t, l3 + 1.75, l3 + 2.35)
     f.text("81,000 × 4/5 = 64,800 bit", 1360, BAND_Y0 + 44, 20, C.INK2,
            C.MONO, alpha=k3 * a * 0.95)
     f.text("64,800 ÷ 8 = ", 1360, BAND_Y0 + 84, 24, C.INK2, C.MONO,
@@ -312,33 +312,32 @@ def draw(f, t, S):
     C.footer(f, 5, 9, t)
     C.header(f, "每组 5 bit 取 4 bit，首位当翻转标志", t=t)
 
-    l0, l1, l2, l3, l4 = [C.ls(S, i) for i in range(5)]
+    l0, l1, l2 = [C.ls(S, i) for i in range(3)]
 
-    a_strip = ramp(t, l0 + 0.1, l0 + 1.0) * (1.0 - 0.5 * ramp(t, l1 - 0.3, l1 + 0.6))
+    a_strip = ramp(t, l0 + 0.1, l0 + 0.8) * (1.0 - 0.5 * ramp(t, l1 - 0.2,
+                                                              l1 + 0.4))
     strip(f, t, a_strip, l0)
 
-    a_det = ramp(t, l1 - 0.3, l1 + 0.5)
+    a_det = ramp(t, l1 - 0.2, l1 + 0.4)
     detail(f, t, a_det, l1, l2)
 
-    # 两个对照在讲 b0 取值那句时一起登场，随后按叙述顺序依次点亮
-    a_case = ramp(t, l1 + 1.6, l1 + 2.3)
-    hot_a = ramp(t, l2 + 0.2, l2 + 0.8) * (1.0 - ramp(t, l2 + 2.5, l2 + 2.9))
-    hot_b = ramp(t, l2 + 2.7, l2 + 3.2)
+    # 两个对照在讲五位合法模式那句时一起登场，随后依次点亮
+    a_case = ramp(t, l1 + 1.1, l1 + 1.7)
+    hot_a = ramp(t, l1 + 1.9, l1 + 2.4) * (1.0 - ramp(t, l1 + 3.0, l1 + 3.4))
+    hot_b = ramp(t, l1 + 3.3, l1 + 3.7)
     case_panel(f, CASE_A_X, CASE_Y, CASE_W, CASE_H, a_case, 0, C.OKC, hot_a,
                "原样输出")
     case_panel(f, CASE_B_X, CASE_Y, CASE_W, CASE_H, a_case, 1, C.S3C, hot_b,
                "四位全部取反")
 
-    a_c = ramp(t, l0 + 1.0, l0 + 1.6) * (1.0 - ramp(t, l3 - 0.30, l3 - 0.05))
+    a_c = ramp(t, l0 + 0.8, l0 + 1.4) * (1.0 - ramp(t, l1 - 0.30, l1 - 0.05))
     # 底部两块在同一 y 上放小标题（BAND_Y0 + 2）。只做交叉淡出时，退场的
     # 「码本…」会在 0.2~0.4 的透明度上和新标题「数据量…」叠在同一行，
     # 所以换块之前把 748..952 抹回纸底。
-    C.paper_patch(f, t, 0, 748, C.W, 204, ramp(t, l3 - 0.30, l3 - 0.05))
+    C.paper_patch(f, t, 0, 748, C.W, 204, ramp(t, l1 - 0.30, l1 - 0.05))
     band_codebook(f, t, a_c, l0)
     # 两块共用同一批坐标：前一块必须在后一块入场前完全退干净，
-    # 否则两个小标题会叠在同一行 y 上（"分之四" 粘到 "硬件节奏" 后面）
-    a_s = ramp(t, l3 - 0.05, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.65, l4 - 0.40))
-    band_size(f, t, a_s, l3)
-    C.paper_patch(f, t, 0, 748, C.W, 204, ramp(t, l4 - 0.55, l4 - 0.30))
-    a_e = ramp(t, l4 - 0.10, l4 + 0.45)
-    band_beats(f, t, a_e, l4)
+    # 否则两个小标题会叠在同一行 y 上。
+    # 全片压缩后底部只剩「码本」与「数据量」两块，拍数块并入片尾的性能段。
+    a_s = ramp(t, l2 - 0.05, l2 + 0.45)
+    band_size(f, t, a_s, l2)

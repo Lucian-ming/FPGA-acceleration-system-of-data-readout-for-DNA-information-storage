@@ -205,15 +205,17 @@ def draw(f, t, S):
     C.footer(f, 7, 9, t)
     C.header(f, "两道硬判据，都过了才交出文件", t=t)
 
-    l0, l1, l2, l3, l4 = [C.ls(S, i) for i in range(5)]
+    l0, l1 = C.ls(S, 0), C.ls(S, 1)
 
-    k = ramp(t, l0 + 0.1, l0 + 0.8)
-    gate_a(f, t, k, l1, l2)
-    gate_b(f, t, k, l2, l3)
+    # 只剩两句：第一句两扇判据并列亮起，第二句取证与结论一起收。
+    k = ramp(t, l0 + 0.1, l0 + 0.7)
+    t_b = l0 + 1.55          # 第二扇门在「摘要覆盖全文件」那半句亮
+    gate_a(f, t, k, l0, t_b)
+    gate_b(f, t, k, t_b, l1)
 
-    a_p = ramp(t, l3 - 0.35, l3 + 0.35)
-    path_chain(f, t, a_p, l3)
+    a_p = ramp(t, l1 - 0.35, l1 + 0.30)
+    path_chain(f, t, a_p, l1)
 
-    a_f = ramp(t, l4 - 0.3, l4 + 0.4)
-    forensics(f, t, a_f, l4)
-    verdict(f, t, ramp(t, l4 + 1.4, l4 + 2.2), l4)
+    a_f = ramp(t, l1 + 0.55, l1 + 1.15)
+    forensics(f, t, a_f, l1)
+    verdict(f, t, ramp(t, l1 + 1.5, l1 + 2.1), l1)

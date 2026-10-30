@@ -39,7 +39,9 @@ AXB_X, AXB_W = 960, 58
 AXB_Y0, AXB_Y1 = 330, 700
 SAT_MIN, SAT_MAX = -512, 511
 
-T_GAUGE_NOTE = 92.0
+# 「为什么是差分」这段说明跟在数轴出现之后，必须相对第二句算，
+# 不能写成绝对秒——早期版本这里是 92.0，缩片后它落进了第六场。
+T_GAUGE_NOTE_DT = 1.0
 
 # 底部条带共用区间
 BAND_Y0, BAND_Y1 = 760, 940
@@ -47,6 +49,96 @@ BAND_Y0, BAND_Y1 = 760, 940
 
 def axb_y(v):
     return AXB_Y0 + (AXB_Y1 - AXB_Y0) * (SAT_MAX - v) / float(SAT_MAX - SAT_MIN)
+
+
+def intro_fold(f, t, a, l0):
+    """第一句的垫场：十万条记录按位置合到八万一千位。
+
+    缩片后第一句单独占 3.6 s，后面几块都在第二句才进场，
+    这里补一张「多对一」的图，别让整屏只剩标题。
+    """
+    if a <= 0:
+        return
+    f.text("一条任务 = 103,616 条读出记录", 150, 214, 21, C.INK2, alpha=a)
+    f.text("每条记录自带 16 bit 位置", 1770, 214, 18, C.INK3, align="right",
+           alpha=a * 0.85)
+
+    # 左：记录堆
+    nrec = 9
+    for i in range(nrec):
+        k = ramp(t, l0 + 0.20 + 0.06 * i, l0 + 0.40 + 0.06 * i)
+        if k <= 0:
+            continue
+        y = 316 + i * 38
+        f.rect(150, y, 430, 30, C.PANEL_HI, alpha=0.95 * k * a, r=4)
+        f.rect_stroke(150, y, 430, 30, C.EDGE, 1.0, r=4, alpha=0.7 * k * a)
+        f.text("读出 %02d" % (i + 1), 162, y + 6, 16, C.INK3, C.MONO,
+               alpha=k * a * 0.85)
+        for j in range(10):
+            f.rect(246 + j * 15, y + 9, 10, 12, C.S2C, alpha=0.35 * k * a, r=2)
+        f.text("300 bit · 位置 p", 412, y + 6, 15, C.INK3,
+               alpha=k * a * 0.8)
+    kk = ramp(t, l0 + 0.9, l0 + 1.2)
+    if kk > 0:
+        f.text("…… 共 103,616 条", 150, 316 + nrec * 38 + 8, 18, C.INK3,
+               alpha=kk * a * 0.9)
+
+    # 中：按位置收拢。每条记录拉一根曲线到八万一千位条上的同一小段，
+    # 曲线上跑小方块——「多对一」要靠连线本身读出来，光有漂移的点看不明白。
+    y_bar = 322
+    PERIOD = 1.30
+    for i in range(nrec):
+        kline = ramp(t, l0 + 0.55 + 0.05 * i, l0 + 0.85 + 0.05 * i)
+        if kline <= 0:
+            continue
+        y0 = 331 + i * 38
+        y1 = y_bar + 4 + (i % 5) * 4.4
+        pts = []
+        for s in range(25):
+            q = s / 24.0
+            # 三次贝塞尔：横向先直后收，纵向从行高平滑落到条内
+            x = (1 - q) ** 3 * 596 + 3 * (1 - q) ** 2 * q * 790 \
+                + 3 * (1 - q) * q * q * 930 + q ** 3 * 1076
+            y = (1 - q) ** 3 * y0 + 3 * (1 - q) ** 2 * q * y0 \
+                + 3 * (1 - q) * q * q * y1 + q ** 3 * y1
+            pts.append((x, y))
+        f.polyline(pts, C.S2C, 1.2, alpha=0.20 * kline * a)
+
+    for j in range(nrec * 3):
+        row = j % nrec
+        y0 = 331 + row * 38
+        y1 = y_bar + 4 + (row % 5) * 4.4
+        u = ((t - (l0 + 0.70) - PERIOD * (j / float(nrec * 3)))
+             % PERIOD) / PERIOD
+        if t < l0 + 0.70 or u >= 0.999:
+            continue
+        e = ease_in_out(u)
+        x = (1 - e) ** 3 * 596 + 3 * (1 - e) ** 2 * e * 790 \
+            + 3 * (1 - e) * e * e * 930 + e ** 3 * 1076
+        y = (1 - e) ** 3 * y0 + 3 * (1 - e) ** 2 * e * y0 \
+            + 3 * (1 - e) * e * e * y1 + e ** 3 * y1
+        sz = C.lerp(10, 6, e)
+        f.rect(x - sz / 2, y - sz / 2, sz, sz, C.S2C, alpha=0.55 * a, r=1.5)
+
+    kc = ramp(t, l0 + 1.05, l0 + 1.45)
+    if kc > 0:
+        f.text("按 16 bit 位置对齐，同号计票、异号相消", 836, 316 + nrec * 38 + 30,
+               19, C.INK3, C.SANS, align="center", alpha=kc * a * 0.95)
+
+    # 右：八万一千位
+    kr = ramp(t, l0 + 1.25, l0 + 1.85)
+    if kr > 0:
+        f.text("81,000 个位置", 1080, 286, 22, C.INK2, alpha=kr * a)
+        f.rect(1080, 320, 690, 26, "#DDD2BE", r=2, alpha=kr * a)
+        x = 1080
+        while x < 1770:
+            f.line(x, 323, x, 343, C.S2C, 1.0, alpha=0.30 * kr * a)
+            x += 5.0
+        f.rect_stroke(1080, 320, 690, 26, C.S2C, 1.2, r=2, alpha=0.55 * kr * a)
+        f.text("两层各 40,500：高、低位平面", 1080, 356, 17, C.INK3,
+               alpha=kr * a * 0.9)
+        f.text("一位一个 10 bit 有符号累加器", 1770, 356, 17, C.INK3,
+               align="right", alpha=kr * a * 0.9)
 
 
 def layer_bars(f, a):
@@ -109,7 +201,7 @@ def plane_detail(f, a):
            alpha=a * 0.9)
 
 
-def gauge(f, t, a, value, show_sat=False):
+def gauge(f, t, a, value, note_t, show_sat=False):
     if a <= 0:
         return
     f.rect(AXB_X, AXB_Y0, AXB_W, AXB_Y1 - AXB_Y0, "#EDE5D6", r=3, alpha=a)
@@ -147,7 +239,7 @@ def gauge(f, t, a, value, show_sat=False):
             f.rect(AXB_X + 4, y - (6 if v > 0 else 0), AXB_W - 8, 6, C.WARNC,
                    alpha=0.5 * a, r=2)
     # 右侧说明：为什么用差分
-    kn = ramp(t, T_GAUGE_NOTE, T_GAUGE_NOTE + 0.8)
+    kn = ramp(t, note_t, note_t + 0.8)
     if kn > 0:
         f.text("为什么是差分", 1200, AXB_Y0 + 4, 22, C.INK2, C.SANS,
                WEIGHT_MEDIUM, alpha=kn)
@@ -333,39 +425,44 @@ def draw(f, t, S):
     C.footer(f, 4, 9, t)
     C.header(f, "同一位的多条读出，加在一起投票", t=t)
 
-    l0, l1, l2, l3, l4, l5, l6 = [C.ls(S, i) for i in range(7)]
+    l0, l1, l2, l3, l4 = [C.ls(S, i) for i in range(5)]
+
+    # 第一句：垫场图，第二句进场前连纸一起抹掉，免得和层带叠在一起
+    a_in = ramp(t, l0 + 0.05, l0 + 0.45) * (1 - ramp(t, l1 - 1.00, l1 - 0.60))
+    intro_fold(f, t, a_in, l0)
+    C.paper_patch(f, t, 0, 196, C.W, 430, ramp(t, l1 - 1.00, l1 - 0.60))
 
     layer_bars(f, ramp(t, l1 - 0.2, l1 + 0.7))
     plane_detail(f, ramp(t, l1 + 0.6, l1 + 1.3)
                  * (1 - ramp(t, l2 - 1.0, l2 - 0.4)))
 
-    a_grid = ramp(t, l2 - 0.1, l2 + 0.6)
-    row_a = t - (l2 + 0.6)
-    total_a = ramp(t, l2 + 3.4, l2 + 4.0)
-    dec_a = ramp(t, l4 - 0.2, l4 + 0.5)
+    a_grid = ramp(t, l1 - 0.1, l1 + 0.5)
+    row_a = t - (l1 + 0.5)
+    total_a = ramp(t, l1 + 2.6, l1 + 3.1)
+    dec_a = ramp(t, l3 - 0.2, l3 + 0.4)
     vote_grid(f, a_grid, row_a, total_a, dec_a)
 
     # 右侧数轴：随 l2 里的演示值变化
-    ga = ramp(t, l2 + 0.5, l2 + 1.2)
+    ga = ramp(t, l2 + 0.25, l2 + 0.9)
     val = 0.0
-    if t > l2 + 1.0:
-        seg = clamp((t - (l2 + 1.0)) / max(0.5, C.ld(S, 2) - 1.2))
+    if t > l2 + 0.8:
+        seg = clamp((t - (l2 + 0.8)) / max(0.5, C.ld(S, 2) - 1.0))
         val = -600 + 1200 * seg          # 先撞下界再回到上界，展示饱和
         val = max(SAT_MIN, min(SAT_MAX, val))
-    gauge(f, t, ga, val, show_sat=ga > 0.5)
+    gauge(f, t, ga, val, l2 + T_GAUGE_NOTE_DT, show_sat=ga > 0.5)
 
     # 底部条带逐段切换
     # 换段时先把 760..952 抹回纸，再画新段：两段都是在同一 y 上放小标题，
     # 只靠交叉淡出的话，退的那一段会在 0.2~0.4 之间和新标题叠在同一行。
+    # 只剩三句的位置：判决、门限、水印。批次的「整条任务不清零」并到判决段，
+    # 门限一句拆成「门限 + 清零」两半，水印一句独占末段。
+    t_s = l3 + 2.15
     C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l3 - 0.30, l3 - 0.05))
-    a_b = ramp(t, l3 - 0.2, l3 + 0.5) * (1 - ramp(t, l4 - 0.30, l4 - 0.05))
-    band_batches(f, t, a_b, l3)
+    a_d = ramp(t, l3 - 0.2, l3 + 0.35) * (1 - ramp(t, t_s - 0.30, t_s - 0.05))
+    band_decision(f, t, a_d, l3)
+    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, t_s - 0.30, t_s - 0.05))
+    a_s = ramp(t, t_s - 0.15, t_s + 0.35) * (1 - ramp(t, l4 - 0.30, l4 - 0.05))
+    band_score(f, t, a_s, t_s)
     C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l4 - 0.30, l4 - 0.05))
-    a_d = ramp(t, l4 - 0.2, l4 + 0.4) * (1 - ramp(t, l5 - 0.30, l5 - 0.05))
-    band_decision(f, t, a_d, l4)
-    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l5 - 0.30, l5 - 0.05))
-    a_s = ramp(t, l5 - 0.2, l5 + 0.5) * (1 - ramp(t, l6 - 0.30, l6 - 0.05))
-    band_score(f, t, a_s, l5)
-    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l6 - 0.30, l6 - 0.05))
-    a_w = ramp(t, l6 - 0.2, l6 + 0.5)
-    band_wm(f, t, a_w, l6)
+    a_w = ramp(t, l4 - 0.2, l4 + 0.45)
+    band_wm(f, t, a_w, l4)

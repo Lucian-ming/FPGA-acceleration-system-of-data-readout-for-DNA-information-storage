@@ -194,16 +194,18 @@ def draw(f, t, S):
     C.footer(f, 8, 9, t)
     C.header(f, "实测：从 26.5 秒到约 5.1 秒", t=t)
 
-    l0, l1, l2, l3, l4 = [C.ls(S, i) for i in range(5)]
+    l0, l1, l2 = [C.ls(S, i) for i in range(3)]
 
-    a_p = ramp(t, l0, l0 + 0.7)
+    # 第一句给计时口径，四行时延跨 l0→l1；第二句前半上传、后半写第二条时延；
+    # 第三句同时给正确性与长稳（两块纵向分居，不抢位）。
+    a_p = ramp(t, l0, l0 + 0.6)
     perf(f, t, a_p, l0, l1)
 
-    a_u = ramp(t, l2 - 0.2, l2 + 0.5)
-    upload(f, t, a_u, l2)
+    a_u = ramp(t, l1 + 2.0, l1 + 2.5)
+    upload(f, t, a_u, l1 + 1.9)
 
-    a_c = ramp(t, l3 - 0.2, l3 + 0.5)
-    correctness(f, t, a_c, l3)
+    a_c = ramp(t, l2 - 0.2, l2 + 0.4)
+    correctness(f, t, a_c, l2)
 
-    a_l = ramp(t, l4 - 0.25, l4 + 0.4)
-    longrun(f, t, a_l, l4)
+    a_l = ramp(t, l2 + 2.1, l2 + 2.6)
+    longrun(f, t, a_l, l2 + 2.2)

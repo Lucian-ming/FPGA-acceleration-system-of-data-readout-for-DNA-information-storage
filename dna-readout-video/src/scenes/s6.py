@@ -365,43 +365,46 @@ def draw(f, t, S):
     C.footer(f, 6, 9, t)
     C.header(f, "硬判决 Flooding Min-Sum，收敛才交结果", t=t)
 
-    l0, l1, l2, l3, l4, l5, l6, l7 = [C.ls(S, i) for i in range(8)]
+    l0, l1, l2, l3 = [C.ls(S, i) for i in range(4)]
 
-    a_cw = ramp(t, l0 + 0.1, l0 + 0.9)
+    a_cw = ramp(t, l0 + 0.1, l0 + 0.85)
     codeword(f, t, a_cw, l0, l1)
 
     # 比例条要在两块面板起来之前退净：面板淡入到 0.5 时还是半透明，
     # 比例条若仍停在 0.15，条块与图例会从面板底下透出来。
-    a_rs = (ramp(t, l0 + 0.5, l0 + 1.3)
-            * (1.0 - ramp(t, l2 - 0.85, l2 - 0.50)))
+    a_rs = (ramp(t, l0 + 0.5, l0 + 1.2)
+            * (1.0 - ramp(t, l1 - 0.80, l1 - 0.45)))
     ratio_strip(f, t, a_rs, l0, l1)
-    C.paper_patch(f, t, 0, 356, C.W, 200, ramp(t, l2 - 0.85, l2 - 0.50))
+    C.paper_patch(f, t, 0, 356, C.W, 200, ramp(t, l1 - 0.80, l1 - 0.45))
 
-    a_tg = ramp(t, l2 - 0.4, l2 + 0.4) * (1.0 - 0.4 * ramp(t, l4, l4 + 0.8))
-    tanner(f, t, a_tg, l2)
-    a_sp = ramp(t, l2 + 0.3, l2 + 1.1)
-    syndrome(f, t, a_sp, l2, l4, l5)
+    a_tg = ramp(t, l1 - 0.35, l1 + 0.40) * (1.0 - 0.4 * ramp(t, l3, l3 + 0.8))
+    tanner(f, t, a_tg, l1)
+    a_sp = ramp(t, l1 + 0.30, l1 + 1.05)
+    syndrome(f, t, a_sp, l1, l2, l2)
 
     # 底部条带：四段都在 BAND_Y0+2 放小标题，换段前先把 692..952 抹回纸。
     # 只做交叉淡出时，退的那一段会在 0.2~0.4 的透明度上与新标题同 y 叠印
     # （「参数：64,800 / 54,000 / 10,800」曾压到「一轮里发生什么」底下）。
-    a_p = ramp(t, l0 + 0.3, l0 + 1.0) * (1.0 - ramp(t, l2 - 0.35, l2 - 0.10))
-    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l2 - 0.35, l2 - 0.10))
+    a_p = ramp(t, l0 + 0.3, l0 + 0.95) * (1.0 - ramp(t, l1 - 0.35, l1 - 0.10))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l1 - 0.35, l1 - 0.10))
     band_params(f, t, a_p, l0)
-    a_r = ramp(t, l2 - 0.10, l2 + 0.5) * (1.0 - ramp(t, l3 - 0.45, l3 - 0.20))
+    a_r = ramp(t, l1 - 0.10, l1 + 0.45) * (1.0 - ramp(t, l2 - 0.45, l2 - 0.20))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l2 - 0.45, l2 - 0.20))
+    band_round(f, t, a_r, l1)
+    a_h = ramp(t, l2 - 0.20, l2 + 0.45) * (1.0 - ramp(t, l3 - 0.45, l3 - 0.20))
     C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l3 - 0.45, l3 - 0.20))
-    band_round(f, t, a_r, l2)
-    a_h = ramp(t, l3 - 0.20, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.45, l4 - 0.20))
-    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l4 - 0.45, l4 - 0.20))
-    band_hard(f, t, a_h, l3)
-    a_g = ramp(t, l5 - 0.20, l5 + 0.5) * (1.0 - ramp(t, l6 - 0.45, l6 - 0.20))
-    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l6 - 0.45, l6 - 0.20))
-    band_gate(f, t, a_g, l5)
-    a_n = ramp(t, l6 - 0.20, l6 + 0.5)
-    band_noconv(f, t, a_n, l6)
+    band_hard(f, t, a_h, l2)
+    # 末段两句并做一段：先给判据，收束叠层随即压上来
+    t_g = l3 + 1.55
+    a_g = ramp(t, l3 - 0.20, l3 + 0.45) * (1.0 - ramp(t, t_g - 0.45,
+                                                      t_g - 0.20))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, t_g - 0.45, t_g - 0.20))
+    band_gate(f, t, a_g, l3)
+    a_n = ramp(t, t_g - 0.20, t_g + 0.45)
+    band_noconv(f, t, a_n, t_g)
 
     # 收束：未收敛即拒收
-    k = ramp(t, l7 + 0.2, l7 + 1.0)
+    k = ramp(t, t_g + 0.85, t_g + 1.55)
     if k > 0:
         f.rect(0, 0, C.W, C.H, C.BG, alpha=0.72 * k)
         # 面板要接近不透明：只留 0.72 的底噪会把 Tanner 图与校验子条柱透到标题背后

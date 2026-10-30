@@ -106,14 +106,17 @@ def strand(f, x, y, seq, cw, h, alpha=1.0, size=15, letters_below=False,
                align="center", alpha=ba)
 
 
-def score_layer(f, a, drawn=1.0, cursor_u=None):
+def score_layer(f, a, drawn=1.0, cursor_u=None, note=1.0):
     if a <= 0:
         return
     AX_X, AX_W = BAR_X, BAR_W
     # 合一行并贴着绘图区上沿：上面 LAB_Y 那行放的是 +1/+0 图例，
     # 原来是两行右对齐轴注，正好被图例的右端压住。
-    f.text("纵轴 得分 / 150　横轴 候选起点 →", AX_X + AX_W, AX_Y - 26, 15,
-           C.INK3, align="right", alpha=a * 0.9)
+    # 轴注只在本层是主角时出现：选路树/批次输出接管中景区以后，
+    # 它孤零零挂在树下方，读起来像一条没主的标签。
+    if note > 0.01:
+        f.text("纵轴 得分 / 150　横轴 候选起点 →", AX_X + AX_W, AX_Y - 26, 15,
+               C.INK3, align="right", alpha=a * 0.9 * note)
 
     for s in (0, 50, 75, 100, 150):
         y = score_to_y(s)
@@ -163,7 +166,7 @@ def draw(f, t, S):
     C.footer(f, 3, 9, t)
     C.header(f, "先定位：读出落在参考串的哪一段", t=t)
 
-    l0, l1, l2, l3, l4, l5, l6, l7 = [C.ls(S, i) for i in range(8)]
+    l0, l1, l2, l3, l4 = [C.ls(S, i) for i in range(5)]
 
     # ---------- 第一句：一句话点题
     k_tag = ramp(t, 0.0, 0.5) * (1 - ramp(t, l2 - 0.2, l2 + 0.5))
@@ -177,10 +180,10 @@ def draw(f, t, S):
     # 扫描进度只有一个来源：游标、总览条、得分曲线、逐位窗口全部读它，
     # 否则曲线画完的时候游标早停下了，两边对不上。
     prog = None
-    if t >= l3 - 0.05:
-        prog = ease_in_out(clamp((t - l3 - 0.15) /
-                                 max(0.2, C.ld(S, 3) - 1.0)))
-    cursor_off = prog * TOTAL_OFF if (prog is not None and t < l6) else None
+    if t >= l2 - 0.05:
+        prog = ease_in_out(clamp((t - l2 - 0.10) /
+                                 max(0.2, C.ld(S, 2) - 0.9)))
+    cursor_off = prog * TOTAL_OFF if (prog is not None and t < l4) else None
     overview(f, a_bar, cursor_off)
 
     refseq = C.base_seq(SHOWN, 21)
@@ -189,24 +192,24 @@ def draw(f, t, S):
         readseq[i] = {"A": "G", "T": "C", "C": "A", "G": "T"}[refseq[i]]
     readseq = "".join(readseq)
 
-    band_dim = 1.0 - 0.88 * ramp(t, l6 - 0.3, l6 + 0.3)
+    band_dim = 1.0 - 0.88 * ramp(t, l4 - 0.25, l4 + 0.25)
     zoom_a = ramp(t, l2 - 0.1, l2 + 0.6) * band_dim
 
     # ---------- 第三句：螺旋解开成参考链
-    unwrap = ramp(t, l2 + 0.5, l3 + 1.4)
+    unwrap = ramp(t, l1 + 0.15, l1 + 1.35)
     if zoom_a > 0.01 and unwrap < 0.999:
         C.helix(f, Z_X + Z_W / 2, REF_Y + LH / 2, Z_W, t,
                 phase=t * 0.6, bases=refseq, alpha=zoom_a * (1 - unwrap),
                 rad=22, period=210, pitch=10, rung_alpha=0.6)
 
-    a_ref = ramp(t, l2 + 0.9, l3 + 1.2) * band_dim
+    a_ref = ramp(t, l1 + 0.95, l1 + 1.75) * band_dim
     if a_ref > 0.01:
         strand(f, Z_X, REF_Y, refseq, CW, LH, alpha=a_ref, size=15)
         f.text("参考链", 112, REF_Y + 4, 17, C.INK3, alpha=a_ref)
         f.text("64 位局部", 112, REF_Y + 23, 12, C.INK3, alpha=a_ref * 0.8)
 
     # ---------- 第四句：读出链 + 逐位比对
-    a_read = ramp(t, l3 + 0.6, l4 + 0.9) * band_dim
+    a_read = ramp(t, l2 + 0.15, l2 + 0.85) * band_dim
     win = None
     if prog is not None:
         w0 = int(prog * (SHOWN - 18))
@@ -215,7 +218,7 @@ def draw(f, t, S):
         if win:
             wy0, wy1 = REF_Y - 30, READ_Y + LH + 26
             wx, ww = Z_X + win[0] * CW, (win[1] - win[0]) * CW
-            k = ramp(t, l4 - 0.4, l4 + 0.4)
+            k = ramp(t, l2 - 0.15, l2 + 0.45)
             if k > 0:
                 f.rect(wx, wy0, ww, wy1 - wy0, C.S1C, alpha=0.09 * k * a_read,
                        r=6)
@@ -226,7 +229,7 @@ def draw(f, t, S):
         f.text("读出链", 112, READ_Y + 4, 17, C.INK3, alpha=a_read)
         f.text("300 bit", 112, READ_Y + 23, 12, C.INK3, alpha=a_read * 0.8)
 
-        mk = ramp(t, l4, l4 + 0.6)
+        mk = ramp(t, l2 + 0.85, l2 + 1.35)
         if mk > 0 and win:
             for i in range(win[0], win[1]):
                 cx = Z_X + i * CW + CW / 2
@@ -235,7 +238,7 @@ def draw(f, t, S):
                        C.OKC if hit else C.WARNC, C.MONO, WEIGHT_BOLD,
                        align="center", alpha=mk * a_read * (0.75 if hit else 1.0))
         f.text("比对窗口沿候选起点滑动，窗口内逐位计分", Z_X, LAB_Y + 4, 16,
-               C.INK3, alpha=a_read * 0.9 * ramp(t, l4, l4 + 0.6))
+               C.INK3, alpha=a_read * 0.9 * ramp(t, l2 + 0.85, l2 + 1.35))
         if mk > 0:
             w1 = f.measure("+1 命中", 16)[0] + 22
             C.chip(f, Z_X + Z_W - w1 - 124, LAB_Y - 2, "+1 命中", C.OKC, 16,
@@ -244,27 +247,30 @@ def draw(f, t, S):
                    9, 4, alpha=mk * a_read, fill_alpha=0.10)
 
     # ---------- 第五句：得分曲线
-    a_ax = ramp(t, l3 + 0.7, l3 + 1.6)
-    dim = 1.0 - 0.55 * ramp(t, l6, l6 + 0.7)
+    a_ax = ramp(t, l2 + 1.15, l2 + 1.95)
+    dim = 1.0 - 0.55 * ramp(t, l4, l4 + 0.5)
     if a_ax > 0:
         # 曲线画到哪、游标停在哪个起点，都是同一个 prog
         drawn = 0.0 if prog is None else prog
-        cu = prog if (prog is not None and t < l6) else None
-        score_layer(f, a_ax * dim, drawn, cu)
+        cu = prog if (prog is not None and t < l4) else None
+        score_layer(f, a_ax * dim, drawn, cu,
+                    note=1.0 - ramp(t, l4 + 0.00, l4 + 0.40))
         if dim > 0.5:
             C.principle_tag(f, BAR_X, AX_Y + AX_H + 12,
                             "曲线为原理示意；59–62 与 ≈75 为项目典型值",
                             alpha=a_ax * (dim - 0.5) * 2 * 0.85)
 
-    # ---------- 第六句：16 窗口 + 选路树
-    a_tree = ramp(t, l6, l6 + 0.8) * (1 - ramp(t, l7 - 0.4, l7 + 0.2))
+    # ---------- 第五句：16 窗口 + 选路树 → 64 条一批 → 输出记录
+    # 只剩一句的位置，前半句给选路树，后半句让位给批次输出。
+    t_out = l4 + 1.85
+    a_tree = ramp(t, l4 + 0.05, l4 + 0.60) * (1 - ramp(t, t_out - 0.30,
+                                                      t_out + 0.10))
     if a_tree > 0.01:
-        draw_selector(f, t, a_tree, l6)
+        draw_selector(f, t, a_tree, l4)
 
-    # ---------- 第七句：64 条一批 → 输出
-    a_batch = ramp(t, l7 + 0.1, l7 + 1.0)
+    a_batch = ramp(t, t_out, t_out + 0.60)
     if a_batch > 0.01:
-        draw_output(f, t, a_batch, l7)
+        draw_output(f, t, a_batch, t_out)
 
 
 def head_patch(f, t, a):
@@ -280,18 +286,20 @@ def head_patch(f, t, a):
 
 def draw_selector(f, t, a, l6):
     head_patch(f, t, a)
+    # 原节拍按一整句（~4.5 s）铺开，这里只有前半句，整体压到 0.55 倍
+    sl = lambda d: l6 + 0.55 * d
     f.text("16 个滑窗并行扫描，选路树每拍折半：16 → 8 → 4 → 2 → 1",
            Z_X, 366, 22, C.INK2, alpha=a)
     f.text("每条读出 → 300 bit 码字 + 16 bit 位置 + 10 bit 得分",
            Z_X + Z_W, 366, 17, C.INK3, align="right",
-           alpha=a * ramp(t, l6 + 2.2, l6 + 2.8) * 0.95)
+           alpha=a * ramp(t, sl(2.2), sl(2.8)) * 0.95)
 
     n = 16
     bw, bh, top = 62, 58, 402
     gap = 16.0
     sc = [58, 61, 60, 74, 62, 59, 61, 60, 63, 59, 60, 61, 58, 62, 60, 59]
     for i in range(n):
-        k = ramp(t, l6 + 0.25 + 0.025 * i, l6 + 0.55 + 0.025 * i)
+        k = ramp(t, l6 + 0.20 + 0.016 * i, l6 + 0.42 + 0.016 * i)
         if k <= 0:
             continue
         x = Z_X + (i % 8) * (bw + gap)
@@ -306,14 +314,14 @@ def draw_selector(f, t, a, l6):
         f.text(str(sc[i]), x + bw / 2, y + 26, 20, C.S1C if best else C.INK3,
                C.MONO, WEIGHT_BOLD, align="center", alpha=a * k)
     f.text("每窗一个得分（示意值）", Z_X, top + 2 * bh + 24, 15, C.INK3,
-           alpha=a * ramp(t, l6 + 0.9, l6 + 1.4) * 0.85)
+           alpha=a * ramp(t, l6 + 0.55, l6 + 0.85) * 0.85)
 
     # ---- 折半选路：每列条数减半，条高一致，靠密度读数
     levels = [16, 8, 4, 2, 1]
     fx = Z_X + 8 * (bw + gap) + 66
     mid = top + bh + 5
     for li, cnt in enumerate(levels):
-        k = ramp(t, l6 + 0.9 + 0.26 * li, l6 + 1.2 + 0.26 * li)
+        k = ramp(t, l6 + 0.55 + 0.17 * li, l6 + 0.75 + 0.17 * li)
         if k <= 0:
             continue
         bx = fx + li * 86
@@ -330,7 +338,7 @@ def draw_selector(f, t, a, l6):
             f.text("›", bx + 64, mid - 9, 20, C.INK3, align="center",
                    alpha=k * a * 0.7)
     f.text("逐级流水，每拍只比一对", fx, mid + 92, 15, C.INK3,
-           alpha=a * ramp(t, l6 + 2.0, l6 + 2.6) * 0.85)
+           alpha=a * ramp(t, sl(1.9), sl(2.4)) * 0.85)
 
 
 def draw_output(f, t, a, l7):
