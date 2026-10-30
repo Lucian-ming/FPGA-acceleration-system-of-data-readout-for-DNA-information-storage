@@ -32,6 +32,7 @@ BUILD = os.path.join(ROOT, "build")
 SCENE_DIR = os.path.join(BUILD, "scenes")
 ORDER = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"]
 NCHUNK = 16              # 并行块数（本机 16 核）
+FLOOR = 0.10             # 换场两端的不透明度下限：边界那一帧两场各留 10%，不出现纯纸
 
 
 def available():
@@ -51,13 +52,14 @@ def load_segs(names, by_id):
 
 
 def draw_global(f, t, segs, xf):
-    """Draw the film at absolute time t, blending across scene boundaries.
+    """Draw the film at absolute time t, changing scenes across a paper dip.
 
-    Scene i owns [start_i, start_i + dur_i). The dissolve is centred on the
-    boundary and charges the same 0..xf window to both scenes, so it costs no
-    timeline. The outgoing scene may be queried up to xf/2 past its end; it is
-    clamped to its last frame rather than extrapolated, and every scene ends on
-    a held tail anyway.
+    Scene i owns [start_i, start_i + dur_i). 换场不是把两场半透明叠在一起——
+    两场各有自己的大标题，叠印时两个标题会同时半可见，读起来是重影。
+    这里改成「过纸」：窗内先铺本帧的纸底，前半段只有上一场，按 smoothstep
+    淡出到纸；后半段只有本场，从纸淡入。任一时刻至多一场在画面上，
+    所以不会出现双标题。上一场在窗内锁在它的最后一帧（不越界外推），
+    每场本来就有 0.6–1.6 s 的静止尾巴，切断处看不到运动。
     """
     n = len(segs)
     i = 0
@@ -66,28 +68,32 @@ def draw_global(f, t, segs, xf):
             i = k
 
     half = (xf / 2.0) if xf > 0 else 0.0
-    b_in = segs[i][1]["start"] if (i > 0 and half) else None
-    b_out = segs[i + 1][1]["start"] if (i + 1 < n and half) else None
+    b = segs[i][1]["start"]
 
-    # 入画那一侧的半程：上一场打底，本场盖上去
-    if b_in is not None and (t - b_in) < half:
-        k = clamp((t - (b_in - half)) / xf, 0.0, 1.0)
-        mod_p, S_p = segs[i - 1]
-        tp = min(t, S_p["start"] + S_p["dur"] - 1.0 / C.FPS)
-        mod_p.draw(f, tp, S_p)
+    # 淡入段：本场起始后的半个窗。i==0 时前面没有内容，不用淡入。
+    # u 从 0 到 1，a = 1-(1-u)² 让前几帧就亮起来，避免整段停在近空纸上。
+    # 下限 FLOOR：两段曲线在边界那一刻都落在这个值上，画面不会出现纯纸闪一帧。
+    if half > 0.0 and i > 0 and (t - b) < half:
+        u = clamp((t - b) / half, 0.0, 1.0)
+        a = max(FLOOR, 1.0 - (1.0 - u) * (1.0 - u))
+        C.background(f, t)                       # 纸底一直铺着，换场只换上面的画
         f.push_group()
         segs[i][0].draw(f, t, segs[i][1])
-        f.pop_group(k * k * (3 - 2 * k))
+        f.pop_group(a)
         return
-    # 出画那一侧的半程：本场打底，下一场盖上去
-    if b_out is not None and (t - b_out) > -half:
-        k = clamp((t - (b_out - half)) / xf, 0.0, 1.0)
-        if k > 0.0:
-            tt = min(t, segs[i][1]["start"] + segs[i][1]["dur"] - 1.0 / C.FPS)
-            segs[i][0].draw(f, tt, segs[i][1])
+
+    # 淡出段：下一场起始前的半个窗。上一场锁在它的最后一帧上（不越界外推），
+    # 每场本来就有 0.6–1.6 s 的静止尾巴，切断处看不到运动。
+    if half > 0.0 and i + 1 < n:
+        nb = segs[i + 1][1]["start"]
+        if (nb - t) <= half:
+            u = clamp((t - (nb - half)) / half, 0.0, 1.0)
+            a = max(FLOOR, (1.0 - u) * (1.0 - u))
+            C.background(f, t)
+            tp = min(t, segs[i][1]["start"] + segs[i][1]["dur"] - 1.0 / C.FPS)
             f.push_group()
-            segs[i + 1][0].draw(f, t, segs[i + 1][1])
-            f.pop_group(k * k * (3 - 2 * k))
+            segs[i][0].draw(f, tp, segs[i][1])
+            f.pop_group(a)
             return
 
     segs[i][0].draw(f, t, segs[i][1])

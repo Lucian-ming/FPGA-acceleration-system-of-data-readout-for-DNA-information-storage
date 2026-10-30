@@ -131,7 +131,7 @@ def edge_pt(v, c):
 def tanner(f, t, a, l2):
     if a <= 0:
         return
-    f.rect(TG_X, TG_Y, TG_W, TG_H, C.PANEL, alpha=0.88 * a, r=3)
+    f.rect(TG_X, TG_Y, TG_W, TG_H, C.PANEL, alpha=0.97 * a, r=3)
     f.rect_stroke(TG_X, TG_Y, TG_W, TG_H, C.EDGE, lw=1.2, r=3)
     f.text("Tanner 图 · 变量节点 ↔ 校验节点", TG_X + 20, TG_Y + 14, 22,
            C.LDC, C.SANS, WEIGHT_MEDIUM, alpha=a)
@@ -194,7 +194,7 @@ def tanner(f, t, a, l2):
 def syndrome(f, t, a, l2, l4, l5):
     if a <= 0:
         return
-    f.rect(SP_X, SP_Y, SP_W, SP_H, C.PANEL, alpha=0.88 * a, r=3)
+    f.rect(SP_X, SP_Y, SP_W, SP_H, C.PANEL, alpha=0.97 * a, r=3)
     f.rect_stroke(SP_X, SP_Y, SP_W, SP_H, C.EDGE, lw=1.2, r=3)
     f.text("迭代与校验子", SP_X + 20, SP_Y + 14, 22, C.LDC, C.SANS,
            WEIGHT_MEDIUM, alpha=a)
@@ -370,24 +370,34 @@ def draw(f, t, S):
     a_cw = ramp(t, l0 + 0.1, l0 + 0.9)
     codeword(f, t, a_cw, l0, l1)
 
+    # 比例条要在两块面板起来之前退净：面板淡入到 0.5 时还是半透明，
+    # 比例条若仍停在 0.15，条块与图例会从面板底下透出来。
     a_rs = (ramp(t, l0 + 0.5, l0 + 1.3)
-            * (1.0 - ramp(t, l2 - 0.5, l2 + 0.1)))
+            * (1.0 - ramp(t, l2 - 0.85, l2 - 0.50)))
     ratio_strip(f, t, a_rs, l0, l1)
+    C.paper_patch(f, t, 0, 356, C.W, 200, ramp(t, l2 - 0.85, l2 - 0.50))
 
     a_tg = ramp(t, l2 - 0.4, l2 + 0.4) * (1.0 - 0.4 * ramp(t, l4, l4 + 0.8))
     tanner(f, t, a_tg, l2)
     a_sp = ramp(t, l2 + 0.3, l2 + 1.1)
     syndrome(f, t, a_sp, l2, l4, l5)
 
-    a_p = ramp(t, l0 + 0.3, l0 + 1.0) * (1.0 - ramp(t, l2 - 0.4, l2 + 0.1))
+    # 底部条带：四段都在 BAND_Y0+2 放小标题，换段前先把 692..952 抹回纸。
+    # 只做交叉淡出时，退的那一段会在 0.2~0.4 的透明度上与新标题同 y 叠印
+    # （「参数：64,800 / 54,000 / 10,800」曾压到「一轮里发生什么」底下）。
+    a_p = ramp(t, l0 + 0.3, l0 + 1.0) * (1.0 - ramp(t, l2 - 0.35, l2 - 0.10))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l2 - 0.35, l2 - 0.10))
     band_params(f, t, a_p, l0)
-    a_r = ramp(t, l2 - 0.2, l2 + 0.5) * (1.0 - ramp(t, l3 - 0.35, l3 + 0.15))
+    a_r = ramp(t, l2 - 0.10, l2 + 0.5) * (1.0 - ramp(t, l3 - 0.45, l3 - 0.20))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l3 - 0.45, l3 - 0.20))
     band_round(f, t, a_r, l2)
-    a_h = ramp(t, l3 - 0.2, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.35, l4 + 0.15))
+    a_h = ramp(t, l3 - 0.20, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.45, l4 - 0.20))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l4 - 0.45, l4 - 0.20))
     band_hard(f, t, a_h, l3)
-    a_g = ramp(t, l5 - 0.2, l5 + 0.5) * (1.0 - ramp(t, l6 - 0.35, l6 + 0.15))
+    a_g = ramp(t, l5 - 0.20, l5 + 0.5) * (1.0 - ramp(t, l6 - 0.45, l6 - 0.20))
+    C.paper_patch(f, t, 0, 692, C.W, 260, ramp(t, l6 - 0.45, l6 - 0.20))
     band_gate(f, t, a_g, l5)
-    a_n = ramp(t, l6 - 0.2, l6 + 0.5)
+    a_n = ramp(t, l6 - 0.20, l6 + 0.5)
     band_noconv(f, t, a_n, l6)
 
     # 收束：未收敛即拒收

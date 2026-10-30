@@ -294,6 +294,24 @@ def principle_tag(f, x, y, text="原理示意 · 非实测波形", alpha=0.75):
     f.text(text, x, y, 18, INK3, SANS, alpha=alpha)
 
 
+def paper_patch(f, t, x, y, w, h, a):
+    """把一块矩形区域重画成当帧的纸底。
+
+    半透明底色盖不住上一句的内容：上一句在 0.9 alpha 上还看得见，
+    两行小标题会叠在同一 y 上。这里整块重画纸底（同帧同渐变同网格，
+    看不出接缝），alpha 到 1 时是纯纸，旧内容一点不剩。
+    """
+    aa = min(1.0, 1.55 * a)
+    if aa <= 0.01:
+        return
+    f.save()
+    f.clip_rect(x, y, w, h)
+    f.push_group()
+    background(f, t)
+    f.pop_group(aa)
+    f.restore()
+
+
 # ------------------------------------------------------------------ data marks
 def bits_row(f, x, y, bits, cw=20, ch=28, gap=4, alpha=1.0, hl=None,
              hl_c=None, colors=None, size=18, dim=None):

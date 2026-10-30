@@ -56,8 +56,10 @@ def strip(f, t, a, l0):
         return
     f.text("输入码流 · 81,000 bit", STRIP_X, STRIP_Y - 34, 21, C.INK2,
            C.SANS, WEIGHT_MEDIUM, alpha=a * 0.95)
-    f.text("81,000 ÷ 5 = 16,200 组 · 每组第 1 位是 b0 · 这里画出 16 组",
-           C.W - 112, STRIP_Y - 32, 19, C.INK3, align="right", alpha=a * 0.9)
+    # 右对齐说明挂在条带上沿之上：选中组的描边从 STRIP_Y-7 起，
+    # 原来贴着 STRIP_Y-32 放会与框线压在同一条线上。
+    f.text("81,000 ÷ 5 = 16,200 组 · 每组第 1 位是 b0 · 图中示出前 16 组",
+           C.W - 112, STRIP_Y - 46, 19, C.INK3, align="right", alpha=a * 0.9)
 
     sel_k = ramp(t, l0 + 1.5, l0 + 2.1)
     for g in range(N_GROUPS):
@@ -184,6 +186,9 @@ def detail(f, t, a, l1, l2):
 
     f.text("rᵢ = bᵢ ⊕ b0（4 位逐位异或）", PANEL_X + 22, PANEL_Y + PANEL_H - 48,
            21, C.INK2, C.MONO, alpha=a * 0.95)
+    C.principle_tag(f, PANEL_X, PANEL_Y + PANEL_H + 12,
+                    "门级画法为原理示意；实际是 4 路组合逻辑并行异或",
+                    alpha=a * 0.7)
 
 
 def case_panel(f, x, y, w, h, a, b0v, accent, hot, note):
@@ -324,11 +329,16 @@ def draw(f, t, S):
     case_panel(f, CASE_B_X, CASE_Y, CASE_W, CASE_H, a_case, 1, C.S3C, hot_b,
                "四位全部取反")
 
-    a_c = ramp(t, l0 + 1.0, l0 + 1.6) * (1.0 - ramp(t, l3 - 0.3, l3 + 0.2))
+    a_c = ramp(t, l0 + 1.0, l0 + 1.6) * (1.0 - ramp(t, l3 - 0.30, l3 - 0.05))
+    # 底部两块在同一 y 上放小标题（BAND_Y0 + 2）。只做交叉淡出时，退场的
+    # 「码本…」会在 0.2~0.4 的透明度上和新标题「数据量…」叠在同一行，
+    # 所以换块之前把 748..952 抹回纸底。
+    C.paper_patch(f, t, 0, 748, C.W, 204, ramp(t, l3 - 0.30, l3 - 0.05))
     band_codebook(f, t, a_c, l0)
     # 两块共用同一批坐标：前一块必须在后一块入场前完全退干净，
     # 否则两个小标题会叠在同一行 y 上（"分之四" 粘到 "硬件节奏" 后面）
-    a_s = ramp(t, l3 - 0.2, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.65, l4 - 0.15))
+    a_s = ramp(t, l3 - 0.05, l3 + 0.5) * (1.0 - ramp(t, l4 - 0.65, l4 - 0.40))
     band_size(f, t, a_s, l3)
+    C.paper_patch(f, t, 0, 748, C.W, 204, ramp(t, l4 - 0.55, l4 - 0.30))
     a_e = ramp(t, l4 - 0.10, l4 + 0.45)
     band_beats(f, t, a_e, l4)

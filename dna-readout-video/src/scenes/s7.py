@@ -118,7 +118,7 @@ def gate_b(f, t, a, l2, l3):
     if kp > 0:
         f.text("PASS", GB_X + 26, GATE_Y + GATE_H - 62, 34, C.OKC, C.MONO,
                WEIGHT_BOLD, alpha=kp * a)
-        f.text("端到端载荷逐位相同（R0.83 SE150 全量）", GB_X + 150,
+        f.text("整份载荷 SHA-256 摘要一致（R0.83 SE150 全量）", GB_X + 150,
                GATE_Y + GATE_H - 50, 21, C.INK2, alpha=kp * a * 0.95)
 
 

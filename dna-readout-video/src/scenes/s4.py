@@ -160,9 +160,16 @@ def gauge(f, t, a, value, show_sat=False):
 
 
 def vote_grid(f, a, row_a, total_a, dec_a):
-    """6×6 的 ±1 表 + 合计行 + 判决行。"""
+    """6×6 的 ±1 表 + 合计行 + 判决行。
+
+    表里的 +1/−1 是示意数据（真机一条任务 103,616 条读出、81,000 个位置），
+    所以下面挂一条原理示意标注。
+    """
     if a <= 0:
         return
+    C.principle_tag(f, GX, GY + ROWS * RGAP_Y + RGAP_Y + 44,
+                    "示意：6 条读出 × 6 个位置；真机为 103,616 条读出",
+                    alpha=a * 0.7)
     f.text("一个位置一个累加器", GX, GY - 58, 24, C.INK2, alpha=a)
     f.text("每行是一条读出的贡献", GX + 250, GY - 57, 18, C.INK3,
            alpha=a * 0.85)
@@ -279,7 +286,7 @@ def band_score(f, t, a, l5):
                alpha=a * k * 0.8)
     f.line(sx(67), y - 46, sx(67), y + 22, C.WARNC, 1.6, alpha=k * a,
            dash=[6, 4])
-    f.text("SE150 默认值；高熵场景用 65", x1, y + 40, 17, C.INK3,
+    f.text("SE150 默认值；高熵样本另设门限 60", x1, y + 40, 17, C.INK3,
            align="right", alpha=a * k * 0.85)
     pts = [(59, C.WARNC), (61, C.WARNC), (65, C.WARNC), (74, C.OKC),
            (76, C.OKC), (61, C.WARNC), (78, C.OKC), (60, C.WARNC)]
@@ -348,11 +355,17 @@ def draw(f, t, S):
     gauge(f, t, ga, val, show_sat=ga > 0.5)
 
     # 底部条带逐段切换
-    a_b = ramp(t, l3 - 0.2, l3 + 0.5) * (1 - ramp(t, l4 - 0.3, l4 + 0.3))
+    # 换段时先把 760..952 抹回纸，再画新段：两段都是在同一 y 上放小标题，
+    # 只靠交叉淡出的话，退的那一段会在 0.2~0.4 之间和新标题叠在同一行。
+    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l3 - 0.30, l3 - 0.05))
+    a_b = ramp(t, l3 - 0.2, l3 + 0.5) * (1 - ramp(t, l4 - 0.30, l4 - 0.05))
     band_batches(f, t, a_b, l3)
-    a_d = ramp(t, l4 - 0.3, l4 + 0.4) * (1 - ramp(t, l5 - 0.3, l5 + 0.3))
+    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l4 - 0.30, l4 - 0.05))
+    a_d = ramp(t, l4 - 0.2, l4 + 0.4) * (1 - ramp(t, l5 - 0.30, l5 - 0.05))
     band_decision(f, t, a_d, l4)
-    a_s = ramp(t, l5 - 0.2, l5 + 0.5) * (1 - ramp(t, l6 - 0.3, l6 + 0.3))
+    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l5 - 0.30, l5 - 0.05))
+    a_s = ramp(t, l5 - 0.2, l5 + 0.5) * (1 - ramp(t, l6 - 0.30, l6 - 0.05))
     band_score(f, t, a_s, l5)
+    C.paper_patch(f, t, 0, 752, C.W, 200, ramp(t, l6 - 0.30, l6 - 0.05))
     a_w = ramp(t, l6 - 0.2, l6 + 0.5)
     band_wm(f, t, a_w, l6)

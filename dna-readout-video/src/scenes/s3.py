@@ -28,7 +28,8 @@ READ_Y = 470                 # 读出链骨架顶边
 LAB_Y = 540                  # 图例行
 
 AX_Y, AX_H = 610, 240        # 得分曲线绘图区
-TOTAL_OFF = 40351
+TOTAL_OFF = 40351          # 候选起点的个数
+MAX_OFF = TOTAL_OFF - 1    # 最后一个候选起点 40,350；刻度写的是位置，不是个数
 SCORE_MAX = 150
 
 MISMATCH = {11, 27, 43, 58}  # 示意：读出里读错的位
@@ -75,7 +76,7 @@ def overview(f, a, cursor_off=None):
         x += 4.0
     f.rect_stroke(BAR_X, BAR_Y, BAR_W, BAR_H, "#B3A48A", lw=1.0, r=2, alpha=a)
     for k in range(5):
-        off = TOTAL_OFF * k / 4.0
+        off = MAX_OFF * k / 4.0
         x = off_to_x(off)
         f.line(x, BAR_Y + BAR_H, x, BAR_Y + BAR_H + 6, "#9C8E76", 1.0, alpha=a)
         f.text("{:,}".format(int(round(off))), x, BAR_Y + BAR_H + 11, 16,
@@ -173,10 +174,13 @@ def draw(f, t, S):
 
     # ---------- 第二句：总览条
     a_bar = ramp(t, l1 - 0.2, l1 + 0.8)
-    cursor_off = None
-    if l3 <= t < l6:
-        u = ease_in_out(clamp((t - l3 - 0.15) / max(0.2, C.ld(S, 3) - 1.0)))
-        cursor_off = u * TOTAL_OFF
+    # 扫描进度只有一个来源：游标、总览条、得分曲线、逐位窗口全部读它，
+    # 否则曲线画完的时候游标早停下了，两边对不上。
+    prog = None
+    if t >= l3 - 0.05:
+        prog = ease_in_out(clamp((t - l3 - 0.15) /
+                                 max(0.2, C.ld(S, 3) - 1.0)))
+    cursor_off = prog * TOTAL_OFF if (prog is not None and t < l6) else None
     overview(f, a_bar, cursor_off)
 
     refseq = C.base_seq(SHOWN, 21)
@@ -204,9 +208,8 @@ def draw(f, t, S):
     # ---------- 第四句：读出链 + 逐位比对
     a_read = ramp(t, l3 + 0.6, l4 + 0.9) * band_dim
     win = None
-    if t >= l3 + 0.4:
-        cu = clamp((t - l3 - 0.4) / max(0.2, C.ld(S, 3) - 1.0))
-        w0 = int(cu * (SHOWN - 18))
+    if prog is not None:
+        w0 = int(prog * (SHOWN - 18))
         win = (w0, w0 + 18)
     if a_read > 0.01:
         if win:
@@ -244,10 +247,9 @@ def draw(f, t, S):
     a_ax = ramp(t, l3 + 0.7, l3 + 1.6)
     dim = 1.0 - 0.55 * ramp(t, l6, l6 + 0.7)
     if a_ax > 0:
-        drawn = clamp((t - (l3 + 0.9)) / max(0.2, (l6 + 0.3) - (l3 + 0.9)))
-        cu = None
-        if l3 <= t < l6:
-            cu = clamp((t - l3 - 0.15) / max(0.2, C.ld(S, 3) - 1.0))
+        # 曲线画到哪、游标停在哪个起点，都是同一个 prog
+        drawn = 0.0 if prog is None else prog
+        cu = prog if (prog is not None and t < l6) else None
         score_layer(f, a_ax * dim, drawn, cu)
         if dim > 0.5:
             C.principle_tag(f, BAR_X, AX_Y + AX_H + 12,
@@ -265,8 +267,19 @@ def draw(f, t, S):
         draw_output(f, t, a_batch, l7)
 
 
+def head_patch(f, t, a):
+    """把中景区（352..602）换成一块当帧的纸。
+
+    原来这里是 0.92 的半透明底色，上一句的螺旋和链还会从里面透出来，
+    读起来像两层字叠着。纸底在同一帧里是同一套渐变与网格，看不出接缝。
+    """
+    # 只抹到 572：得分曲线的轴注在 AX_Y-26 = 584，抹高了会把「横轴 候选起点 →」
+    # 擦成半透明的残字（73.0 s 那帧右上角）。图例行在 540，高 220 仍能盖住。
+    C.paper_patch(f, t, 0, 352, C.W, 220, a)
+
+
 def draw_selector(f, t, a, l6):
-    f.rect(0, 352, C.W, 250, C.BG, alpha=0.92 * a)
+    head_patch(f, t, a)
     f.text("16 个滑窗并行扫描，选路树每拍折半：16 → 8 → 4 → 2 → 1",
            Z_X, 366, 22, C.INK2, alpha=a)
     f.text("每条读出 → 300 bit 码字 + 16 bit 位置 + 10 bit 得分",
@@ -321,7 +334,7 @@ def draw_selector(f, t, a, l6):
 
 
 def draw_output(f, t, a, l7):
-    f.rect(0, 352, C.W, 250, C.BG, alpha=0.92 * a)
+    head_patch(f, t, a)
     f.text("每批 64 条读出", Z_X, 366, 22, C.INK2, alpha=a)
     for i in range(64):
         k = ramp(t, l7 + 0.3 + 0.012 * i, l7 + 0.45 + 0.012 * i)
