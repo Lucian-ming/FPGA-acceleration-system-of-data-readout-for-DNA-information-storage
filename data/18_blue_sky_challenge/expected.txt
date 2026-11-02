@@ -1,0 +1,4 @@
+用例：18_blue_sky_challenge
+期望载荷 SHA-256：cc5b1768e3e53b51c9d669d41c04fe94c46df5f62b4800b4ee96377a1e30ed9a
+score_min：65    记录：6150 源读段
+软件侧结果：通过（LDPC 1 轮收敛）

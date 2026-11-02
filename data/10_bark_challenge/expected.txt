@@ -1,0 +1,4 @@
+用例：10_bark_challenge
+期望载荷 SHA-256：90bc6ca5376bcb65f9f76f252c949c7f0cc4e0291ba0f5a8138c56b49f27c662
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 4 轮收敛）

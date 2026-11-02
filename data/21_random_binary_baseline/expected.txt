@@ -1,0 +1,4 @@
+用例：21_random_binary_baseline
+期望载荷 SHA-256：9bc24dc3239381f2f8358690f040626937188644cc66d2bdfc94da2d571e90c7
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 4 轮收敛）

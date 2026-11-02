@@ -1,0 +1,4 @@
+用例：11_beach_sand_baseline
+期望载荷 SHA-256：edf0180d337571c9f5fbe88c6e35539d8cc210a86d1d8fd11fd9ef3af1a29b47
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 4 轮收敛）

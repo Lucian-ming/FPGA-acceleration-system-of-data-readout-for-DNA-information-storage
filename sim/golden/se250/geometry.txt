@@ -1,0 +1,33 @@
+# 本批黄金向量的几何与来源（tools/make_golden.py --manifest 生成）
+#
+# 为什么需要这份文件：SE150 与 SE250 产出同一个图片 SHA-256
+# fcd0cf90…f2c3（docs/20 §2），哈希分不出用的是哪套几何。引用本目录的
+# 任何判据时，必须连同下面这些字段一起记录。
+# 内容只由输入决定（不含时间戳），重跑同一条命令应逐字节相同。
+
+read_bps        = 250
+num_lc          = 50
+stride          = 805
+ref_len         = 1055
+L               = 40500
+codebits        = 500
+result_w        = 526
+words_per_read  = 9
+record_bytes    = 72
+read_wire_bytes = 64
+per_read_bytes  = 63
+wm_regions_rows = 52750
+
+source_reads    = 2048
+records         = 4096
+min_score_ratio = 0.45
+score_min       = 112
+voted_records   = 2004/4096
+codeword_err    = 36/64800
+
+reads_file      = data/r083-data/sequencing-data/dna-40_5kb-mc-se250.fastq
+reads_sha256    = dde178bc0df9e3c500641ff61ff29faca701c5087948d7268d1f5e88e3f05a80
+watermark_file  = data/r083-data/source-data/watermark-sequences/r0.83_watermark.txt
+watermark_sha256= b7c842f30be1c49bb57b0161d7685a0a0761668b5d2bd0df024145ae7075d05f
+codeword_file   = data/r083-data/source-data/encoded_codeword/codeword_r083.txt
+codeword_sha256 = 767d194809f9d89f9ba66e9194f198fe472dd32448a69bfc6327b180e2a0d108

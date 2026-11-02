@@ -1,0 +1,15 @@
+# 各 IP 的 component.xml 当前打包了哪些 HDL 文件。
+# 由 tools/check_ip_packaging.sh --write-manifest 生成，请勿手工编辑。
+# 换实现变体（如 2-way <-> 4-way）会让本文件产生 diff——这正是目的：
+# 让微架构变更在 Git 里可见，而不是藏在 component.xml 的一行文件名里。
+dna_accelerator_core_1_0 hdl/dna_accelerator_core.v
+dna_accelerator_core_1_0 hdl/dna_accelerator_core_s_axi_lite_ctrl.v
+dna_accelerator_core_1_0 hdl/fifo_sync_sdpram_b64.v
+dna_accelerator_core_1_0 hdl/s2mm_pack64.v
+dna_accelerator_core_1_0 hdl/srpe_batch_4way.v
+dna_accelerator_core_1_0 hdl/srpe_batch_pway.v
+desparsification_decoder_1_0 hdl/desparsification_decoder.v
+desparsification_decoder_1_0 hdl/desparsify_datapath.v
+differential_voter_1_0 hdl/differential_voter.v
+ldpc_decoder_1_0 hdl/ldpc_decoder_p1.v
+ldpc_decoder_1_0 hdl/ldpc_decoder.v

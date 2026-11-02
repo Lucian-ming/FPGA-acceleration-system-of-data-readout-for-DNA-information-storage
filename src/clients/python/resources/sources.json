@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "description": "客户端 LDPC 资源清单。二进制哈希记录清单创建时的现状；来源未知项明确标注，不代表可复现构建。",
+  "resources": [
+    {
+      "file": "dvb_s2_r5_6.pchk",
+      "sha256": "9b33ea42f3334e5fbc2aa3cb4b76d968a184da591c9dcb0284a29b3964c407dc",
+      "upstream_source_file": "2025-11-07 随 PC 端硬判决译码器包首次上传（同批：LDPC_R5_6_decoder_hard.cpp 编译的 R5_6_LDPC_hard_decoder.exe 与 permutation64800）。EXE 符号含 read_pchk 与 mod2sparse_*/mod2dense_*，后者来自 Radford Neal 的公开 LDPC 软件包；.pchk 即该包的校验矩阵格式。具体矩阵数据文件的下载来源/生成器仍未记录",
+      "build_command": "不适用：预编译校验矩阵数据，仓库内无生成器",
+      "platform": "平台无关数据文件",
+      "current_use": "客户端运行时由 ldpc_pipeline.verify_board_result 加载以校验板端 syndrome；离线工具 tools/ldpc_decode.py、tools/run_robustness_scan.py、tools/generate_payload_dataset.py、tools/run_multi_payload_regression.py 也使用。"
+    },
+    {
+      "file": "libc_ldpc.so",
+      "sha256": "ce92dcc1026cb4e36b9dd9092c703e428f9ab59e4a4037ca4051e85688cb67a6",
+      "upstream_source_file": "clients/python/c_ldpc_accel.c",
+      "build_command": "gcc -O3 -fPIC -shared -Wall -Wextra c_ldpc_accel.c -o resources/libc_ldpc.so",
+      "platform": "Linux x86-64 ELF shared library",
+      "current_use": "客户端 GUI/CLI 新运行路径不加载此库；clients/python/c_ldpc.py 仍用它，离线工具 tools/generate_payload_dataset.py、tools/profile_host.py、tools/run_multi_payload_regression.py、tools/run_robustness_scan.py 导入 c_ldpc。"
+    },
+    {
+      "file": "permutation64800",
+      "sha256": "42f751c6d95c782ccaa3171aacf354435f77bc4186e433f52e89827995416742",
+      "upstream_source_file": "2025-11-07 随同一批 PC 端译码器包上传；2025 版 ldpc_pipeline.py 以 DECODER_PERM 引用。精确上游地址与生成方式未记录；已实测排除行列交织、模关系、块内重排等结构",
+      "build_command": "不适用：预编译长度 64800 的置换表，仓库内无原始生成器",
+      "platform": "平台无关数据文件",
+      "current_use": "客户端运行时由 ldpc_pipeline.verify_board_result 加载以解交织板端回传；离线工具 tools/ldpc_decode.py、tools/gen_ldpc_perm_table.py、tools/run_robustness_scan.py、tools/generate_payload_dataset.py、tools/run_multi_payload_regression.py 也使用。"
+    },
+    {
+      "file": "readme.txt",
+      "sha256": "0353581ea452f98a565c2474a43a2b764750c3de810dc6db1c4fd8c6dbf0e847",
+      "upstream_source_file": "本文件；外部来源未记录",
+      "build_command": "不适用：静态说明文本",
+      "platform": "平台无关文本",
+      "current_use": "供开发者查看资源用途；客户端运行时不读取此说明文件。"
+    }
+  ],
+  "removed_files": [
+    {
+      "file": "r5_6_ldpc_hard_decoder.exe",
+      "sha256": "ceadd2f55445ebae8c042922f047777f4351cb2b9a186c1178279350ba9a7d71",
+      "removed_utc": "2026-10-20",
+      "reason": "未使用的外部二进制，来源与再分发许可未确认；按提交口径从包中移除，哈希保留以便追溯"
+    },
+    {
+      "file": "libgcc_s_seh-1.dll",
+      "sha256": "438ae82ffd621a2413199155574cc85681f8986f05420b1485aa4be936c3bc0b",
+      "removed_utc": "2026-10-20",
+      "reason": "未使用的外部二进制，来源与再分发许可未确认；按提交口径从包中移除，哈希保留以便追溯"
+    },
+    {
+      "file": "libstdc++-6.dll",
+      "sha256": "72ce15df7c50e8d0ca57701b0b37394942e5348654505fcb993873b515dfd1d0",
+      "removed_utc": "2026-10-20",
+      "reason": "未使用的外部二进制，来源与再分发许可未确认；按提交口径从包中移除，哈希保留以便追溯"
+    },
+    {
+      "file": "libwinpthread-1.dll",
+      "sha256": "5bbef249a0d00e2d32c699d0bbe89f714ebeb872b3990a5cbeccb1d89f63e5e8",
+      "removed_utc": "2026-10-20",
+      "reason": "未使用的外部二进制，来源与再分发许可未确认；按提交口径从包中移除，哈希保留以便追溯"
+    }
+  ]
+}

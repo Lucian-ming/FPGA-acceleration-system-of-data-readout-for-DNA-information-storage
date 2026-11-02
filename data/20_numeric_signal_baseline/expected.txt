@@ -1,0 +1,4 @@
+用例：20_numeric_signal_baseline
+期望载荷 SHA-256：ced298c4a2f882fa1406d843d96adf70f1a1bbf50a9f97b28f37fda8e255dd98
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 4 轮收敛）

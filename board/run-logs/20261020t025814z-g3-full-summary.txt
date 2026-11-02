@@ -1,0 +1,51 @@
+G3 一键复现  run=20261020T025814Z
+时间(UTC)   : 20261020T025814Z
+命令        : tools/run_g3.sh --artifact-dir ../build/artifact --strict-artifacts --xsdb /tools/Xilinx/Vitis/2022.2/bin/xsdb --hw-server TCP:127.0.0.1:3132 --device xc7z020 --uart-port /dev/ttyUSB2 --ip 192.168.1.10 --port 7 --win-root /mnt/d/bkb220_submit_work/g3-evidence --score-min 67 --full
+任务次数    : 1（同一次上电内连续下发，中间不复位、不重烧）
+判据阈值    : score_min=67（该阈值标识常规判据轮；每轮架构 syndrome 均判定）
+载荷字节数  : 6624
+orient      : both（both = 每条读段发正/反两条记录），记录数按 64 对齐
+
+轮次 类型     源读段 记录数 阈值  超时(s) 实测耗时(s)
+1    判据轮  51781     103616    67      2112     10
+
+四级取证按最后一轮算：Stage1 dump 4096 条记录
+bitstream   : babfbc269a3aa7a4ffe56d9d996d23f26df1636135499c6954f47c0142246732
+ELF         : e71554ac3c911d3536c788e89677154002f283c625ba09136d648c4173a9b176
+制品目录    : ../build/artifact
+制品清单门禁: manifest 与完整同源包必需
+目标器件    : xc7z020
+XSDB        : (WSL 本机) /tools/Xilinx/Vitis/2022.2/bin/xsdb
+XSDB 模式   : wsl
+hw_server   : TCP:127.0.0.1:3132
+板端地址    : 192.168.1.10:7
+FASTQ SHA256: f66503ae9f91ce8980876520e5c93330586cfd2870336cc834b2fab352a37691
+水印 SHA256 : b7c842f30be1c49bb57b0161d7685a0a0761668b5d2bd0df024145ae7075d05f
+串口裁决    : 验收严格（必须打开且收到输出）
+串口接收量  : 282
+串口        : /dev/ttyUSB2
+制品细节    : artifact_selection.json（XSA/PS7/manifest/完整参数）
+固件身份    : 期望=bfcd40dd3c435a19；实读=bfcd40dd3c435a19；结果=PASS；留证=fw_build_id_check.json
+期望系统 SHA: fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3（系统判据；架构判据与它都须过才是 G3 通过）
+
+三层判据（架构与系统都须过；主机译码仅作诊断，不参与裁决）
+G3 三层判据
+板端回传     : /mnt/d/bkb220_submit_work/g3-evidence/g3_runs/20261020T025814Z/dec_input_run1.txt
+架构判据     : PASS — syndrome 全零 0/10800
+系统判据     : PASS — SHA-256 fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3；期望 fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+系统载荷来源 : 板端合法码字直接提取
+诊断层       : 起始 syndrome=0，主机译码迭代=0；主机输出 SHA-256 fcd0cf90bd680e7bbdc203e3398119504da0897acac9e2117008b4efb6b1f2c3
+旧口径       : PASS — 主机译码 + SHA-256
+PC 兜底标记  : 未发生
+本次裁决     : PASS（架构判据与系统判据均通过；诊断层不参与裁决）
+
+结果  步骤
+PASS    完整制品包一致性（所选SHA/XSA内bit/part/参数）  — ../build/artifact
+PASS    烧录
+PASS    板上固件构建身份核对（fw_build_id）  — 期望=bfcd40dd3c435a19；实读=bfcd40dd3c435a19
+PASS    板端应用层就绪（CAPS）  — READY 3.0 1
+PASS    第 1 轮 first.py 原始回传  — 103616 条记录 / score_min=67 / 10s；      Result: 8100 bytes, 5.03s, 0.01 Mbps
+PASS    第 1 轮架构判据（板端 syndrome 全零）  — 0/10800 条非零校验行
+PASS    第 1 轮系统判据（板端码字载荷 SHA）  — 来源=板端合法码字直接提取
+PASS    四级逐级取证（board_stage_check.py）
+PASS    串口收到板端输出  — 282 个字符/字节；原始日志 uart.log

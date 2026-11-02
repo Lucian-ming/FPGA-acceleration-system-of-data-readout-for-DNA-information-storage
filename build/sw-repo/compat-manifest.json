@@ -1,0 +1,1665 @@
+{
+  "schema_version": 1,
+  "scope": "BOM-only metadata compatibility; library source unchanged",
+  "source_root": "/mnt/d/xilinx/2026.1/Vitis/data/embeddedsw/ThirdParty/sw_services/lwip220_v1_4",
+  "output_root": "/mnt/d/dna-readout-accelerator/build/sw-repo/ThirdParty/sw_services/lwip220_v1_4",
+  "removed_bom": true,
+  "files": {
+    "data/dependencies.props": {
+      "original_sha256": "fb27bfae7f5f05303be96ed6bc8f2cde543ea2205ad2ba8670216d19485a5897",
+      "compat_sha256": "fb27bfae7f5f05303be96ed6bc8f2cde543ea2205ad2ba8670216d19485a5897"
+    },
+    "data/lwip220.mld": {
+      "original_sha256": "f289d61bf520bfc0a43eb7a720ec079f948de83ba5281987e0e9a54da2814732",
+      "compat_sha256": "f289d61bf520bfc0a43eb7a720ec079f948de83ba5281987e0e9a54da2814732"
+    },
+    "data/lwip220.tcl": {
+      "original_sha256": "a1119989c4f1445a5a95fade641bd65f6d8627d3a73a4f45fc9dd7e17e7a4840",
+      "compat_sha256": "a1119989c4f1445a5a95fade641bd65f6d8627d3a73a4f45fc9dd7e17e7a4840"
+    },
+    "data/lwip220.yaml": {
+      "original_sha256": "9a1e5544b21ed94ceaecb384adab53328ebfba6cc3640a701e86ab706ddb72fd",
+      "compat_sha256": "052f89fb568f73a3fd113a5857920d23060caedb5b568d6e92ad21b3ff33027b"
+    },
+    "examples/CMakeLists.txt": {
+      "original_sha256": "af2d001805a1d32568f695f33c63ef82bbd311f8bea3bf27c5c0d8508f581d6d",
+      "compat_sha256": "af2d001805a1d32568f695f33c63ef82bbd311f8bea3bf27c5c0d8508f581d6d"
+    },
+    "examples/README.txt": {
+      "original_sha256": "ed8488538cfaa2656ab2c847c8d7afbb770165180b604dc8e9f94eb890c0c8c1",
+      "compat_sha256": "ed8488538cfaa2656ab2c847c8d7afbb770165180b604dc8e9f94eb890c0c8c1"
+    },
+    "examples/freertos_lwip_example_igmp_app.c": {
+      "original_sha256": "9ea3efefebe8c1195bca767c2ba54d2c527da55f748f07089f5fb26b6ed3a25d",
+      "compat_sha256": "9ea3efefebe8c1195bca767c2ba54d2c527da55f748f07089f5fb26b6ed3a25d"
+    },
+    "examples/freertos_lwip_example_igmp_app.h": {
+      "original_sha256": "1cdd72828c70263166a9ccdcca05ed2540ae71cd52a8230aece0564864a8fe88",
+      "compat_sha256": "1cdd72828c70263166a9ccdcca05ed2540ae71cd52a8230aece0564864a8fe88"
+    },
+    "examples/freertos_lwip_example_igmp_main.c": {
+      "original_sha256": "0951f5131d180887e43db467cc6d965ed285a4518dd3b5a23767b9217967ba6a",
+      "compat_sha256": "0951f5131d180887e43db467cc6d965ed285a4518dd3b5a23767b9217967ba6a"
+    },
+    "examples/freertos_lwip_example_tftp_client.c": {
+      "original_sha256": "bd520b02b8be6e4115d1da922ae54f8799b8e3ba86d419850933d679264ab8ae",
+      "compat_sha256": "bd520b02b8be6e4115d1da922ae54f8799b8e3ba86d419850933d679264ab8ae"
+    },
+    "examples/freertos_lwip_example_tftp_platform_fs.c": {
+      "original_sha256": "196031621a8ac30f3a340a877ef1c300eefa4d83ba0dcc8073b742c73dd0096a",
+      "compat_sha256": "196031621a8ac30f3a340a877ef1c300eefa4d83ba0dcc8073b742c73dd0096a"
+    },
+    "examples/freertos_lwip_example_tftp_platform_fs.h": {
+      "original_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1",
+      "compat_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1"
+    },
+    "examples/freertos_lwip_example_tftp_server.c": {
+      "original_sha256": "16ee943437077e2bc7c953765d12aa67d0a39132422e519e05a152d15c78b81e",
+      "compat_sha256": "16ee943437077e2bc7c953765d12aa67d0a39132422e519e05a152d15c78b81e"
+    },
+    "examples/freertos_lwip_example_tftpclient_common.h": {
+      "original_sha256": "70a62044fb0a7eeab4a030190b7fa03293e4df44ae686df644387f52987f1110",
+      "compat_sha256": "70a62044fb0a7eeab4a030190b7fa03293e4df44ae686df644387f52987f1110"
+    },
+    "examples/freertos_lwip_example_tftpclient_main.c": {
+      "original_sha256": "d2332ed1254155e860e9351d7e14e7d629897184f85d22d76ee957c50a256ca6",
+      "compat_sha256": "d2332ed1254155e860e9351d7e14e7d629897184f85d22d76ee957c50a256ca6"
+    },
+    "examples/freertos_lwip_example_tftpserver_common.h": {
+      "original_sha256": "43b2126da0fe626e6df6904abb1198e20cc319df29d0a114b0f7aa9b306de309",
+      "compat_sha256": "43b2126da0fe626e6df6904abb1198e20cc319df29d0a114b0f7aa9b306de309"
+    },
+    "examples/freertos_lwip_example_tftpserver_main.c": {
+      "original_sha256": "8ed582218ac7307a533779deaffc7ba9082294146b14416a020b144aba71de60",
+      "compat_sha256": "8ed582218ac7307a533779deaffc7ba9082294146b14416a020b144aba71de60"
+    },
+    "examples/freertos_lwip_example_web_utils.c": {
+      "original_sha256": "768dad3e7078cd36d89cfa18ebae088eea9d6fa878a65960eea18d05aa3a8f49",
+      "compat_sha256": "768dad3e7078cd36d89cfa18ebae088eea9d6fa878a65960eea18d05aa3a8f49"
+    },
+    "examples/freertos_lwip_example_webserver.c": {
+      "original_sha256": "e4d2fd6769fcf6a4411eedad4f43ab9d426103dd08d3e3b984abbad2aa99dcca",
+      "compat_sha256": "e4d2fd6769fcf6a4411eedad4f43ab9d426103dd08d3e3b984abbad2aa99dcca"
+    },
+    "examples/freertos_lwip_example_webserver.h": {
+      "original_sha256": "3d2d84fd21ef8e35625c33fdca5138205671e68c62b8506b32a521e8eab9792a",
+      "compat_sha256": "3d2d84fd21ef8e35625c33fdca5138205671e68c62b8506b32a521e8eab9792a"
+    },
+    "examples/freertos_lwip_example_ws_http_response.c": {
+      "original_sha256": "731b3d5ae24b00a21728dbfeec16cd1d2b750721d7baab02b50e5ef3f31678e9",
+      "compat_sha256": "731b3d5ae24b00a21728dbfeec16cd1d2b750721d7baab02b50e5ef3f31678e9"
+    },
+    "examples/freertos_lwip_example_ws_main.c": {
+      "original_sha256": "b5b8bff4e40e8a21cca2845060135a36102924734c5d2b1f0f9ac46bc4b40698",
+      "compat_sha256": "b5b8bff4e40e8a21cca2845060135a36102924734c5d2b1f0f9ac46bc4b40698"
+    },
+    "examples/freertos_lwip_example_ws_platform_fs.c": {
+      "original_sha256": "cb35d68b44060567ef76b6fe44b28b169fb1b2ffac10c0d131473c6daa33cbaa",
+      "compat_sha256": "cb35d68b44060567ef76b6fe44b28b169fb1b2ffac10c0d131473c6daa33cbaa"
+    },
+    "examples/lwip_example_i2c_access.c": {
+      "original_sha256": "f317368a7ae25eb82034eda3c3f20ab9d10070424677b25c15b097897ef4e97d",
+      "compat_sha256": "f317368a7ae25eb82034eda3c3f20ab9d10070424677b25c15b097897ef4e97d"
+    },
+    "examples/lwip_example_igmp_app.c": {
+      "original_sha256": "2f2d28366ccaf10f4e7b019b2a642c756fb606ca1464d605331775c07101c85b",
+      "compat_sha256": "2f2d28366ccaf10f4e7b019b2a642c756fb606ca1464d605331775c07101c85b"
+    },
+    "examples/lwip_example_igmp_app.h": {
+      "original_sha256": "ba8db282ee57edd4560fd2c488bf1940069568e56664a0b7fdaf5664421d3610",
+      "compat_sha256": "ba8db282ee57edd4560fd2c488bf1940069568e56664a0b7fdaf5664421d3610"
+    },
+    "examples/lwip_example_igmp_main.c": {
+      "original_sha256": "d9a01e66c0fbc40b2f128cca38a8876c07a887ed97ca0c8591e3174617485345",
+      "compat_sha256": "d9a01e66c0fbc40b2f128cca38a8876c07a887ed97ca0c8591e3174617485345"
+    },
+    "examples/lwip_example_iic_phyreset.c": {
+      "original_sha256": "c10c2178e2970cbf071e69df552daf8723a7c494a856b4141b6de880824ac44d",
+      "compat_sha256": "c10c2178e2970cbf071e69df552daf8723a7c494a856b4141b6de880824ac44d"
+    },
+    "examples/lwip_example_platform.c": {
+      "original_sha256": "1a0f9633e7f94e6c0bb3c0477d775618fb2daf9bb5d631a7a5b832acad55f692",
+      "compat_sha256": "1a0f9633e7f94e6c0bb3c0477d775618fb2daf9bb5d631a7a5b832acad55f692"
+    },
+    "examples/lwip_example_platform.h": {
+      "original_sha256": "35a8dc625188820dfccd7344e447ff97a1af4774ba31e97c5f6c3cc72ae3ce31",
+      "compat_sha256": "35a8dc625188820dfccd7344e447ff97a1af4774ba31e97c5f6c3cc72ae3ce31"
+    },
+    "examples/lwip_example_platform_config.h": {
+      "original_sha256": "e7a2c562063fbc7e204ba871aa67e6f79e9fb7790d2848f2bc901dc800043b72",
+      "compat_sha256": "e7a2c562063fbc7e204ba871aa67e6f79e9fb7790d2848f2bc901dc800043b72"
+    },
+    "examples/lwip_example_platform_mb.c": {
+      "original_sha256": "33d16f69d2fbb1b6a33938587120416861e18261bbab3200b4a0c235aa57f73e",
+      "compat_sha256": "33d16f69d2fbb1b6a33938587120416861e18261bbab3200b4a0c235aa57f73e"
+    },
+    "examples/lwip_example_platform_zynq.c": {
+      "original_sha256": "73987b5d1019bb6e3e547938e64fdd3439ff8a6960324fb1e8d9ae466d7ed100",
+      "compat_sha256": "73987b5d1019bb6e3e547938e64fdd3439ff8a6960324fb1e8d9ae466d7ed100"
+    },
+    "examples/lwip_example_platform_zynqmp.c": {
+      "original_sha256": "27f5fdbf5a2519348b93b5174107e0c34e939566c689bbd4c3712d290562de26",
+      "compat_sha256": "27f5fdbf5a2519348b93b5174107e0c34e939566c689bbd4c3712d290562de26"
+    },
+    "examples/lwip_example_sfp.c": {
+      "original_sha256": "7129916cb67fb5c6eaeb88863e617cf8b29976b5b6d1aef957a82e7115447c01",
+      "compat_sha256": "7129916cb67fb5c6eaeb88863e617cf8b29976b5b6d1aef957a82e7115447c01"
+    },
+    "examples/lwip_example_si5324.c": {
+      "original_sha256": "f1fd28d2701ed61418da74d933703a1a96329fb1d75c8c28fd58a7107e3ef43b",
+      "compat_sha256": "f1fd28d2701ed61418da74d933703a1a96329fb1d75c8c28fd58a7107e3ef43b"
+    },
+    "examples/lwip_example_tftp_client.c": {
+      "original_sha256": "72bedcd2e1c56028ad14cf0afe06a43d22c047e8f82b4c3ae58ca28d5f6bd730",
+      "compat_sha256": "72bedcd2e1c56028ad14cf0afe06a43d22c047e8f82b4c3ae58ca28d5f6bd730"
+    },
+    "examples/lwip_example_tftp_platform_fs.c": {
+      "original_sha256": "196031621a8ac30f3a340a877ef1c300eefa4d83ba0dcc8073b742c73dd0096a",
+      "compat_sha256": "196031621a8ac30f3a340a877ef1c300eefa4d83ba0dcc8073b742c73dd0096a"
+    },
+    "examples/lwip_example_tftp_platform_fs.h": {
+      "original_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1",
+      "compat_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1"
+    },
+    "examples/lwip_example_tftp_server.c": {
+      "original_sha256": "be25b576f00d400bf52e347c6e65a9677cff9ad3e75b68b8f314ef8b39d59d9c",
+      "compat_sha256": "be25b576f00d400bf52e347c6e65a9677cff9ad3e75b68b8f314ef8b39d59d9c"
+    },
+    "examples/lwip_example_tftpclient_common.h": {
+      "original_sha256": "49229921b1a0d860897c7cf93cfd0dab8f082c4d50fbdb866d257ba94f50af49",
+      "compat_sha256": "49229921b1a0d860897c7cf93cfd0dab8f082c4d50fbdb866d257ba94f50af49"
+    },
+    "examples/lwip_example_tftpclient_main.c": {
+      "original_sha256": "3c967695a0d501989d21bd9dcfb200f602b7616070d139bca702b4970f8947e5",
+      "compat_sha256": "3c967695a0d501989d21bd9dcfb200f602b7616070d139bca702b4970f8947e5"
+    },
+    "examples/lwip_example_tftpserver_common.h": {
+      "original_sha256": "155a4e0ff536a6d031df05c1f7178167cd06f89d3a6c78e5ab3293835bbb3290",
+      "compat_sha256": "155a4e0ff536a6d031df05c1f7178167cd06f89d3a6c78e5ab3293835bbb3290"
+    },
+    "examples/lwip_example_tftpserver_main.c": {
+      "original_sha256": "864ea1cc379f665fb79bb358875ccf24ba022443c9d5a87f625fa82c981058a0",
+      "compat_sha256": "864ea1cc379f665fb79bb358875ccf24ba022443c9d5a87f625fa82c981058a0"
+    },
+    "examples/lwip_example_web_utils.c": {
+      "original_sha256": "62e6218aa6f2d20e65a1c7b308894f20c912623216ed9ee4ae5b3b8261db8490",
+      "compat_sha256": "62e6218aa6f2d20e65a1c7b308894f20c912623216ed9ee4ae5b3b8261db8490"
+    },
+    "examples/lwip_example_webserver.c": {
+      "original_sha256": "b0ac148e5859a7d5cbb63247fb2d208f4193a82c2a9172653540a23140d33dd7",
+      "compat_sha256": "b0ac148e5859a7d5cbb63247fb2d208f4193a82c2a9172653540a23140d33dd7"
+    },
+    "examples/lwip_example_webserver.h": {
+      "original_sha256": "218bae79fb61564d3c08aff86bf904d92f1a9caabbcc62abbe3b288345808898",
+      "compat_sha256": "218bae79fb61564d3c08aff86bf904d92f1a9caabbcc62abbe3b288345808898"
+    },
+    "examples/lwip_example_ws_http_response.c": {
+      "original_sha256": "870bf703c37e40bcebd9861b922563be898c33c0813584b65f20cf49f915d7c3",
+      "compat_sha256": "870bf703c37e40bcebd9861b922563be898c33c0813584b65f20cf49f915d7c3"
+    },
+    "examples/lwip_example_ws_main.c": {
+      "original_sha256": "3acd2a2c9a4ec1165d7cfd43703ace11f6ed2fe86015ec5838fe1dfcadaca3d9",
+      "compat_sha256": "3acd2a2c9a4ec1165d7cfd43703ace11f6ed2fe86015ec5838fe1dfcadaca3d9"
+    },
+    "examples/lwip_example_ws_platform_fs.c": {
+      "original_sha256": "cb35d68b44060567ef76b6fe44b28b169fb1b2ffac10c0d131473c6daa33cbaa",
+      "compat_sha256": "cb35d68b44060567ef76b6fe44b28b169fb1b2ffac10c0d131473c6daa33cbaa"
+    },
+    "examples/lwip_example_ws_platform_fs.h": {
+      "original_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1",
+      "compat_sha256": "a1a487b6329d08a0ab76bf92aa65712df68d665c200f0adb1a678a0a42d39ee1"
+    },
+    "src/CMakeLists.txt": {
+      "original_sha256": "9f5927a13ffc0f08c32da6ee473db3da59d39e930801a3a6d7606c30a5343e22",
+      "compat_sha256": "9f5927a13ffc0f08c32da6ee473db3da59d39e930801a3a6d7606c30a5343e22"
+    },
+    "src/ChangeLog": {
+      "original_sha256": "589fec507b09cd8e3183697f67513c7852d18f621fbf589d57d06dc4b74bac2c",
+      "compat_sha256": "589fec507b09cd8e3183697f67513c7852d18f621fbf589d57d06dc4b74bac2c"
+    },
+    "src/Filelists.cmake": {
+      "original_sha256": "ca32a27e939d3d73677e870acdbe2bc50888c989bdb1d30be6b97dda16b0360a",
+      "compat_sha256": "ca32a27e939d3d73677e870acdbe2bc50888c989bdb1d30be6b97dda16b0360a"
+    },
+    "src/Makefile": {
+      "original_sha256": "a81b56dba0eabe58050a6c941d576fb51765e2b2a4be19c752d585b86fe24a84",
+      "compat_sha256": "a81b56dba0eabe58050a6c941d576fb51765e2b2a4be19c752d585b86fe24a84"
+    },
+    "src/Makefile.adapter": {
+      "original_sha256": "00281b838a96cfcd7cbd46b82ec203c692c6eaf45e2524fbfeb1b0ff69f6654b",
+      "compat_sha256": "00281b838a96cfcd7cbd46b82ec203c692c6eaf45e2524fbfeb1b0ff69f6654b"
+    },
+    "src/Makefile.config": {
+      "original_sha256": "f6dcdead432f8a73b36deb6989f817ddddc5bf56f02e486c1324c67d88f9813a",
+      "compat_sha256": "f6dcdead432f8a73b36deb6989f817ddddc5bf56f02e486c1324c67d88f9813a"
+    },
+    "src/Makefile.lwip": {
+      "original_sha256": "207427695e83df6e3774f0603339f444ba9bfd4c8042f435403536ff504fcf52",
+      "compat_sha256": "207427695e83df6e3774f0603339f444ba9bfd4c8042f435403536ff504fcf52"
+    },
+    "src/lwip-2.2.0/BUILDING": {
+      "original_sha256": "8a8ec22c18a1dd4dcfd13afa8d7460d7eba3e5db45342d3c2c70d6ede831a493",
+      "compat_sha256": "8a8ec22c18a1dd4dcfd13afa8d7460d7eba3e5db45342d3c2c70d6ede831a493"
+    },
+    "src/lwip-2.2.0/CHANGELOG": {
+      "original_sha256": "0665fd0a01162fa2b2955bb554b564e45f86af5680fff14b381f91128a63f85c",
+      "compat_sha256": "0665fd0a01162fa2b2955bb554b564e45f86af5680fff14b381f91128a63f85c"
+    },
+    "src/lwip-2.2.0/CMakeLists.txt": {
+      "original_sha256": "a50d9d2e9adfbea8baea762c1964d77b7b58bd5636dfdb6c7ba7be8c4074198f",
+      "compat_sha256": "a50d9d2e9adfbea8baea762c1964d77b7b58bd5636dfdb6c7ba7be8c4074198f"
+    },
+    "src/lwip-2.2.0/COPYING": {
+      "original_sha256": "353b9851da160c784535c5d20db7f2a435cbfeecdee73d16540ed9b324407c14",
+      "compat_sha256": "353b9851da160c784535c5d20db7f2a435cbfeecdee73d16540ed9b324407c14"
+    },
+    "src/lwip-2.2.0/FEATURES": {
+      "original_sha256": "39a76615b5fc94b8fcc9236969f17b5b0589de89cf16dab88d0352e2a03fe196",
+      "compat_sha256": "39a76615b5fc94b8fcc9236969f17b5b0589de89cf16dab88d0352e2a03fe196"
+    },
+    "src/lwip-2.2.0/FILES": {
+      "original_sha256": "8cab124b0bfd686958adeb1e36e7f485b2c0411b75fecb28590cfd8c98bf00c6",
+      "compat_sha256": "8cab124b0bfd686958adeb1e36e7f485b2c0411b75fecb28590cfd8c98bf00c6"
+    },
+    "src/lwip-2.2.0/README": {
+      "original_sha256": "382adcbaff80ccbcabbee4e0a747eeb914453d4e7f9c97ed7ba872a1a49835d1",
+      "compat_sha256": "382adcbaff80ccbcabbee4e0a747eeb914453d4e7f9c97ed7ba872a1a49835d1"
+    },
+    "src/lwip-2.2.0/UPGRADING": {
+      "original_sha256": "4a2907e5718c61b875db8f868e21cb04f34e24a49273c09e590c866467c44be0",
+      "compat_sha256": "4a2907e5718c61b875db8f868e21cb04f34e24a49273c09e590c866467c44be0"
+    },
+    "src/lwip-2.2.0/codespell_changed_files.sh": {
+      "original_sha256": "76c7f020da15ef46ecb03713f0b5bde76a8c08757e5a0a31de86af0ec27666fd",
+      "compat_sha256": "76c7f020da15ef46ecb03713f0b5bde76a8c08757e5a0a31de86af0ec27666fd"
+    },
+    "src/lwip-2.2.0/codespell_check.sh": {
+      "original_sha256": "633fe2a9c7472738aebc3da5262931eddd7646dc7a660e017e1ffb3bb98b8f72",
+      "compat_sha256": "633fe2a9c7472738aebc3da5262931eddd7646dc7a660e017e1ffb3bb98b8f72"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/CMakeLists.txt": {
+      "original_sha256": "cdd7bc03a511402a3fab5a86ebe39935725f8e1d8a7195b0912e7ffeed1a7a0a",
+      "compat_sha256": "cdd7bc03a511402a3fab5a86ebe39935725f8e1d8a7195b0912e7ffeed1a7a0a"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/arch/cc.h": {
+      "original_sha256": "15e0c3ed378114207271581d5fd57ba8c5b276eeaeb3862e5c4828e4a59c2882",
+      "compat_sha256": "15e0c3ed378114207271581d5fd57ba8c5b276eeaeb3862e5c4828e4a59c2882"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/arch/cpu.h": {
+      "original_sha256": "4d569dda48d3a12699397b13456469b6ff3efb172b9e4c754c3070bc0bc4a5b8",
+      "compat_sha256": "4d569dda48d3a12699397b13456469b6ff3efb172b9e4c754c3070bc0bc4a5b8"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/arch/perf.h": {
+      "original_sha256": "f35cb8ca6c8998e56f5d1497a516dd13e395714083d56c42181b165bac9cf97f",
+      "compat_sha256": "f35cb8ca6c8998e56f5d1497a516dd13e395714083d56c42181b165bac9cf97f"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/arch/sys_arch.h": {
+      "original_sha256": "37bfe490b59d9a2f8dbeb85947b041a2596078bf7c8dc9378e60a1f869c99dc6",
+      "compat_sha256": "37bfe490b59d9a2f8dbeb85947b041a2596078bf7c8dc9378e60a1f869c99dc6"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/lwipopts.h": {
+      "original_sha256": "b9dfca2749c0792ddfb55b07dcdc2c5087a41e69ed4da4d0fad6dbd8a20b80b5",
+      "compat_sha256": "b9dfca2749c0792ddfb55b07dcdc2c5087a41e69ed4da4d0fad6dbd8a20b80b5"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/lwipopts.h.in": {
+      "original_sha256": "bc8eda7df7f97ab866a8ed47e4845b0c4231f4ce0aa7516e114f3dbe45d589a8",
+      "compat_sha256": "bc8eda7df7f97ab866a8ed47e4845b0c4231f4ce0aa7516e114f3dbe45d589a8"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xadapter.h": {
+      "original_sha256": "7938a0350521e44f5874617b19e7cf667307e3e51202e262bb5f0cf32100860b",
+      "compat_sha256": "7938a0350521e44f5874617b19e7cf667307e3e51202e262bb5f0cf32100860b"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xaxiemacif.h": {
+      "original_sha256": "ab4b9942b2e81c5a2ec17de49c0c4484d786767102f747f010122c0995a98c46",
+      "compat_sha256": "ab4b9942b2e81c5a2ec17de49c0c4484d786767102f747f010122c0995a98c46"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xemacliteif.h": {
+      "original_sha256": "e309e44774cf4415d6abac41ddebf236dc86fda6b4849290e1fcd68482f4735d",
+      "compat_sha256": "e309e44774cf4415d6abac41ddebf236dc86fda6b4849290e1fcd68482f4735d"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xemacpsif.h": {
+      "original_sha256": "4a54241bb3f2e4b0f5025613c13c29b9f48c65b1069fc1039719b2510f07ea1f",
+      "compat_sha256": "4a54241bb3f2e4b0f5025613c13c29b9f48c65b1069fc1039719b2510f07ea1f"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xlltemacif.h": {
+      "original_sha256": "ff06a7ea2af57a9484a8c737de29bad50768bba9b43dd83ef197892f0a5e78a2",
+      "compat_sha256": "ff06a7ea2af57a9484a8c737de29bad50768bba9b43dd83ef197892f0a5e78a2"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xpqueue.h": {
+      "original_sha256": "6593272a7951f52ad160ae734b04b694e16b40a83ed80ba42d201f50153b349c",
+      "compat_sha256": "6593272a7951f52ad160ae734b04b694e16b40a83ed80ba42d201f50153b349c"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/netif/xtopology.h": {
+      "original_sha256": "27c7271df267af010042907d7998e9bb6cbe5247680aeb4e9f1937bcc68d5b8d",
+      "compat_sha256": "27c7271df267af010042907d7998e9bb6cbe5247680aeb4e9f1937bcc68d5b8d"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/xlwipconfig.h": {
+      "original_sha256": "a3e58658796182f5a1f179f95c52e412e2f9cc4efef80be0ef40b5f2bb1d9cb0",
+      "compat_sha256": "a3e58658796182f5a1f179f95c52e412e2f9cc4efef80be0ef40b5f2bb1d9cb0"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/include/xlwipconfig.h.in": {
+      "original_sha256": "263ca0b2ef2bf244e63743ecc5032eaedd538efc7d84a162b9320438ec285aef",
+      "compat_sha256": "263ca0b2ef2bf244e63743ecc5032eaedd538efc7d84a162b9320438ec285aef"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/CMakeLists.txt": {
+      "original_sha256": "e01ab8a320e977ead7db956575da1899b476354209f4381d2ab08a4fd98318a1",
+      "compat_sha256": "e01ab8a320e977ead7db956575da1899b476354209f4381d2ab08a4fd98318a1"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xadapter.c": {
+      "original_sha256": "0cde5ad72758bbe005a3f1ccdada6e9b53de91d284f4580b2500c626b348f67f",
+      "compat_sha256": "0cde5ad72758bbe005a3f1ccdada6e9b53de91d284f4580b2500c626b348f67f"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif.c": {
+      "original_sha256": "4c9301b07d8aaab9ccdd9d52ccb1e7d7efdf2339a05ee43bd13ad7966dcfbd57",
+      "compat_sha256": "4c9301b07d8aaab9ccdd9d52ccb1e7d7efdf2339a05ee43bd13ad7966dcfbd57"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_dma.c": {
+      "original_sha256": "7b91aa7e14428ff1df71a033947ae27c39bf7968d7b904078ec25802fb090f90",
+      "compat_sha256": "7b91aa7e14428ff1df71a033947ae27c39bf7968d7b904078ec25802fb090f90"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_fifo.c": {
+      "original_sha256": "f8f757bf92f1238294b872261d479a9051b622f28081ca422928e5ddd63d05ab",
+      "compat_sha256": "f8f757bf92f1238294b872261d479a9051b622f28081ca422928e5ddd63d05ab"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_fifo.h": {
+      "original_sha256": "cdbf2286e5c3ce52a80d2c1daadf0f614449f547545fa92a64cd3291b84c3444",
+      "compat_sha256": "cdbf2286e5c3ce52a80d2c1daadf0f614449f547545fa92a64cd3291b84c3444"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_hw.c": {
+      "original_sha256": "6e80b0266d42dc5612ef48081c8b681d586662a372e4a405c99b9c8bea70a4e7",
+      "compat_sha256": "6e80b0266d42dc5612ef48081c8b681d586662a372e4a405c99b9c8bea70a4e7"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_hw.h": {
+      "original_sha256": "7a455a159faad604a344f7f6f9cb91de5a2208b663665a62cf9ca8a55d8a6596",
+      "compat_sha256": "7a455a159faad604a344f7f6f9cb91de5a2208b663665a62cf9ca8a55d8a6596"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_mcdma.c": {
+      "original_sha256": "a592c4eb4ac52cd2011727fac25e496a57a25292749ab05fddc1cd57e488d831",
+      "compat_sha256": "a592c4eb4ac52cd2011727fac25e496a57a25292749ab05fddc1cd57e488d831"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xaxiemacif_physpeed.c": {
+      "original_sha256": "8e9eeba13eeecef03fad57cecec87b1c22d759334a9b040166690bcfac64b30a",
+      "compat_sha256": "8e9eeba13eeecef03fad57cecec87b1c22d759334a9b040166690bcfac64b30a"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemac_ieee_reg.h": {
+      "original_sha256": "8fe34f4f8faf0ea3724f1d0e8f01129bc5a3769f2c1c90da37eb95f0d92ed990",
+      "compat_sha256": "8fe34f4f8faf0ea3724f1d0e8f01129bc5a3769f2c1c90da37eb95f0d92ed990"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacliteif.c": {
+      "original_sha256": "380c28cfa8499bcad7b5474aac213bf3fad2c9acf989aa096545817f67effee8",
+      "compat_sha256": "380c28cfa8499bcad7b5474aac213bf3fad2c9acf989aa096545817f67effee8"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif.c": {
+      "original_sha256": "d1e231d7dcce58074f8536241ab13b6e5912c966b176836c24638a6c406daac6",
+      "compat_sha256": "d1e231d7dcce58074f8536241ab13b6e5912c966b176836c24638a6c406daac6"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_dma.c": {
+      "original_sha256": "e9dd04983c5e0d9bd13b5ebaf8b807dd17eacec24e0f3b90423be730c515e2cc",
+      "compat_sha256": "e9dd04983c5e0d9bd13b5ebaf8b807dd17eacec24e0f3b90423be730c515e2cc"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_hw.c": {
+      "original_sha256": "b91ccf7d74912ba0970eb1a97e902cfc46ec734d603f3d4a39324659cddff02c",
+      "compat_sha256": "b91ccf7d74912ba0970eb1a97e902cfc46ec734d603f3d4a39324659cddff02c"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_hw.h": {
+      "original_sha256": "44e88e7be90e4d16268c9619a7b1d708867d54aa33b822f075e55d359555bfd6",
+      "compat_sha256": "44e88e7be90e4d16268c9619a7b1d708867d54aa33b822f075e55d359555bfd6"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_physpeed.c": {
+      "original_sha256": "bb58d502d22544d34827c1262e15c2b5a6dc139c267dbb1ba29f110e8958b8d1",
+      "compat_sha256": "bb58d502d22544d34827c1262e15c2b5a6dc139c267dbb1ba29f110e8958b8d1"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/netif/xpqueue.c": {
+      "original_sha256": "3a8923cb99462452a7e980bd6ad68215c37575e129019a525c6de4e972eaf649",
+      "compat_sha256": "3a8923cb99462452a7e980bd6ad68215c37575e129019a525c6de4e972eaf649"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/sys_arch.c": {
+      "original_sha256": "8e9eda2e135dfa1c9fa80337f88c270d415de1885ca093df156cadc6f3ede6eb",
+      "compat_sha256": "8e9eda2e135dfa1c9fa80337f88c270d415de1885ca093df156cadc6f3ede6eb"
+    },
+    "src/lwip-2.2.0/contrib/ports/xilinx/sys_arch_raw.c": {
+      "original_sha256": "9e8403314f808e564642b807035a6779fe5eee6d47fc8a439aebbb7d27f47bb9",
+      "compat_sha256": "9e8403314f808e564642b807035a6779fe5eee6d47fc8a439aebbb7d27f47bb9"
+    },
+    "src/lwip-2.2.0/src/FILES": {
+      "original_sha256": "05faeb3c86d87e76ba9366ea01db86c00977e5d811c57c6dde081ca9ec6fec2e",
+      "compat_sha256": "05faeb3c86d87e76ba9366ea01db86c00977e5d811c57c6dde081ca9ec6fec2e"
+    },
+    "src/lwip-2.2.0/src/Filelists.cmake": {
+      "original_sha256": "5a6780badb89a2dafe7fb12b8e8c7706387dc8b1612627cc02275ac60caf23af",
+      "compat_sha256": "5a6780badb89a2dafe7fb12b8e8c7706387dc8b1612627cc02275ac60caf23af"
+    },
+    "src/lwip-2.2.0/src/Filelists.mk": {
+      "original_sha256": "a750091212a64e856461256dc27fd749f7851780bf70ca3b67751afe36f2699e",
+      "compat_sha256": "a750091212a64e856461256dc27fd749f7851780bf70ca3b67751afe36f2699e"
+    },
+    "src/lwip-2.2.0/src/api/api_lib.c": {
+      "original_sha256": "fcb5fe814f566e3eb5dce8868fb1bd2546e7f514fafb48aa1b3ef7bc01ad0ee1",
+      "compat_sha256": "fcb5fe814f566e3eb5dce8868fb1bd2546e7f514fafb48aa1b3ef7bc01ad0ee1"
+    },
+    "src/lwip-2.2.0/src/api/api_msg.c": {
+      "original_sha256": "f78d53c17119fbf48158346f5fbb44ef76a1617a88c3ab1b0d3175500bb3966c",
+      "compat_sha256": "f78d53c17119fbf48158346f5fbb44ef76a1617a88c3ab1b0d3175500bb3966c"
+    },
+    "src/lwip-2.2.0/src/api/err.c": {
+      "original_sha256": "5dd20e93a89f5cf4492e6cc3de49a5b6de6a9b15136963cef2a08a5e411a1f15",
+      "compat_sha256": "5dd20e93a89f5cf4492e6cc3de49a5b6de6a9b15136963cef2a08a5e411a1f15"
+    },
+    "src/lwip-2.2.0/src/api/if_api.c": {
+      "original_sha256": "72cf85ae71f085aa7c13a330a5eed3f8120739d63ec4a961d36b951e89aa75bc",
+      "compat_sha256": "72cf85ae71f085aa7c13a330a5eed3f8120739d63ec4a961d36b951e89aa75bc"
+    },
+    "src/lwip-2.2.0/src/api/netbuf.c": {
+      "original_sha256": "2b2bc92804b38f37eb865714d68e5039fa7fe7ad43aabfed7cd39528b93a35b4",
+      "compat_sha256": "2b2bc92804b38f37eb865714d68e5039fa7fe7ad43aabfed7cd39528b93a35b4"
+    },
+    "src/lwip-2.2.0/src/api/netdb.c": {
+      "original_sha256": "1eb1cce33e91bc48f03aeb0c884e70bab93d29dad1b71aac5fe0aa6d7d2b1b9c",
+      "compat_sha256": "1eb1cce33e91bc48f03aeb0c884e70bab93d29dad1b71aac5fe0aa6d7d2b1b9c"
+    },
+    "src/lwip-2.2.0/src/api/netifapi.c": {
+      "original_sha256": "d8426d620c4556c1f8cfc68aba0e91c8e7bbe214a13fb877f364041f9bf8ec34",
+      "compat_sha256": "d8426d620c4556c1f8cfc68aba0e91c8e7bbe214a13fb877f364041f9bf8ec34"
+    },
+    "src/lwip-2.2.0/src/api/sockets.c": {
+      "original_sha256": "eeb7f2f151d543c8a104ca4fe7b758494e3fe5be209569e3fa8b20d749c6ac00",
+      "compat_sha256": "eeb7f2f151d543c8a104ca4fe7b758494e3fe5be209569e3fa8b20d749c6ac00"
+    },
+    "src/lwip-2.2.0/src/api/tcpip.c": {
+      "original_sha256": "3c0993ed941c543bad791cb63dbc2bf37a655cbbc72c306426a3915dcade12a5",
+      "compat_sha256": "3c0993ed941c543bad791cb63dbc2bf37a655cbbc72c306426a3915dcade12a5"
+    },
+    "src/lwip-2.2.0/src/apps/altcp_tls/altcp_tls_mbedtls.c": {
+      "original_sha256": "a4712a1681fdfea46c6482236dfa5e6a77c5b7440b9b002fc121d66a82a60d8f",
+      "compat_sha256": "a4712a1681fdfea46c6482236dfa5e6a77c5b7440b9b002fc121d66a82a60d8f"
+    },
+    "src/lwip-2.2.0/src/apps/altcp_tls/altcp_tls_mbedtls_mem.c": {
+      "original_sha256": "7d2e5d0032f16579c9a55aeea21bcdc61e981e8b9a46b873c13096bd93db90ab",
+      "compat_sha256": "7d2e5d0032f16579c9a55aeea21bcdc61e981e8b9a46b873c13096bd93db90ab"
+    },
+    "src/lwip-2.2.0/src/apps/altcp_tls/altcp_tls_mbedtls_mem.h": {
+      "original_sha256": "e145466f175096ce419c0e6e267353b3f8af174c0135a1485305ee79c71ac9ab",
+      "compat_sha256": "e145466f175096ce419c0e6e267353b3f8af174c0135a1485305ee79c71ac9ab"
+    },
+    "src/lwip-2.2.0/src/apps/altcp_tls/altcp_tls_mbedtls_structs.h": {
+      "original_sha256": "17fe098afa114cc04d6295f60257de228fb9d382f776a400fbb80e92a8675218",
+      "compat_sha256": "17fe098afa114cc04d6295f60257de228fb9d382f776a400fbb80e92a8675218"
+    },
+    "src/lwip-2.2.0/src/apps/http/altcp_proxyconnect.c": {
+      "original_sha256": "880eeea58d1eaf4e1b095b666de6a0a81826061d4d397091389951ad74c11f3c",
+      "compat_sha256": "880eeea58d1eaf4e1b095b666de6a0a81826061d4d397091389951ad74c11f3c"
+    },
+    "src/lwip-2.2.0/src/apps/http/fs/404.html": {
+      "original_sha256": "78b49de4d92486208a4f564c3215fed4ed41d22e5c99d3ab2ebaeda9e395a0cd",
+      "compat_sha256": "78b49de4d92486208a4f564c3215fed4ed41d22e5c99d3ab2ebaeda9e395a0cd"
+    },
+    "src/lwip-2.2.0/src/apps/http/fs/img/sics.gif": {
+      "original_sha256": "3b4eb378fdefac1e7dd6dbb6c84db20e1512463457626f5d991bf7c1ccb7cf63",
+      "compat_sha256": "3b4eb378fdefac1e7dd6dbb6c84db20e1512463457626f5d991bf7c1ccb7cf63"
+    },
+    "src/lwip-2.2.0/src/apps/http/fs/index.html": {
+      "original_sha256": "7928ac4a9499f65933203a92a20e87a3fa1ef662a896e429001e434b2dd39992",
+      "compat_sha256": "7928ac4a9499f65933203a92a20e87a3fa1ef662a896e429001e434b2dd39992"
+    },
+    "src/lwip-2.2.0/src/apps/http/fs.c": {
+      "original_sha256": "cb78b79c342f93affdb6415d76ccd52c59c687e2bcd4459a4e00261e14c80939",
+      "compat_sha256": "cb78b79c342f93affdb6415d76ccd52c59c687e2bcd4459a4e00261e14c80939"
+    },
+    "src/lwip-2.2.0/src/apps/http/fsdata.c": {
+      "original_sha256": "71eeb2b3435f2d46200bdd64fbea09301ea56f41ee64660740d893a2621ad192",
+      "compat_sha256": "71eeb2b3435f2d46200bdd64fbea09301ea56f41ee64660740d893a2621ad192"
+    },
+    "src/lwip-2.2.0/src/apps/http/fsdata.h": {
+      "original_sha256": "44df92ed526d0d6b1c374fdd97a96b3f5eb188c7d1084e32fcf420a8a23e3d0f",
+      "compat_sha256": "44df92ed526d0d6b1c374fdd97a96b3f5eb188c7d1084e32fcf420a8a23e3d0f"
+    },
+    "src/lwip-2.2.0/src/apps/http/http_client.c": {
+      "original_sha256": "07de6a53104d534976cf5e6e5e8dc5211195574f80505c82fa0269879595a982",
+      "compat_sha256": "07de6a53104d534976cf5e6e5e8dc5211195574f80505c82fa0269879595a982"
+    },
+    "src/lwip-2.2.0/src/apps/http/httpd.c": {
+      "original_sha256": "8ffd99540ebc390c684f88189cc2e194b22ebbd4a4c301a2242e90c5feb3ce70",
+      "compat_sha256": "8ffd99540ebc390c684f88189cc2e194b22ebbd4a4c301a2242e90c5feb3ce70"
+    },
+    "src/lwip-2.2.0/src/apps/http/httpd_structs.h": {
+      "original_sha256": "392cc349b27b067284a51bf767e0685ca4ec8787485d10f2740128364660e4a0",
+      "compat_sha256": "392cc349b27b067284a51bf767e0685ca4ec8787485d10f2740128364660e4a0"
+    },
+    "src/lwip-2.2.0/src/apps/http/makefsdata/makefsdata": {
+      "original_sha256": "805268c67e436cff241ba7dbe44b50123846ed71b1e369b3235dfdccb4fd2b61",
+      "compat_sha256": "805268c67e436cff241ba7dbe44b50123846ed71b1e369b3235dfdccb4fd2b61"
+    },
+    "src/lwip-2.2.0/src/apps/http/makefsdata/makefsdata.c": {
+      "original_sha256": "10cf3f30e9743acf8641595e031dc058071287c50614b739ff6ea217cc2b8eeb",
+      "compat_sha256": "10cf3f30e9743acf8641595e031dc058071287c50614b739ff6ea217cc2b8eeb"
+    },
+    "src/lwip-2.2.0/src/apps/http/makefsdata/readme.txt": {
+      "original_sha256": "a259a563a1a42b66faf0f355ce486cab93e3ddb6384c27ed0306249e615ecf77",
+      "compat_sha256": "a259a563a1a42b66faf0f355ce486cab93e3ddb6384c27ed0306249e615ecf77"
+    },
+    "src/lwip-2.2.0/src/apps/http/makefsdata/tinydir.h": {
+      "original_sha256": "ae7afcde141050e587d6daabb7afcdc913d0673853555fa1e3bb13c450fb91ae",
+      "compat_sha256": "ae7afcde141050e587d6daabb7afcdc913d0673853555fa1e3bb13c450fb91ae"
+    },
+    "src/lwip-2.2.0/src/apps/lwiperf/lwiperf.c": {
+      "original_sha256": "f275cba0849f4b6543d6423b0c9acf21dc531327e76cefdc581c731913c8a528",
+      "compat_sha256": "f275cba0849f4b6543d6423b0c9acf21dc531327e76cefdc581c731913c8a528"
+    },
+    "src/lwip-2.2.0/src/apps/mdns/mdns.c": {
+      "original_sha256": "2bd12a3bb8b3c8830c56c2b5c3b8073ab5f71654171602210f63cf6dafc8d5e9",
+      "compat_sha256": "2bd12a3bb8b3c8830c56c2b5c3b8073ab5f71654171602210f63cf6dafc8d5e9"
+    },
+    "src/lwip-2.2.0/src/apps/mdns/mdns_domain.c": {
+      "original_sha256": "e273ff4e4e1a4b9a96a8e1cded5ff240f14f89d9ab6cacf233a8eba49ab51642",
+      "compat_sha256": "e273ff4e4e1a4b9a96a8e1cded5ff240f14f89d9ab6cacf233a8eba49ab51642"
+    },
+    "src/lwip-2.2.0/src/apps/mdns/mdns_out.c": {
+      "original_sha256": "722ff35f55d9f8f3695663e1f1d16b2cf0e5ca6445798bd07ba0a1221ca2f135",
+      "compat_sha256": "722ff35f55d9f8f3695663e1f1d16b2cf0e5ca6445798bd07ba0a1221ca2f135"
+    },
+    "src/lwip-2.2.0/src/apps/mqtt/mqtt.c": {
+      "original_sha256": "f03592307f1fafd13104d30b7da22291ef37f1747997e0bb771eec151f8f5544",
+      "compat_sha256": "f03592307f1fafd13104d30b7da22291ef37f1747997e0bb771eec151f8f5544"
+    },
+    "src/lwip-2.2.0/src/apps/netbiosns/netbiosns.c": {
+      "original_sha256": "49c51ffdfc4e410761ecf3fe7eb3e0139f1a655a25c069d1b2d2afbdc7860e2a",
+      "compat_sha256": "49c51ffdfc4e410761ecf3fe7eb3e0139f1a655a25c069d1b2d2afbdc7860e2a"
+    },
+    "src/lwip-2.2.0/src/apps/smtp/smtp.c": {
+      "original_sha256": "9abe960def181e7e549e3566ae0319ef3a521c57aaa34524785e879c08e390a6",
+      "compat_sha256": "9abe960def181e7e549e3566ae0319ef3a521c57aaa34524785e879c08e390a6"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_asn1.c": {
+      "original_sha256": "d8bab135914260bc8cb3810be04bb17dd6dc58abfb46a063cd2930f5dfcb9a92",
+      "compat_sha256": "d8bab135914260bc8cb3810be04bb17dd6dc58abfb46a063cd2930f5dfcb9a92"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_asn1.h": {
+      "original_sha256": "87bc7b07c8c510b17134ab05a22ee675c9c48450169dc99e600be2f331a27f54",
+      "compat_sha256": "87bc7b07c8c510b17134ab05a22ee675c9c48450169dc99e600be2f331a27f54"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_core.c": {
+      "original_sha256": "b7e2e0157c22b0126e397e66f56daf343a4012f7f319d78fcc586163451ed50d",
+      "compat_sha256": "b7e2e0157c22b0126e397e66f56daf343a4012f7f319d78fcc586163451ed50d"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_core_priv.h": {
+      "original_sha256": "fdb0bd874a251363bee4b6cc118d8d8e63ea17674bd091fde785060b50f0203c",
+      "compat_sha256": "fdb0bd874a251363bee4b6cc118d8d8e63ea17674bd091fde785060b50f0203c"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2.c": {
+      "original_sha256": "1695042f8e26a8c2a830c6c7df35ef7b084fb184b84638e56eef46c4faa3386f",
+      "compat_sha256": "1695042f8e26a8c2a830c6c7df35ef7b084fb184b84638e56eef46c4faa3386f"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_icmp.c": {
+      "original_sha256": "1072cf5d410a39b540ecd09554e98b264488a26f90628f67ccdc9368d3b5a179",
+      "compat_sha256": "1072cf5d410a39b540ecd09554e98b264488a26f90628f67ccdc9368d3b5a179"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_interfaces.c": {
+      "original_sha256": "4998987c9ba42a8808b317dc4a67dd8dd761371d358f3ad4a43fd704b6cbb330",
+      "compat_sha256": "4998987c9ba42a8808b317dc4a67dd8dd761371d358f3ad4a43fd704b6cbb330"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_ip.c": {
+      "original_sha256": "b5cbec924e70fae272b5f66bc260bd9cd7c76eba1050216fcce0129e74c28b2d",
+      "compat_sha256": "b5cbec924e70fae272b5f66bc260bd9cd7c76eba1050216fcce0129e74c28b2d"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_snmp.c": {
+      "original_sha256": "bb5d3ced0dbd9b11cef0bc337791cd2cc4c06f7562e1d4b351e0043388a5c816",
+      "compat_sha256": "bb5d3ced0dbd9b11cef0bc337791cd2cc4c06f7562e1d4b351e0043388a5c816"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_system.c": {
+      "original_sha256": "e4454c37018aa43bf95368dd5abbb0a18306be4639d79af0c4e2247697483b36",
+      "compat_sha256": "e4454c37018aa43bf95368dd5abbb0a18306be4639d79af0c4e2247697483b36"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_tcp.c": {
+      "original_sha256": "e1ccfe4f42268bb4273171b7a6428c342c3914516bc1ca2d783da47b7e5e44e7",
+      "compat_sha256": "e1ccfe4f42268bb4273171b7a6428c342c3914516bc1ca2d783da47b7e5e44e7"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_mib2_udp.c": {
+      "original_sha256": "d6dcdbb3348418a57aa0adc6948ed81cb88c254549a057f49e768c75557e6e61",
+      "compat_sha256": "d6dcdbb3348418a57aa0adc6948ed81cb88c254549a057f49e768c75557e6e61"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_msg.c": {
+      "original_sha256": "dd47d49f1c3d821746ac25b3206d68ee34d0f5f109f85cb83ef05f2e684f728c",
+      "compat_sha256": "dd47d49f1c3d821746ac25b3206d68ee34d0f5f109f85cb83ef05f2e684f728c"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_msg.h": {
+      "original_sha256": "1ddd054f74cea2c6c595b22228461578114d381fe82f86c96c9cf85cf5dc8dee",
+      "compat_sha256": "1ddd054f74cea2c6c595b22228461578114d381fe82f86c96c9cf85cf5dc8dee"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_netconn.c": {
+      "original_sha256": "1f17a0122330556bcb7ac61c491a4edb360e7cd7ee2c4f52af06aaddefcc576a",
+      "compat_sha256": "1f17a0122330556bcb7ac61c491a4edb360e7cd7ee2c4f52af06aaddefcc576a"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_pbuf_stream.c": {
+      "original_sha256": "86344231294dde0a8d647bc91d72cb72b2064b1e799259c114eba337c709fe30",
+      "compat_sha256": "86344231294dde0a8d647bc91d72cb72b2064b1e799259c114eba337c709fe30"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_pbuf_stream.h": {
+      "original_sha256": "22630a24db7edbcaf482b7975765e7df0860f141e9bd9c48083e00af0b7eeba7",
+      "compat_sha256": "22630a24db7edbcaf482b7975765e7df0860f141e9bd9c48083e00af0b7eeba7"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_raw.c": {
+      "original_sha256": "2c5eedb6d972f6313575f837d0e9c33e129fcc43498d180eef6c80c8c4a85c73",
+      "compat_sha256": "2c5eedb6d972f6313575f837d0e9c33e129fcc43498d180eef6c80c8c4a85c73"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_scalar.c": {
+      "original_sha256": "065919819cd402d35c925e80f7732c70872d78faf69f77964e6b75c26be7563d",
+      "compat_sha256": "065919819cd402d35c925e80f7732c70872d78faf69f77964e6b75c26be7563d"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_snmpv2_framework.c": {
+      "original_sha256": "9e0e7a9bee3cd1e55da9398f16e47f5e83395e8979221f0d64809f06c1230994",
+      "compat_sha256": "9e0e7a9bee3cd1e55da9398f16e47f5e83395e8979221f0d64809f06c1230994"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_snmpv2_usm.c": {
+      "original_sha256": "03971bb82a24ec73ff28fe90fd13329b707e3c86f75a23b68f8596c98b56008c",
+      "compat_sha256": "03971bb82a24ec73ff28fe90fd13329b707e3c86f75a23b68f8596c98b56008c"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_table.c": {
+      "original_sha256": "72546d138df585ada6fb1d854b65f7d54d81e98bed5dcdeab79c8c043704e116",
+      "compat_sha256": "72546d138df585ada6fb1d854b65f7d54d81e98bed5dcdeab79c8c043704e116"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_threadsync.c": {
+      "original_sha256": "e286f7a611a7ae080cc5f8d309dc3ee82091721cc274baca333c0d4308795f39",
+      "compat_sha256": "e286f7a611a7ae080cc5f8d309dc3ee82091721cc274baca333c0d4308795f39"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmp_traps.c": {
+      "original_sha256": "284326f4ccabb6a1bd04fe37c3a1d054b75ee8c0f1779510039fbe2300329981",
+      "compat_sha256": "284326f4ccabb6a1bd04fe37c3a1d054b75ee8c0f1779510039fbe2300329981"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmpv3.c": {
+      "original_sha256": "9dec4ef75e29632234089a5593cbd27f9dea972f0829f07bd15c84a14f947ba7",
+      "compat_sha256": "9dec4ef75e29632234089a5593cbd27f9dea972f0829f07bd15c84a14f947ba7"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmpv3_mbedtls.c": {
+      "original_sha256": "7dace5c3961dbdbf6b2085c4403e83aa6666d0ba1a8d0c70709873af5c6609f3",
+      "compat_sha256": "7dace5c3961dbdbf6b2085c4403e83aa6666d0ba1a8d0c70709873af5c6609f3"
+    },
+    "src/lwip-2.2.0/src/apps/snmp/snmpv3_priv.h": {
+      "original_sha256": "f7027abe4f437bbd639ec6703cc9549ce6f0881cee0e44c461de686feef02d2b",
+      "compat_sha256": "f7027abe4f437bbd639ec6703cc9549ce6f0881cee0e44c461de686feef02d2b"
+    },
+    "src/lwip-2.2.0/src/apps/sntp/sntp.c": {
+      "original_sha256": "2c1dc340f09ab63a501d6b3185339f27bb24cd0f7b0943b8a58643716884e087",
+      "compat_sha256": "2c1dc340f09ab63a501d6b3185339f27bb24cd0f7b0943b8a58643716884e087"
+    },
+    "src/lwip-2.2.0/src/apps/tftp/tftp.c": {
+      "original_sha256": "5fd9490a36a2a8ec0d10c257d2365bfd16a1c88e3f6942557311bb1b058e3f12",
+      "compat_sha256": "5fd9490a36a2a8ec0d10c257d2365bfd16a1c88e3f6942557311bb1b058e3f12"
+    },
+    "src/lwip-2.2.0/src/core/altcp.c": {
+      "original_sha256": "3c6653588772a62efdd11ceeffa760847f95d8ec98889c7551e9a1eb8326f8cd",
+      "compat_sha256": "3c6653588772a62efdd11ceeffa760847f95d8ec98889c7551e9a1eb8326f8cd"
+    },
+    "src/lwip-2.2.0/src/core/altcp_alloc.c": {
+      "original_sha256": "90db26c801a4a6466e188e8b5a6b8d2aac2e6f39b4ceeb0f825e7b35ae1786c7",
+      "compat_sha256": "90db26c801a4a6466e188e8b5a6b8d2aac2e6f39b4ceeb0f825e7b35ae1786c7"
+    },
+    "src/lwip-2.2.0/src/core/altcp_tcp.c": {
+      "original_sha256": "55119d3a2213bff38a3734834391c48475c1fd6eb35cc0ffdde74ef0ed657a3a",
+      "compat_sha256": "55119d3a2213bff38a3734834391c48475c1fd6eb35cc0ffdde74ef0ed657a3a"
+    },
+    "src/lwip-2.2.0/src/core/def.c": {
+      "original_sha256": "a12f3ef6c087efb6d4ec524cf332ff438d2504c17d60c263d0bb1b82b79eb2cd",
+      "compat_sha256": "a12f3ef6c087efb6d4ec524cf332ff438d2504c17d60c263d0bb1b82b79eb2cd"
+    },
+    "src/lwip-2.2.0/src/core/dns.c": {
+      "original_sha256": "fe35ede9919974da54598630cc08d654ccc30b668c45b09668c3ba572686b26c",
+      "compat_sha256": "fe35ede9919974da54598630cc08d654ccc30b668c45b09668c3ba572686b26c"
+    },
+    "src/lwip-2.2.0/src/core/inet_chksum.c": {
+      "original_sha256": "fc82b44fc866704a51c0aacd6037b10802b88e8576e1b691917cd2b863878b1b",
+      "compat_sha256": "fc82b44fc866704a51c0aacd6037b10802b88e8576e1b691917cd2b863878b1b"
+    },
+    "src/lwip-2.2.0/src/core/init.c": {
+      "original_sha256": "1eec201491ecc563fcc2984bb9b67fa3f55450559cdca9d1ca2691a1cf3fe5b8",
+      "compat_sha256": "1eec201491ecc563fcc2984bb9b67fa3f55450559cdca9d1ca2691a1cf3fe5b8"
+    },
+    "src/lwip-2.2.0/src/core/ip.c": {
+      "original_sha256": "82d0fc6b45c6d1af88bdece3229fc9821274263c261369de4f81b8d6c80751e7",
+      "compat_sha256": "82d0fc6b45c6d1af88bdece3229fc9821274263c261369de4f81b8d6c80751e7"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/acd.c": {
+      "original_sha256": "e780cbbd86eeadc5033dd2e6311704db0fc9264288f10db6ad0a6ce7dfce86e7",
+      "compat_sha256": "e780cbbd86eeadc5033dd2e6311704db0fc9264288f10db6ad0a6ce7dfce86e7"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/autoip.c": {
+      "original_sha256": "383ccb8d9cb6fc8153d903c82bcfec18bd694103c99f9e870c931944c9989e71",
+      "compat_sha256": "383ccb8d9cb6fc8153d903c82bcfec18bd694103c99f9e870c931944c9989e71"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/dhcp.c": {
+      "original_sha256": "fdddf8c08aba0534f531d97aa7fa713bad4e541531aae61a37759daa88d29e3d",
+      "compat_sha256": "fdddf8c08aba0534f531d97aa7fa713bad4e541531aae61a37759daa88d29e3d"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/etharp.c": {
+      "original_sha256": "8ee2c65e26eacf265ef34798aefd39aa9678296a64154d3d049b10f32e658f5d",
+      "compat_sha256": "8ee2c65e26eacf265ef34798aefd39aa9678296a64154d3d049b10f32e658f5d"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/icmp.c": {
+      "original_sha256": "18f0a520157eb2600e54548f90720aaa1b4719b361d6e12f7406e8c440a57c4e",
+      "compat_sha256": "18f0a520157eb2600e54548f90720aaa1b4719b361d6e12f7406e8c440a57c4e"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/igmp.c": {
+      "original_sha256": "8097841aac8642af43ad7e19a5b340f4b34eabbce8b3b18839176dc5df12b981",
+      "compat_sha256": "8097841aac8642af43ad7e19a5b340f4b34eabbce8b3b18839176dc5df12b981"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/ip4.c": {
+      "original_sha256": "d4973142adede3b868036d5404df9a258ed632788d98969539dc21470b748ae6",
+      "compat_sha256": "d4973142adede3b868036d5404df9a258ed632788d98969539dc21470b748ae6"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/ip4_addr.c": {
+      "original_sha256": "b440b85c9e49e60510cfa61d40e24b0e2ad480e23a821a94017e42df09dcf8be",
+      "compat_sha256": "b440b85c9e49e60510cfa61d40e24b0e2ad480e23a821a94017e42df09dcf8be"
+    },
+    "src/lwip-2.2.0/src/core/ipv4/ip4_frag.c": {
+      "original_sha256": "2624bd59ee8fb612e0b2633644602eddf88d26699b5ddfc3f7877c1c6b06a8d0",
+      "compat_sha256": "2624bd59ee8fb612e0b2633644602eddf88d26699b5ddfc3f7877c1c6b06a8d0"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/dhcp6.c": {
+      "original_sha256": "0984b06d9d907af2c9de419d507dc749f622753e752d13802751be1253f00086",
+      "compat_sha256": "0984b06d9d907af2c9de419d507dc749f622753e752d13802751be1253f00086"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/ethip6.c": {
+      "original_sha256": "548b460688f824015b5b30401cf907828f1dc088a8442d8ee43e4049c1e1401d",
+      "compat_sha256": "548b460688f824015b5b30401cf907828f1dc088a8442d8ee43e4049c1e1401d"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/icmp6.c": {
+      "original_sha256": "d2136d4130f39f854d1279be494d0106b99d6523c3b20c4d96698af08d7961e6",
+      "compat_sha256": "d2136d4130f39f854d1279be494d0106b99d6523c3b20c4d96698af08d7961e6"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/inet6.c": {
+      "original_sha256": "3f7676e46413586fc3d07438b51c0dcd46bb3ba24644892362cf47f84fc15390",
+      "compat_sha256": "3f7676e46413586fc3d07438b51c0dcd46bb3ba24644892362cf47f84fc15390"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/ip6.c": {
+      "original_sha256": "9f64c0ad690b8308099b2fac81eff039c59be5727bd9f17e2b2ec7ed37443f24",
+      "compat_sha256": "9f64c0ad690b8308099b2fac81eff039c59be5727bd9f17e2b2ec7ed37443f24"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/ip6_addr.c": {
+      "original_sha256": "af20c31623fa8bcc50fd41855b7308d9492f7272147f5018aea069358beb7bce",
+      "compat_sha256": "af20c31623fa8bcc50fd41855b7308d9492f7272147f5018aea069358beb7bce"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/ip6_frag.c": {
+      "original_sha256": "087fb4b04d49966cf57f1dd04286aa08fa17bcb739354293fe50a01ea448abb4",
+      "compat_sha256": "087fb4b04d49966cf57f1dd04286aa08fa17bcb739354293fe50a01ea448abb4"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/mld6.c": {
+      "original_sha256": "70b43ea0fe3cd29817bbd6ced03d56696cc7355ab28fe8fae9b5c5e2acc45670",
+      "compat_sha256": "70b43ea0fe3cd29817bbd6ced03d56696cc7355ab28fe8fae9b5c5e2acc45670"
+    },
+    "src/lwip-2.2.0/src/core/ipv6/nd6.c": {
+      "original_sha256": "e2f0348ee6ae426f7e51ddc60ca831ecf1991bd7da955f9828b8c650c3014864",
+      "compat_sha256": "e2f0348ee6ae426f7e51ddc60ca831ecf1991bd7da955f9828b8c650c3014864"
+    },
+    "src/lwip-2.2.0/src/core/mem.c": {
+      "original_sha256": "3f33e25353afdb69940d7e5525d39721357caf8f9dba705718b552f2b2286d45",
+      "compat_sha256": "3f33e25353afdb69940d7e5525d39721357caf8f9dba705718b552f2b2286d45"
+    },
+    "src/lwip-2.2.0/src/core/memp.c": {
+      "original_sha256": "91ca3a00487d61849324ae571ac9ede550a879365c557aba38667ace122b6c00",
+      "compat_sha256": "91ca3a00487d61849324ae571ac9ede550a879365c557aba38667ace122b6c00"
+    },
+    "src/lwip-2.2.0/src/core/netif.c": {
+      "original_sha256": "0d33ad1497fecaa56484781fa8400d88189b687486104f75d4d2a5760ed96f19",
+      "compat_sha256": "0d33ad1497fecaa56484781fa8400d88189b687486104f75d4d2a5760ed96f19"
+    },
+    "src/lwip-2.2.0/src/core/pbuf.c": {
+      "original_sha256": "dbf73163db7db38e398ac8bf1e1c3de3b5b200bc8910b2698bace53acbf339d3",
+      "compat_sha256": "dbf73163db7db38e398ac8bf1e1c3de3b5b200bc8910b2698bace53acbf339d3"
+    },
+    "src/lwip-2.2.0/src/core/raw.c": {
+      "original_sha256": "3ba4f2e5d2b61bbfbe813653c7f4e88e2542d567808d3f03be000e0876ce0392",
+      "compat_sha256": "3ba4f2e5d2b61bbfbe813653c7f4e88e2542d567808d3f03be000e0876ce0392"
+    },
+    "src/lwip-2.2.0/src/core/stats.c": {
+      "original_sha256": "a18b76cde437213ca9f00137bdb61adb00f6f931fe28c40c81f811a5e674caea",
+      "compat_sha256": "a18b76cde437213ca9f00137bdb61adb00f6f931fe28c40c81f811a5e674caea"
+    },
+    "src/lwip-2.2.0/src/core/sys.c": {
+      "original_sha256": "86e336dedec36e042aadaebe93c8be944675210841ccabf180200e82c91b0f8d",
+      "compat_sha256": "86e336dedec36e042aadaebe93c8be944675210841ccabf180200e82c91b0f8d"
+    },
+    "src/lwip-2.2.0/src/core/tcp.c": {
+      "original_sha256": "76d701944a20dae435fb09a37046fea046ba1d996038362e37eae57157ba586f",
+      "compat_sha256": "76d701944a20dae435fb09a37046fea046ba1d996038362e37eae57157ba586f"
+    },
+    "src/lwip-2.2.0/src/core/tcp_in.c": {
+      "original_sha256": "7a3f67af25eed370d8f9ac7c3bacc99b8cf8fdaf373137f92d4a5dc3221e8655",
+      "compat_sha256": "7a3f67af25eed370d8f9ac7c3bacc99b8cf8fdaf373137f92d4a5dc3221e8655"
+    },
+    "src/lwip-2.2.0/src/core/tcp_out.c": {
+      "original_sha256": "85237ab2822b3ad0cd3d043b56f6802d078af27b5871f5de080492d956deb83c",
+      "compat_sha256": "85237ab2822b3ad0cd3d043b56f6802d078af27b5871f5de080492d956deb83c"
+    },
+    "src/lwip-2.2.0/src/core/timeouts.c": {
+      "original_sha256": "884c742f9e3a71dfd35b8962d6ca7bd59db1a721de6b5b8064cb3f89f428bfbd",
+      "compat_sha256": "884c742f9e3a71dfd35b8962d6ca7bd59db1a721de6b5b8064cb3f89f428bfbd"
+    },
+    "src/lwip-2.2.0/src/core/udp.c": {
+      "original_sha256": "a832ebb254a97204f9ff284959da64fbd991b75366b6365ec953c53797568467",
+      "compat_sha256": "a832ebb254a97204f9ff284959da64fbd991b75366b6365ec953c53797568467"
+    },
+    "src/lwip-2.2.0/src/include/compat/posix/arpa/inet.h": {
+      "original_sha256": "8b3edc25121de40cd1c3338d5d68be93091f0713ee8a23eba9789f14d41e0f6d",
+      "compat_sha256": "8b3edc25121de40cd1c3338d5d68be93091f0713ee8a23eba9789f14d41e0f6d"
+    },
+    "src/lwip-2.2.0/src/include/compat/posix/net/if.h": {
+      "original_sha256": "b1cc52bb828e7cc23f070269a60a6ea33f3fd828190b0248f4cd589f06fcab6e",
+      "compat_sha256": "b1cc52bb828e7cc23f070269a60a6ea33f3fd828190b0248f4cd589f06fcab6e"
+    },
+    "src/lwip-2.2.0/src/include/compat/posix/netdb.h": {
+      "original_sha256": "ec3cb99596ef6bf11b39870541bf6607a7cff6011cfef99bf5d53f2abed05948",
+      "compat_sha256": "ec3cb99596ef6bf11b39870541bf6607a7cff6011cfef99bf5d53f2abed05948"
+    },
+    "src/lwip-2.2.0/src/include/compat/posix/sys/socket.h": {
+      "original_sha256": "8b3edc25121de40cd1c3338d5d68be93091f0713ee8a23eba9789f14d41e0f6d",
+      "compat_sha256": "8b3edc25121de40cd1c3338d5d68be93091f0713ee8a23eba9789f14d41e0f6d"
+    },
+    "src/lwip-2.2.0/src/include/compat/stdc/errno.h": {
+      "original_sha256": "9fdac7c52c9fe0cfdf50f96eae29c5f341a9afde5a56166d21500c656a8a0728",
+      "compat_sha256": "9fdac7c52c9fe0cfdf50f96eae29c5f341a9afde5a56166d21500c656a8a0728"
+    },
+    "src/lwip-2.2.0/src/include/lwip/acd.h": {
+      "original_sha256": "ac7477d81a56bedf62e3db9e502a6d9a46ddf6f8705fd420df91e9f8a2398275",
+      "compat_sha256": "ac7477d81a56bedf62e3db9e502a6d9a46ddf6f8705fd420df91e9f8a2398275"
+    },
+    "src/lwip-2.2.0/src/include/lwip/altcp.h": {
+      "original_sha256": "9140dba340b590f329b0d8653c71104d0509d1e7dbb6c184a99afe980474c958",
+      "compat_sha256": "9140dba340b590f329b0d8653c71104d0509d1e7dbb6c184a99afe980474c958"
+    },
+    "src/lwip-2.2.0/src/include/lwip/altcp_tcp.h": {
+      "original_sha256": "e6b325b516d9e2af49b3187e01cd324066ef2c6508a2d9c06016fc0570148d43",
+      "compat_sha256": "e6b325b516d9e2af49b3187e01cd324066ef2c6508a2d9c06016fc0570148d43"
+    },
+    "src/lwip-2.2.0/src/include/lwip/altcp_tls.h": {
+      "original_sha256": "cf34454f5e63c8f766b0653ffe492bebf763ee767cacfa7277ee84336a9ac55d",
+      "compat_sha256": "cf34454f5e63c8f766b0653ffe492bebf763ee767cacfa7277ee84336a9ac55d"
+    },
+    "src/lwip-2.2.0/src/include/lwip/api.h": {
+      "original_sha256": "39a93870e9151ab0a4a70c007c931cf3b642b0704eee43aa662aba9cb9d14f4a",
+      "compat_sha256": "39a93870e9151ab0a4a70c007c931cf3b642b0704eee43aa662aba9cb9d14f4a"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/FILES": {
+      "original_sha256": "1baacff539b72c79be4fb5491be4963f0103557286405b3b4b4dd3396bdb0196",
+      "compat_sha256": "1baacff539b72c79be4fb5491be4963f0103557286405b3b4b4dd3396bdb0196"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/altcp_proxyconnect.h": {
+      "original_sha256": "c4b47d012ce46a6aa25d4038ecfe0844b0f3cdfe40e6234d622de298aa48ab13",
+      "compat_sha256": "c4b47d012ce46a6aa25d4038ecfe0844b0f3cdfe40e6234d622de298aa48ab13"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/altcp_tls_mbedtls_opts.h": {
+      "original_sha256": "7fb4fef6a302f23316bad885be4d108a9227377c00948df5be82c9a49fefb0b9",
+      "compat_sha256": "7fb4fef6a302f23316bad885be4d108a9227377c00948df5be82c9a49fefb0b9"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/fs.h": {
+      "original_sha256": "7b262fbde86e0217750e1254db7fe2660f7d79f11a9c7cc4b039d75870582bfe",
+      "compat_sha256": "7b262fbde86e0217750e1254db7fe2660f7d79f11a9c7cc4b039d75870582bfe"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/http_client.h": {
+      "original_sha256": "54c304f5f3264f555af454f0e14a7ea8610d7cdf4d1424bb79dd7f5159838bbe",
+      "compat_sha256": "54c304f5f3264f555af454f0e14a7ea8610d7cdf4d1424bb79dd7f5159838bbe"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/httpd.h": {
+      "original_sha256": "d9b70d5da0ad3d525cf2a2c3d18bc5403fa6d693365db583dd64b3de94d60087",
+      "compat_sha256": "d9b70d5da0ad3d525cf2a2c3d18bc5403fa6d693365db583dd64b3de94d60087"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/httpd_opts.h": {
+      "original_sha256": "d7dec61f4a8f4856504f21734290396588116ec09c8fe1ff9f89ec8ba2510cb9",
+      "compat_sha256": "d7dec61f4a8f4856504f21734290396588116ec09c8fe1ff9f89ec8ba2510cb9"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/lwiperf.h": {
+      "original_sha256": "894124ebd57d7aa493072e19981781a642d6d7f0ebdd58af5f792dfde20d101e",
+      "compat_sha256": "894124ebd57d7aa493072e19981781a642d6d7f0ebdd58af5f792dfde20d101e"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mdns.h": {
+      "original_sha256": "359d459f2d0a4d00eab082d28699478bfb175bd015ecd00a7b601f3494a5d0ca",
+      "compat_sha256": "359d459f2d0a4d00eab082d28699478bfb175bd015ecd00a7b601f3494a5d0ca"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mdns_domain.h": {
+      "original_sha256": "9856b7844ac7faaf51476e55f44fcf345324eb60bea01e8d0e964b18a8d7fcea",
+      "compat_sha256": "9856b7844ac7faaf51476e55f44fcf345324eb60bea01e8d0e964b18a8d7fcea"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mdns_opts.h": {
+      "original_sha256": "f98772a9ec77cb8ff02853f77d2fa9538d7f4e96561ee5a64a1e39b36952383b",
+      "compat_sha256": "f98772a9ec77cb8ff02853f77d2fa9538d7f4e96561ee5a64a1e39b36952383b"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mdns_out.h": {
+      "original_sha256": "2bff804ddd536e3b1daa97d6322a5279aac56288851de1f277c9c131f16dc365",
+      "compat_sha256": "2bff804ddd536e3b1daa97d6322a5279aac56288851de1f277c9c131f16dc365"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mdns_priv.h": {
+      "original_sha256": "46167eba46afba0bc2ecede799441e1f6916e6dd864f2a4ecb75a90ba6474e4d",
+      "compat_sha256": "46167eba46afba0bc2ecede799441e1f6916e6dd864f2a4ecb75a90ba6474e4d"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mqtt.h": {
+      "original_sha256": "15386369c1683c4e436e9ee883d6346333e025a2f890ecb31f23f80f7bcc2270",
+      "compat_sha256": "15386369c1683c4e436e9ee883d6346333e025a2f890ecb31f23f80f7bcc2270"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mqtt_opts.h": {
+      "original_sha256": "b8bb920a04472488f3fa1371cbb9c934bfead7cc8ba7f06316da4bdb2e354feb",
+      "compat_sha256": "b8bb920a04472488f3fa1371cbb9c934bfead7cc8ba7f06316da4bdb2e354feb"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/mqtt_priv.h": {
+      "original_sha256": "e4903b34c12c941650045977e2629d41b1ca8407e48dc28d9ba36382825bb2d9",
+      "compat_sha256": "e4903b34c12c941650045977e2629d41b1ca8407e48dc28d9ba36382825bb2d9"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/netbiosns.h": {
+      "original_sha256": "438a8e5cb80794959e0ebb0989a8d0615dc8d2d737fa97c231b10d4040e8f715",
+      "compat_sha256": "438a8e5cb80794959e0ebb0989a8d0615dc8d2d737fa97c231b10d4040e8f715"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/netbiosns_opts.h": {
+      "original_sha256": "6d83f549e1ce36325382c0a776bddb1b66fc1d3cb1cd573aa92eb2cc719ac313",
+      "compat_sha256": "6d83f549e1ce36325382c0a776bddb1b66fc1d3cb1cd573aa92eb2cc719ac313"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/smtp.h": {
+      "original_sha256": "61d670c0c914cc4d39f6c9e4661a1ac5e2b3cdfc45bb972b35cbf7ad3ea3d569",
+      "compat_sha256": "61d670c0c914cc4d39f6c9e4661a1ac5e2b3cdfc45bb972b35cbf7ad3ea3d569"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/smtp_opts.h": {
+      "original_sha256": "6f3e0517c42b198078615074a72d8d158304264c8fa56a1dea79636bdd1898be",
+      "compat_sha256": "6f3e0517c42b198078615074a72d8d158304264c8fa56a1dea79636bdd1898be"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp.h": {
+      "original_sha256": "2dd823f99a0ecec5e3e0568594f8f6360a04f906c5e9c5fc110bee2717e64337",
+      "compat_sha256": "2dd823f99a0ecec5e3e0568594f8f6360a04f906c5e9c5fc110bee2717e64337"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_core.h": {
+      "original_sha256": "226888829e92f37f5e34e04f8472c2bc00f16817f41253288b7746eb1afeeb7a",
+      "compat_sha256": "226888829e92f37f5e34e04f8472c2bc00f16817f41253288b7746eb1afeeb7a"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_mib2.h": {
+      "original_sha256": "6f40a24aedc34c24f13d4e4dba0fc49237bc692ee30e2a2d43b6bbe9446087b0",
+      "compat_sha256": "6f40a24aedc34c24f13d4e4dba0fc49237bc692ee30e2a2d43b6bbe9446087b0"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_opts.h": {
+      "original_sha256": "fcd7d37a9418f6b25fc367ad1252c193a62915099b5bbc9f6693f0526d915bd4",
+      "compat_sha256": "fcd7d37a9418f6b25fc367ad1252c193a62915099b5bbc9f6693f0526d915bd4"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_scalar.h": {
+      "original_sha256": "f88ed96f2010bb383af723c50f8e0b93a9a5d566599ef0f35c11102124805c09",
+      "compat_sha256": "f88ed96f2010bb383af723c50f8e0b93a9a5d566599ef0f35c11102124805c09"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_snmpv2_framework.h": {
+      "original_sha256": "8397074e6d74aceb6430e077537eff4330f6c712d00647a13f2832093a7f9eeb",
+      "compat_sha256": "8397074e6d74aceb6430e077537eff4330f6c712d00647a13f2832093a7f9eeb"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_snmpv2_usm.h": {
+      "original_sha256": "ddd777bac19a3f0c6823854f121e52e1c16a9f788540e1f172920b45a01713bc",
+      "compat_sha256": "ddd777bac19a3f0c6823854f121e52e1c16a9f788540e1f172920b45a01713bc"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_table.h": {
+      "original_sha256": "1d0ef0508b2a00f55e6a90c27d484e526a2db5cde41c13b2aafcc6f2c8d7e25b",
+      "compat_sha256": "1d0ef0508b2a00f55e6a90c27d484e526a2db5cde41c13b2aafcc6f2c8d7e25b"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmp_threadsync.h": {
+      "original_sha256": "730f06bbad7d1fc61cf30fb43f27c4b90c6da50685630563c2f9b1763576f74b",
+      "compat_sha256": "730f06bbad7d1fc61cf30fb43f27c4b90c6da50685630563c2f9b1763576f74b"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/snmpv3.h": {
+      "original_sha256": "7d1be4c7469ae8108d3657433f965c8884e66475178fee2a474fbbf01aee3fe0",
+      "compat_sha256": "7d1be4c7469ae8108d3657433f965c8884e66475178fee2a474fbbf01aee3fe0"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/sntp.h": {
+      "original_sha256": "c7b56e4653387585d4d5073c1917f93114027ccae13ef842880441477b471653",
+      "compat_sha256": "c7b56e4653387585d4d5073c1917f93114027ccae13ef842880441477b471653"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/sntp_opts.h": {
+      "original_sha256": "e19e34bbe7f97d3f626b5975d1182771683cec15957b3415d4d674ef9489ada8",
+      "compat_sha256": "e19e34bbe7f97d3f626b5975d1182771683cec15957b3415d4d674ef9489ada8"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/tftp_client.h": {
+      "original_sha256": "afe8265f9b7c7746c5bf86b5a739e1eae6c064c7af7e116959a7b52c66064ed3",
+      "compat_sha256": "afe8265f9b7c7746c5bf86b5a739e1eae6c064c7af7e116959a7b52c66064ed3"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/tftp_common.h": {
+      "original_sha256": "76b2fb20cbe1212c6e691e9216ced22cc959f602ce76e0fed06dd3c474fb6f31",
+      "compat_sha256": "76b2fb20cbe1212c6e691e9216ced22cc959f602ce76e0fed06dd3c474fb6f31"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/tftp_opts.h": {
+      "original_sha256": "185e13e074f0ca14271e187fe15fbe8411de355d55ec6cd4fbb5b271776f8479",
+      "compat_sha256": "185e13e074f0ca14271e187fe15fbe8411de355d55ec6cd4fbb5b271776f8479"
+    },
+    "src/lwip-2.2.0/src/include/lwip/apps/tftp_server.h": {
+      "original_sha256": "627e19deb28320005781f9052d090aa6fc7d5785ccb0a4315c50beee4180d0c8",
+      "compat_sha256": "627e19deb28320005781f9052d090aa6fc7d5785ccb0a4315c50beee4180d0c8"
+    },
+    "src/lwip-2.2.0/src/include/lwip/arch.h": {
+      "original_sha256": "b077b876e21d03e7b5944e06012f8c7a6385a148efd09efccf2bf4667b90e3cc",
+      "compat_sha256": "b077b876e21d03e7b5944e06012f8c7a6385a148efd09efccf2bf4667b90e3cc"
+    },
+    "src/lwip-2.2.0/src/include/lwip/autoip.h": {
+      "original_sha256": "d7b0a366fc1442033df3e7247fff0cf28851c1ef7ad6539ac2728fb5f483f707",
+      "compat_sha256": "d7b0a366fc1442033df3e7247fff0cf28851c1ef7ad6539ac2728fb5f483f707"
+    },
+    "src/lwip-2.2.0/src/include/lwip/debug.h": {
+      "original_sha256": "1f3545fc48dec531f2dff50fffa1094bd4bdd0fca5bb96e32f82c559e33a4fce",
+      "compat_sha256": "1f3545fc48dec531f2dff50fffa1094bd4bdd0fca5bb96e32f82c559e33a4fce"
+    },
+    "src/lwip-2.2.0/src/include/lwip/def.h": {
+      "original_sha256": "224152c2266e14b418ee0e7e1704df9c103011630240548221a91cf6aff64d90",
+      "compat_sha256": "224152c2266e14b418ee0e7e1704df9c103011630240548221a91cf6aff64d90"
+    },
+    "src/lwip-2.2.0/src/include/lwip/dhcp.h": {
+      "original_sha256": "babfa093330aa0b8039badc8c373f11dda5dd8f0e94c55e4440a6643b9996f7e",
+      "compat_sha256": "babfa093330aa0b8039badc8c373f11dda5dd8f0e94c55e4440a6643b9996f7e"
+    },
+    "src/lwip-2.2.0/src/include/lwip/dhcp6.h": {
+      "original_sha256": "dbac3f610e3e76547691af73a667bd5fd6564a7fbfa5ac382ef77604938d4afa",
+      "compat_sha256": "dbac3f610e3e76547691af73a667bd5fd6564a7fbfa5ac382ef77604938d4afa"
+    },
+    "src/lwip-2.2.0/src/include/lwip/dns.h": {
+      "original_sha256": "962c462c90afd41ed010b961f539c11b2baba3e8a6bfe584f331a5e4d43c1b05",
+      "compat_sha256": "962c462c90afd41ed010b961f539c11b2baba3e8a6bfe584f331a5e4d43c1b05"
+    },
+    "src/lwip-2.2.0/src/include/lwip/err.h": {
+      "original_sha256": "af26b573fc5c6a31877fdcde35e15382ac0c8b01f35af3f5a4429f9cf5dd323d",
+      "compat_sha256": "af26b573fc5c6a31877fdcde35e15382ac0c8b01f35af3f5a4429f9cf5dd323d"
+    },
+    "src/lwip-2.2.0/src/include/lwip/errno.h": {
+      "original_sha256": "79dc6e03887ccf301e01a5129d1a732e21fb05308a8e38f04ada44e0928c075a",
+      "compat_sha256": "79dc6e03887ccf301e01a5129d1a732e21fb05308a8e38f04ada44e0928c075a"
+    },
+    "src/lwip-2.2.0/src/include/lwip/etharp.h": {
+      "original_sha256": "bd50bec728d92dbd790a1504e52f42e4e1bdd018380c2b116f0dd8d3ed44e3f9",
+      "compat_sha256": "bd50bec728d92dbd790a1504e52f42e4e1bdd018380c2b116f0dd8d3ed44e3f9"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ethip6.h": {
+      "original_sha256": "7a7e744ae373a720261be3651adaa0f35ff00ebb1bcf38e5330e371ddfd162b7",
+      "compat_sha256": "7a7e744ae373a720261be3651adaa0f35ff00ebb1bcf38e5330e371ddfd162b7"
+    },
+    "src/lwip-2.2.0/src/include/lwip/icmp.h": {
+      "original_sha256": "84f63c9fbc6f6d66ef437f834279c25c20bfa78834eb0ee347c70377f7f8d8c8",
+      "compat_sha256": "84f63c9fbc6f6d66ef437f834279c25c20bfa78834eb0ee347c70377f7f8d8c8"
+    },
+    "src/lwip-2.2.0/src/include/lwip/icmp6.h": {
+      "original_sha256": "f790cd444ecbe2e605b2f1a1deab3e6e9662ba6e87fd47b401912c5a118ee836",
+      "compat_sha256": "f790cd444ecbe2e605b2f1a1deab3e6e9662ba6e87fd47b401912c5a118ee836"
+    },
+    "src/lwip-2.2.0/src/include/lwip/if_api.h": {
+      "original_sha256": "6f6945cccbf0721180ddc7ff589d9f7b47f825ce62ae8b3cf6c186f5d2750822",
+      "compat_sha256": "6f6945cccbf0721180ddc7ff589d9f7b47f825ce62ae8b3cf6c186f5d2750822"
+    },
+    "src/lwip-2.2.0/src/include/lwip/igmp.h": {
+      "original_sha256": "abf5ff1e19ec61690b6e8d55c8ee11afd1556b77c8b0fc452d5eb490810cc27f",
+      "compat_sha256": "abf5ff1e19ec61690b6e8d55c8ee11afd1556b77c8b0fc452d5eb490810cc27f"
+    },
+    "src/lwip-2.2.0/src/include/lwip/inet.h": {
+      "original_sha256": "9ea4982e2a72cf99e15d31268ed72ac8219ff4ace89b6848267a335acc15f080",
+      "compat_sha256": "9ea4982e2a72cf99e15d31268ed72ac8219ff4ace89b6848267a335acc15f080"
+    },
+    "src/lwip-2.2.0/src/include/lwip/inet_chksum.h": {
+      "original_sha256": "df6720f78e47afde2315d6a9dee1bb5b26f76692ce3e040c574409493435c933",
+      "compat_sha256": "df6720f78e47afde2315d6a9dee1bb5b26f76692ce3e040c574409493435c933"
+    },
+    "src/lwip-2.2.0/src/include/lwip/init.h": {
+      "original_sha256": "e61c4c6c58e7d784947675dd6ac97f473c55bbb17a63e47888538eb7fb15a779",
+      "compat_sha256": "e61c4c6c58e7d784947675dd6ac97f473c55bbb17a63e47888538eb7fb15a779"
+    },
+    "src/lwip-2.2.0/src/include/lwip/init.h.cmake.in": {
+      "original_sha256": "38df819f1ae753f240e9adb27398c14d6cf3e2e9065547a8ceb7694a9d132216",
+      "compat_sha256": "38df819f1ae753f240e9adb27398c14d6cf3e2e9065547a8ceb7694a9d132216"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip.h": {
+      "original_sha256": "dc040fd513b7fff5de699e235e2a09623f2a80d813c09ae91f9c6af067f756e8",
+      "compat_sha256": "dc040fd513b7fff5de699e235e2a09623f2a80d813c09ae91f9c6af067f756e8"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip4.h": {
+      "original_sha256": "188a62765c765fb07cda26a695f17c9c1674c0da7539c71e4d8f79b3f6f6ba21",
+      "compat_sha256": "188a62765c765fb07cda26a695f17c9c1674c0da7539c71e4d8f79b3f6f6ba21"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip4_addr.h": {
+      "original_sha256": "58f6c9a179e8719fb91f2b76b489be45e05365c3958dbba55f00a4d134adf535",
+      "compat_sha256": "58f6c9a179e8719fb91f2b76b489be45e05365c3958dbba55f00a4d134adf535"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip4_frag.h": {
+      "original_sha256": "8b0bb67655cba6da8cddc360e655c711553ad35e6306dbae618637e80be9911c",
+      "compat_sha256": "8b0bb67655cba6da8cddc360e655c711553ad35e6306dbae618637e80be9911c"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip6.h": {
+      "original_sha256": "7681c2948f700aa565c387ca20654f7322991ca15de7fd4e8f342a8ce44abe57",
+      "compat_sha256": "7681c2948f700aa565c387ca20654f7322991ca15de7fd4e8f342a8ce44abe57"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip6_addr.h": {
+      "original_sha256": "9dea395e61fdcc6676afdfd322838c185cb87d8b38c39b0ad0b83b206f300c00",
+      "compat_sha256": "9dea395e61fdcc6676afdfd322838c185cb87d8b38c39b0ad0b83b206f300c00"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip6_frag.h": {
+      "original_sha256": "3ab1bdb9220a3c87c8187fb26b1150cd03c4401b0a0c6db2ea4a22674141dd3b",
+      "compat_sha256": "3ab1bdb9220a3c87c8187fb26b1150cd03c4401b0a0c6db2ea4a22674141dd3b"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip6_zone.h": {
+      "original_sha256": "4b1dfc44be4c4c138ac41d17fdfc88712fab42557c899193e46bc4e6972e4641",
+      "compat_sha256": "4b1dfc44be4c4c138ac41d17fdfc88712fab42557c899193e46bc4e6972e4641"
+    },
+    "src/lwip-2.2.0/src/include/lwip/ip_addr.h": {
+      "original_sha256": "90e9886f4fc5e96058d19d3504415d52ee37d8ebd7d29aeede3435f247cb4146",
+      "compat_sha256": "90e9886f4fc5e96058d19d3504415d52ee37d8ebd7d29aeede3435f247cb4146"
+    },
+    "src/lwip-2.2.0/src/include/lwip/mem.h": {
+      "original_sha256": "416f961f338a0cba460494ebfe2527b7cc1fc5c18f489711e66af7dd76b7a223",
+      "compat_sha256": "416f961f338a0cba460494ebfe2527b7cc1fc5c18f489711e66af7dd76b7a223"
+    },
+    "src/lwip-2.2.0/src/include/lwip/memp.h": {
+      "original_sha256": "79dfd019219330cf08deb1360483eb7d1da7a1a7a304034ef65ad52feefba1ef",
+      "compat_sha256": "79dfd019219330cf08deb1360483eb7d1da7a1a7a304034ef65ad52feefba1ef"
+    },
+    "src/lwip-2.2.0/src/include/lwip/mld6.h": {
+      "original_sha256": "026348d23012aa1c2210ae53f2a5ddf3a273cf004ef597a1861266a01d4ca86e",
+      "compat_sha256": "026348d23012aa1c2210ae53f2a5ddf3a273cf004ef597a1861266a01d4ca86e"
+    },
+    "src/lwip-2.2.0/src/include/lwip/nd6.h": {
+      "original_sha256": "79fa57b4bded6763d38f5e4fa56aa2fac8117bf76ffc69869e05357af88951d6",
+      "compat_sha256": "79fa57b4bded6763d38f5e4fa56aa2fac8117bf76ffc69869e05357af88951d6"
+    },
+    "src/lwip-2.2.0/src/include/lwip/netbuf.h": {
+      "original_sha256": "8e7c26bc3648369c4988aaa394fc4d200356f8fe8b3edbdd7d6a9d86f8bcf09f",
+      "compat_sha256": "8e7c26bc3648369c4988aaa394fc4d200356f8fe8b3edbdd7d6a9d86f8bcf09f"
+    },
+    "src/lwip-2.2.0/src/include/lwip/netdb.h": {
+      "original_sha256": "582518497fefd57cd1d227947965c71b1dc16846add471af0fddfbb461c7aca0",
+      "compat_sha256": "582518497fefd57cd1d227947965c71b1dc16846add471af0fddfbb461c7aca0"
+    },
+    "src/lwip-2.2.0/src/include/lwip/netif.h": {
+      "original_sha256": "b41344550fe7d4cfd2d00ca9eae1795aa51c4e9c51b23d4a4b127be0f58d0f51",
+      "compat_sha256": "b41344550fe7d4cfd2d00ca9eae1795aa51c4e9c51b23d4a4b127be0f58d0f51"
+    },
+    "src/lwip-2.2.0/src/include/lwip/netifapi.h": {
+      "original_sha256": "2c087eac81246ac74e3ba2c3922de0612890587f0cca7c1360f379a57ab45518",
+      "compat_sha256": "2c087eac81246ac74e3ba2c3922de0612890587f0cca7c1360f379a57ab45518"
+    },
+    "src/lwip-2.2.0/src/include/lwip/opt.h": {
+      "original_sha256": "c7d6dea70818f232f20cce1496936db173467e12f4e4cb0394bb2728b894e614",
+      "compat_sha256": "c7d6dea70818f232f20cce1496936db173467e12f4e4cb0394bb2728b894e614"
+    },
+    "src/lwip-2.2.0/src/include/lwip/pbuf.h": {
+      "original_sha256": "0b84e49877d81241874c101d24aa6fd815e6e78407f0894f88af371e04437196",
+      "compat_sha256": "0b84e49877d81241874c101d24aa6fd815e6e78407f0894f88af371e04437196"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/altcp_priv.h": {
+      "original_sha256": "8b1c271129eea8f8d125ee8e653e143d5099683c2fddb9bc64524fcfdadcabd1",
+      "compat_sha256": "8b1c271129eea8f8d125ee8e653e143d5099683c2fddb9bc64524fcfdadcabd1"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/api_msg.h": {
+      "original_sha256": "e2458063868f0813bc26f41709bbf78d994760e72667b646b88f15e16e235f48",
+      "compat_sha256": "e2458063868f0813bc26f41709bbf78d994760e72667b646b88f15e16e235f48"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/mem_priv.h": {
+      "original_sha256": "c90c9b64c8ea95c05d5b8b10d706acb53b6cc124166e8dd85b397698679f7920",
+      "compat_sha256": "c90c9b64c8ea95c05d5b8b10d706acb53b6cc124166e8dd85b397698679f7920"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/memp_priv.h": {
+      "original_sha256": "37aff2894bbe25f1888e43b96be80f4c1a43a24867c0fc9aceb4093328682937",
+      "compat_sha256": "37aff2894bbe25f1888e43b96be80f4c1a43a24867c0fc9aceb4093328682937"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/memp_std.h": {
+      "original_sha256": "86cdf1d80f2716a07011dc763e5fa614cd2b555382cb7d6750176116def67a0f",
+      "compat_sha256": "86cdf1d80f2716a07011dc763e5fa614cd2b555382cb7d6750176116def67a0f"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/nd6_priv.h": {
+      "original_sha256": "0f8b44f4163523c10c2085a8b9393b87e81d054c9a40cf0887be2885d8b2fa35",
+      "compat_sha256": "0f8b44f4163523c10c2085a8b9393b87e81d054c9a40cf0887be2885d8b2fa35"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/raw_priv.h": {
+      "original_sha256": "0b2b019a55fab8eed89d668f13402778835117fe472464046472cd04b93c2bb2",
+      "compat_sha256": "0b2b019a55fab8eed89d668f13402778835117fe472464046472cd04b93c2bb2"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/sockets_priv.h": {
+      "original_sha256": "2efcf39c42b1a7055628461915d42521a4df3cb285b6f5635a5c6a961aff4f93",
+      "compat_sha256": "2efcf39c42b1a7055628461915d42521a4df3cb285b6f5635a5c6a961aff4f93"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/tcp_priv.h": {
+      "original_sha256": "07df02da365d83e5a488b4cf9e61d8319132d11b6830a7fe6b04c2912fd3d4c9",
+      "compat_sha256": "07df02da365d83e5a488b4cf9e61d8319132d11b6830a7fe6b04c2912fd3d4c9"
+    },
+    "src/lwip-2.2.0/src/include/lwip/priv/tcpip_priv.h": {
+      "original_sha256": "13fb2e7159ebcafc4ddda4961a9d70b2f8182f9e201aa990cb9148d8897bf598",
+      "compat_sha256": "13fb2e7159ebcafc4ddda4961a9d70b2f8182f9e201aa990cb9148d8897bf598"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/acd.h": {
+      "original_sha256": "3d5d347182390f367afd107322bdbc2b4997806cd0bc83a7ccc5579248e956a5",
+      "compat_sha256": "3d5d347182390f367afd107322bdbc2b4997806cd0bc83a7ccc5579248e956a5"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/autoip.h": {
+      "original_sha256": "a0b78c818f6642e68c1d9c0b5c3ad12fc6595b66ac5ae41724c52decc6de760c",
+      "compat_sha256": "a0b78c818f6642e68c1d9c0b5c3ad12fc6595b66ac5ae41724c52decc6de760c"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/dhcp.h": {
+      "original_sha256": "bc74edb6abff7b5182e04e2e588292401ecba3875bb6673156b026a5c391dbc4",
+      "compat_sha256": "bc74edb6abff7b5182e04e2e588292401ecba3875bb6673156b026a5c391dbc4"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/dhcp6.h": {
+      "original_sha256": "72c645a6153694229ca535f044af2d1520ebc7860baa98121747218a08c2b74b",
+      "compat_sha256": "72c645a6153694229ca535f044af2d1520ebc7860baa98121747218a08c2b74b"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/dns.h": {
+      "original_sha256": "34049c0f7f489aaec12d0589dc51ecfb24408dba422f605d8deb207c44d02b8f",
+      "compat_sha256": "34049c0f7f489aaec12d0589dc51ecfb24408dba422f605d8deb207c44d02b8f"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/etharp.h": {
+      "original_sha256": "c8fbe4c023ac697d18e542d25c26cf63468763239f35a3a87401c88acda109f1",
+      "compat_sha256": "c8fbe4c023ac697d18e542d25c26cf63468763239f35a3a87401c88acda109f1"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/ethernet.h": {
+      "original_sha256": "58d1547ef5fab9379b8e01a5cc9178c5dc2c550300bb69825bdfa1e13cc8c609",
+      "compat_sha256": "58d1547ef5fab9379b8e01a5cc9178c5dc2c550300bb69825bdfa1e13cc8c609"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/iana.h": {
+      "original_sha256": "745c2d70a5d4839e3df5a34f7e37b83bcc7fe58f39eba1d2f5e238242d74c878",
+      "compat_sha256": "745c2d70a5d4839e3df5a34f7e37b83bcc7fe58f39eba1d2f5e238242d74c878"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/icmp.h": {
+      "original_sha256": "5acac93c34363f3ca07f3f14c8861f09cf822096e6654941a307f1c78914cf5c",
+      "compat_sha256": "5acac93c34363f3ca07f3f14c8861f09cf822096e6654941a307f1c78914cf5c"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/icmp6.h": {
+      "original_sha256": "a3fdc254460b9e2c45cbfb1ad2402c055b34b907a09fb5337a0f26e068302074",
+      "compat_sha256": "a3fdc254460b9e2c45cbfb1ad2402c055b34b907a09fb5337a0f26e068302074"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/ieee.h": {
+      "original_sha256": "ec85a505aba178178743b34429f463a41ac43d3750d63901c7e1273dcd0a2ba6",
+      "compat_sha256": "ec85a505aba178178743b34429f463a41ac43d3750d63901c7e1273dcd0a2ba6"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/igmp.h": {
+      "original_sha256": "9adb3a0b03feff302b057020aa860fd958f6ef4528225014c104bd4175ebdff7",
+      "compat_sha256": "9adb3a0b03feff302b057020aa860fd958f6ef4528225014c104bd4175ebdff7"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/ip.h": {
+      "original_sha256": "eb5371e5ac58467253d813bc58726e317f91abadb10336497de0d64645ec01cd",
+      "compat_sha256": "eb5371e5ac58467253d813bc58726e317f91abadb10336497de0d64645ec01cd"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/ip4.h": {
+      "original_sha256": "033570c0b7657f5475959f7b74d9e23c6f8e81498495d5b23d8c2eeb0640d7a7",
+      "compat_sha256": "033570c0b7657f5475959f7b74d9e23c6f8e81498495d5b23d8c2eeb0640d7a7"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/ip6.h": {
+      "original_sha256": "c0514e97f153f2e5cf514e6f1f4350fd2cbcb7073ebc05495b436c638bd32109",
+      "compat_sha256": "c0514e97f153f2e5cf514e6f1f4350fd2cbcb7073ebc05495b436c638bd32109"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/mld6.h": {
+      "original_sha256": "9601cee67b48c4b7cadb75caf3d83c05f5409d367341af70af7e7e4f46f173f8",
+      "compat_sha256": "9601cee67b48c4b7cadb75caf3d83c05f5409d367341af70af7e7e4f46f173f8"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/nd6.h": {
+      "original_sha256": "50cff239fdb433defe12f7e35c4f2964e42ad7bfeab15d3b274a59142c4d558e",
+      "compat_sha256": "50cff239fdb433defe12f7e35c4f2964e42ad7bfeab15d3b274a59142c4d558e"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/tcp.h": {
+      "original_sha256": "db67bb5ea0517a8cd9e30ebf655743f69ce05e77ca6e4a113e8c60e69bd7c48a",
+      "compat_sha256": "db67bb5ea0517a8cd9e30ebf655743f69ce05e77ca6e4a113e8c60e69bd7c48a"
+    },
+    "src/lwip-2.2.0/src/include/lwip/prot/udp.h": {
+      "original_sha256": "b56daa8ff1e8e52cdd4f720297f07af2a96feea254db86768e20e157d7ce2784",
+      "compat_sha256": "b56daa8ff1e8e52cdd4f720297f07af2a96feea254db86768e20e157d7ce2784"
+    },
+    "src/lwip-2.2.0/src/include/lwip/raw.h": {
+      "original_sha256": "e9efc60e31f2ff39a98b1367968ac724fc91ecdc115a74fc44813b761f02caf7",
+      "compat_sha256": "e9efc60e31f2ff39a98b1367968ac724fc91ecdc115a74fc44813b761f02caf7"
+    },
+    "src/lwip-2.2.0/src/include/lwip/sio.h": {
+      "original_sha256": "d5b13bb9fe2010b215d0c8b9453890b564c12b58471968bcd099563b02469d34",
+      "compat_sha256": "d5b13bb9fe2010b215d0c8b9453890b564c12b58471968bcd099563b02469d34"
+    },
+    "src/lwip-2.2.0/src/include/lwip/snmp.h": {
+      "original_sha256": "1f90da65829c29545e9562ce5355d1799ea36cd901ed8ea9faa8e1ef3d7c2ece",
+      "compat_sha256": "1f90da65829c29545e9562ce5355d1799ea36cd901ed8ea9faa8e1ef3d7c2ece"
+    },
+    "src/lwip-2.2.0/src/include/lwip/sockets.h": {
+      "original_sha256": "b83a1d58ba00cf19b71de556a303c0f0eeadab93b994ce36497ec2aa91aaa671",
+      "compat_sha256": "b83a1d58ba00cf19b71de556a303c0f0eeadab93b994ce36497ec2aa91aaa671"
+    },
+    "src/lwip-2.2.0/src/include/lwip/stats.h": {
+      "original_sha256": "295e3f2f9be188c05a90c2bb7e57a250a07e5ca7c54bdd31a50309da82cc5874",
+      "compat_sha256": "295e3f2f9be188c05a90c2bb7e57a250a07e5ca7c54bdd31a50309da82cc5874"
+    },
+    "src/lwip-2.2.0/src/include/lwip/sys.h": {
+      "original_sha256": "f771adb82536a6d23b51aa6306c5a7b21958c0eb62160f1a6874231ac8fc6c42",
+      "compat_sha256": "f771adb82536a6d23b51aa6306c5a7b21958c0eb62160f1a6874231ac8fc6c42"
+    },
+    "src/lwip-2.2.0/src/include/lwip/tcp.h": {
+      "original_sha256": "eb514477b21ed78dd4d527f4aea3bed5585200e285b85c666689b9c43b77a89a",
+      "compat_sha256": "eb514477b21ed78dd4d527f4aea3bed5585200e285b85c666689b9c43b77a89a"
+    },
+    "src/lwip-2.2.0/src/include/lwip/tcpbase.h": {
+      "original_sha256": "cf4b048f3bc228ab364cde15eb6be5eca961fab09036c699c2c4b1437ab90aff",
+      "compat_sha256": "cf4b048f3bc228ab364cde15eb6be5eca961fab09036c699c2c4b1437ab90aff"
+    },
+    "src/lwip-2.2.0/src/include/lwip/tcpip.h": {
+      "original_sha256": "c772dbff8e46a86ffa65ec62e5b304e75525b6bcfef94917fb7de1045449f603",
+      "compat_sha256": "c772dbff8e46a86ffa65ec62e5b304e75525b6bcfef94917fb7de1045449f603"
+    },
+    "src/lwip-2.2.0/src/include/lwip/timeouts.h": {
+      "original_sha256": "a383b43e3ba021d06ff3791d223db46cb3385e8dcdfcec0221ef2a006243c022",
+      "compat_sha256": "a383b43e3ba021d06ff3791d223db46cb3385e8dcdfcec0221ef2a006243c022"
+    },
+    "src/lwip-2.2.0/src/include/lwip/udp.h": {
+      "original_sha256": "b5e33feb7fbfcf3c10c7e76947c5203fc5944a99deb4d421a2b6ae65cdd0e5ba",
+      "compat_sha256": "b5e33feb7fbfcf3c10c7e76947c5203fc5944a99deb4d421a2b6ae65cdd0e5ba"
+    },
+    "src/lwip-2.2.0/src/include/netif/bridgeif.h": {
+      "original_sha256": "39d409d880187e2a7b372ddae2b1cfc004b88a0dd786dbe9070945420b8e42c8",
+      "compat_sha256": "39d409d880187e2a7b372ddae2b1cfc004b88a0dd786dbe9070945420b8e42c8"
+    },
+    "src/lwip-2.2.0/src/include/netif/bridgeif_opts.h": {
+      "original_sha256": "bc6e5f0677c621a5a8adb315e1cdb06210e1391efea6d308684103fd38edfe66",
+      "compat_sha256": "bc6e5f0677c621a5a8adb315e1cdb06210e1391efea6d308684103fd38edfe66"
+    },
+    "src/lwip-2.2.0/src/include/netif/etharp.h": {
+      "original_sha256": "2e1ab81eced65420cdee5940d2e547cae7b0fa70088f452692363676ecfc66dc",
+      "compat_sha256": "2e1ab81eced65420cdee5940d2e547cae7b0fa70088f452692363676ecfc66dc"
+    },
+    "src/lwip-2.2.0/src/include/netif/ethernet.h": {
+      "original_sha256": "1dd88263e583593e47f7c891680d67838287160551b8c06562c9feca1ddee443",
+      "compat_sha256": "1dd88263e583593e47f7c891680d67838287160551b8c06562c9feca1ddee443"
+    },
+    "src/lwip-2.2.0/src/include/netif/ieee802154.h": {
+      "original_sha256": "02f21d8b3e143fa77d8fa3f0d3db9ac1683507436ab441a61d5012ddb6037699",
+      "compat_sha256": "02f21d8b3e143fa77d8fa3f0d3db9ac1683507436ab441a61d5012ddb6037699"
+    },
+    "src/lwip-2.2.0/src/include/netif/lowpan6.h": {
+      "original_sha256": "538ac2429cedf9193b6538998f3ba5bdd003fbf0840fd03b46d4ad5bcfaa4c20",
+      "compat_sha256": "538ac2429cedf9193b6538998f3ba5bdd003fbf0840fd03b46d4ad5bcfaa4c20"
+    },
+    "src/lwip-2.2.0/src/include/netif/lowpan6_ble.h": {
+      "original_sha256": "5c40e2a9640810cebaa8a0e501913cae093368da21f1226e9476b078f34f247f",
+      "compat_sha256": "5c40e2a9640810cebaa8a0e501913cae093368da21f1226e9476b078f34f247f"
+    },
+    "src/lwip-2.2.0/src/include/netif/lowpan6_common.h": {
+      "original_sha256": "eed0a8f45ea6e62ba4238d6bc139a1bef5fe625ec7527b52856fbf885c12f8ba",
+      "compat_sha256": "eed0a8f45ea6e62ba4238d6bc139a1bef5fe625ec7527b52856fbf885c12f8ba"
+    },
+    "src/lwip-2.2.0/src/include/netif/lowpan6_opts.h": {
+      "original_sha256": "fc57628292ff0ccece9770a9c101b992f350c55088af2bb364246fbcf6f3f024",
+      "compat_sha256": "fc57628292ff0ccece9770a9c101b992f350c55088af2bb364246fbcf6f3f024"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ccp.h": {
+      "original_sha256": "b6e681ffe6855a6772c6d0a9077f144676c30db0c9ec0ea461e816f7647d6d43",
+      "compat_sha256": "b6e681ffe6855a6772c6d0a9077f144676c30db0c9ec0ea461e816f7647d6d43"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/chap-md5.h": {
+      "original_sha256": "f67cd93664262575ded862c17bac7c1003e2eb690224b89ba2b0cdd221c2f725",
+      "compat_sha256": "f67cd93664262575ded862c17bac7c1003e2eb690224b89ba2b0cdd221c2f725"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/chap-new.h": {
+      "original_sha256": "f7bfb4e194fedcd1e6d499320826ecca7f14add5170c8fb7d4832b8e831bc2ac",
+      "compat_sha256": "f7bfb4e194fedcd1e6d499320826ecca7f14add5170c8fb7d4832b8e831bc2ac"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/chap_ms.h": {
+      "original_sha256": "77316bd6366248a0d0715e19e231667c1564f3ef081dc3ba839cd673a5d4984e",
+      "compat_sha256": "77316bd6366248a0d0715e19e231667c1564f3ef081dc3ba839cd673a5d4984e"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/eap.h": {
+      "original_sha256": "1f52215c54298f1b93049cda01f2a9a6dfd254f52b5ba4507bcf755fee16a2c1",
+      "compat_sha256": "1f52215c54298f1b93049cda01f2a9a6dfd254f52b5ba4507bcf755fee16a2c1"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ecp.h": {
+      "original_sha256": "4936fccc29a900ced5b67906f97f192ea634642b6a003605dc1cb40d65d011f6",
+      "compat_sha256": "4936fccc29a900ced5b67906f97f192ea634642b6a003605dc1cb40d65d011f6"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/eui64.h": {
+      "original_sha256": "fc79081c31fd7333b0e2b3cf61c870727a3b066d82482c894b02c81cdbf464c7",
+      "compat_sha256": "fc79081c31fd7333b0e2b3cf61c870727a3b066d82482c894b02c81cdbf464c7"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/fsm.h": {
+      "original_sha256": "8751104f5cdeb3ace720744016431ee2d704983e8a94de7add0830e63dfdef0e",
+      "compat_sha256": "8751104f5cdeb3ace720744016431ee2d704983e8a94de7add0830e63dfdef0e"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ipcp.h": {
+      "original_sha256": "39a12080fdad65f6fc8d4846c5e0d061d4fa9c4801e2d0012b992559a2e2b522",
+      "compat_sha256": "39a12080fdad65f6fc8d4846c5e0d061d4fa9c4801e2d0012b992559a2e2b522"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ipv6cp.h": {
+      "original_sha256": "b3db666c1904b25dbc81d3f041fc08f027af688114733285893197550c98d3a1",
+      "compat_sha256": "b3db666c1904b25dbc81d3f041fc08f027af688114733285893197550c98d3a1"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/lcp.h": {
+      "original_sha256": "0278457347c50aeaa4636124d0265fb8064511f461de2b3ff7fa51e3dacb0345",
+      "compat_sha256": "0278457347c50aeaa4636124d0265fb8064511f461de2b3ff7fa51e3dacb0345"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/magic.h": {
+      "original_sha256": "44881d887c9d1cb351115eabdb54e276fcbaf7e631ef310ef59195b299e5fc2a",
+      "compat_sha256": "44881d887c9d1cb351115eabdb54e276fcbaf7e631ef310ef59195b299e5fc2a"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/mppe.h": {
+      "original_sha256": "8dd28c994f67ca45b11586ecc195fabedd5d51efa0bd99872336d82886477c9f",
+      "compat_sha256": "8dd28c994f67ca45b11586ecc195fabedd5d51efa0bd99872336d82886477c9f"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/polarssl/arc4.h": {
+      "original_sha256": "a86f6889a62edc40fffebdf86e5c190ed65fb56f17f33f7dbac22e1aa7ddb98f",
+      "compat_sha256": "a86f6889a62edc40fffebdf86e5c190ed65fb56f17f33f7dbac22e1aa7ddb98f"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/polarssl/des.h": {
+      "original_sha256": "a064defd1f01c507099c5e10cd92b8ba5219482bd9c7e714b18ea91c746a04eb",
+      "compat_sha256": "a064defd1f01c507099c5e10cd92b8ba5219482bd9c7e714b18ea91c746a04eb"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/polarssl/md4.h": {
+      "original_sha256": "2de5e9cb03b20709d8741254166a8dde1933d757b625bb1b74985f49611fb68a",
+      "compat_sha256": "2de5e9cb03b20709d8741254166a8dde1933d757b625bb1b74985f49611fb68a"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/polarssl/md5.h": {
+      "original_sha256": "11ee8fae68c845cada48ff438069f05a3eff8f0e7cd85b7d631f7e2d4cc25f2d",
+      "compat_sha256": "11ee8fae68c845cada48ff438069f05a3eff8f0e7cd85b7d631f7e2d4cc25f2d"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/polarssl/sha1.h": {
+      "original_sha256": "52575d9211c5400d056c0f98b3d51fbe939fe916a516d7fa3101d7d15219b268",
+      "compat_sha256": "52575d9211c5400d056c0f98b3d51fbe939fe916a516d7fa3101d7d15219b268"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ppp.h": {
+      "original_sha256": "96bdada4194c515c0256b68fb46810b95dab24415631d4ea3bc7d154ef0ce18c",
+      "compat_sha256": "96bdada4194c515c0256b68fb46810b95dab24415631d4ea3bc7d154ef0ce18c"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ppp_impl.h": {
+      "original_sha256": "0149c380ed789193da79e9fb5084d8c54b040ee7e03719e8bf3c0cbfbfb05a0b",
+      "compat_sha256": "0149c380ed789193da79e9fb5084d8c54b040ee7e03719e8bf3c0cbfbfb05a0b"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/ppp_opts.h": {
+      "original_sha256": "4a3507a0cc400a05592d15252ac6513044f1e514be26ba6502fe0b055daa2bc8",
+      "compat_sha256": "4a3507a0cc400a05592d15252ac6513044f1e514be26ba6502fe0b055daa2bc8"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppapi.h": {
+      "original_sha256": "f1520293792605ad0f0c78c93a5907d478affbebea8d6be1b0f8a8bdc9c4b427",
+      "compat_sha256": "f1520293792605ad0f0c78c93a5907d478affbebea8d6be1b0f8a8bdc9c4b427"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppcrypt.h": {
+      "original_sha256": "954943c6c1286c707c0f1182428eb514dc8cf87a704a4e8f26a926553f260d58",
+      "compat_sha256": "954943c6c1286c707c0f1182428eb514dc8cf87a704a4e8f26a926553f260d58"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppdebug.h": {
+      "original_sha256": "92c389477b5d655a13e54871d3d3289ebc6ac19bf4c90758ff74e9bb552abd5b",
+      "compat_sha256": "92c389477b5d655a13e54871d3d3289ebc6ac19bf4c90758ff74e9bb552abd5b"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppoe.h": {
+      "original_sha256": "b9a2defa016bf1fabbd20256e6fd989faf973f13c46455d23e32627d833c5a3e",
+      "compat_sha256": "b9a2defa016bf1fabbd20256e6fd989faf973f13c46455d23e32627d833c5a3e"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppol2tp.h": {
+      "original_sha256": "ae9a819aaf816ae4ff25c35bddaf7c10654a54b95451b247fd5d2824229d3cf7",
+      "compat_sha256": "ae9a819aaf816ae4ff25c35bddaf7c10654a54b95451b247fd5d2824229d3cf7"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/pppos.h": {
+      "original_sha256": "afaafbc40596ccc0511cf3352deec609f5a114e181cfeb3eb804525abecf49e3",
+      "compat_sha256": "afaafbc40596ccc0511cf3352deec609f5a114e181cfeb3eb804525abecf49e3"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/upap.h": {
+      "original_sha256": "7cf555545ed20e7d7897ed935c6333e77d629b1862e4e2136df87ebebfcb3907",
+      "compat_sha256": "7cf555545ed20e7d7897ed935c6333e77d629b1862e4e2136df87ebebfcb3907"
+    },
+    "src/lwip-2.2.0/src/include/netif/ppp/vj.h": {
+      "original_sha256": "a6ee51c1e925570d6a84d4885c42b646fdd2cceb85d38f501fc91178e237fc05",
+      "compat_sha256": "a6ee51c1e925570d6a84d4885c42b646fdd2cceb85d38f501fc91178e237fc05"
+    },
+    "src/lwip-2.2.0/src/include/netif/slipif.h": {
+      "original_sha256": "f58cc6842251be4358904b2475021fc2da592de3756fbb358b615b0173efd791",
+      "compat_sha256": "f58cc6842251be4358904b2475021fc2da592de3756fbb358b615b0173efd791"
+    },
+    "src/lwip-2.2.0/src/include/netif/zepif.h": {
+      "original_sha256": "7b3a4c9094483c14eb3c4da651874aca325e3927fde02eb28e226040deef4714",
+      "compat_sha256": "7b3a4c9094483c14eb3c4da651874aca325e3927fde02eb28e226040deef4714"
+    },
+    "src/lwip-2.2.0/src/netif/FILES": {
+      "original_sha256": "10564ef1c25f4ca37518cc705b3cb27b206cfea82db6a9601ad416aeffe560dd",
+      "compat_sha256": "10564ef1c25f4ca37518cc705b3cb27b206cfea82db6a9601ad416aeffe560dd"
+    },
+    "src/lwip-2.2.0/src/netif/bridgeif.c": {
+      "original_sha256": "bd66c4f883a670a75c529929cb4327ac6d2c246c617f2b0ddaa7d3790c33dfae",
+      "compat_sha256": "bd66c4f883a670a75c529929cb4327ac6d2c246c617f2b0ddaa7d3790c33dfae"
+    },
+    "src/lwip-2.2.0/src/netif/bridgeif_fdb.c": {
+      "original_sha256": "dcbd424f88425943409f2aa54a93fa09afa19473444d005a6bdbe3aad85503f5",
+      "compat_sha256": "dcbd424f88425943409f2aa54a93fa09afa19473444d005a6bdbe3aad85503f5"
+    },
+    "src/lwip-2.2.0/src/netif/ethernet.c": {
+      "original_sha256": "7c493427956150ca9e97decd87784df0d2adb0f1504fa262b7e732bee1892eaf",
+      "compat_sha256": "7c493427956150ca9e97decd87784df0d2adb0f1504fa262b7e732bee1892eaf"
+    },
+    "src/lwip-2.2.0/src/netif/lowpan6.c": {
+      "original_sha256": "9ebbe5af554f102e08cbbb0e4d46381c23a310bef8a7741e41f311c5d8d747c2",
+      "compat_sha256": "9ebbe5af554f102e08cbbb0e4d46381c23a310bef8a7741e41f311c5d8d747c2"
+    },
+    "src/lwip-2.2.0/src/netif/lowpan6_ble.c": {
+      "original_sha256": "813e98990f440b14ea66282d1b490447812b66268ecda7097a265a6ec78f5ef5",
+      "compat_sha256": "813e98990f440b14ea66282d1b490447812b66268ecda7097a265a6ec78f5ef5"
+    },
+    "src/lwip-2.2.0/src/netif/lowpan6_common.c": {
+      "original_sha256": "a7d78c5b3ee87db5d6daef00063286a566b2b9a1a14b2ab9d559dd6409433adc",
+      "compat_sha256": "a7d78c5b3ee87db5d6daef00063286a566b2b9a1a14b2ab9d559dd6409433adc"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/PPPD_FOLLOWUP": {
+      "original_sha256": "4b4a4da04c123b2b98ad9dd1c39554be864a3a30e98ad163c0692ec0b8b1150c",
+      "compat_sha256": "4b4a4da04c123b2b98ad9dd1c39554be864a3a30e98ad163c0692ec0b8b1150c"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/auth.c": {
+      "original_sha256": "006d30196d668c6a78c9d93262dfd23695ac94e3038e8c3a3cc33be64aed09e8",
+      "compat_sha256": "006d30196d668c6a78c9d93262dfd23695ac94e3038e8c3a3cc33be64aed09e8"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/ccp.c": {
+      "original_sha256": "4364bb55858f291f9778d912f79188cb970b8cbe1c215103bf9f6fccd4504f41",
+      "compat_sha256": "4364bb55858f291f9778d912f79188cb970b8cbe1c215103bf9f6fccd4504f41"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/chap-md5.c": {
+      "original_sha256": "9f099cddf6fa7931b962fda6dc1d1df5eecf8c94881eda29a63d1abafe317ec2",
+      "compat_sha256": "9f099cddf6fa7931b962fda6dc1d1df5eecf8c94881eda29a63d1abafe317ec2"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/chap-new.c": {
+      "original_sha256": "28bb59f086f6b4eb512a92d05e78146341f7567bbf0c1d8d43795a7ac9a5a505",
+      "compat_sha256": "28bb59f086f6b4eb512a92d05e78146341f7567bbf0c1d8d43795a7ac9a5a505"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/chap_ms.c": {
+      "original_sha256": "45d7832b33cd1f9476d40550a4ed72697226daa52c584cb71525919cc95da2a5",
+      "compat_sha256": "45d7832b33cd1f9476d40550a4ed72697226daa52c584cb71525919cc95da2a5"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/demand.c": {
+      "original_sha256": "2da9d1f5881573072cc7d52bfb658ff444227bb28e952b032ae075a2b0e184cf",
+      "compat_sha256": "2da9d1f5881573072cc7d52bfb658ff444227bb28e952b032ae075a2b0e184cf"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/eap.c": {
+      "original_sha256": "2add965735eade1c6f5c1028c504e3df31d8e6f144f7506b73e45171cf149677",
+      "compat_sha256": "2add965735eade1c6f5c1028c504e3df31d8e6f144f7506b73e45171cf149677"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/ecp.c": {
+      "original_sha256": "b6736696754a289ea5464f7386d05790365b873c0ed0123692bebc4ebb18e6eb",
+      "compat_sha256": "b6736696754a289ea5464f7386d05790365b873c0ed0123692bebc4ebb18e6eb"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/eui64.c": {
+      "original_sha256": "8fec5b0948510d5d86af7a29c993286f76f379dca91a9f914e200ea8a5110d26",
+      "compat_sha256": "8fec5b0948510d5d86af7a29c993286f76f379dca91a9f914e200ea8a5110d26"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/fsm.c": {
+      "original_sha256": "b39f311b0a904f88ef5961e7e5daf64e6ab931055e5fe5fb5512c7d0f43f5160",
+      "compat_sha256": "b39f311b0a904f88ef5961e7e5daf64e6ab931055e5fe5fb5512c7d0f43f5160"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/ipcp.c": {
+      "original_sha256": "6528014d9ba263feca7cd6bbf12d75ad6807d9e63562295b0f4171e9fb8be38e",
+      "compat_sha256": "6528014d9ba263feca7cd6bbf12d75ad6807d9e63562295b0f4171e9fb8be38e"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/ipv6cp.c": {
+      "original_sha256": "967851abdd4fde05eff47e36b95acef47b5ef6c17ba830f23f8dd1474ed2549d",
+      "compat_sha256": "967851abdd4fde05eff47e36b95acef47b5ef6c17ba830f23f8dd1474ed2549d"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/lcp.c": {
+      "original_sha256": "6e742a6cb4fc483cf6c6b1d0787bdfa8b0c4826622e9822cb4a00fd1841fc5a4",
+      "compat_sha256": "6e742a6cb4fc483cf6c6b1d0787bdfa8b0c4826622e9822cb4a00fd1841fc5a4"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/magic.c": {
+      "original_sha256": "d5721e4b422229735c31fa362d8b0d060e94eef5a676d3d7ca5d4064eb6f0e20",
+      "compat_sha256": "d5721e4b422229735c31fa362d8b0d060e94eef5a676d3d7ca5d4064eb6f0e20"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/mppe.c": {
+      "original_sha256": "f209f08e59f0e9ed5d4b736a7534e6c0df726b2d14cac07dee311017fa2a0a41",
+      "compat_sha256": "f209f08e59f0e9ed5d4b736a7534e6c0df726b2d14cac07dee311017fa2a0a41"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/multilink.c": {
+      "original_sha256": "56bf93e396b7083040df963eaaf382e897f096d5fd0f479a80409c9eb63bc7c7",
+      "compat_sha256": "56bf93e396b7083040df963eaaf382e897f096d5fd0f479a80409c9eb63bc7c7"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/README": {
+      "original_sha256": "242dd0f7c45dd7fafc37e2caa4b1e0609e1cd9a61512d7772d58c41f7a7e7c95",
+      "compat_sha256": "242dd0f7c45dd7fafc37e2caa4b1e0609e1cd9a61512d7772d58c41f7a7e7c95"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/arc4.c": {
+      "original_sha256": "71eb2d4d685a3cee9056ca2e6bc81a828bc8952abe9e1f8aa8be84dcc4520423",
+      "compat_sha256": "71eb2d4d685a3cee9056ca2e6bc81a828bc8952abe9e1f8aa8be84dcc4520423"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/des.c": {
+      "original_sha256": "4e563c744ba5d7b56f91dd74d16eb0e85d37ee151461c944888f70bcc48dd3c6",
+      "compat_sha256": "4e563c744ba5d7b56f91dd74d16eb0e85d37ee151461c944888f70bcc48dd3c6"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/md4.c": {
+      "original_sha256": "9fac83147e0ef4a1d9d2424d90bbef8b30636ac953854111eeb25b5257907054",
+      "compat_sha256": "9fac83147e0ef4a1d9d2424d90bbef8b30636ac953854111eeb25b5257907054"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/md5.c": {
+      "original_sha256": "d08233e160590193eaf06a14aac563dbb9848acc182ef90f67de5221edf238e6",
+      "compat_sha256": "d08233e160590193eaf06a14aac563dbb9848acc182ef90f67de5221edf238e6"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/polarssl/sha1.c": {
+      "original_sha256": "2213e58bbdfc1f5e4654895276c77651dc7f401cecb748b73daa0d873fb117d6",
+      "compat_sha256": "2213e58bbdfc1f5e4654895276c77651dc7f401cecb748b73daa0d873fb117d6"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/ppp.c": {
+      "original_sha256": "37f8213a64eb9c2483f42be46b014f58354eb869f0725b7038c892110552b4a6",
+      "compat_sha256": "37f8213a64eb9c2483f42be46b014f58354eb869f0725b7038c892110552b4a6"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/pppapi.c": {
+      "original_sha256": "85cddcbffe73864afbf87e7953393f77da50ac7fb082e0fc5204b3072934eb18",
+      "compat_sha256": "85cddcbffe73864afbf87e7953393f77da50ac7fb082e0fc5204b3072934eb18"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/pppcrypt.c": {
+      "original_sha256": "02b12e7626078be9591237fe84ae000514a2cfd6f0653c890b7b75ce20cada8b",
+      "compat_sha256": "02b12e7626078be9591237fe84ae000514a2cfd6f0653c890b7b75ce20cada8b"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/pppoe.c": {
+      "original_sha256": "61edbe884c85174e93bc626f9ab21a8c85e7b677c3398c38c7beece8fbff9ba5",
+      "compat_sha256": "61edbe884c85174e93bc626f9ab21a8c85e7b677c3398c38c7beece8fbff9ba5"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/pppol2tp.c": {
+      "original_sha256": "33a2629a97af962361693f5ea1e314be967c0f05a49f04467ad6a91b14335650",
+      "compat_sha256": "33a2629a97af962361693f5ea1e314be967c0f05a49f04467ad6a91b14335650"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/pppos.c": {
+      "original_sha256": "318c9aa46449904d9c7ca0999932163f0e11cd4408513a73826b6da98082386c",
+      "compat_sha256": "318c9aa46449904d9c7ca0999932163f0e11cd4408513a73826b6da98082386c"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/upap.c": {
+      "original_sha256": "fa1ac01eca4d95eb904ed843f6b6bfb80c09caf304adf3c6a1b1025134b898a1",
+      "compat_sha256": "fa1ac01eca4d95eb904ed843f6b6bfb80c09caf304adf3c6a1b1025134b898a1"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/utils.c": {
+      "original_sha256": "a311cdf6708635bc04cccf2352452d28fa246cf1aa400059c7b11455e33aa9bb",
+      "compat_sha256": "a311cdf6708635bc04cccf2352452d28fa246cf1aa400059c7b11455e33aa9bb"
+    },
+    "src/lwip-2.2.0/src/netif/ppp/vj.c": {
+      "original_sha256": "5aeb6a28663396b0f6f385a4c247ac2d0a552239b60f891d84328de9f8bc7ed2",
+      "compat_sha256": "5aeb6a28663396b0f6f385a4c247ac2d0a552239b60f891d84328de9f8bc7ed2"
+    },
+    "src/lwip-2.2.0/src/netif/slipif.c": {
+      "original_sha256": "6e33b2aa2794b9baf67e8776b2c6e61b5e92725ee679067a71494dcb00071f34",
+      "compat_sha256": "6e33b2aa2794b9baf67e8776b2c6e61b5e92725ee679067a71494dcb00071f34"
+    },
+    "src/lwip-2.2.0/src/netif/zepif.c": {
+      "original_sha256": "1ee211522e5c4c4bd0b10a2cf747b4ec892d61751064e1f380e720d3be11349e",
+      "compat_sha256": "1ee211522e5c4c4bd0b10a2cf747b4ec892d61751064e1f380e720d3be11349e"
+    },
+    "src/lwip220.cmake": {
+      "original_sha256": "3d7a0f3e0c05f9354fb3e8a216e3d56deae7506e77c5b3151dc746467a0e1ec7",
+      "compat_sha256": "3d7a0f3e0c05f9354fb3e8a216e3d56deae7506e77c5b3151dc746467a0e1ec7"
+    }
+  }
+}

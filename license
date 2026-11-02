@@ -1,0 +1,46 @@
+MIT License
+
+Copyright (c) 2026 Lucian-ming
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## 适用范围说明（重要，不是许可证正文）
+
+本 MIT 许可证覆盖**本仓库作者原创的源码、脚本、测试与文档**。
+
+仓库内还包含**第三方素材**，它们**不适用**上面这份 MIT，各自保留原有条款，
+公开分享这些素材前须按各自来源的许可处理：
+
+- `data/r083-data/`：R0.83 原始测序、码字、水印与图像数据；权利人、来源 URL
+  与再分发许可尚未确认。本项目仅在比赛评审与本地复现范围内使用。
+- `sim/golden/`：由上述数据生成的黄金向量与板测派生文件，随上游数据的
+  权利状态而定。
+- `data/test-sets/multimedia/`：42 例测试集；逐资产来源与许可见同目录
+  `sources.json`（USC-SIPI / ESC-50 / Xiph Derf / 项目合成）。
+- `src/clients/python/resources/dvb_s2_r5_6.pchk`、`permutation64800`：
+  对应 DVB-S2 标准的校验矩阵与交织表，具体文件来源尚待补充。
+- `build/sw-repo/`：第三方 lwIP 2.2.0 源码，遵循其随附 `COPYING`。
+- `build/artifact/`、`build/software-export/` 以及任何由 AMD/Xilinx 工具生成的
+  IP、BSP、FSBL、BOOT、bit、XSA、ELF：条款随上游工具与 IP。
+
+逐项说明与未决项见 `report/third-party-notices.md`。
+
+若本项目的下游使用者需要把这些第三方素材一并再分发，请自行取得对应授权。

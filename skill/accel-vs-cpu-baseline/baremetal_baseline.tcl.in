@@ -1,0 +1,80 @@
+# baremetal_baseline.tcl.in —— 在板上跑「纯软件基线」的 XSDB 模板
+#
+# 用法：把 @@...@@ 占位符替换成实际值，再从主机运行 `xsdb baseline_run.tcl`。
+#   @@OUT@@        XSDB 主机可访问的目录，内含 ps7_init.tcl、ref.bin、input.bin、baseline.elf
+#   @@N@@          本次处理的条数（正整数）
+#   @@TIMEOUT@@    等待板端完成的秒数上限（正整数；这是超时，不是性能计时值）
+# 下列地址与 magic 都是示例，必须和裸机 ELF 的链接地址/共享内存协议逐项一致：
+#   header_addr / ref_addr / input_addr / status_addr / result_addr
+#   init_magic / done_magic / error_magic
+# 期望末尾输出：`BASELINE> status 0x... after ... s` 和 `BASELINE> dumped`。
+# 非零状态/超时返回 exit 2；缺文件、XSDB 命令失败会打印 Tcl/XSDB 错误。
+# exit 0 仅表示板端报告完成并导出文件，不代表结果正确；主机比较器仍须逐字段比对。
+#
+# 为什么这样写（三条都踩过）：
+#   1) 先 rst -system + ps7_init 再 dow -data：不初始化 DDR 控制器就往 DDR 写，静默失败；
+#   2) 轮询用 mrd -force，不要反复 stop/con —— stop 会暂停 CPU 但硬件计时器照跑，污染计时；
+#   3) 裸机程序写完结果必须 Xil_DCacheFlush()，否则这里读到的是 DDR 里的旧值。
+
+set header_addr 0x08000000
+set ref_addr    0x08001000
+set input_addr  0x08010000
+set status_addr 0x09F00000
+set result_addr 0x09000000
+set init_magic  0xAB5E0001
+set done_magic  0xAB5E00D0
+set error_magic 0xAB5E0BAD
+set result_bytes [expr {@@N@@ * 4}]
+
+connect
+targets -set -nocase -filter {name =~ "APU*"}
+rst -system
+after 2000
+targets -set -nocase -filter {name =~ "*Cortex-A9*#0*"}
+source {@@OUT@@/ps7_init.tcl}
+ps7_init
+ps7_post_config
+
+# 输入数据写进 DDR（地址须与裸机程序里的定义一致）
+dow -data {@@OUT@@/ref.bin}   $ref_addr
+dow -data {@@OUT@@/input.bin} $input_addr
+
+# 头部：magic + 条数；结果区的完成标志先清零
+mwr $header_addr $init_magic
+mwr [expr {$header_addr + 4}] @@N@@
+mwr $status_addr 0
+
+dow @@OUT@@/baseline.elf
+con
+puts "BASELINE> running"
+
+set t0 [clock seconds]
+set st 0
+set completed 0
+while {[clock seconds] - $t0 < @@TIMEOUT@@} {
+    after 2000
+    if {[catch {set st [mrd -force -value $status_addr]} err]} {
+        puts "BASELINE> mrd err $err"
+        continue
+    }
+    if {$st == $done_magic} {
+        set completed 1
+        break
+    }
+    if {$st == $error_magic} {
+        stop
+        puts [format "BASELINE> FAIL board reported error status 0x%08X" $st]
+        exit 2
+    }
+}
+stop
+if {!$completed} {
+    puts [format "BASELINE> FAIL timeout after %d s; last status 0x%08X" [expr {[clock seconds] - $t0}] $st]
+    exit 2
+}
+puts [format "BASELINE> status 0x%08X after %d s" $st [expr {[clock seconds] - $t0}]]
+
+# 摘要（条数、耗时计数、计数器频率）与逐条结果都读回主机，由主机做逐条比对
+mrd -bin -file {@@OUT@@/sum.bin}    $status_addr 8
+mrd -bin -file {@@OUT@@/result.bin} $result_addr $result_bytes
+puts "BASELINE> dumped"

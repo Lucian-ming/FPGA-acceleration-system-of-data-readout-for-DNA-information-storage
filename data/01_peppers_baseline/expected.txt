@@ -1,0 +1,4 @@
+用例：01_peppers_baseline
+期望载荷 SHA-256：e0e65925814e07374dd4188939dd13e9d647cd2ecfb3480b050fe4775119242b
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 38 轮收敛）

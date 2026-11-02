@@ -192,10 +192,10 @@ LINE_REF_HITS="$(
     fi
     scan_line_references --include='*.c' --include='*.h' --include='*.v' --include='*.sv' \
         --include='*.py' --include='*.sh' \
-        sw/app/ hw/ip/ hw/sim/ tools/ clients/python/ hw/scripts/ sw/scripts/ || SCAN_FAILED=1
+        src/sw/app/ src/hw/ip/ sim/rtl/ src/tools/ tools/ src/clients/python/ src/hw/scripts/ src/sw/scripts/ || SCAN_FAILED=1
     # Tcl/PowerShell 入口还存在于 hw/sim/ 与 tools/；递归扫描这四个目录。
     scan_line_references --include='*.tcl' --include='*.ps1' \
-        hw/scripts/ sw/scripts/ hw/sim/ tools/ || SCAN_FAILED=1
+        src/hw/scripts/ src/sw/scripts/ sim/rtl/ src/tools/ tools/ || SCAN_FAILED=1
     (( SCAN_FAILED == 0 ))
 )"
 if (( $? != 0 )); then
@@ -211,11 +211,21 @@ else
         ref="${hit##*:::}"                     # 被引用的 path:line
         f="${ref%%:*}"; ln="${ref##*:}"
         resolved=""
-        for pre in "" sw/app/ tools/ tools/board/ clients/python/ hw/scripts/ hw/sim/ hw/sim/ip_tb/ \
-                   hw/experimental/ hw/experimental/unused_axi_wrappers/ sw/scripts/ \
-                   hw/ip/Dna_accelerator_core_1_0/hdl/ hw/ip/differential_voter_1_0/hdl/ \
-                   hw/ip/desparsification_decoder_1_0/hdl/; do
-            [[ -f "$pre$f" ]] && { resolved="$pre$f"; break; }
+        # 路径重定位与解析
+        cand_f="$f"
+        cand_f="${cand_f#src/}"
+        cand_f="${cand_f#hw/}"
+        cand_f="${cand_f#tests/}"
+        for pre in "" src/ src/sw/app/ src/tools/ src/tools/board/ tools/ src/clients/python/ \
+                   src/hw/scripts/ sim/ sim/rtl/ sim/rtl/ip_tb/ sim/host/ src/sw/scripts/ docs/history/ \
+                   src/hw/ip/dna_accelerator_core_1_0/hdl/ src/hw/ip/differential_voter_1_0/hdl/ \
+                   src/hw/ip/desparsification_decoder_1_0/hdl/ src/hw/ip/ldpc_decoder_1_0/hdl/; do
+            if [[ -f "$pre$f" ]]; then resolved="$pre$f"; break; fi
+            if [[ -f "$pre$cand_f" ]]; then resolved="$pre$cand_f"; break; fi
+            # HDL 命名规范去除 _v1_0
+            no_v10="${f/_v1_0/}"
+            no_v10="${no_v10,,}" # 小写化
+            if [[ -f "$pre$no_v10" ]]; then resolved="$pre$no_v10"; break; fi
         done
         if [[ -z "$resolved" ]]; then
             STALE_REF+=$'\n'"      悬空  $ref        （出自 $src）"
@@ -366,8 +376,8 @@ import subprocess, hashlib, os, sys
 files = subprocess.check_output(['git', 'ls-files']).decode().splitlines()
 hashes = {}
 for f in files:
-    if f.startswith(('tests/datasets/', 'tests/golden/', 'tests/stress_results/', 'docs/images/',
-                        'docs/submission/llm-collaboration/')):
+    if f.startswith(('sim/golden/', 'data/', 'build/sw-repo/', 'tests/datasets/', 'tests/golden/', 'tests/stress_results/', 'docs/images/',
+                        'docs/submission/llm-collaboration/', 'archive/')):
         continue
     if os.path.isfile(f):
         h = hashlib.sha256(open(f, 'rb').read()).hexdigest()

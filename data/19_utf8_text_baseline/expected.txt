@@ -1,0 +1,4 @@
+用例：19_utf8_text_baseline
+期望载荷 SHA-256：07707eee39b6c39cba8ef77aafbb282a7aa91d58172dc5374bd7ec1b18cd390b
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 39 轮收敛）

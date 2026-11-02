@@ -1,0 +1,4 @@
+用例：17_waterfall_challenge
+期望载荷 SHA-256：46d2e7e9f0159c209ec903a8d1a06d114da5fab6fc701475c3b251c7ff555849
+score_min：65    记录：5668 源读段
+软件侧结果：通过（LDPC 5 轮收敛）

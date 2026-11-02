@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# 统一入口：Git Bash 下优先真实 Python，避开 Windows 商店占位符；
+# 在 WSL/Linux 下直接交给系统 python3（本目录被前置到 PATH 时会覆盖同名命令）。
+if [ -n "${DNA_PYTHON:-}" ]; then exec "$DNA_PYTHON" "$@"; fi
+case "$(uname -s 2>/dev/null)" in
+  *Microsoft*|*WSL*) exec /usr/bin/python3 "$@" ;;
+esac
+if command -v python >/dev/null 2>&1; then exec python "$@"; fi
+if command -v python.exe >/dev/null 2>&1; then exec python.exe "$@"; fi
+exec py -3 "$@"

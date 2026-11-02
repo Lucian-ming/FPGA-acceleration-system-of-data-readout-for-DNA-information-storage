@@ -1,0 +1,10 @@
+date_utc	run_id	artifact	driver	criteria	result
+2026-10-16	20261016T140746Z-v11-fwid-run3	v1.1 release	fw_id=db5705fb4d0bc003	三层 + 固件身份	PASS
+2026-10-18	soak-v1.1-20261018T0239Z	v1.1 release	fw_id=db5705fb4d0bc003	8 h 长稳 1736 轮 + 173 次探针	PASS
+2026-10-20	20261020T025652Z	2026.1 manifest c2d151e0	WSL xsdb + hw_server	三层	PASS
+2026-10-20	20261020T025814Z	2026.1 manifest c2d151e0	WSL xsdb + hw_server	三层 + 四级 4/4	PASS
+2026-10-20	20261020T030433Z	2026.1 manifest c2d151e0	Windows native (Vitis 2026.1 xsdb + COM10)	三层 + 四级 4/4	PASS
+2026-10-20	20261020T031743Z	2026.1 manifest c38f3a3e	Windows native	三层 + 四级 4/4	PASS
+2026-10-20	20261020T032441Z	2026.1 manifest 91876564	Windows native	三层 + 四级 4/4	PASS
+2026-10-20	20261020T060315Z	2026.1 manifest 50d41f40	Windows native	三层 + 四级 4/4	PASS
+2026-10-20	soak-2h (manifest bb7ff543)	2026.1 final	Windows native	2 h 长稳 262 轮 + 26 次探针	PASS

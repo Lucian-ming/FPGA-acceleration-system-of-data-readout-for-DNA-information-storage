@@ -1,73 +1,41 @@
-# 本机 Git 元数据（因受限工作区使用 .git 文件指向此目录）
+# 本机 Git 元数据
 .git-data/
 
-# Vivado / Vitis 生成目录与临时文件
+# 运行临时与崩溃文件
 .Xil/
-hw/build/synth_*/
-# 当前 Tcl 构建产生的 Vivado 工程中间目录；export/ 中的交付制品保留版本管理。
-hw/build/dna_accel.cache/
-hw/build/dna_accel.gen/
-hw/build/dna_accel.hw/
-hw/build/dna_accel.runs/
-hw/build/dna_accel.srcs/
-hw/build/dna_accel.xpr
-hw/build/reports/
-hw/build/xsim/
-# BKB220 新板构建/探针目录：ps7_init 探针每变体都是完整 Vivado 工程（r3 实测约 54 MB），
-# P4/P16 整机工程更大。这些是可重建的大生成物——只把可复现 Tcl 入口、报告摘要与
-# 时序/资源结论入库，工程目录本身不入库、也不自动删除。
-hw/build/bkb220-ps7-probe/
-# v1.0 定版包与后续新命名包（2026-10-16）：上面按旧名前缀的规则匹配不到
-hw/build/bkb220-v1.0-*/
-hw/build/bkb220-v*-*/
-hw/build/bkb220-p4-*/
-hw/build/bkb220-p16-*/
-sw/workspace/
 *.jou
 *.log
-# 例外：板端 UART 实录是上板判据的证据，必须入库（作用域仅此目录）
-!docs/board/run-logs/*.log
+!board/run-logs/*.log
 *.str
 *.pb
 *.wdb
-# 运行留证目录：默认不入库（体量大、每次运行都新建一个 run-id 子目录）。
-# 结论与判据写进 docs/，需要保留的**单份小证据**用 git add -f 显式入库
-# （例如 logs/vivado/.../physopt/summary.log、logs/multi_payload/repeat3_*/report.md）。
-# 2026-09-10：补齐本轮新增的 6 个目录——它们此前未被覆盖，
-# 一旦有人误用 git add -A 就会把几百 MB 的运行产物卷进仓库。
-# 2026-09-11：改为**整体忽略 logs/ 下的运行目录**，再用否定模式放行刻意入库的
-# 单份证据。此前是逐个目录列举，每新增一个日志目录就漏一个——tools/check_repo_hygiene.sh
-# 第一次运行就抓到 5 个漏网目录。默认忽略、例外放行，比逐个补要稳。
+
+# Vivado / Vitis 生成目录与临时工程（build/artifact 与 build/reports 纳入版本管理）
+build/vivado/
+build/software-export/
+build/workspace/
+src/sw/workspace/
+
+# 运行留证目录与本地归档（本地归档含提交物原件、原始板测数据与涉密隔离区）
+archive/
 logs/*/
 !logs/README.md
-# 以下是刻意入库的小份证据（体积小、被 docs 直接引用）
-!logs/vivado/
-logs/vivado/*/
-!logs/vivado/recovery_20260909/
-!logs/multi_payload/
-logs/multi_payload/*/
-!logs/multi_payload/repeat3_20260910T200339Z/
 
-# Python 缓存
+# Python 缓存与构建产物
 __pycache__/
 *.py[cod]
-tools/*.so
+*.so
 
-# 本地导入的只读数据与历史归档。
-# 校验和、来源和使用约束记录在 docs/reference/；如需远端保存大文件，请另行使用 Git LFS 或制品库。
-# data/ 是 54 MB 实验原始数据，不入库；但清单必须入库，
-# 否则 clean checkout 既拿不到数据、也无从知道该拿什么（G7 独立复现的硬阻塞）。
-# 注意必须写 data/* 而不是 data/：忽略目录本身会让 git 不再下探，
-# 后面的 ! 否定规则就永远不生效。
-data/*
-!data/MANIFEST.md
-!data/MANIFEST.sh
-archive/
+# 客户端打包产物（30 MB gui_app.exe 进本地归档与 Release 附件，源码与 spec 纳入版本管理）
+*.exe
+src/clients/dist/
+src/clients/python/build/
+src/clients/python/gui_app.exe
 
-# 当前 BKB220 厂商资料位于 docs/board/bkb220/，SHA-256 清单为 docs/board/bkb220/SHA256SUMS.txt；
-# 旧 ZYNQ ECO 7010 资料原件已于 2026-10-16 移出仓库，历史项目记录见
-# docs/archive/history/2026/board-zynq-eco-7010.md。板卡资料仍整体纳入版本管理，只排除体积过大的教学视频。
-docs/board/**/tutorials/*.mp4
+# 视频渲染中间缓存与大成片（成片 105 MB 超过 GitHub 单文件限制，归档至 archive/submission-2026/）
+dna-readout-video/dna-readout-explainer.mp4
+dna-readout-video/build/
+dna-readout-video/stills/
 
 # 编辑器与操作系统本地文件
 .vscode/
@@ -77,38 +45,7 @@ docs/board/**/tutorials/*.mp4
 .DS_Store
 Thumbs.db
 
-# 多 agent 实时工作看板（本机可见即可，不进版本管理）；
-# 由 tools/agent_view.sh 生成，结论与判据仍写入 docs/ 并提交。
+# 多 Agent 实时工作看板（本机可见即可，不进版本管理）
 view.md
 .agent_view/
-
-# 压测中间转储数据文件（体积过大且已在 results.jsonl 完整记录）
-tests/stress_results/**/dec_run_*.txt
-# docs 历史归档需要纳入版本管理；仅仓库根 archive/ 继续忽略。
-!docs/archive/
-!docs/archive/history/
-!docs/archive/history/2026/
-!docs/archive/history/2026/**
-
-# 2026-10-10：已盘点的历史生成物/活证据原位保留，精确忽略以防误提交。
-# 已跟踪的小份报告继续跟踪；清单见docs/reference/workspace-cleanup-2026-10-10.md。
-/hw/build/attic/
-/hw/build/export_4way_physopt/
-/logs/multi_payload/repeat3_20260910T200339Z/dumps/
-/logs/vivado/recovery_20260909/failing_endpoints.tsv
-/logs/vivado/recovery_20260909/failing_paths_all.rpt
-/tests/stress_results/g6_config_guard_20260911T035705Z/
-/tests/stress_results/g6_continuous_20260908T121731Z/
-/tests/stress_results/g6_postfault_20260908T165423Z/
-
-# PyInstaller 产物：31 MB 单文件 exe，按用户 2026-10-14 指示不入库
-# （只提交 spec 与打包方法；exe 在 Windows 侧现打）
-clients/dist/
-clients/python/build/
-__pycache__/
-
-# dna-readout-video：成片、TTS/混音中间件、逐场预览与抽帧总 438 MB，不入库；
-# 只提交可复现的脚本（src/）、旁白/分镜/字幕与检查记录。
-dna-readout-video/dna-readout-explainer.mp4
-dna-readout-video/build/
-dna-readout-video/stills/
+src/logs/

@@ -1,0 +1,4 @@
+用例：14_rain_baseline
+期望载荷 SHA-256：0f2657e993b668756fdb2a2ae62f3c64be31aed80c1557422990c766f0863282
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 42 轮收敛）

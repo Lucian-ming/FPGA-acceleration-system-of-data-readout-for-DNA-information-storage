@@ -1,0 +1,4 @@
+用例：08_stream_bridge_challenge
+期望载荷 SHA-256：1e028f88f77664451f255138e12e36e2f4c3d209afa49a9b334be68a812efe9a
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 8 轮收敛）

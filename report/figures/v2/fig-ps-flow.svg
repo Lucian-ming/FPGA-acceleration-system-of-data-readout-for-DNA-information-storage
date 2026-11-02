@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1787.072" viewBox="190.816 20.816 818.367 609.367">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D788F" /></marker></defs>
+<rect x="190.816" y="20.816" width="818.367" height="609.367" fill="#FFFFFF" />
+<rect x="200" y="30" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="232" y="70" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">IDLE</text>
+<text x="450" y="70" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">等待连接与 CONFIG</text>
+<line x1="600" y1="93" x2="600" y2="108" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="200" y="111" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="232" y="151" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">STAGE1</text>
+<text x="450" y="151" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">读段滑窗比对</text>
+<line x1="600" y1="174" x2="600" y2="189" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="200" y="192" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="232" y="232" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">VOTER</text>
+<text x="450" y="232" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">差分投票</text>
+<line x1="600" y1="255" x2="600" y2="270" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="200" y="273" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#7154A3" stroke-width="2" />
+<text x="232" y="313" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#7154A3">DECODER</text>
+<text x="450" y="313" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">反稀疏化</text>
+<line x1="600" y1="336" x2="600" y2="351" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="200" y="354" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#D89027" stroke-width="2" />
+<text x="232" y="394" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#D89027">LDPC</text>
+<text x="450" y="394" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">片上纠错</text>
+<line x1="600" y1="417" x2="600" y2="432" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="200" y="435" width="800" height="62" rx="12" fill="#F8FBFD" stroke="#17324D" stroke-width="2" />
+<text x="232" y="475" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#17324D">SEND_RESULT</text>
+<text x="450" y="475" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">结果回传</text>
+<text x="600" y="561" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="600" fill="#168C86">VOTER 输出后，PS 执行 Stage2.5 水印异或，再进入 DECODER</text>
+<text x="600" y="619" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="600" fill="#A64242">异常路径：超时或校验失败 → FAIL 并停止本轮</text>
+</svg>

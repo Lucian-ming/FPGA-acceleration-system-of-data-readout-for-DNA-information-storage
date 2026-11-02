@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1659.639" viewBox="68.367 16.367 1063.265 735.265">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D788F" /></marker></defs>
+<rect x="68.367" y="16.367" width="1063.265" height="735.265" fill="#FFFFFF" />
+<rect x="80" y="28" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="112" y="68" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">制品包一致性</text>
+<text x="330" y="68" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">SHA-256 · XSA 内 bit · 器件与参数</text>
+<line x1="600" y1="92" x2="600" y2="99" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="80" y="105" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="112" y="145" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">烧录</text>
+<text x="330" y="145" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">将制品写入目标板</text>
+<line x1="600" y1="169" x2="600" y2="176" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="80" y="182" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="112" y="222" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">固件身份</text>
+<text x="330" y="222" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">fw_build_id 与定版值一致</text>
+<line x1="600" y1="246" x2="600" y2="253" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="80" y="259" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="112" y="299" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">应用就绪</text>
+<text x="330" y="299" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">CAPS 能力查询成功</text>
+<line x1="600" y1="323" x2="600" y2="330" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="80" y="336" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#7154A3" stroke-width="2" />
+<text x="112" y="376" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#7154A3">架构判据</text>
+<text x="330" y="376" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">板端回传码字 syndrome = 0 / 10,800</text>
+<line x1="600" y1="400" x2="600" y2="407" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="80" y="413" width="1040" height="62" rx="10" fill="#F8FBFD" stroke="#7154A3" stroke-width="2" />
+<text x="112" y="453" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#7154A3">系统判据</text>
+<text x="330" y="453" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">载荷 SHA-256 与期望值一致</text>
+<rect x="80" y="502" width="1040" height="84" rx="12" fill="#FFF9EF" stroke="#D89027" stroke-width="2" stroke-dasharray="8 6" />
+<text x="112" y="537" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#A86812">四级逐级取证</text>
+<text x="330" y="537" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">水印 / Stage1 / Stage2 / Stage3（仅诊断）</text>
+<text x="330" y="570" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="500" fill="#52687A">用于定位差异，不参与裁决</text>
+<rect x="165" y="627" width="870" height="112" rx="16" fill="#EAF5F3" stroke="#168C86" stroke-width="3" />
+<text x="600" y="674" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="28" font-weight="700" fill="#168C86">架构判据与系统判据同时通过</text>
+<text x="600" y="716" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="27" font-weight="700" fill="#17324D">= G3 PASS</text>
+</svg>

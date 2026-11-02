@@ -1,0 +1,14 @@
+# 上位机依赖
+#
+# 需要 Python >= 3.8
+#
+#   pip install -r clients/python/requirements.txt
+#
+# 说明：
+#   - numpy  : 原生 DVB-S2 LDPC 译码及向量运算
+#   - Pillow : gui_app.py 显示 LDPC 译码出的图像
+#   - 客户端使用 native_ldpc.py（纯 Python）与 libc_ldpc.so 加速，
+#     历史 Windows 外部译码器 EXE 与三个 MinGW DLL 已从包中移除。
+
+numpy>=1.21
+Pillow>=9.0

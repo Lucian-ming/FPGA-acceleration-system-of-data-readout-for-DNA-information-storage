@@ -1,0 +1,13 @@
+{
+  "repo_root": "src",
+  "workspace": "build/sw-workspace",
+  "xsa": "build/vivado/export/dna_accel.xsa",
+  "export_dir": "build/software-export",
+  "uart": "ps7_uart_0",
+  "board_id": "bkb220",
+  "part": "xc7z020clg400-2",
+  "bootgen": "",
+  "dry_run": false,
+  "lwip": "lwip220",
+  "embedded_sw_repo": "build/sw-repo"
+}

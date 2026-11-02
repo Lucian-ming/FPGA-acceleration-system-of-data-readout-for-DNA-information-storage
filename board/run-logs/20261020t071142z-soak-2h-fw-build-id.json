@@ -1,0 +1,10 @@
+{
+  "verdict": "PASS",
+  "expected_fw_build_id": "bfcd40dd3c435a19",
+  "actual_fw_build_id": "bfcd40dd3c435a19",
+  "manifest_sha256": "bb7ff5433ae09711508e31ef35fb35d8c826b3aebd2481b12c39a5a0e49dec72",
+  "check_source": "live_readback",
+  "checked_utc": "2026-10-20T07:11:42.131762+00:00",
+  "artifact_dir": "../build/artifact",
+  "reason": ""
+}

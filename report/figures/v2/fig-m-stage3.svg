@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1282.099" viewBox="1.020 -0.980 1197.959 639.959">
+<defs>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2F5D9A" /></marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2E7D5B" /></marker>
+</defs>
+<rect x="1.020" y="-0.980" width="1197.959" height="639.959" fill="#FFFFFF" />
+<rect id="module_boundary" x="15" y="110" width="1170" height="515" rx="12" fill="#FFFFFF" stroke="#1A2B4A" stroke-width="3" />
+<text data-owner="module_boundary" x="35" y="145" font-family="Noto Sans CJK SC, sans-serif" font-size="26px" font-weight="700" fill="#1A2B4A" text-anchor="start">desparsification_decoder</text>
+<rect id="control_port" x="390" y="12" width="420" height="72" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="control_port" x="600" y="42" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI-Lite 控制口</text>
+<text data-owner="control_port" x="600" y="71" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#5B6B82" text-anchor="middle">S00_AXI AW/W/B/AR/R</text>
+<line x1="600" y1="84" x2="600" y2="108" stroke="#2F5D9A" stroke-width="2" marker-end="url(#arrowBlue)" />
+<rect id="s3_input" x="25" y="200" width="205" height="250" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s3_input" x="127.5" y="231" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI 读通道</text>
+<text data-owner="s3_input" x="127.5" y="263" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_ARADDR</text>
+<text data-owner="s3_input" x="127.5" y="294" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_ARLEN</text>
+<text data-owner="s3_input" x="127.5" y="325" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_RDATA</text>
+<text data-owner="s3_input" x="127.5" y="356" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">[63:0]</text>
+<text data-owner="s3_input" x="127.5" y="387" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_RLAST</text>
+<rect id="s3_read_fsm" x="245" y="235" width="120" height="205" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s3_read_fsm" x="305.0" y="266" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">读状态机</text>
+<text data-owner="s3_read_fsm" x="305.0" y="297" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">突发 ≤256</text>
+<text data-owner="s3_read_fsm" x="305.0" y="327" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">拍</text>
+<text data-owner="s3_read_fsm" x="305.0" y="357" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">4 KiB</text>
+<text data-owner="s3_read_fsm" x="305.0" y="387" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">边界</text>
+<rect id="s3_inbuf" x="380" y="250" width="120" height="175" rx="10" fill="#EAF5EF" stroke="#2E7D5B" stroke-width="2" />
+<text data-owner="s3_inbuf" x="440.0" y="281" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">输入暂存</text>
+<text data-owner="s3_inbuf" x="440.0" y="312" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">128 bit</text>
+<rect id="s3_convert" x="515" y="210" width="180" height="250" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s3_convert" x="605.0" y="241" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">8 路并行单元</text>
+<text data-owner="s3_convert" x="605.0" y="274" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">5b → 4b</text>
+<text data-owner="s3_convert" x="605.0" y="306" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">grp[4:1] ⊕</text>
+<text data-owner="s3_convert" x="605.0" y="338" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">{4{grp[0]}}</text>
+<text data-owner="s3_convert" x="605.0" y="370" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">40 bit 输入</text>
+<text data-owner="s3_convert" x="605.0" y="402" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">32 bit 输出</text>
+<rect id="s3_outbuf" x="710" y="250" width="120" height="175" rx="10" fill="#EAF5EF" stroke="#2E7D5B" stroke-width="2" />
+<text data-owner="s3_outbuf" x="770.0" y="281" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">输出暂存</text>
+<text data-owner="s3_outbuf" x="770.0" y="312" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">96 bit</text>
+<rect id="s3_write_fsm" x="845" y="235" width="100" height="205" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s3_write_fsm" x="895.0" y="266" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">写状态机</text>
+<text data-owner="s3_write_fsm" x="895.0" y="297" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">突发写</text>
+<rect id="s3_output" x="960" y="200" width="220" height="250" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s3_output" x="1070.0" y="231" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI 写通道</text>
+<text data-owner="s3_output" x="1070.0" y="262" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_AWADDR</text>
+<text data-owner="s3_output" x="1070.0" y="292" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_WDATA</text>
+<text data-owner="s3_output" x="1070.0" y="322" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">[63:0]</text>
+<text data-owner="s3_output" x="1070.0" y="352" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_WLAST</text>
+<text data-owner="s3_output" x="1070.0" y="382" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M00_AXI_BRESP</text>
+<line x1="230" y1="330" x2="245" y2="330" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<line x1="365" y1="330" x2="380" y2="330" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<line x1="500" y1="330" x2="515" y2="330" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="695" y1="330" x2="710" y2="330" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="830" y1="330" x2="845" y2="330" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<line x1="945" y1="330" x2="960" y2="330" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<rect id="s3_note" x="300" y="495" width="600" height="110" rx="10" fill="#FFF9EE" stroke="#B26A00" stroke-width="2" stroke-dasharray="10 7" />
+<text data-owner="s3_note" x="600" y="530" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">读写状态机相互独立，可重叠</text>
+<text data-owner="s3_note" x="600" y="568" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="400" fill="#5B6B82" text-anchor="middle">81,000 bit → 64,800 bit</text>
+</svg>

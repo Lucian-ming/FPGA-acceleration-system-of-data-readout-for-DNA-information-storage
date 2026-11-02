@@ -1,0 +1,801 @@
+
+****** Xilinx Vitis Development Environment
+****** Vitis v2026.1 (64-bit)
+****** SW Build 6497934 on 2026-06-16-17:22:28
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+
+SOFTWARE_CONFIG board=bkb220 part=xc7z020clg400-2 XSA=D:\dna-readout-accelerator\build\vivado\export\dna_accel.xsa UART=ps7_uart_0
+Vitis Server started on port '55667'.
+Vitis Server for Embedded Edition. Only embedded component related functions are supported.
+Platform dna_platform creation started.
+SDT generated successfully.
+[INFO]: Validating inputs
+[INFO]: Validating inputs
+[INFO]: Starting domain creation
+[INFO]: Starting domain creation
+[INFO]: Generating Domain-specific DTS for ps7_cortexa9_0
+[INFO]: Generating Domain-specific DTS for ps7_cortexa9_0
+[INFO]: Generating required metadata from domain specific DT
+[INFO]: Generating required metadata from domain specific DT
+[INFO]: Found cmake at D:\xilinx\2026.1\Vitis\\tps\win64\cmake-4.0.1\bin\cmake.EXE
+[INFO]: cmake version: cmake version 4.0.1
+[INFO]: Found mb-gcc at D:\xilinx\2026.1\Vitis\\gnu\microblaze\nt\bin\mb-gcc.EXE
+[INFO]: mb-gcc version: microblaze-xilinx-elf-gcc.exe (GCC) 13.4.0
+[INFO]: Found cmake at D:\xilinx\2026.1\Vitis\\tps\win64\cmake-4.0.1\bin\cmake.EXE
+[INFO]: cmake version: cmake version 4.0.1
+[INFO]: Found mb-gcc at D:\xilinx\2026.1\Vitis\\gnu\microblaze\nt\bin\mb-gcc.EXE
+[INFO]: mb-gcc version: microblaze-xilinx-elf-gcc.exe (GCC) 13.4.0
+[INFO]: Successfully created Domain at D:\dna-readout-accelerator\build\sw-workspace\dna_platform\ps7_cortexa9_0\standalone_domain\bsp
+Domain standalone_domain added successfully.
+[INFO]: Successfully created Domain at D:\dna-readout-accelerator\build\sw-workspace\dna_platform\zynq_fsbl\zynq_fsbl_bsp
+[INFO]: Validating inputs
+[INFO]: Generating Linker script for zynq_fsbl
+[INFO]: Successfully Created Application sources at D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl
+Platform FSBL Boot domain added successfully.
+Platform creation finished successfully.
+Platform Quick Build initiated.
+Initiating build for the dna_platform component.
+Generating Export directory
+Generated platform metadata for creating application(s) based on platform dna_platform.
+Initiating build for the dna_platform component.
+The log will be written to the file: D:\dna-readout-accelerator\build\sw-workspace\dna_platform\logs\standalone_domain_build.log
+[INFO]: Configuring CMake with updated BSP configurations
+-- The C compiler identification is GNU 13.4.0
+[INFO]: Building BSP
+-- The CXX compiler identification is GNU 13.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-g++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The ASM compiler identification is GNU
+-- Found assembler: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe
+-- Configuring done (0.9s)
+-- Generating done (0.1s)
+-- Build files have been written to: D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/build_configs/gen_bsp
+[0/1] Re-running CMake...
+[1/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testcache.c.obj
+[2/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/print.c.obj
+[3/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/inbyte.c.obj
+[4/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/outbyte.c.obj
+[5/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_assert.c.obj
+[6/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xpm_init.c.obj
+[7/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testio.c.obj
+[8/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_mem.c.obj
+[9/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testmem.c.obj
+[10/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xplatform_info.c.obj
+[11/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/xcortexa9_g.c.obj
+[12/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/unlink.c.obj
+[13/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/cpputest_time.c.obj
+[14/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_printf.c.obj
+[15/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_util.c.obj
+[16/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/read.c.obj
+[17/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/sbrk.c.obj
+[18/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_sbrk.c.obj
+[19/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/isatty.c.obj
+[20/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/intr/xinterrupt_wrap.c.obj
+[21/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_exit.c.obj
+[22/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/close.c.obj
+[23/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/fcntl.c.obj
+[24/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_sutil.c.obj
+[25/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/getpid.c.obj
+[26/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/fstat.c.obj
+[27/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/write.c.obj
+[28/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/errno.c.obj
+[29/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/open.c.obj
+[30/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_open.c.obj
+[31/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/abort.c.obj
+[32/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/lseek.c.obj
+[33/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/getentropy.c.obj
+[34/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/kill.c.obj
+[35/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/time.c.obj
+[36/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/putnum.c.obj
+[37/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/gettimeofday.c.obj
+[38/234] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/asm_vectors.S.obj
+[39/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/vectors.c.obj
+[40/234] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/boot.S.obj
+[41/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xil_exception.c.obj
+[42/234] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/cpu_init.S.obj
+[43/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xil_spinlock.c.obj
+[44/234] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/xil-crt0.S.obj
+[45/234] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/translation_table.S.obj
+[46/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xpm_counter.c.obj
+[47/234] ========== BSP Build Information ==========
+
+Compiler PATH: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe
+
+Compiler FLAGS:  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=D:/dna-readout-
+accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/Xilinx.spec -ID:/dn
+
+a-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/include  
+
+-O2 -g -Wall -Wextra -fno-tree-loop-distribute-patterns -DNDEBUG
+
+
+===========================================
+** The above flags are BSP level flags. Increase verbosity to see component specific flags **
+===========================================
+[48/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xl2cc_counter.c.obj
+[49/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_bd.c.obj
+[50/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_mmu.c.obj
+[51/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_misc_psreset_api.c.obj
+[52/234] Building C object libsrc/coresightps_dcc/src/CMakeFiles/coresightps_dcc.dir/xcoresightpsdcc.c.obj
+[53/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_sinit.c.obj
+[54/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_g.c.obj
+[55/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_selftest.c.obj
+[56/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_g.c.obj
+[57/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma.c.obj
+[58/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_hw.c.obj
+[59/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_selftest.c.obj
+[60/234] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_bdring.c.obj
+[61/234] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_cache.c.obj
+[62/234] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_selftest.c.obj
+[63/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_intr.c.obj
+[64/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_g.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/emacps/src/xemacps_g.c:16:9: warning: missing initializer for field 'S1GDiv0' of 'XEmacPs_Config' [-Wmissing-field-initializers]
+   16 |         },
+      |         ^
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/emacps/src/xemacps_g.c:1:
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/emacps/src/xemacps.h:540:13: note: 'S1GDiv0' declared here
+  540 |         u16 S1GDiv0;    /**< 1Gbps Clock Divider 0 */
+      |             ^~~~~~~
+-- Configuring done (2.5s)
+-- Generating done (0.5s)
+-- Build files have been written to: D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/build_configs/gen_bsp
+The log will be written to the file: D:\dna-readout-accelerator\build\sw-workspace\dna_platform\logs\zynq_fsbl_build.log
+[65/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg.c.obj
+[66/234] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_sinit.c.obj
+[67/234] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_g.c.obj
+[68/234] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_hw.c.obj
+[69/234] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_sinit.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/dmaps/src/xdmaps_sinit.c: In function 'XDmaPs_GetDrvIndex':
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/dmaps/src/xdmaps_sinit.c:101:32: warning: unused parameter 'InstancePtr' [-Wunused-parameter]
+  101 | u32 XDmaPs_GetDrvIndex(XDmaPs *InstancePtr, UINTPTR BaseAddress)
+      |                        ~~~~~~~~^~~~~~~~~~~
+[70/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_hw.c.obj
+[71/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_sinit.c.obj
+[72/234] Linking C static library libsrc\coresightps_dcc\src\libcoresightps_dcc.a
+[73/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_intr.c.obj
+[74/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_g.c.obj
+[75/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_pcs.c.obj
+[76/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps.c.obj
+[77/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_hw.c.obj
+[78/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_bdring.c.obj
+[79/234] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps.c.obj
+[80/234] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_control.c.obj
+[81/234] Linking C static library libsrc\axidma\src\libaxidma.a
+[82/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_sinit.c.obj
+[83/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_g.c.obj
+[84/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_options.c.obj
+[85/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_sinit.c.obj
+[86/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_selftest.c.obj
+[87/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_intr.c.obj
+[88/234] Linking C static library libsrc\devcfg\src\libdevcfg.a
+[89/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_selftest.c.obj
+[90/234] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips.c.obj
+[91/234] Linking C static library libsrc\standalone\src\libxilstandalone.a
+[92/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_hw.c.obj
+[93/234] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_g.c.obj
+[94/234] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_sinit.c.obj
+[95/234] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt.c.obj
+[96/234] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_g.c.obj
+[97/234] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_selftest.c.obj
+[98/234] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer.c.obj
+[99/234] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_selftest.c.obj
+[100/234] Linking C static library libsrc\dmaps\src\libdmaps.a
+[101/234] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_sinit.c.obj
+[102/234] Linking C static library libsrc\emacps\src\libemacps.a
+[103/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_sinit.c.obj
+[104/234] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic.c.obj
+[105/234] Linking C static library libsrc\qspips\src\libqspips.a
+[106/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_g.c.obj
+[107/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_g.c.obj
+[108/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_hw.c.obj
+[109/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_selftest.c.obj
+[110/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps.c.obj
+[111/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_sinit.c.obj
+[112/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_intr.c.obj
+[113/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_options.c.obj
+[114/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps.c.obj
+[115/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps.c.obj
+[116/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_g.c.obj
+[117/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_hw.c.obj
+[118/234] Linking C static library libsrc\scutimer\src\libscutimer.a
+[119/234] Linking C static library libsrc\scuwdt\src\libscuwdt.a
+[120/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_host.c.obj
+[121/234] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_card.c.obj
+[122/234] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_options.c.obj
+[123/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_sinit.c.obj
+[124/234] Linking C static library libsrc\scugic\src\libscugic.a
+[125/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_intr.c.obj
+[126/234] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_g.c.obj
+[127/234] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_selftest.c.obj
+[128/234] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_intr.c.obj
+[129/234] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_sinit.c.obj
+[130/234] Building C object libsrc/xiltimer/src/CMakeFiles/xiltimer.dir/core/default_timer/globaltimer_sleep_zynq.c.obj
+[131/234] Building C object libsrc/xiltimer/src/CMakeFiles/xiltimer.dir/xiltimer.c.obj
+[132/234] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_endpoint.c.obj
+[133/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/dns.c.obj
+[134/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/init.c.obj
+[135/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ip.c.obj
+[136/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/def.c.obj
+[137/234] Linking C static library libsrc\uartps\src\libuartps.a
+[138/234] Linking C static library libsrc\sdps\src\libsdps.a
+[139/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/inet_chksum.c.obj
+[140/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/altcp.c.obj
+[141/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/raw.c.obj
+[142/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/mem.c.obj
+[143/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/memp.c.obj
+[144/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/sys.c.obj
+[145/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/altcp_alloc.c.obj
+[146/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/stats.c.obj
+[147/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/altcp_tcp.c.obj
+[148/234] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps.c.obj
+[149/234] Linking C static library libsrc\xiltimer\src\libxiltimer.a
+[150/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/netif.c.obj
+[151/234] Linking C static library libsrc\usbps\src\libusbps.a
+[152/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/autoip.c.obj
+[153/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/igmp.c.obj
+[154/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/dhcp.c.obj
+[155/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/timeouts.c.obj
+[156/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/icmp.c.obj
+[157/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/pbuf.c.obj
+[158/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/acd.c.obj
+[159/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/udp.c.obj
+[160/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/etharp.c.obj
+[161/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/ip4.c.obj
+[162/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/ip4_addr.c.obj
+[163/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/dhcp6.c.obj
+[164/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/ethip6.c.obj
+[165/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/tcp.c.obj
+[166/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/inet6.c.obj
+[167/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/tcp_in.c.obj
+[168/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/icmp6.c.obj
+[169/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/ip6.c.obj
+[170/234] Linking C static library libsrc\xadcps\src\libxadcps.a
+[171/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/tcp_out.c.obj
+[172/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv4/ip4_frag.c.obj
+[173/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/ip6_addr.c.obj
+[174/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/nd6.c.obj
+[175/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/mld6.c.obj
+[176/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/api_lib.c.obj
+[177/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/netdb.c.obj
+[178/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/core/ipv6/ip6_frag.c.obj
+[179/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/api_msg.c.obj
+[180/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/if_api.c.obj
+[181/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/tcpip.c.obj
+[182/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/sockets.c.obj
+[183/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/err.c.obj
+[184/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/netifapi.c.obj
+[185/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/api/netbuf.c.obj
+[186/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/auth.c.obj
+[187/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/lowpan6.c.obj
+[188/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/bridgeif.c.obj
+[189/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ethernet.c.obj
+[190/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/lowpan6_ble.c.obj
+[191/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/slipif.c.obj
+[192/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/zepif.c.obj
+[193/234] Archiving C static library libsrc/build_configs/gen_bsp/libxil.a
+[194/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/lowpan6_common.c.obj
+[195/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/bridgeif_fdb.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/lwip220/src/lwip-2.2.0/src/netif/bridgeif_fdb.c: In function 'bridgeif_age_tmr':
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/lwip220/src/lwip-2.2.0/src/netif/bridgeif_fdb.c:187:3: warning: implicit declaration of function 'sys_timeout' [-Wimplicit-function-declaration]
+  187 |   sys_timeout(BRIDGEIF_AGE_TIMER_MS, bridgeif_age_tmr, arg);
+      |   ^~~~~~~~~~~
+[196/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/ccp.c.obj
+[197/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/chap-md5.c.obj
+[198/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/chap_ms.c.obj
+[199/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/demand.c.obj
+[200/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/ecp.c.obj
+[201/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/eap.c.obj
+[202/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/chap-new.c.obj
+[203/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/fsm.c.obj
+[204/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/ipcp.c.obj
+[205/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/ipv6cp.c.obj
+[206/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/eui64.c.obj
+[207/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/mppe.c.obj
+[208/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/magic.c.obj
+[209/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/lcp.c.obj
+[210/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/pppapi.c.obj
+[211/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/ppp.c.obj
+[212/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/pppcrypt.c.obj
+[213/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/pppoe.c.obj
+[214/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/multilink.c.obj
+[215/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/pppol2tp.c.obj
+[216/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/pppos.c.obj
+[217/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/utils.c.obj
+[218/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/polarssl/des.c.obj
+[219/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/upap.c.obj
+[220/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/polarssl/arc4.c.obj
+[221/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/sys_arch.c.obj
+[222/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/vj.c.obj
+[223/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/polarssl/sha1.c.obj
+[224/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/polarssl/md4.c.obj
+[225/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/src/netif/ppp/polarssl/md5.c.obj
+[226/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/sys_arch_raw.c.obj[INFO]: Copying headers and built archives
+-- Configuring done (0.9s)
+-- Generating done (0.1s)
+-- Build files have been written to: D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/build_configs/gen_bsp
+[INFO]: Building BSP
+[1/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/print.c.obj
+[2/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_assert.c.obj
+[3/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_mem.c.obj
+[4/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testcache.c.obj
+[5/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testio.c.obj
+[6/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/outbyte.c.obj
+[7/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xplatform_info.c.obj
+[8/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_testmem.c.obj
+[9/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/inbyte.c.obj
+[10/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_printf.c.obj
+[11/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xpm_init.c.obj
+[12/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_util.c.obj
+[13/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/xcortexa9_g.c.obj
+[14/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/cpputest_time.c.obj
+[15/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/sbrk.c.obj
+[16/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/unlink.c.obj
+[17/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/getpid.c.obj
+[18/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/fcntl.c.obj
+[19/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/isatty.c.obj
+[20/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_sbrk.c.obj
+[21/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_exit.c.obj
+[22/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/xil_sutil.c.obj
+[23/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/common/intr/xinterrupt_wrap.c.obj
+[24/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/read.c.obj
+[25/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/write.c.obj
+[26/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/close.c.obj
+[27/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/open.c.obj
+[28/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/errno.c.obj
+[29/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/fstat.c.obj
+[30/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/_open.c.obj
+[31/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/lseek.c.obj
+[32/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/abort.c.obj
+[33/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/kill.c.obj
+[34/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/getentropy.c.obj
+[35/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/gettimeofday.c.obj
+[36/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/putnum.c.obj
+[37/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/gcc/time.c.obj
+[38/145] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/translation_table.S.obj
+[39/145] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/asm_vectors.S.obj
+[40/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xil_exception.c.obj
+[41/145] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/boot.S.obj
+[42/145] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/cpu_init.S.obj
+[43/145] Building ASM object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/gcc/xil-crt0.S.obj
+[44/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xpm_counter.c.obj
+[45/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/vectors.c.obj
+[46/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/common/xil_spinlock.c.obj
+[47/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xl2cc_counter.c.obj
+[48/145] ========== BSP Build Information ==========
+
+Compiler PATH: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe
+
+Compiler FLAGS:  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=D:/dna-readout-
+
+accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/Xilinx.spec -ID:/dna-readout-acc
+
+elerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/include  -O2 -g -Wall -Wextra -fno-
+
+tree-loop-distribute-patterns -DNDEBUG
+
+
+===========================================
+** The above flags are BSP level flags. Increase verbosity to see component specific flags **
+===========================================
+[49/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_misc_psreset_api.c.obj
+[50/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_mmu.c.obj
+[51/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_bd.c.obj
+[52/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_g.c.obj
+[53/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_selftest.c.obj
+[54/145] Building C object libsrc/coresightps_dcc/src/CMakeFiles/coresightps_dcc.dir/xcoresightpsdcc.c.obj
+[55/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_sinit.c.obj
+[56/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_g.c.obj
+[57/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_hw.c.obj
+[58/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_selftest.c.obj
+[59/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_sinit.c.obj
+[60/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma.c.obj
+[61/145] Building C object libsrc/standalone/src/CMakeFiles/xilstandalone.dir/arm/cortexa9/xil_cache.c.obj
+[62/145] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_hw.c.obj
+[63/145] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_selftest.c.obj
+[64/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg_intr.c.obj
+[65/145] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_g.c.obj
+[66/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_g.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/emacps/src/xemacps_g.c:16:9: warning: missing initializer for field 'S1GDiv0' of 'XEmacPs_Config' [-Wmissing-field-initializers]
+   16 |         },
+      |         ^
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/emacps/src/xemacps_g.c:1:
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/emacps/src/xemacps.h:540:13: note: 'S1GDiv0' declared here
+  540 |         u16 S1GDiv0;    /**< 1Gbps Clock Divider 0 */
+      |             ^~~~~~~
+[67/145] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps_sinit.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/dmaps/src/xdmaps_sinit.c: In function 'XDmaPs_GetDrvIndex':[INFO]: Copying headers and built archives
+[INFO]: Successfully built BSP. Generated libxil.a, libxilffs.a, libxilrsa.a, libxilstandalone.a, libxiltimer.a
+
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/libsrc/dmaps/src/xdmaps_sinit.c:101:32: warning: unused parameter 'InstancePtr' [-Wunused-parameter]
+  101 | u32 XDmaPs_GetDrvIndex(XDmaPs *InstancePtr, UINTPTR BaseAddress)
+      |                        ~~~~~~~~^~~~~~~~~~~
+[68/145] Building C object libsrc/axidma/src/CMakeFiles/axidma.dir/xaxidma_bdring.c.obj
+[69/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_hw.c.obj
+[70/145] Building C object libsrc/devcfg/src/CMakeFiles/devcfg.dir/xdevcfg.c.obj
+[71/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_sinit.c.obj
+[72/145] Linking C static library libsrc\coresightps_dcc\src\libcoresightps_dcc.a
+[73/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_g.c.obj
+[74/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps.c.obj
+[75/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_hw.c.obj
+[76/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_pcs.c.obj
+[77/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_intr.c.obj
+[78/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_bdring.c.obj
+[79/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_sinit.c.obj
+[80/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_options.c.obj
+[81/145] Building C object libsrc/dmaps/src/CMakeFiles/dmaps.dir/xdmaps.c.obj
+[82/145] Building C object libsrc/emacps/src/CMakeFiles/emacps.dir/xemacps_control.c.obj
+[83/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_g.c.obj
+[84/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips_selftest.c.obj
+[85/145] Linking C static library libsrc\axidma\src\libaxidma.a
+[86/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_sinit.c.obj
+[87/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_intr.c.obj
+[88/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_selftest.c.obj
+[89/145] Linking C static library libsrc\devcfg\src\libdevcfg.a
+[90/145] Linking C static library libsrc\standalone\src\libxilstandalone.a
+[91/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic_hw.c.obj
+[92/145] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_g.c.obj
+[93/145] Building C object libsrc/qspips/src/CMakeFiles/qspips.dir/xqspips.c.obj
+[94/145] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_selftest.c.obj
+[95/145] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer_sinit.c.obj
+[96/145] Building C object libsrc/scutimer/src/CMakeFiles/scutimer.dir/xscutimer.c.obj
+[97/145] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_g.c.obj
+[98/145] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_selftest.c.obj
+[99/145] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt.c.obj
+[100/145] Building C object libsrc/scuwdt/src/CMakeFiles/scuwdt.dir/xscuwdt_sinit.c.obj
+[101/145] Linking C static library libsrc\emacps\src\libemacps.a
+[102/145] Linking C static library libsrc\dmaps\src\libdmaps.a
+[103/145] Building C object libsrc/scugic/src/CMakeFiles/scugic.dir/xscugic.c.obj
+[104/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_sinit.c.obj
+[105/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_g.c.obj
+[106/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_g.c.obj
+[107/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_hw.c.obj
+[108/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_selftest.c.obj
+[109/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_options.c.obj
+[110/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps.c.obj
+[111/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_intr.c.obj
+[112/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_sinit.c.obj
+[113/145] Linking C static library libsrc\qspips\src\libqspips.a
+[114/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps.c.obj
+[115/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_g.c.obj
+[116/145] Linking C static library libsrc\scutimer\src\libscutimer.a
+[117/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_host.c.obj
+[118/145] Building C object libsrc/sdps/src/CMakeFiles/sdps.dir/xsdps_card.c.obj
+[119/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps.c.obj
+[120/145] Linking C static library libsrc\scuwdt\src\libscuwdt.a
+[121/145] Building C object libsrc/uartps/src/CMakeFiles/uartps.dir/xuartps_options.c.obj
+[122/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_hw.c.obj
+[123/145] Linking C static library libsrc\scugic\src\libscugic.a
+[124/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_sinit.c.obj
+[125/145] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_g.c.obj
+[126/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_intr.c.obj
+[127/145] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_selftest.c.obj
+[128/145] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_intr.c.obj
+[129/145] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps_sinit.c.obj
+[130/145] Building C object libsrc/xiltimer/src/CMakeFiles/xiltimer.dir/core/default_timer/globaltimer_sleep_zynq.c.obj
+[131/145] Building C object libsrc/xiltimer/src/CMakeFiles/xiltimer.dir/xiltimer.c.obj
+[132/145] Building C object libsrc/xilffs/src/CMakeFiles/xilffs.dir/ffsystem.c.obj
+[133/145] Building C object libsrc/xilffs/src/CMakeFiles/xilffs.dir/ffunicode.c.obj
+[134/145] Linking C static library libsrc\xilrsa\src\libxilrsa.a
+[135/145] Linking C static library libsrc\sdps\src\libsdps.a
+[136/145] Building C object libsrc/xilffs/src/CMakeFiles/xilffs.dir/diskio.c.obj
+[137/145] Linking C static library libsrc\uartps\src\libuartps.a
+[138/145] Building C object libsrc/usbps/src/CMakeFiles/usbps.dir/xusbps_endpoint.c.obj
+[139/145] Linking C static library libsrc\xiltimer\src\libxiltimer.a
+[140/145] Linking C static library libsrc\usbps\src\libusbps.a
+[141/145] Building C object libsrc/xadcps/src/CMakeFiles/xadcps.dir/xadcps.c.obj
+[142/145] Linking C static library libsrc\xadcps\src\libxadcps.a
+[143/145] Archiving C static library libsrc/build_configs/gen_bsp/libxil.a
+[144/145] Building C object libsrc/xilffs/src/CMakeFiles/xilffs.dir/ff.c.obj
+[145/145] Linking C static library libsrc\xilffs\src\libxilffs.a
+[INFO]: Successfully built BSP. Generated liblwip220.a, libxil.a, libxilstandalone.a, libxiltimer.a
+
+[227/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/xtopology_g.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/lwip220/src/xtopology_g.c:11:9: warning: initialization of 'unsigned int' from 'void *' makes integer from pointer without a cast [-Wint-conversion]
+   11 |         NULL
+      |         ^~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/ps7_cortexa9_0/standalone_domain/bsp/libsrc/lwip220/src/xtopology_g.c:11:9: note: (near initialization for 'xtopology[1].emac_baseaddr')
+[228/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xpqueue.c.obj
+[229/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xadapter.c.obj
+[230/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_hw.c.obj
+[231/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif.c.obj
+[232/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_physpeed.c.obj
+[233/234] Building C object libsrc/lwip220/src/CMakeFiles/lwip220.dir/lwip-2.2.0/contrib/ports/xilinx/netif/xemacpsif_dma.c.obj
+[234/234] Linking C static library libsrc\lwip220\src\liblwip220.a
+Generating Boot ELFs
+[INFO]: Starting Application build process
+[INFO]: Building BSP
+[INFO]: Copying headers and built archives
+[INFO]: Successfully built BSP. Generated libxil.a, libxilffs.a, libxilrsa.a, libxilstandalone.a, libxiltimer.a
+[INFO]: Building Application
+[1/2] Archiving C static library libsrc/build_configs/gen_bsp/libxil.a
+[2/2] ========== BSP Build Information ==========
+
+Compiler PATH: D:/xilinx/2026.1/Vitis/gnu/aarch32/nt/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe
+
+Compiler FLAGS:  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=D:/dna-readout-
+accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/Xilinx.spec -ID:/dna-readout-acc
+elerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/include  -O2 -g -Wall -Wextra -fno-
+
+tree-loop-distribute-patterns -DNDEBUG
+
+
+===========================================
+** The above flags are BSP level flags. Increase verbosity to see component specific flags **
+===========================================
+[1/14] ==========Application Build Information ==========
+
+Compiler Flags:  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=D:/dna-readout-
+accelerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/Xilinx.spec -ID:/dna-readout-acc
+elerator/build/sw-workspace/dna_platform/zynq_fsbl/zynq_fsbl_bsp/include -Wall -Wextra      -O0  -g3
+     -U__clang__  
+
+Linker Flags:       -Os -Wl,--gc-sections -n -T"D:/dna-readout-accelerator/build/sw-workspace/dna_pl
+atform/zynq_fsbl/lscript.ld" -L"D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl
+
+/zynq_fsbl_bsp/lib/" -L"/" -Wl,--start-group,-lxiltimer,-lxilffs,-lxilrsa,-lxil,-lxilstandalone,-lxi
+
+ltimer,-lxilffs,-lxilrsa,-lgcc,-lc -Wl,--end-group
+
+
+===========================================
+[2/14] Building ASM object CMakeFiles/fsbl.elf.dir/fsbl_handoff.S.obj
+[3/14] Building C object CMakeFiles/fsbl.elf.dir/fsbl_hooks.c.obj
+[4/14] Building C object CMakeFiles/fsbl.elf.dir/md5.c.obj
+[5/14] Building C object CMakeFiles/fsbl.elf.dir/rsa.c.obj
+[6/14] Building C object CMakeFiles/fsbl.elf.dir/nand.c.obj
+[7/14] Building C object CMakeFiles/fsbl.elf.dir/image_mover.c.obj
+[8/14] Building C object CMakeFiles/fsbl.elf.dir/nor.c.obj
+[9/14] Building C object CMakeFiles/fsbl.elf.dir/main.c.obj
+[10/14] Building C object CMakeFiles/fsbl.elf.dir/qspi.c.obj
+[11/14] Building C object CMakeFiles/fsbl.elf.dir/pcap.c.obj
+[12/14] Building C object CMakeFiles/fsbl.elf.dir/sd.c.obj
+[13/14] Building C object CMakeFiles/fsbl.elf.dir/ps7_init.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/ps7_init.c: In function 'ps7_config':
+D:/dna-readout-accelerator/build/sw-workspace/dna_platform/zynq_fsbl/ps7_init.c:10762:35: warning: comparison of integer expressions of different signedness: 'long unsigned int' and 'int' [-Wsign-compare]
+10762 |                     while ((*addr < delay)) {
+      |                                   ^
+[14/14] Linking C executable fsbl.elf
+   text	   data	    bss	    dec	    hex	filename
+  91077	   9684	  76332	 177093	  2b3c5	fsbl.elf
+Generating Export directory
+Platform Build Finished successfully.
+PLATFORM_BUILD_STATUS=0
+Initiating build for the dna_lwip_app component.
+Command: cmd.exe /C set CC= && set CXX= && empyro.bat build_app -s D:\dna-readout-accelerator\build\sw-workspace\dna_lwip_app\src -b D:\dna-readout-accelerator\build\sw-workspace\dna_lwip_app\build
+The log will be written to the file: D:\dna-readout-accelerator\build\sw-workspace\dna_lwip_app\build\build.log
+[INFO]: Starting Application build process
+[INFO]: Building Application
+[1/20] ==========Application Build Information ==========
+
+Compiler Flags:  -DSDT -mcpu=cortex-a9 -mfpu=vfpv3 -mfloat-abi=hard  -MMD -MP -specs=D:/dna-readout-
+accelerator/build/sw-workspace/dna_platform/export/dna_platform/sw/standalone_domain/Xilinx.spec -ID
+:/dna-readout-accelerator/build/sw-workspace/dna_platform/export/dna_platform/sw/standalone_domain/i
+nclude -Wall -Wextra      -O0  -g3     -U__clang__  PLATFORM_ZYNQ
+
+Linker Flags:       -Wl,-T -Wl,"../../../../src/sw/linker/lscript.ld" -L"D:/dna-readout-accelerator/
+
+build/sw-workspace/dna_lwip_app/src/" -L"D:/dna-readout-accelerator/build/sw-workspace/dna_platform/
+
+export/dna_platform/sw/standalone_domain/lib/" -L"/" -Wl,--start-group,-lxilstandalone,-lxiltimer,-l
+
+lwip220,-lxil,-lgcc,-lc,-llwip220 -Wl,--end-group
+
+
+===========================================
+[2/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/fw_build_id.c.obj
+[3/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/platform.c.obj
+[4/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/ldpc_perm.c.obj
+[5/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/bd_ring.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.c: In function 'setup_bd_ring':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.c:20:75: warning: unused parameter 'name' [-Wunused-parameter]
+   20 | int setup_bd_ring(XAxiDma_BdRing *RingPtr, u32 base, int cnt, const char *name)
+      |                                                               ~~~~~~~~~~~~^~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.c: In function 'submit_bd_transfer':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.c:56:36: warning: unused parameter 'name' [-Wunused-parameter]
+   56 |                        const char *name,
+      |                        ~~~~~~~~~~~~^~~~
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.h:12,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.c:8:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h: At top level:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[6/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/dma_dna.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/bd_ring.h:12,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/dma_dna.h:11,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/dma_dna.c:8:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[7/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/prof.c.obj
+[8/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/pipeline.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.h:9,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.c:4:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[9/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/ldpc_onchip.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.h:9,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/ldpc_onchip.h:7,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/ldpc_onchip.c:4:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[10/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/fw_log.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/fw_log.c:5:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[11/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/ldpc_perm_table.c.obj
+[12/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/echo.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.c: In function 'poll_callback':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.c:342:55: warning: unused parameter 'tpcb' [-Wunused-parameter]
+  342 | static err_t poll_callback(void *arg, struct tcp_pcb *tpcb)
+      |                                       ~~~~~~~~~~~~~~~~^~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.c: In function 'accept_callback':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.c:554:36: warning: unused parameter 'arg' [-Wunused-parameter]
+  554 | static err_t accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
+      |                              ~~~~~~^~~
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.c:7:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h: At top level:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[13/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/main.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/main.c: In function 'print_ip_settings':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/main.c:258:57: warning: unused parameter 'mask' [-Wunused-parameter]
+  258 | static void print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
+      |                                              ~~~~~~~~~~~^~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/main.c:258:74: warning: unused parameter 'gw' [-Wunused-parameter]
+  258 | static void print_ip_settings(ip_addr_t *ip, ip_addr_t *mask, ip_addr_t *gw)
+      |                                                               ~~~~~~~~~~~^~
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/main.c:28:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h: At top level:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[14/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/platform_zynq.c.obj
+[15/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/reg_timing.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/reg_timing.h:11,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/reg_timing.c:4:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[16/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/proto.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/proto.h:13,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/proto.c:8:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+[17/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/stage3_decoder.c.obj
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage3_decoder.c: In function 'pipeline_step_stage3':
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage3_decoder.c:53:55: warning: unused parameter 'conn' [-Wunused-parameter]
+   53 | pipe_step_rc_e pipeline_step_stage3(dna_connection_t *conn)
+      |                                     ~~~~~~~~~~~~~~~~~~^~~~
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.h:9,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage3_decoder.h:8,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage3_decoder.c:7:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h: At top level:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[18/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/stage2_voter.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.h:9,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage2_voter.h:8,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage2_voter.c:7:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[19/20] Building C object CMakeFiles/dna_lwip_app.elf.dir/stage1_dna.c.obj
+In file included from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/echo.h:22,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/pipeline.h:9,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage1_dna.h:8,
+                 from D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/stage1_dna.c:7:
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:162:13: warning: 'task_caps_serialize' defined but not used [-Wunused-function]
+  162 | static void task_caps_serialize(const task_caps_t *caps, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:144:13: warning: 'task_config_serialize' defined but not used [-Wunused-function]
+  144 | static void task_config_serialize(const task_config_t *c, uint8_t *payload)
+      |             ^~~~~~~~~~~~~~~~~~~~~
+D:/dna-readout-accelerator/build/sw-workspace/dna_lwip_app/src/task_config.h:88:12: warning: 'task_config_parse' defined but not used [-Wunused-function]
+   88 | static int task_config_parse(const uint8_t *payload,
+      |            ^~~~~~~~~~~~~~~~~
+[20/20] Linking C executable dna_lwip_app.elf
+   text	   data	    bss	    dec	    hex	filename
+
+ 307047	   3352	3234240	3544639	 36163f	dna_lwip_app.elf
+
+Build Finished successfully
+APP_BUILD_STATUS=0 FW_BUILD_ID=bfcd40dd3c435a19
+
+
+****** Bootgen v2026.1
+  **** Build date : Jun  5 2026-13:21:08
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+
+
+[INFO]   : Bootimage generated successfully
+
+SOFTWARE_BUILD_PASS (构建产物已核对；尚需新板完整manifest和板测)
+Shutting down Vitis server running on port '55667'

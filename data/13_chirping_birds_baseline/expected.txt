@@ -1,0 +1,4 @@
+用例：13_chirping_birds_baseline
+期望载荷 SHA-256：11dd5c4b4e1783e009e7a4c5d2766fbf557931bbbc00a8944cecd30eeaf6d7c9
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 7 轮收敛）

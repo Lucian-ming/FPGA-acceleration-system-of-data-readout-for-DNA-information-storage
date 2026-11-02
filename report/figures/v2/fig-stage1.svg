@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1590.403" viewBox="53.061 21.061 1093.878 724.878">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D788F" /></marker></defs>
+<rect x="53.061" y="21.061" width="1093.878" height="724.878" fill="#FFFFFF" />
+<text x="600" y="53" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#17324D">参考窗口</text>
+<rect x="65" y="78" width="1070" height="67" rx="12" fill="#EDF5FC" stroke="#2D6A9F" stroke-width="2" />
+<text x="600" y="121" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="26" font-weight="700" fill="#2D6A9F">同一参考段上的相邻候选偏移</text>
+<rect x="72" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="100" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">0</text>
+<rect x="138" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="166" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">1</text>
+<rect x="204" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="232" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">2</text>
+<rect x="270" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="298" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">3</text>
+<rect x="336" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="364" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">4</text>
+<rect x="402" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="430" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">5</text>
+<rect x="468" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="496" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">6</text>
+<rect x="534" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="562" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">7</text>
+<rect x="600" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="628" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">8</text>
+<rect x="666" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="694" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">9</text>
+<rect x="732" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="760" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">10</text>
+<rect x="798" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="826" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">11</text>
+<rect x="864" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="892" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">12</text>
+<rect x="930" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="958" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">13</text>
+<rect x="996" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="1024" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">14</text>
+<rect x="1062" y="181" width="56" height="54" rx="8" fill="#FFFFFF" stroke="#2D6A9F" stroke-width="2" />
+<text x="1090" y="216" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="600" fill="#2D6A9F">15</text>
+<text x="600" y="270" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="600" fill="#183044">16 路滑窗并行比较 · 每拍 2 个碱基（K=2）</text>
+<text x="600" y="328" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="25" font-weight="700" fill="#17324D">流水选优树</text>
+<rect x="72" y="365" width="72" height="65" rx="10" fill="#F5F1FA" stroke="#7154A3" stroke-width="2" />
+<text x="108.0" y="407" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="700" fill="#7154A3">16 路</text>
+<rect x="300" y="365" width="72" height="65" rx="10" fill="#F5F1FA" stroke="#7154A3" stroke-width="2" />
+<text x="336.0" y="407" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="700" fill="#7154A3">8 路</text>
+<rect x="500" y="365" width="72" height="65" rx="10" fill="#F5F1FA" stroke="#7154A3" stroke-width="2" />
+<text x="536.0" y="407" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="700" fill="#7154A3">4 路</text>
+<rect x="700" y="365" width="72" height="65" rx="10" fill="#F5F1FA" stroke="#7154A3" stroke-width="2" />
+<text x="736.0" y="407" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="700" fill="#7154A3">2 路</text>
+<rect x="900" y="365" width="96" height="65" rx="10" fill="#F5F1FA" stroke="#7154A3" stroke-width="2" />
+<text x="948.0" y="407" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="700" fill="#7154A3">1 路</text>
+<line x1="150" y1="397" x2="292" y2="397" stroke="#B9C9D6" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)" />
+<line x1="372" y1="397" x2="492" y2="397" stroke="#B9C9D6" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)" />
+<line x1="572" y1="397" x2="692" y2="397" stroke="#B9C9D6" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)" />
+<line x1="772" y1="397" x2="892" y2="397" stroke="#B9C9D6" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)" />
+<text x="600" y="493" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="25" font-weight="700" fill="#17324D">16 → 8 → 4 → 2 → 1：共 4 级，每级打一拍</text>
+<rect x="150" y="545" width="900" height="132" rx="14" fill="#F8FBFD" stroke="#B9C9D6" stroke-width="2" />
+<text x="600" y="591" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="500" fill="#183044">每路对 64 条读段做逐碱基匹配打分</text>
+<text x="600" y="635" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#52687A">每个窗口组 75 拍；每段 51 组（末组 8 路有效）</text>
+<text x="600" y="729" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="600" fill="#17324D">Stage1 post-route：29,166 LUT</text>
+</svg>

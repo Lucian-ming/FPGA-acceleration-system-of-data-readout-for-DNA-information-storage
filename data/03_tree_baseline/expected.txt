@@ -1,0 +1,4 @@
+用例：03_tree_baseline
+期望载荷 SHA-256：c50a22ee0d6e43624ae96cb3e2525d21fcfc17c99341a6418410fea67dcc8a59
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 5 轮收敛）

@@ -1,0 +1,13 @@
+board_id=bkb220
+part=xc7z020clg400-2
+tool_version=2026.1
+C_STAGE1_P_WAYS=16
+C_STAGE1_PIPE_TREE=1
+STAGE1_CYCLE_COUNTERS=0
+READ_BPS=150
+NUM_LC=50
+STRIDE=807
+REF_LEN=957
+BATCH=64
+board_config=D:/dna-readout-accelerator/src/hw/boards/bkb220.tcl
+build_dir=D:/dna-readout-accelerator/build/vivado

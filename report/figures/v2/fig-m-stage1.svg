@@ -1,0 +1,89 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1642.712" viewBox="1.020 -0.980 1197.959 819.959">
+<defs>
+  <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2F5D9A" /></marker>
+  <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2E7D5B" /></marker>
+</defs>
+<rect x="1.020" y="-0.980" width="1197.959" height="819.959" fill="#FFFFFF" />
+<rect id="module_boundary" x="15" y="110" width="1170" height="695" rx="12" fill="#FFFFFF" stroke="#1A2B4A" stroke-width="3" />
+<text data-owner="module_boundary" x="35" y="145" font-family="Noto Sans CJK SC, sans-serif" font-size="26px" font-weight="700" fill="#1A2B4A" text-anchor="start">dna_accelerator_core</text>
+<rect id="control_port" x="390" y="12" width="420" height="72" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="control_port" x="600" y="42" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI-Lite 控制口</text>
+<text data-owner="control_port" x="600" y="71" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#5B6B82" text-anchor="middle">s_axi_lite_ctrl AW/W/B/AR/R</text>
+<line x1="600" y1="84" x2="600" y2="108" stroke="#2F5D9A" stroke-width="2" marker-end="url(#arrowBlue)" />
+<rect id="s1_input" x="20" y="185" width="280" height="200" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_input" x="160.0" y="216" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI-Stream 输入</text>
+<text data-owner="s1_input" x="160.0" y="247" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">S_AXIS_DATA_TDATA</text>
+<text data-owner="s1_input" x="160.0" y="277" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">[31:0]</text>
+<text data-owner="s1_input" x="160.0" y="307" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">S_AXIS_DATA_TLAST</text>
+<text data-owner="s1_input" x="160.0" y="337" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">S_AXIS_DATA_TVALID</text>
+<text data-owner="s1_input" x="160.0" y="367" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">S_AXIS_DATA_TREADY</text>
+<rect id="s1_fifo" x="320" y="225" width="130" height="110" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_fifo" x="385.0" y="256" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">输入 FIFO</text>
+<text data-owner="s1_fifo" x="385.0" y="287" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">300 bit</text>
+<text data-owner="s1_fifo" x="385.0" y="317" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">× 256 深</text>
+<rect id="s1_read_mem" x="470" y="160" width="220" height="160" rx="10" fill="#EAF5EF" stroke="#2E7D5B" stroke-width="2" />
+<text data-owner="s1_read_mem" x="580.0" y="191" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">读段位平面存储</text>
+<text data-owner="s1_read_mem" x="580.0" y="222" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">lo / hi 位平面</text>
+<text data-owner="s1_read_mem" x="580.0" y="252" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">各 2 bank</text>
+<text data-owner="s1_read_mem" x="580.0" y="282" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">64 bit / bank</text>
+<text data-owner="s1_read_mem" x="580.0" y="312" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">75 深 / bank</text>
+<rect id="s1_ref_mem" x="470" y="330" width="220" height="135" rx="10" fill="#EAF5EF" stroke="#2E7D5B" stroke-width="2" />
+<text data-owner="s1_ref_mem" x="580.0" y="361" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">参考区同步存储</text>
+<text data-owner="s1_ref_mem" x="580.0" y="392" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">可写 · 预装</text>
+<text data-owner="s1_ref_mem" x="580.0" y="422" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">2 bank × 23,925</text>
+<text data-owner="s1_ref_mem" x="580.0" y="452" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">2 bit / 槽</text>
+<rect id="s1_compare" x="710" y="210" width="210" height="225" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_compare" x="815.0" y="241" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">16 路比较阵列</text>
+<text data-owner="s1_compare" x="815.0" y="272" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">16 偏移 × 2 碱基</text>
+<text data-owner="s1_compare" x="815.0" y="302" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">每拍 K=2</text>
+<text data-owner="s1_compare" x="815.0" y="332" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">× 64 读段</text>
+<text data-owner="s1_compare" x="815.0" y="362" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">2,048 次 / 拍</text>
+<text data-owner="s1_compare" x="815.0" y="392" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">32 × 64 bit</text>
+<text data-owner="s1_compare" x="815.0" y="422" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">match_mask</text>
+<rect id="s1_score" x="940" y="230" width="230" height="160" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_score" x="1055.0" y="261" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">得分寄存器</text>
+<text data-owner="s1_score" x="1055.0" y="292" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">16 组 × 64 读段</text>
+<text data-owner="s1_score" x="1055.0" y="322" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">每组 10 bit</text>
+<text data-owner="s1_score" x="1055.0" y="352" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">每拍增量 0～2</text>
+<rect id="s1_tree" x="55" y="520" width="230" height="205" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_tree" x="170.0" y="551" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">流水选优树</text>
+<text data-owner="s1_tree" x="170.0" y="582" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">16→8→4→2→1</text>
+<text data-owner="s1_tree" x="170.0" y="612" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">15 比较节点 · 4 级</text>
+<text data-owner="s1_tree" x="170.0" y="642" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">每级打一拍</text>
+<text data-owner="s1_tree" x="170.0" y="672" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">同分取较低路号</text>
+<rect id="s1_best" x="305" y="540" width="170" height="205" rx="10" fill="#EAF5EF" stroke="#2E7D5B" stroke-width="2" />
+<text data-owner="s1_best" x="390.0" y="571" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="700" fill="#1A2B4A" text-anchor="middle">最优值寄存器</text>
+<text data-owner="s1_best" x="390.0" y="599" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">best_sc</text>
+<text data-owner="s1_best" x="390.0" y="626" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">10 bit</text>
+<text data-owner="s1_best" x="390.0" y="653" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">best_pos</text>
+<text data-owner="s1_best" x="390.0" y="680" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">16 bit</text>
+<text data-owner="s1_best" x="390.0" y="707" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">best_region</text>
+<text data-owner="s1_best" x="390.0" y="734" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">6 bit</text>
+<rect id="s1_result_fifo" x="495" y="540" width="180" height="145" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_result_fifo" x="585.0" y="571" font-family="Noto Sans CJK SC, sans-serif" font-size="24px" font-weight="700" fill="#1A2B4A" text-anchor="middle">结果 FIFO</text>
+<text data-owner="s1_result_fifo" x="585.0" y="602" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">326 bit</text>
+<text data-owner="s1_result_fifo" x="585.0" y="632" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">× 64 深</text>
+<rect id="s1_pack" x="695" y="540" width="190" height="145" rx="10" fill="#EEF3FB" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_pack" x="790.0" y="571" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="700" fill="#1A2B4A" text-anchor="middle">s2mm_pack64</text>
+<text data-owner="s1_pack" x="790.0" y="602" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">6 拍 × 64 bit</text>
+<text data-owner="s1_pack" x="790.0" y="632" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">末拍置 TLAST</text>
+<rect id="s1_output" x="905" y="520" width="275" height="205" rx="10" fill="#F7F9FD" stroke="#2F5D9A" stroke-width="2" />
+<text data-owner="s1_output" x="1042.5" y="551" font-family="Noto Sans CJK SC, sans-serif" font-size="23px" font-weight="700" fill="#1A2B4A" text-anchor="middle">AXI-Stream 输出</text>
+<text data-owner="s1_output" x="1042.5" y="582" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M_AXIS_RESULT_TDATA</text>
+<text data-owner="s1_output" x="1042.5" y="612" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">[63:0]</text>
+<text data-owner="s1_output" x="1042.5" y="642" font-family="DejaVu Sans Mono, monospace" font-size="22px" font-weight="400" fill="#1A2B4A" text-anchor="middle">M_AXIS_RESULT_TLAST</text>
+<line x1="300" y1="275" x2="320" y2="275" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<line x1="450" y1="270" x2="470" y2="270" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<polyline points="300,365 435,365 435,430 470,430" fill="none" stroke="#2E7D5B" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowGreen)" />
+<line x1="690" y1="250" x2="710" y2="250" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="690" y1="375" x2="710" y2="375" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="920" y1="300" x2="940" y2="300" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<polyline points="1055,390 1055,475 170,475 170,520" fill="none" stroke="#2E7D5B" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrowGreen)" />
+<line x1="285" y1="620" x2="305" y2="620" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="475" y1="620" x2="495" y2="620" stroke="#2E7D5B" stroke-width="3" marker-end="url(#arrowGreen)" />
+<line x1="675" y1="610" x2="695" y2="610" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<line x1="885" y1="610" x2="905" y2="610" stroke="#2F5D9A" stroke-width="3" marker-end="url(#arrowBlue)" />
+<text data-owner="module_boundary" x="360" y="398" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#5B6B82" text-anchor="middle">参考预装</text>
+<text data-owner="module_boundary" x="760" y="463" font-family="Noto Sans CJK SC, sans-serif" font-size="22px" font-weight="400" fill="#2E7D5B" text-anchor="middle">16 组得分</text>
+</svg>

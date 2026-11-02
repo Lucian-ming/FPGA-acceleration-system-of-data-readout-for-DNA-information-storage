@@ -1,36 +1,51 @@
-# 当前文档索引
+# 文档地图与技术索引 (Documentation Map)
 
-2026-10-10把原20份编号文档合并为9份，旧内容完整归档并保留映射。先读01/02/03，再按05执行；新板细节在07。使用[主Agent提示词](agent-prompts/main.md)可直接接管、派发和监控。现有05已经包含完整流程与分工；接管者核对进度后继续未完成阶段，仅对实际变化修订原计划。当前子Agent入口为codex-luna MCP/gpt-6-luna/max，只读任务由main登记看板。
+> 本仓库已随竞赛结束冻结于标签 `final-2026-11`。所有文档已按最终重排后的架构完成校验。
 
-| 当前文档 | 唯一职责 | 合并来源（旧编号） |
-|---|---|---|
-| [01架构](01-architecture.md) | PS/PL/PC数据流、算法载体与实现边界 | 01 |
-| [02数据契约](02-data-contract.md) | 编码/位序/几何/5b4b唯一权威 | 02 |
-| [03状态与交接](03-status.md) | 当前事实、已测/未测、依赖和接手摘要 | 03、10 |
-| [04接口](04-interfaces.md) | TCP/寄存器/DMA/DDR契约 | 05 |
-| [05完整执行计划](05-implementation-plan.md) | 全项目地图、F0～F9、子Agent、监控、Git/清理 | 04、06、11、13、14、15、19 |
-| [06验证与压力](06-verification-plan.md) | 逐层判据、故障/连续/长稳、统计 | 08、12 |
-| [07板级与迁移](07-board-build-and-acceptance.md) | 旧板/BKB220、PS7、硬软制品、P4/P16上板 | 09 |
-| [08性能与策略](08-performance-and-strategy.md) | 最新公平基线、旧推导边界、测量优先级 | 07、17 |
-| [09证据台账](09-evidence-ledger.md) | 可使用结论→原始证据/复现/限制；历史审计索引 | 16、18 |
+---
 
-事实优先级与全貌阅读方法见05。02/04契约不能被计划改写，03/09及本轮benchmark限定可宣称结果；08旧的7010封顶推论不能套7020。历史成果不替代新板验收。
+## 1. 核心架构与现行设计文档 (01 ~ 09)
 
-## 提示词与脚本
+| 文档编号与名称 | 主要职责与核心内容 | 对应实现载体 |
+| :--- | :--- | :--- |
+| [01 架构设计](01-architecture.md) | PS/PL/PC 数据流划分、四级硬件流水线与系统设计边界 | `src/hw/`、`src/sw/` |
+| [02 数据契约](02-data-contract.md) | 读段几何结构、水印排布、码字映射与 5b/4b 权威规范 | `sim/golden/`、`data/` |
+| [03 最终状态与项目冻结](03-status.md) | 完赛状态说明、冻结标签、最终交付指标与交接指引 | 全库 |
+| [04 软硬件接口](04-interfaces.md) | AXI-Lite 寄存器映射、AXI-Stream 通道、DMA 环与 TCP 协议 | `src/sw/app/dma_dna.c`、`src/sw/app/proto.h` |
+| [05 实施与执行计划](05-implementation-plan.md) | 全生命周期路线图、里程碑拆解与验证判据 | 历史开发记录 |
+| [06 验证与压力测试](06-verification-plan.md) | 三层验收判据、长稳测试方案、故障注入与统计学评估 | `src/tools/run_sim.sh`、`src/tools/run_g3.sh` |
+| [07 板级构建与验收](07-board-build-and-acceptance.md) | BKB220 开发板外设、时钟网络、PS7 配置与启动流程 | `build/configs/`、`src/hw/boards/` |
+| [08 性能对比与优化策略](08-performance-and-strategy.md) | 吞吐量优化分析、K=2 与 100 MHz 取舍依据、性能瓶颈分析 | `docs/history/` |
+| [09 证据台账](09-evidence-ledger.md) | 结论→原始证据链索引、关键数据哈希映射与测试依据 | `board/run-logs/` |
 
-- [Agent提示词索引](agent-prompts/readme.md)：主Agent及board-migrate、rtl-16way、verify-system完整提示词。
-- [BKB220板级资料](board/bkb220/README.md)：已收录并校验的用户提供v1.1产品手册；main/board-migrate接管时完整阅读，后续资料缺项按03/07核对。
-- [工具索引](../tools/README.md)：全部工具类别与入口。
-- [逐文件清单](reference/project-inventory-2026-10-10.tsv)：源码、脚本、配置、测试、文档与资产职责。
-- [本轮工具整理与开发路线](reference/tool-cleanup-2026-10-11.md)：6个历史脚本原样归档、启动器选择修正、22开发/26下载及最终26复核。
-- [工作区整理记录](reference/workspace-cleanup-2026-10-10.md)：精确忽略/原位保留范围与已知卫生告警。
-- [片上 LDPC 交接](reference/ldpc-onchip-handoff-2026-10-14.md)：**LDPC 上 PL 的接手入口**——用户已按「展示/集成」立项；L0/L1 已证、L2 为静态估算、**L3（bank 地址转换）未开始**；含硬事实、封停方向与板端现场状态。
-- [片上 LDPC 架构决定](reference/ldpc-architecture-decision-2026-10-14.md)：**取代交接文 §5.3 的下一步**——改用 p=1 边串行（不需要 43 路 bank 映射/颜色表），并纠正交接文 §4.5 资源表漏计「下一状态累加器」与「逐边消息 RAM」。
+---
 
-## 本轮证据与历史
+## 2. 最终总结与项目档案
 
-- [项目历史导航索引](reference/project-history.md)：按日期和原始资料入口追溯历史；当前状态仍以03、结论边界仍以09为准。
-- [P16集成](benchmarks/stage1-16way-ip-integration.md)、[工具/板级核查](benchmarks/bkb220-toolchain-audit.md)、[G3主机验证](benchmarks/bkb220-host-verification.md)、[同板P4/P16六档性能矩阵](benchmarks/bkb220-p4-p16-performance-matrix.md)（性能分正式口径）、[P16故障注入探针](benchmarks/bkb220-p16-fault-probes.md)（守卫/畸变包/中途断网 + 判据轮）、[P16长稳2小时](benchmarks/bkb220-p16-soak-2h.md)、[P16精细时间预算](benchmarks/bkb220-p16-time-budget.md)（speed 主线底稿）、[LDPC行引擎OOC探针](benchmarks/ldpc-row-engine-ooc-probe.md)、[LDPC L4译码器原型](benchmarks/ldpc-decoder-l4.md)（功能对黄金 + 时序收敛）。
-- docs/board：对应资料和板测小证据；docs/benchmarks：可复查的性能/功能摘要。
-- [本次合并归档索引](archive/history/2026/pre-bkb220-handoff-2026-10-10/README.md)：旧20份文档、原名→当前入口、快照校验清单。
-- docs/archive/history/2026其余历史与docs/reference保留来源/负结果；docs/submission是参赛提交资产，不自动成为本项目任务指令。
+- **[10-final-status.md](10-final-status.md)**：**最终状态与归档总表**（必读：最终制品哈希、资源数字、旧 ELF 合法性论证、全量归档台账）；
+- **[11-project-summary.md](11-project-summary.md)**：206 字作品定稿官方简介；
+- **[agent-prompts/archive-cleanup.md](agent-prompts/archive-cleanup.md)**：本次归档整理交接的完整提示词与执行规范。
+
+---
+
+## 3. 科研演进档案与历史留证 (docs/history/)
+
+为保证学术严谨性与加速比基线可溯源，开发过程中的对比实验源码原样留存在 `docs/history/`：
+
+- **[bench-arm/](history/bench-arm/)**：ARM Cortex-A9 裸机 CPU 对齐基准源码（报告 §10 加速比分母依据）；
+- **[bench-cpu-server/](history/bench-cpu-server/)**：48 核 Intel Xeon 5220R 服务器 CPU 基线实测数据与分析；
+- **[bench-cpu-tools/](history/bench-cpu-tools/)**：开发期 CPU 比对工具（`align.c`、`run_cpu_benchmark.py` 等）；
+- **[experimental-hw/](history/experimental-hw/)**：6 个硬件探索原型（`srpe_batch_pway.v` 等探索阶段 RTL）；
+- **[milestones/](history/milestones/)**：阶段性验证脚本（`m2_chain.py`、`run_m3_bd.sh` 等）；
+- **[experiments/](history/experiments/)**：信道噪声分析与鲁棒性扫描工具（`mutate_reads.py`、`extract_error_profile.py` 等）；
+- **[video/](history/video/)**：视频阶段提示词与分镜脚本；
+- **[demo-notes.md](history/demo-notes.md)**：板级演示操作说明与实测经验。
+
+---
+
+## 4. 赛事报告、海报与工具 (report/)
+
+- **权威报告**：`report/design-report-2026.docx`（权威可编辑稿）与 `report/design-report-2026.pdf`（权威交付稿）；
+- **权威海报**：`report/poster/dna-readout-poster-2026.pptx` 与 `report/poster/dna-readout-poster-2026.pdf`；
+- **支撑资产**：`report/figures/v2/`（15 张正式插图）与 `report/evidence/`（数据表格）；
+- **打捞工具套件**：`report/tools/`（包含报告/海报自动化构建、Word/PPT COM 导出、图片局部脱敏 `clean.py`、Crossref 文献检索等 10 个自动化脚本）。

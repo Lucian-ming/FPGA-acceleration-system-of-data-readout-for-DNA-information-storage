@@ -1,7 +1,0 @@
-{"case": "capacity_ok_boundary", "total_reads": 129600, "read_bps": 150, "expect_accepted": true, "accepted": true, "detail": "板端接受 CONFIG (rc=0)", "board_alive_after": true, "verdict": true, "why": "恰好等于容量上限，应当接受（守卫不能把合法值也拦掉）"}
-{"case": "capacity_exceed_by_one_frame", "total_reads": 129664, "read_bps": 150, "expect_accepted": false, "accepted": false, "detail": "板端拒绝 (rc=5: total_reads 非法)", "board_alive_after": true, "verdict": true, "why": "超容量一帧，C3 应当拒绝"}
-{"case": "capacity_exceed_large", "total_reads": 259200, "read_bps": 150, "expect_accepted": false, "accepted": false, "detail": "板端拒绝 (rc=5: total_reads 非法)", "board_alive_after": true, "verdict": true, "why": "远超容量，C3 应当拒绝"}
-{"case": "not_frame_aligned", "total_reads": 129599, "read_bps": 150, "expect_accepted": false, "accepted": false, "detail": "板端拒绝 (rc=5: total_reads 非法)", "board_alive_after": true, "verdict": true, "why": "非 64 整数倍，C2 应当拒绝"}
-{"case": "zero_reads", "total_reads": 0, "read_bps": 150, "expect_accepted": false, "accepted": false, "detail": "板端拒绝 (rc=5: total_reads 非法)", "board_alive_after": true, "verdict": true, "why": "空任务，应当拒绝"}
-{"case": "wrong_read_bps", "total_reads": 4096, "read_bps": 250, "expect_accepted": false, "accepted": false, "detail": "板端拒绝 (rc=2: read_bps 不被支持)", "board_alive_after": true, "verdict": true, "why": "read_bps=250 与 150bp 比特流不符，几何校验应当拒绝"}
-{"case": "late_guard_batch_over_capacity", "config_rc": 5, "config_accepted": false, "verdict": true, "note": "CONFIG 被前置拒绝 (rc=5)，后置守卫无从触发；防线在更早位置生效，本用例不适用", "board_alive_after": true}

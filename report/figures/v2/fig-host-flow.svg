@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1923.176" viewBox="114.286 14.286 971.429 778.429">
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5D788F" /></marker></defs>
+<rect x="114.286" y="14.286" width="971.429" height="778.429" fill="#FFFFFF" />
+<rect x="125" y="25" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="160" y="65" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">读取 FASTQ</text>
+<text x="370" y="65" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">读段与水印文件</text>
+<line x1="600" y1="89" x2="600" y2="95" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="101" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="160" y="141" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">正、反向展开</text>
+<text x="370" y="141" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">完成读段方向展开</text>
+<line x1="600" y1="165" x2="600" y2="171" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="177" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="160" y="217" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">建立连接</text>
+<text x="370" y="217" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">连接板端 TCP 服务</text>
+<line x1="600" y1="241" x2="600" y2="247" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="253" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="160" y="293" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">读取能力</text>
+<text x="370" y="293" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">CAPS 握手并读取几何参数</text>
+<line x1="600" y1="317" x2="600" y2="323" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="329" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#2D6A9F" stroke-width="2" />
+<text x="160" y="369" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#2D6A9F">配置任务</text>
+<text x="370" y="369" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">CONFIG 下发 score_min、input_bytes</text>
+<line x1="600" y1="393" x2="600" y2="399" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="405" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="160" y="445" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">上传读段</text>
+<text x="370" y="445" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">分帧发送并校验数据</text>
+<line x1="600" y1="469" x2="600" y2="475" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="481" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="160" y="521" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">接收码字</text>
+<text x="370" y="521" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">收取 8,100 B 码字</text>
+<line x1="600" y1="545" x2="600" y2="551" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="557" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="160" y="597" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">独立复核</text>
+<text x="370" y="597" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">解交织、syndrome 与载荷 SHA-256</text>
+<line x1="600" y1="621" x2="600" y2="627" stroke="#B9C9D6" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)" />
+<rect x="125" y="633" width="950" height="62" rx="10" fill="#F8FBFD" stroke="#168C86" stroke-width="2" />
+<text x="160" y="673" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="24" font-weight="700" fill="#168C86">展示结果</text>
+<text x="370" y="673" text-anchor="start" font-family="Noto Sans CJK SC, sans-serif" font-size="23" font-weight="500" fill="#183044">与期望载荷比对并预览</text>
+<text x="600" y="778" text-anchor="middle" font-family="Noto Sans CJK SC, sans-serif" font-size="22" font-weight="500" fill="#52687A">上位机复核（不改变板端判定）；校验失败时明确报告错误</text>
+</svg>

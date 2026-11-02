@@ -1,0 +1,34 @@
+{
+ "schema_version": 1,
+ "package_name": "bkb220-release",
+ "created_utc": "2026-10-30T16:20:04Z",
+ "fw_build_id": "bfcd40dd3c435a19",
+ "board_id": "bkb220",
+ "part": "xc7z020clg400-2",
+ "parameters": {
+  "READ_BPS": 150,
+  "NUM_LC": 50,
+  "STRIDE": 807,
+  "REF_LEN": 957,
+  "BATCH": 64,
+  "C_STAGE1_P_WAYS": 16,
+  "C_STAGE1_PIPE_TREE": 1
+ },
+ "artifacts": {
+  "bit": "export/top_bd_wrapper.bit",
+  "xsa": "export/dna_accel.xsa",
+  "ps7_init": "export/ps7_init.tcl",
+  "elf": "export/dna_lwip_app.elf",
+  "fsbl": "export/fsbl.elf",
+  "boot": "export/BOOT.bin"
+ },
+ "tool_versions": {
+  "vivado": "2026.1",
+  "vitis": "2026.1",
+  "build_method": "Vivado/Vitis 2026.1 on Windows; no WSL dependency"
+ },
+ "source_manifest": {
+  "path": "reports/source_manifest.json",
+  "sha256": "dae1219c62e4122eda2a15b8f3c2fcbec97db6ed3d554d5e29b099123e88e8bc"
+ }
+}

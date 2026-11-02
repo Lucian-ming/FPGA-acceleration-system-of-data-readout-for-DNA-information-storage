@@ -1,0 +1,4 @@
+用例：02_mandrill_baseline
+期望载荷 SHA-256：8182f8e9f8135c6a611cc2a807cce6ff36d0e5e080feaa6a12128f6be8aae132
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 4 轮收敛）

@@ -1,0 +1,4 @@
+用例：12_brick_wall_baseline
+期望载荷 SHA-256：336d99b0dd03b842b274fb7cd9a8170b6e327172157e3140f200009f3ba46f8d
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 1 轮收敛）

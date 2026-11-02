@@ -1,0 +1,4 @@
+用例：04_jellybeans_baseline
+期望载荷 SHA-256：650fc2224140741f53836f0fed308e27373919befab1a8ac15892e12d3eabb86
+score_min：65    记录：8192 源读段
+软件侧结果：通过（LDPC 40 轮收敛）

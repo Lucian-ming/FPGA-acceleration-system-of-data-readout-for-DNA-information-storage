@@ -1,0 +1,201 @@
+{
+ "schema_version": 1,
+ "description": "42 例多媒体测试集的逐资产来源清单（由数据集 media_manifest.json 精简生成；只保留来源与载荷哈希）。",
+ "license_notes": {
+  "image": "USC-SIPI Image Database，版权状态按其官方说明（https://sipi.usc.edu/database/copyright.php），并非全部属于公有领域。",
+  "audio": "ESC-50（https://github.com/karolpiczak/ESC-50）：整包 CC BY-NC，ESC-10 子集为 CC BY；不得称为无条件商用。",
+  "video": "Xiph Derf 媒体库（https://media.xiph.org/video/derf/），逐片段可能另有说明。",
+  "synthetic": "项目自行合成的载荷，适用仓库根 license（MIT）。"
+ },
+ "assets": [
+  {
+   "id": "peppers",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=4.2.07",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "e0e65925814e07374dd4188939dd13e9d647cd2ecfb3480b050fe4775119242b",
+   "bytes": 6742
+  },
+  {
+   "id": "mandrill",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=4.2.03",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "8182f8e9f8135c6a611cc2a807cce6ff36d0e5e080feaa6a12128f6be8aae132",
+   "bytes": 6734
+  },
+  {
+   "id": "tree",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=4.1.06",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "c50a22ee0d6e43624ae96cb3e2525d21fcfc17c99341a6418410fea67dcc8a59",
+   "bytes": 6750
+  },
+  {
+   "id": "jellybeans",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=4.1.08",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "650fc2224140741f53836f0fed308e27373919befab1a8ac15892e12d3eabb86",
+   "bytes": 6725
+  },
+  {
+   "id": "moon",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=5.1.09",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "7db24feeca6126f023bd7987520219a62818cc875969cf219b2315c5437490e5",
+   "bytes": 6714
+  },
+  {
+   "id": "sailboat",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=4.2.06",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "455d9b612385ce653cb8a5ea85335e4210ee92b6ee1896ec6b849da1dcec228e",
+   "bytes": 6746
+  },
+  {
+   "id": "fishing_boat",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=boat.512",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "5566c30ca8ebfaa7632ff96874bd9cbbb9367764ded878f8d875d5974d22f599",
+   "bytes": 6750
+  },
+  {
+   "id": "stream_bridge",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=misc&img=5.2.10",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=misc",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "1e028f88f77664451f255138e12e36e2f4c3d209afa49a9b334be68a812efe9a",
+   "bytes": 6701
+  },
+  {
+   "id": "grass",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=textures&img=1.1.01",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=textures",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "841056802a674b10032816f394323084982801b6cb40f6a25e1bbf3679799c2b",
+   "bytes": 6615
+  },
+  {
+   "id": "bark",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=textures&img=1.1.02",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=textures",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "90bc6ca5376bcb65f9f76f252c949c7f0cc4e0291ba0f5a8138c56b49f27c662",
+   "bytes": 6738
+  },
+  {
+   "id": "beach_sand",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=textures&img=1.1.07",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=textures",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "edf0180d337571c9f5fbe88c6e35539d8cc210a86d1d8fd11fd9ef3af1a29b47",
+   "bytes": 6705
+  },
+  {
+   "id": "brick_wall",
+   "kind": "image",
+   "source_url": "https://sipi.usc.edu/database/download.php?vol=textures&img=1.1.12",
+   "catalog": "https://sipi.usc.edu/database/database.php?volume=textures",
+   "license_url": "https://sipi.usc.edu/database/copyright.php",
+   "payload_sha256": "336d99b0dd03b842b274fb7cd9a8170b6e327172157e3140f200009f3ba46f8d",
+   "bytes": 6730
+  },
+  {
+   "id": "chirping_birds",
+   "kind": "audio",
+   "source_url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-100038-A-14.wav",
+   "catalog": "https://github.com/karolpiczak/ESC-50",
+   "license_url": "https://github.com/karolpiczak/ESC-50",
+   "payload_sha256": "11dd5c4b4e1783e009e7a4c5d2766fbf557931bbbc00a8944cecd30eeaf6d7c9",
+   "bytes": 8044
+  },
+  {
+   "id": "rain",
+   "kind": "audio",
+   "source_url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-17367-A-10.wav",
+   "catalog": "https://github.com/karolpiczak/ESC-50",
+   "license_url": "https://github.com/karolpiczak/ESC-50",
+   "payload_sha256": "0f2657e993b668756fdb2a2ae62f3c64be31aed80c1557422990c766f0863282",
+   "bytes": 8044
+  },
+  {
+   "id": "sea_waves",
+   "kind": "audio",
+   "source_url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-28135-A-11.wav",
+   "catalog": "https://github.com/karolpiczak/ESC-50",
+   "license_url": "https://github.com/karolpiczak/ESC-50",
+   "payload_sha256": "3d906bd81aca9a18853948603ab7a527ba7f2735df5916ed0a1238d185ae8139",
+   "bytes": 8044
+  },
+  {
+   "id": "water_drops",
+   "kind": "audio",
+   "source_url": "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/1-12653-A-15.wav",
+   "catalog": "https://github.com/karolpiczak/ESC-50",
+   "license_url": "https://github.com/karolpiczak/ESC-50",
+   "payload_sha256": "e0d4558565ccf458dd4242fa933dc2128b4dbc6bccc0e2d6801e16ff9034a8f1",
+   "bytes": 8044
+  },
+  {
+   "id": "waterfall",
+   "kind": "video",
+   "source_url": "https://media.xiph.org/video/derf/y4m/waterfall_cif.y4m",
+   "catalog": "https://media.xiph.org/video/derf/",
+   "license_url": "https://media.xiph.org/video/derf/",
+   "payload_sha256": "46d2e7e9f0159c209ec903a8d1a06d114da5fab6fc701475c3b251c7ff555849",
+   "bytes": 4161
+  },
+  {
+   "id": "blue_sky",
+   "kind": "video",
+   "source_url": "https://media.xiph.org/video/derf/y4m/blue_sky_1080p25.y4m",
+   "catalog": "https://media.xiph.org/video/derf/",
+   "license_url": "https://media.xiph.org/video/derf/",
+   "payload_sha256": "cc5b1768e3e53b51c9d669d41c04fe94c46df5f62b4800b4ee96377a1e30ed9a",
+   "bytes": 3920
+  },
+  {
+   "id": "utf8_text",
+   "kind": "text",
+   "source_url": null,
+   "catalog": null,
+   "license_url": null,
+   "payload_sha256": "07707eee39b6c39cba8ef77aafbb282a7aa91d58172dc5374bd7ec1b18cd390b",
+   "bytes": 3300
+  },
+  {
+   "id": "numeric_signal",
+   "kind": "text",
+   "source_url": null,
+   "catalog": null,
+   "license_url": null,
+   "payload_sha256": "ced298c4a2f882fa1406d843d96adf70f1a1bbf50a9f97b28f37fda8e255dd98",
+   "bytes": 3862
+  },
+  {
+   "id": "random_binary",
+   "kind": "binary",
+   "source_url": null,
+   "catalog": null,
+   "license_url": null,
+   "payload_sha256": "9bc24dc3239381f2f8358690f040626937188644cc66d2bdfc94da2d571e90c7",
+   "bytes": 6000
+  }
+ ]
+}
