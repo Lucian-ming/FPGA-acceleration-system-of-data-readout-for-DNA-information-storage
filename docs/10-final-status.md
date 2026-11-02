@@ -96,4 +96,31 @@
 ### 4.3 释放存储收益
 - WSL 内部清理：安全清理视频中间帧缓存（916 MB）、Vivado 崩溃缓存（141 MB）、冗余测试集（714 MB）、中间综合工程（700 MB）等，共释放空间 **约 2.8 GB**；
 - 板测留证硬链接去重：释放空间 **约 1.73 GB**；
-- Windows 侧清理（Phase 6 后执行）：清理旧平铺包、桌面冗余副本、PyInstaller 缓存等，释放空间 **约 1.2 GB**。
+- Windows 侧清理：已执行安全清理，释放空间 **约 1.2 GB**（桌面旧包、旧平铺包、演示包、PyInstaller 缓存及临时解压物）。
+
+### 4.4 阶段 7 收尾门禁、标签与交付清册 (Final Closure Record)
+
+1. **核心提交与发布标签**：
+   - 仓库重组与归档主提交：`044290b`；
+   - 最终发布冻结标签：`final-2026-11`，已正式推送至 GitHub `origin/main` 与 `origin/final-2026-11`；
+   - 远端分支绑定状态：`0 ahead, 0 behind`（严格 0/0 对齐）。
+
+2. **全套自动化门禁验证实测记录**：
+   - `tools/verify_repo_binding.sh --remote`：**PASS**（分支绑定与远端拉取状态正常）；
+   - `tools/check_repo_hygiene.sh`：**PASS**（根目录无残留、文档规范编号、水印唯一、日志不漏、文件行号引用全部解析命中、无未授权重复 SHA-256）；
+   - `src/tools/run_sim.sh host`：**6/6 PASS**（`wm_expand` 展开 47,850 符号黄金比对、`ddr_layout` 12 组严苛布局校验、`task_config` 黄金 CRC-32 及往返序列化、`echo.c` 固件行为轨迹 1,325 行寄存器写序比对、`client_core` 任务模型、`ldpc_decode` 黄金解码）；
+   - `src/tools/run_sim.sh packaging`：**PASS**（生产 IP 打包卫生检查全通，K=2 契约锁定）；
+   - `archive/SHA256SUMS`：**71/71 项 100% PASS**（全部归档与打捞资产校验和逐一匹配）。
+
+3. **物理清理与安全边界记录**：
+   - **已清理的 Windows 冗余资产**：
+     - `E:\fpga-dna-bld`：NTFS Junction 符号链接，单文件安全解除；
+     - `E:\桌面\FPGA-DNA\`：桌面旧副本与历史杂项，所含资产已全量归入 WSL；
+     - `E:\桌面\演示\`：桌面演示程序与测试集，已提炼入库与本地归档；
+     - `D:\dna-accel-bkb220\`：旧平铺包，所有技术差异已在文档中闭环论证；
+     - `D:\submitwork\`：核心底稿已 100% 完整迁移至 `report/`、`poster/`、`archive/submission-2026/` 及 `archive/history-windows/submitwork/`；
+     - `C:\Users\Lucian\AppData\Local\Temp\rpq\`：已清理；
+   - **已清理的 WSL 临时目录**：`/tmp/photo12/`、`/tmp/refsearch/`、`/tmp/pkgfix-bak/`、`/tmp/rp/` 全部清理完毕；
+   - **安全边界审计**：`E:\桌面\微电子学院24级本科新生分班名单.xls` 及任何非本项目文件绝对未触碰；
+   - **权威原件保留**：`D:\dna-readout-accelerator\` 与 `D:\dna-readout-accelerator.rar` 仍完好留存 D 盘根目录（WSL 内部已全量镜像）。
+

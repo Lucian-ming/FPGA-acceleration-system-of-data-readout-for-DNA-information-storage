@@ -67,13 +67,13 @@ else
         exit 0
     fi
     # 尝试从 git 提取 src/sw/app 或 sw/app
-    if git -C "$REPO_DIR" archive "$REV" src/sw/app 2>/dev/null | tar -x -C "$BUILD/src" 2>/dev/null && [ -d "$BUILD/src/src/sw/app" ]; then
-        mv "$BUILD/src/src/sw/app" "$SRC"
-    elif git -C "$REPO_DIR" archive "$REV" sw/app 2>/dev/null | tar -x -C "$BUILD/src" 2>/dev/null && [ -d "$BUILD/src/sw/app" ]; then
+    mkdir -p "$SRC"
+    if git -C "$REPO_DIR" archive "$REV" src/sw/app 2>/dev/null | tar -x --strip-components=3 -C "$SRC" 2>/dev/null && [ -f "$SRC/echo.c" ]; then
+        :
+    elif git -C "$REPO_DIR" archive "$REV" sw/app 2>/dev/null | tar -x --strip-components=2 -C "$SRC" 2>/dev/null && [ -f "$SRC/echo.c" ]; then
         :
     else
         # 回落至工作树源码
-        mkdir -p "$SRC"
         cp "$REPO_DIR"/src/sw/app/*.h "$REPO_DIR"/src/sw/app/*.c "$SRC/" 2>/dev/null || cp "$REPO_DIR"/sw/app/*.h "$REPO_DIR"/sw/app/*.c "$SRC/"
     fi
     ORIGIN="git $REV ($(git rev-parse --short "$REV" 2>/dev/null || echo 'HEAD'))"
