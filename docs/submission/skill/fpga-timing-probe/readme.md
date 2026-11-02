@@ -20,8 +20,22 @@
 ```bash
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 OOC_TCL=docs/submission/skill/fpga-timing-probe/ooc_probe.tcl
-VIVADO=/tools/Xilinx/Vivado/2022.2/bin/vivado
-"$VIVADO" -version  # 确认输出是 Vivado v2022.2；其他项目须替换并记录实际版本
+# 解析 Vivado：优先 VIVADO / VIVADO_BAT 环境变量，否则在常见安装路径探测。
+# 找不到就明确报错，不留下一个占位路径让命令以 127 静默失败。
+resolve_vivado() {
+  for cand in "${VIVADO:-}" "${VIVADO_BAT:-}" \
+              /tools/Xilinx/Vivado/*/bin/vivado /opt/Xilinx/Vivado/*/bin/vivado \
+              /tools/Xilinx/Vitis/*/bin/vivado /mnt/d/xilinx/*/Vivado/bin/vivado.bat; do
+    [ -n "$cand" ] && [ -x "$cand" ] && { printf '%s\n' "$cand"; return 0; }
+  done
+  return 1
+}
+VIVADO="$(resolve_vivado)" || {
+  echo "fpga-timing-probe: 找不到 Vivado。请设置 VIVADO（或 VIVADO_BAT）指向可执行文件，例如：" >&2
+  echo "  export VIVADO=/path/to/Vivado/2022.2/bin/vivado" >&2
+  exit 127
+}
+"$VIVADO" -version  # 记录实际版本；跨版本比较前先确认 OOC 行为一致
 mkdir -p "logs/vivado/$RUN_ID"
 # 1) BKB220 / XC7Z020：显式指定当前实测器件与 100 MHz，并跑到布线
 SYNTH_PART=xc7z020clg400-2 SYNTH_IMPL=1 SYNTH_TAG="$RUN_ID" \

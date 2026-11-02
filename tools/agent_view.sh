@@ -154,8 +154,9 @@ write_entry() {
   render_view
 }
 
-mkdir -p "$STATE_DIR"
-touch "$HISTORY" "$LOCK"
+# 注意：这里**不**创建 .agent_view/ 与锁文件。show 是纯读路径，
+# 必须在只读环境（只读挂载、提交包快照、只看不写的 agent）里也能跑通；
+# 目录与锁只在真正要写入的子命令里按需创建。
 
 cmd="${1:-}"; shift || true
 agent=""; doing=""; why=""; next=""; status=""; all_done=0
@@ -175,6 +176,8 @@ done
 case "$cmd" in
   start|update|block|done)
     [ -n "$agent" ] || { echo "agent_view: 必须提供 --agent" >&2; exit 2; }
+    mkdir -p "$STATE_DIR"
+    touch "$HISTORY" "$LOCK"
     if [ -z "$status" ]; then
       case "$cmd" in
         start)  status="进行中" ;;
@@ -192,23 +195,27 @@ case "$cmd" in
     # 陈旧标记是渲染时算出来的，而渲染只在有人写看板时发生。
     # 所以「某个 agent 挂了、14 小时没更新」这件事不会自己浮出来——
     # refresh 用来在没有任何写入的情况下重新渲染，让 ⚠️ 标记和时间差刷新。
+    mkdir -p "$STATE_DIR"
+    touch "$HISTORY" "$LOCK"
     exec 9>"$LOCK"; flock 9
     render_view
     exec 9>&-
     echo "view.md 已重新渲染"
     ;;
   show)
+    # 纯读路径：不加锁、不建目录、不重渲染 view.md。
+    # 想看刷新后的看板请显式调用 `refresh`（那才是会写文件的子命令）。
     if [ -n "$agent" ]; then
       f="$STATE_DIR/$(slug "$agent").state"
       [ -f "$f" ] && cat "$f" || echo "（无记录）"
     else
-      exec 9>"$LOCK"; flock 9
-      render_view
-      exec 9>&-
+      [ -d "$STATE_DIR" ] || echo "（看板尚未登记：$STATE_DIR 不存在）"
       [ -f "$VIEW" ] && cat "$VIEW" || echo "（view.md 尚未生成）"
     fi
     ;;
   clear)
+    mkdir -p "$STATE_DIR"
+    touch "$HISTORY" "$LOCK"
     exec 9>"$LOCK"; flock 9
     if [ -n "$agent" ]; then
       rm -f "$STATE_DIR/$(slug "$agent").state"
