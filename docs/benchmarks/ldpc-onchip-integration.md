@@ -75,7 +75,7 @@ L6 的目标是把已验的 p=1 译码器**接进整机数据通路**，并且**
 
 ## 2. 软件侧
 
-新增 [sw/app/ldpc_onchip.c](../../sw/app/ldpc_onchip.c)（201 行）与 `.h`；
+新增 [src/sw/app/ldpc_onchip.c](../../src/sw/app/ldpc_onchip.c)（201 行）与 `.h`；
 `pipeline.h` 加三个状态 `PIPE_LDPC_PREP / _RUN / _READBACK`；
 `stage3_decoder.c` 的收尾由 `PIPE_SEND_RESULT` 改指向 `PIPE_LDPC_PREP`；
 `echo.c` 的完成判定随之由 `PIPE_DONE_STAGE3` 改为 `PIPE_SEND_RESULT`

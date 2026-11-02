@@ -1,8 +1,8 @@
-# 证据台账（Evidence Ledger）
+# 09 · 证据台账 (Evidence Ledger)
 
 > 2026-10-10：本台账保留历史结论及其适用范围，当前事实见03；原16中断审计全文在[合并归档](archive/history/2026/pre-bkb220-handoff-2026-10-10/interrupted-work-audit-2026-09-06.md)。原16的dump/哈希/复核命令仍随全文保留，不能把历史板结果当新板。
 
-> **2026.1 归档与最终交付说明（2026-11-02）**：最终从零重建交付制品与板测依据总表见 [final-status.md](final-status.md)。本台账保留科研演进过程中的全量证据链与适用范围；原 `tools/` 与 `tests/golden/` 路径在最终仓库中对应为 `src/tools/` 与 `sim/golden/`。
+> **2026.1 归档与最终交付说明（2026-11-02）**：最终从零重建交付制品与板测依据总表见 [10-final-status.md](10-final-status.md)。本台账保留科研演进过程中的全量证据链与适用范围；原 `tools/` 与 `tests/golden/` 路径在最终仓库中对应为 `src/tools/` 与 `sim/golden/`。
 
 > **本文不叙述、不解释、不推销**，只做一件事：把每一条**可以对外说的话**
 > 与它的**判据、证据路径、复现命令、边界**钉在一起。

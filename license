@@ -33,7 +33,7 @@ SOFTWARE.
   与再分发许可尚未确认。本项目仅在比赛评审与本地复现范围内使用。
 - `sim/golden/`：由上述数据生成的黄金向量与板测派生文件，随上游数据的
   权利状态而定。
-- `data/test-sets/multimedia/`：42 例测试集；逐资产来源与许可见同目录
+- `data/`：42 组多媒体测试集（`01_*` ~ `21_*`）；逐资产来源与许可见同目录
   `sources.json`（USC-SIPI / ESC-50 / Xiph Derf / 项目合成）。
 - `src/clients/python/resources/dvb_s2_r5_6.pchk`、`permutation64800`：
   对应 DVB-S2 标准的校验矩阵与交织表，具体文件来源尚待补充。
@@ -41,6 +41,6 @@ SOFTWARE.
 - `build/artifact/`、`build/software-export/` 以及任何由 AMD/Xilinx 工具生成的
   IP、BSP、FSBL、BOOT、bit、XSA、ELF：条款随上游工具与 IP。
 
-逐项说明与未决项见 `report/third-party-notices.md`。
+逐项说明与未决项见 `docs/submission/third-party-notices.md`。
 
 若本项目的下游使用者需要把这些第三方素材一并再分发，请自行取得对应授权。

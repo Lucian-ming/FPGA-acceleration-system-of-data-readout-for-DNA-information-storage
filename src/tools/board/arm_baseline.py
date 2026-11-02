@@ -42,7 +42,13 @@ import sys
 import zipfile
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent.parent
+def _find_repo_root(p: Path) -> Path:
+    for parent in [p] + list(p.parents):
+        if (parent / "readme.md").exists() and (parent / "src").is_dir():
+            return parent
+    return p.parents[3]
+
+REPO = _find_repo_root(Path(__file__).resolve())
 sys.path.insert(0, str(REPO / "tools"))
 import golden_model as g  # noqa: E402
 

@@ -14,13 +14,12 @@
 | `srpe_batch_pway_dbuf_proto.v` | 双 bank 周期级原型：独立装载/扫描/发放 FSM，Port B 仲裁；**未打包** | **保留**：LC50 双缓冲实验对象；无自动入口（未接 tools/run_sim.sh 常规回归），但 docs/03-status.md 保留直接 Icarus 命令；本轮验证跨批次 bank 生命周期、元数据顺序与 res_full 背压；正式 LC50 测量与整机 route 待 main 完成 |
 | `vivado_quick_sim.tcl` | 2026-10-12 由 Dna_accelerator_core_1_0 的 hdl/ 目录移入。它是 Vivado batch **仿真脚本**，不是可综合 HDL；全库零活动调用点，也不在 component.xml 源集里 | **保留**：无自动入口（全库零活动调用点）；不满足退休三条中任何一条——未被实测证伪、无逐字节重复件、其功能（一键跑 quick sim）未被任何受回归覆盖的文件取代。移入依据是 AGENTS.md 代码卫生 §2「IP 打包目录只放会被综合的文件」 |
 | `ldpc_row_engine_probe.v` | p=1 LDPC 行引擎 OOC 探针，含 600×14 同步 ROM 地址候选转换、LLR/累加器 BRAM 与饱和消息写回；未打包 | **保留**：用于 XC7Z020 100 MHz 资源/时序摸底；ROM 内容是非真实 B_t 的仿射占位（仅为避免被综合折叠），整体不是完整译码器 |
-| `tb_ldpc_decoder_p1.v` | 通过 summary.tsv 选择黄金样本，加载输入字节并检查收敛状态、轮数和完整码字 | **保留**：Icarus 仿真 testbench，覆盖 packbits 大端位序、完整码字逐位比较和合法码字 0 轮返回 |
+| `tb_srpe_batch_pway_dbuf_proto.v` | 原型双缓冲测试台，仿真 `srpe_batch_pway_dbuf_proto.v` | **保留**：历史探索原型测试台，与原型 RTL 一并归档在此 |
 
-## 已迁出（2026-10-14）
+## 已迁出（2026-10-14 / 2026-11-02）
 
-`ldpc_decoder_p1.v` 已移入 IP 目录 `hw/ip/ldpc_decoder_1_0/hdl/`：它已打包成 AXI IP 进比特流，
-**权威副本随 IP 走**，实验目录不再保留重复件（门禁 A1「无重复 SHA 文件」）。
-其 testbench 仍在本目录（`tb_ldpc_decoder_p1.v`），仿真时引用 IP 里的那份 RTL。
+- `ldpc_decoder_p1.v` 已移入 IP 目录 `src/hw/ip/ldpc_decoder_1_0/hdl/`：它已打包成 AXI IP 进比特流，**权威副本随 IP 走**，实验目录不再保留重复件（门禁 A1「无重复 SHA 文件」）。
+- `tb_ldpc_decoder_p1.v` 已统一归入活跃仿真套件 `sim/rtl/tb_ldpc_decoder_p1.v`，实验目录不再保留冗余副本。
 
 ## 历史退休记录（2026-09-11，docs/05 §B2）
 

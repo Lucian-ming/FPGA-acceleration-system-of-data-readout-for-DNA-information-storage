@@ -15,9 +15,16 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+import os
 
-REPO = Path(__file__).resolve().parent.parent
-VITIS_ROOT = Path("/tools/Xilinx/Vitis/2022.2")
+def _find_repo_root(p: Path) -> Path:
+    for parent in [p] + list(p.parents):
+        if (parent / "readme.md").exists() and (parent / "src").is_dir():
+            return parent
+    return p.parents[2]
+
+REPO = _find_repo_root(Path(__file__).resolve())
+VITIS_ROOT = Path(os.environ.get("XILINX_VITIS", "/tools/Xilinx/Vitis/2022.2"))
 TOOLBIN = VITIS_ROOT / "gnu/aarch32/lin/gcc-arm-none-eabi/bin"
 XSCT = VITIS_ROOT / "bin/xsct"
 BOOTGEN = VITIS_ROOT / "bin/bootgen"

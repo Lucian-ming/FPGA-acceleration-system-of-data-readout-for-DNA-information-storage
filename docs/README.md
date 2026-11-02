@@ -33,7 +33,7 @@
 为保证学术严谨性与加速比基线可溯源，开发过程中的对比实验源码原样留存在 `docs/history/`：
 
 - **[bench-arm/](history/bench-arm/)**：ARM Cortex-A9 裸机 CPU 对齐基准源码（报告 §10 加速比分母依据）；
-- **[bench-cpu-server/](history/bench-cpu-server/)**：48 核 Intel Xeon 5220R 服务器 CPU 基线实测数据与分析；
+- **[server-baseline-2026-10-20/](benchmarks/server-baseline-2026-10-20/)**：48 核 Intel Xeon 5220R 服务器 CPU 基线实测数据与分析；
 - **[bench-cpu-tools/](history/bench-cpu-tools/)**：开发期 CPU 比对工具（`align.c`、`run_cpu_benchmark.py` 等）；
 - **[experimental-hw/](history/experimental-hw/)**：6 个硬件探索原型（`srpe_batch_pway.v` 等探索阶段 RTL）；
 - **[milestones/](history/milestones/)**：阶段性验证脚本（`m2_chain.py`、`run_m3_bd.sh` 等）；

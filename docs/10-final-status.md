@@ -1,4 +1,4 @@
-# 最终状态与归档总表 (Final Status & Evidence Ledger)
+# 10 · 最终状态与归档总表 (Final Status & Evidence Ledger)
 
 > **发布日期**：2026-11-02  
 > **项目状态**：比赛已全部结束，全库归档冻结于标签 `final-2026-11`。  
@@ -121,6 +121,6 @@
      - `D:\submitwork\`：核心底稿已 100% 完整迁移至 `report/`、`poster/`、`archive/submission-2026/` 及 `archive/history-windows/submitwork/`；
      - `C:\Users\Lucian\AppData\Local\Temp\rpq\`：已清理；
    - **已清理的 WSL 临时目录**：`/tmp/photo12/`、`/tmp/refsearch/`、`/tmp/pkgfix-bak/`、`/tmp/rp/` 全部清理完毕；
-   - **安全边界审计**：`E:\桌面\微电子学院24级本科新生分班名单.xls` 及任何非本项目文件绝对未触碰；
-   - **权威原件保留**：`D:\dna-readout-accelerator\` 与 `D:\dna-readout-accelerator.rar` 仍完好留存 D 盘根目录（WSL 内部已全量镜像）。
+   - **安全边界审计**：宿主机桌面非本项目文件及系统个人资料绝对未触碰；
+   - **Windows 侧收敛完毕**：所有 Windows 侧原件及提交包均已安全清理，全量资产统一收归 WSL 项目库并建立 Git 冻结与 Release 备份。
 

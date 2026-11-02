@@ -249,9 +249,11 @@ fi
 # --- 8. sw/app 与 sw/workspace 同名文件必须逐字节相同 -------------------------
 # 2026-09-11 新增（docs/05 的清理分类与门禁）。sw/app 是唯一权威源，sw/workspace 是其生成副本。
 WS_APP="sw/workspace/dna_lwip_app_b27/src"
+APP_DIR="src/sw/app"
+[[ -d "$APP_DIR" ]] || APP_DIR="sw/app"
 if [[ -d "$WS_APP" ]]; then
     WS_DIFF=""
-    for app_f in sw/app/*; do
+    for app_f in "$APP_DIR"/*; do
         [[ -f "$app_f" ]] || continue
         bn="$(basename "$app_f")"
         ws_f="$WS_APP/$bn"
@@ -262,10 +264,10 @@ if [[ -d "$WS_APP" ]]; then
         fi
     done
     if [[ -n "$WS_DIFF" ]]; then
-        bad "sw/app/ 与 $WS_APP/ 存在不一致的文件：$WS_DIFF"
-        info "sw/app 是权威源，禁止直接编辑 workspace；重新同步或由 create_vitis.tcl 生成"
+        bad "$APP_DIR/ 与 $WS_APP/ 存在不一致的文件：$WS_DIFF"
+        info "$APP_DIR 是权威源，禁止直接编辑 workspace；重新同步或由 create_vitis.tcl 生成"
     else
-        ok "sw/app/ 与 workspace 同名文件逐字节相同"
+        ok "$APP_DIR/ 与 workspace 同名文件逐字节相同"
     fi
 else
     skip "sw/app 与 workspace 一致性：无 sw/workspace/ 目录，本项无输入可查"
@@ -274,8 +276,10 @@ fi
 # --- 9. tools/attic/ 下脚本必须登记进 tools/README.md -------------------------
 # 2026-09-11 新增（docs/05 的清理分类与门禁）。退役脚本也须在 README 单列一节说明原用途与归档原因。
 UNDOC_ATTIC=""
-if [[ -d "tools/attic" ]]; then
-    for f in tools/attic/*.py tools/attic/*.sh; do
+ATTIC_DIR="tools/attic"
+[[ -d "src/tools/attic" ]] && ATTIC_DIR="src/tools/attic"
+if [[ -d "$ATTIC_DIR" ]] && compgen -G "$ATTIC_DIR/*" > /dev/null; then
+    for f in "$ATTIC_DIR"/*.py "$ATTIC_DIR"/*.sh; do
         [[ -f "$f" ]] || continue
         if ! readme_registers_tool "$f"; then
             # Attic 表登记为指向归档源码的 Markdown 链接；检查链接所在表格行。
@@ -302,13 +306,13 @@ if [[ -d "tools/attic" ]]; then
         fi
     done
 fi
-if [[ ! -d tools/attic ]]; then
-    skip "attic 脚本登记：无 tools/attic/ 目录，本项无输入可查"
+if [[ ! -d "$ATTIC_DIR" ]] || ! compgen -G "$ATTIC_DIR/*" > /dev/null; then
+    skip "attic 脚本登记：无 $ATTIC_DIR/ 目录或为空，本项无输入可查"
 elif [[ -n "$UNDOC_ATTIC" ]]; then
     bad "未登记进 tools/README.md 的 attic 脚本：$UNDOC_ATTIC"
     info "退役工具也须在 tools/README.md 单列一节说明原用途与为何归档"
 else
-    ok "tools/attic/ 下脚本均已登记进 README"
+    ok "$ATTIC_DIR/ 下脚本均已登记进 README"
 fi
 
 # --- 10. hw/experimental/README.md 当前内容表必须与目录实际文件一一对应 ------
@@ -316,14 +320,16 @@ fi
 EXP_TABLE_FILES=()
 EXP_ACTUAL_FILES=()
 EXP_MISMATCH=""
+EXP_DIR="hw/experimental"
+[[ -d "docs/history/experimental-hw" ]] && EXP_DIR="docs/history/experimental-hw"
 
-if [[ -f "hw/experimental/README.md" ]]; then
+if [[ -f "$EXP_DIR/README.md" ]]; then
     while IFS= read -r f; do
         [[ -n "$f" ]] && EXP_TABLE_FILES+=("$f")
-    done < <(awk '/^## 当前内容/{flag=1; next} /^## /{flag=0} flag' hw/experimental/README.md | grep -oE '`[^`]+`' | tr -d '`')
+    done < <(awk '/^## 当前内容/{flag=1; next} /^## /{flag=0} flag' "$EXP_DIR/README.md" | grep -oE '`[^`]+`' | tr -d '`')
 fi
 
-for p in hw/experimental/*; do
+for p in "$EXP_DIR"/*; do
     [[ -e "$p" ]] || continue
     bn="$(basename "$p")"
     [[ "$bn" == "README.md" ]] && continue
@@ -350,13 +356,13 @@ for tf in "${EXP_TABLE_FILES[@]}"; do
     fi
 done
 
-if [[ ! -d hw/experimental ]]; then
-    skip "hw/experimental 表与目录一致性：无 hw/experimental/ 目录，本项无输入可查"
+if [[ ! -d "$EXP_DIR" ]]; then
+    skip "$EXP_DIR 表与目录一致性：无 $EXP_DIR/ 目录，本项无输入可查"
 elif [[ -n "$EXP_MISMATCH" ]]; then
-    bad "hw/experimental/ 实际文件与 README.md「当前内容」表不一致：$EXP_MISMATCH"
+    bad "$EXP_DIR/ 实际文件与 README.md「当前内容」表不一致：$EXP_MISMATCH"
     info "表与目录不一致本身就是卫生缺陷；增删实验文件须同步维护 README.md 表"
 else
-    ok "hw/experimental/README.md「当前内容」表与目录实际文件一致"
+    ok "$EXP_DIR/README.md「当前内容」表与目录实际文件一致"
 fi
 
 # --- 11. 仓库内不得存在两份 SHA-256 相同的已跟踪文件 --------------------------
